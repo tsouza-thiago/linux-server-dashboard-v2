@@ -5,14 +5,14 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <meta name="color-scheme" content="light dark">
   <title>Linux Server Dashboard</title>
-  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='7' fill='%233b82f6'/%3E%3Cpath d='M9 16h4l2-5 4 10 2-5h2' stroke='white' stroke-width='2.4' fill='none' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E">
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='6' fill='%23D68A3C'/%3E%3Cpath d='M9 16h4l2-5 4 10 2-5h2' stroke='white' stroke-width='2.4' fill='none' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E">
   <link rel="stylesheet" href="style.css">
 </head>
 <body>
   <div class="app">
-    <aside class="sidebar">
+    <aside class="sidebar" id="sidebar" aria-label="Barra lateral">
       <div class="brand">
-        <span class="dot" id="statusDot" role="status" aria-label="Status do servidor"></span>
+        <span class="status-pill"><span class="dot" id="statusDot" role="status" aria-label="Status do servidor"></span><span class="status-text" id="statusText">offline</span></span>
         <div class="brand-text">
           <h1>Dashboard</h1>
           <span class="subtitle" id="osLabel">—</span>
@@ -72,10 +72,14 @@
         </button>
       </div>
     </aside>
+    <button class="nav-scrim" id="navScrim" aria-label="Fechar navegação" tabindex="-1"></button>
 
     <div class="main">
       <header class="topbar">
         <div class="topbar-left">
+          <button id="navToggle" class="btn-icon nav-toggle" aria-label="Abrir navegação" aria-expanded="false" aria-controls="sidebar">
+            <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="18" x2="21" y2="18"/></svg>
+          </button>
           <h2 id="viewTitle">Visão Geral</h2>
           <span class="subtitle" id="hostLabel">—</span>
         </div>
@@ -199,7 +203,7 @@
             <div class="toolbar">
               <input type="search" id="procSearch" placeholder="Buscar por comando ou usuário…" aria-label="Buscar processos">
             </div>
-            <table id="procsTable">
+            <div class="table-wrap"><table id="procsTable">
               <thead><tr>
                 <th data-key="pid">PID</th>
                 <th data-key="user">Usuário</th>
@@ -208,7 +212,7 @@
                 <th data-key="cmd">Comando</th>
               </tr></thead>
               <tbody></tbody>
-            </table>
+            </table></div>
           </div>
         </section>
 
@@ -240,6 +244,7 @@
           <div class="grid-2">
             <div class="panel">
               <h2>Índice de saúde</h2>
+              <div class="health-hero"><span id="healthHeroScore">—</span><span class="health-hero-note" id="healthHeroNote">calculando…</span></div>
               <div id="healthBreakdown"></div>
             </div>
             <div class="panel">
@@ -249,17 +254,17 @@
           </div>
           <div class="panel wide">
             <h2>ETA — discos cheios</h2>
-            <table id="etaTable">
+            <div class="table-wrap"><table id="etaTable">
               <thead><tr><th>Mount</th><th>Usado</th><th>Crescimento/dia</th><th>Previsão de lotação</th><th>Amostras</th></tr></thead>
               <tbody></tbody>
-            </table>
+            </table></div>
           </div>
           <div class="panel wide">
             <h2>Resumo diário <span class="hint">min / máx / média no período</span></h2>
-            <table id="dailyTable">
+            <div class="table-wrap"><table id="dailyTable">
               <thead><tr><th>Dia</th><th>Load 1m</th><th>RAM %</th><th>Temp °C</th><th>Rx máx Mbps</th><th>Tx máx Mbps</th></tr></thead>
               <tbody></tbody>
-            </table>
+            </table></div>
           </div>
           <div class="panel wide">
             <h2>Outages (indisponibilidade)</h2>
@@ -270,10 +275,10 @@
         <section id="view-historico" class="view">
           <div class="panel wide">
             <h2>Histórico de amostras <span class="hint" id="historyHint">—</span></h2>
-            <table id="historyTable">
+            <div class="table-wrap"><table id="historyTable">
               <thead><tr><th>Data/hora</th><th>Load 1m</th><th>RAM %</th><th>Temp</th><th>Rx Mbps</th><th>Tx Mbps</th><th>Discos</th></tr></thead>
               <tbody></tbody>
-            </table>
+            </table></div>
           </div>
         </section>
 

@@ -18,3 +18,8 @@ id_ed25519*
 .idea/
 *.bak
 *.orig
+
+# Documentos internos de planejamento — nunca versionar
+UI_DESIGN_SYSTEM.md
+UI_RESTYLE_PROMPT.md
+PROMPT_DOCUMENTAR_E_PUBLICAR.md

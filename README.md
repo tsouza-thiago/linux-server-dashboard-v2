@@ -525,7 +525,8 @@ linux-server-dashboard/
 ├── test-support/           (helpers de teste: VM p/ frontend, request HTTP)
 └── public/
     ├── index.html          (dashboard PT-BR, temas claro/escuro, sidebar multi-view)
-    ├── style.css
+    ├── style.css           (visual: paleta de console de operação, tipografia sans/mono, responsivo)
+    ├── fonts/              (Inter + JetBrains Mono self-hosted, .woff2 — sem CDN)
     └── js/
         ├── main.js         (orquestração: SSE, refresh, ações, modais, token, tema)
         ├── router.js       (navegação por hash entre as views)
@@ -545,7 +546,7 @@ linux-server-dashboard/
 - "Host não permitido (403)"? Abra por `http://localhost:3000` ou `http://127.0.0.1:3000`
   — outros endereços são bloqueados de propósito.
 
-### "Servidor inacessível" (dot vermelho)
+### "Servidor inacessível" (indicador offline)
 1. `ping -c 3 seu-host`
 2. `ssh seu-host 'uptime'`
 3. Se voltou, o painel se recupera sozinho no próximo minuto (ou clique em **Coletar agora**).

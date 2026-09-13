@@ -254,7 +254,8 @@ linux-server-dashboard/
 ├── test-support/           (helpers de teste: VM p/ frontend, request HTTP)
 └── public/
     ├── index.html          (dashboard PT-BR, temas claro/escuro, sidebar multi-view + Ajuda/Anotações)
-    ├── style.css           (layout app corporativo, responsivo, CSS variables por tema)
+    ├── style.css           (temas claro/escuro com paleta de console de operação, tipografia dupla sans/mono, tokens em CSS variables)
+    ├── fonts/              (Inter + JetBrains Mono self-hosted, .woff2 — sem CDN)
     └── js/
         ├── main.js         (orquestração: SSE, refresh por período, ações, modais, token, tema)
         ├── router.js       (navegação por hash entre as views)

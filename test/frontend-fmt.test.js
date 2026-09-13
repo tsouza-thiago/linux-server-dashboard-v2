@@ -31,11 +31,11 @@ test('fmt.time e timeDate', () => {
   assert.equal(F.timeDate(null), '—');
 });
 
-test('fmt.pctColor limiares', () => {
-  assert.equal(F.pctColor(95), '#e5484d');
-  assert.equal(F.pctColor(90), '#e5484d');
-  assert.equal(F.pctColor(60), '#f5a524');
-  assert.equal(F.pctColor(10), '#3b82f6');
+test('fmt.pctColor limiares (tokens DS §2)', () => {
+  assert.equal(F.pctColor(95), '#E2604F');
+  assert.equal(F.pctColor(90), '#E2604F');
+  assert.equal(F.pctColor(60), '#D6A23C');
+  assert.equal(F.pctColor(10), '#3FA6A0');
 });
 
 test('fmt.days formata previsões', () => {

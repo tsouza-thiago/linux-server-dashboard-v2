@@ -118,6 +118,8 @@ Desenhado para não tocar em nada além de leitura no servidor monitorado:
   contém apenas código e modelos com placeholders.
 - **Permissões restritas** — `data/` (0700) e arquivos sensíveis (0600).
 - **Zero agentes no servidor** — não há daemon, serviço ou script persistente instalado nele.
+- **Fontes self-hosted** — Inter + JetBrains Mono servidos de `public/fonts/` (`.woff2`),
+  sem carregar nada de CDN externo (coerente com `font-src 'self'` do CSP).
 
 ---
 

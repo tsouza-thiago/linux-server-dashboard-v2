@@ -425,7 +425,7 @@ serviços com selo verde (ativo) ou vermelho (parado).
 - Se aparecer **"Host não permitido (403)"**: abra por `http://localhost:3000`
   (outros endereços são bloqueados de propósito).
 
-### "Servidor inacessível" (dot vermelho, banner de alerta)
+### "Servidor inacessível" (indicador offline, banner de alerta)
 
 1. O servidor está ligado? `ping -c 3 192.0.2.10`
 2. O SSH responde? `ssh seu-host 'uptime'`

@@ -35,6 +35,9 @@ window.Dash = window.Dash || {};
 
   function toggleTheme() {
     applyTheme(Dash.theme === 'dark' ? 'light' : 'dark');
+    try {
+      if (Dash.charts && typeof Dash.charts.retheme === 'function') Dash.charts.retheme();
+    } catch { /* noop */ }
   }
 
   function getToken() {
@@ -72,6 +75,8 @@ window.Dash = window.Dash || {};
     const meta = payload.meta || {};
     const online = !!meta.online;
     $('statusDot').className = `dot ${online ? 'dot-online' : 'dot-offline'}`;
+    const st = $('statusText');
+    if (st) st.textContent = online ? 'online' : 'offline';
     $('lastPollAt').textContent = Dash.fmt.time(meta.lastPollAt) + (meta.lastError ? ` · ${meta.lastError}` : '');
     Dash.nextPollAt = meta.nextPollAt ? Date.parse(meta.nextPollAt) : null;
     if (payload.sample && payload.sample.os && payload.sample.os.name) {
@@ -245,7 +250,33 @@ window.Dash = window.Dash || {};
     es.onerror = () => { $('statusDot').className = 'dot dot-offline'; };
   }
 
+  function setNavOpen(open) {
+    const btn = $('navToggle');
+    if (btn) {
+      if (typeof btn.setAttribute === 'function') {
+        btn.setAttribute('aria-expanded', open ? 'true' : 'false');
+        btn.setAttribute('aria-label', open ? 'Fechar navegação' : 'Abrir navegação');
+      } else {
+        btn['aria-expanded'] = open ? 'true' : 'false';
+      }
+    }
+    try {
+      document.documentElement.classList.toggle('nav-open', !!open);
+    } catch { /* noop */ }
+  }
+
   function wireUI() {
+    const navToggle = $('navToggle');
+    if (navToggle) navToggle.addEventListener('click', () => {
+      let open = false;
+      try { open = document.documentElement.classList.contains('nav-open'); } catch { /* noop */ }
+      setNavOpen(!open);
+    });
+    const navScrim = $('navScrim');
+    if (navScrim) navScrim.addEventListener('click', () => setNavOpen(false));
+    try {
+      document.querySelectorAll('.nav-item').forEach((a) => a.addEventListener('click', () => setNavOpen(false)));
+    } catch { /* noop */ }
     $('pollBtn').addEventListener('click', async () => {
       $('pollBtn').disabled = true;
       try {

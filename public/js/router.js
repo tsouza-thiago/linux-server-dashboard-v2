@@ -24,7 +24,16 @@ Dash.router = {
     document.querySelectorAll('.view').forEach((v) => v.classList.remove('active'));
     const el = document.getElementById('view-' + view);
     if (el) el.classList.add('active');
-    document.querySelectorAll('.nav-item').forEach((a) => a.classList.toggle('active', a.dataset.view === view));
+    document.querySelectorAll('.nav-item').forEach((a) => {
+      const on = a.dataset.view === view;
+      a.classList.toggle('active', on);
+      try {
+        if (typeof a.setAttribute === 'function' && typeof a.removeAttribute === 'function') {
+          if (on) a.setAttribute('aria-current', 'page');
+          else a.removeAttribute('aria-current');
+        }
+      } catch { /* noop */ }
+    });
     const title = document.getElementById('viewTitle');
     if (title) title.textContent = this.TITLES[view];
     Dash.charts.resize();

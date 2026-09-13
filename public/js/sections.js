@@ -26,9 +26,9 @@ Dash.fmt = {
     return new Date(iso).toLocaleString('pt-BR', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit', hour12: false });
   },
   pctColor(p) {
-    if (p >= 90) return '#e5484d';
-    if (p >= 60) return '#f5a524';
-    return '#3b82f6';
+    if (p >= 90) return '#E2604F';
+    if (p >= 60) return '#D6A23C';
+    return '#3FA6A0';
   },
   days(days) {
     if (days === null || days === undefined) return '—';
@@ -61,14 +61,33 @@ function smartOf(sample, mount) {
   return devMatch || {};
 }
 
+/* Pisca uma vez o elemento atualizado via SSE (DS §8); noop em testes/headless */
+function flash(el) {
+  if (!el || !el.classList) return;
+  try {
+    el.classList.remove('flash');
+    void el.offsetWidth;
+    el.classList.add('flash');
+    setTimeout(() => { try { el.classList.remove('flash'); } catch { /* noop */ } }, 700);
+  } catch { /* noop */ }
+}
+
 Dash.sections = {
   health(latest) {
     const { score, level, parts } = Dash.analysis.healthScore(latest, Dash.alerts.active);
-    const color = level === 'ok' ? '#22c55e' : level === 'warn' ? '#f5a524' : '#e5484d';
-    $('healthRing').style.background = `conic-gradient(${color} ${score * 3.6}deg, var(--panel3) 0deg)`;
+    const color = level === 'ok' ? '#4FA98A' : level === 'warn' ? '#D6A23C' : '#E2604F';
+    $('healthRing').style.background = `conic-gradient(${color} ${score * 3.6}deg, var(--bg-surface-2) 0deg)`;
     $('healthScore').textContent = score;
     $('healthScore').style.color = color;
     $('healthNote').textContent = level === 'ok' ? 'saudável' : level === 'warn' ? 'atenção' : 'crítico';
+    flash($('healthBox'));
+    const hero = $('healthHeroScore');
+    if (hero) {
+      hero.textContent = score;
+      hero.style.color = color;
+      const heroNote = $('healthHeroNote');
+      if (heroNote) heroNote.textContent = level === 'ok' ? 'saudável' : level === 'warn' ? 'atenção' : 'crítico';
+    }
     const el = $('healthBreakdown');
     if (el) {
       el.innerHTML = parts.length
@@ -110,7 +129,7 @@ Dash.sections = {
     $('load15').textContent = load.length > 2 ? load[2].toFixed(2) : '—';
     const load1 = load.length ? load[0] : 0;
     const loadPct = Math.min(load1 * (100 / (latest.cores || 1)), 100);
-    setBar($('loadBar'), loadPct, loadPct > 90 ? '#e5484d' : '#3b82f6');
+    setBar($('loadBar'), loadPct, loadPct >= 90 ? '#E2604F' : '#3FA6A0');
     $('loadNote').textContent = `núcleos: ${latest.cores || 1} · ${load1 >= (latest.cores || 1) ? 'sobrecarga' : 'ok'}`;
 
     const r = latest.ram;
@@ -236,12 +255,12 @@ Dash.sections = {
     });
     tbody.innerHTML = '';
     if (!list.length) {
-      tbody.innerHTML = '<tr><td colspan="5" style="color:var(--dim)">nenhum processo encontrado</td></tr>';
+      tbody.innerHTML = '<tr><td colspan="5" style="color:var(--text-secondary)">nenhum processo encontrado</td></tr>';
       return;
     }
     for (const p of list) {
       const tr = document.createElement('tr');
-      tr.innerHTML = `<td>${p.pid}</td><td>${Dash.fmt.esc(p.user)}</td><td>${p.cpu.toFixed(1)}</td><td>${p.mem.toFixed(1)}</td><td class="mono">${Dash.fmt.esc(p.cmd)}</td>`;
+      tr.innerHTML = `<td class="num">${p.pid}</td><td>${Dash.fmt.esc(p.user)}</td><td class="num">${p.cpu.toFixed(1)}</td><td class="num">${p.mem.toFixed(1)}</td><td class="mono">${Dash.fmt.esc(p.cmd)}</td>`;
       tbody.appendChild(tr);
     }
     const heads = $('procsTable').querySelectorAll('th');
@@ -256,13 +275,15 @@ Dash.sections = {
     const el = $('alertsList');
     el.innerHTML = '';
     if (!list.length) {
-      el.innerHTML = '<div class="alert-item"><span class="alert-msg" style="color:var(--dim)">nenhum alerta neste filtro</span></div>';
+      el.innerHTML = '<div class="empty">Nenhum alerta neste filtro — ajuste o filtro acima ou aguarde a próxima coleta.</div>';
       return;
     }
     for (const a of list) {
       const div = document.createElement('div');
-      div.className = `alert-item ${a.status === 'resolved' ? 'resolved' : ''}`;
+      div.className = `alert-item alert-${a.level === 'critical' ? 'critical' : 'warning'}${a.status === 'resolved' ? ' resolved' : ''}`;
+      const icon = a.level === 'critical' ? '●' : '▲';
       div.innerHTML = `
+        <span class="alert-level" aria-hidden="true">${icon}</span>
         <span class="badge ${a.level === 'critical' ? 'badge-bad' : 'badge-warn'}">${a.level}</span>
         <span class="alert-msg"><b>${Dash.fmt.esc(a.message)}</b><br><span class="alert-time">${Dash.fmt.timeDate(a.ts)} · ${a.status}${a.resolvedAt ? ` · resolvido em ${Dash.fmt.timeDate(a.resolvedAt)}` : ''}</span></span>
         <span class="alert-actions">
@@ -328,7 +349,7 @@ Dash.sections = {
         <td>${e.growthPerDayGB >= 0.001 ? `+${e.growthPerDayGB.toFixed(1)} GB/dia` : 'estável'}</td>
         <td>${e.daysToFull !== null ? `<span class="badge ${e.daysToFull < 90 ? 'badge-warn' : 'badge-neutral'}">${Dash.fmt.days(e.daysToFull)}</span>` : '<span class="badge badge-ok">não estimável</span>'}</td>
         <td>${e.samples}</td>
-      </tr>`).join('') : '<tr><td colspan="5" style="color:var(--dim)">precisa de ≥10 amostras no período para estimar</td></tr>';
+      </tr>`).join('') : '<tr><td colspan="5" style="color:var(--text-secondary)">precisa de ≥10 amostras no período para estimar</td></tr>';
 
     const dt = $('dailyTable').querySelector('tbody');
     dt.innerHTML = daily.map((d) => `
@@ -339,7 +360,7 @@ Dash.sections = {
         <td>${d.temp ? `${d.temp.min.toFixed(0)} / ${d.temp.max.toFixed(0)} / ${d.temp.avg.toFixed(0)}°C` : '—'}</td>
         <td>${d.rx ? d.rx.max.toFixed(2) : '—'}</td>
         <td>${d.tx ? d.tx.max.toFixed(2) : '—'}</td>
-      </tr>`).join('') || '<tr><td colspan="6" style="color:var(--dim)">sem dados no período</td></tr>';
+      </tr>`).join('') || '<tr><td colspan="6" style="color:var(--text-secondary)">sem dados no período</td></tr>';
 
     const ol = $('outagesList');
     ol.innerHTML = outages.length ? outages.map((o) => `
@@ -361,15 +382,15 @@ Dash.sections = {
       const disks = (s.disks || []).map((d) => `${Dash.fmt.esc(d.mount)} ${d.pct}%`).join(' · ');
       const ramPct = s.ram && s.ram.total ? ((s.ram.used / s.ram.total) * 100).toFixed(0) : '—';
       return `<tr>
-        <td>${Dash.fmt.timeDate(s.ts)}</td>
-        <td>${s.load ? s.load[0].toFixed(2) : '—'}</td>
-        <td>${ramPct}%</td>
-        <td>${s.tempC !== null && s.tempC !== undefined ? s.tempC.toFixed(0) + '°C' : '—'}</td>
-        <td>${s.net ? s.net.rxMbps.toFixed(2) : '—'}</td>
-        <td>${s.net ? s.net.txMbps.toFixed(2) : '—'}</td>
+        <td class="mono">${Dash.fmt.timeDate(s.ts)}</td>
+        <td class="num">${s.load ? s.load[0].toFixed(2) : '—'}</td>
+        <td class="num">${ramPct}%</td>
+        <td class="num">${s.tempC !== null && s.tempC !== undefined ? s.tempC.toFixed(0) + '°C' : '—'}</td>
+        <td class="num">${s.net ? s.net.rxMbps.toFixed(2) : '—'}</td>
+        <td class="num">${s.net ? s.net.txMbps.toFixed(2) : '—'}</td>
         <td class="mono">${disks}</td>
       </tr>`;
-    }).join('') || '<tr><td colspan="7" style="color:var(--dim)">sem amostras no período</td></tr>';
+    }).join('') || '<tr><td colspan="7" style="color:var(--text-secondary)">sem amostras no período</td></tr>';
   },
 
   ioDevTabs() {
