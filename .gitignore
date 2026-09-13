@@ -23,3 +23,6 @@ id_ed25519*
 UI_DESIGN_SYSTEM.md
 UI_RESTYLE_PROMPT.md
 PROMPT_DOCUMENTAR_E_PUBLICAR.md
+
+# Automação local do agente — não versionar
+.github/
