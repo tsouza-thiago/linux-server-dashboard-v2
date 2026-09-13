@@ -70,7 +70,19 @@ function runSSH(host, timeoutMs = 45000) {
   });
 }
 
-export function parseOutput(stdout, ts) {
+/**
+ * Interpreta a saída do comando SSH único e monta a amostra JSON.
+ * @param {string} stdout saída bruta do SSH (seções `===X===`)
+ * @param {string} ts timestamp ISO da coleta
+ * @param {object} [opts] overrides p/ isolamento de ambiente nos testes
+ * @param {string[]} [opts.svcOrder] ordem dos serviços (default: SVC_ORDER do .env/SERVICES)
+ * @param {Set<string>} [opts.devSet] dispositivos de IO aceitos (default: DEV_SET do .env/DISK_DEVS)
+ * `collect()` usa o default (config global); testes passam valores explícitos
+ * (mesmo padrão de `buildCommand(overrides)`).
+ */
+export function parseOutput(stdout, ts, opts = {}) {
+  const svcOrder = opts.svcOrder ?? SVC_ORDER;
+  const devSet = opts.devSet ?? DEV_SET;
   const sample = {
     ts,
     host: '',
@@ -176,7 +188,7 @@ export function parseOutput(stdout, ts) {
       }
       case 'IO': {
         const parts = line.trim().split(/\s+/);
-        if (parts.length >= 11 && (DEV_SET.size === 0 || DEV_SET.has(parts[2]))) {
+        if (parts.length >= 11 && (devSet.size === 0 || devSet.has(parts[2]))) {
           sample.io.push({
             dev: parts[2],
             sectorsRead: parseInt(parts[5], 10) || 0,
@@ -196,8 +208,8 @@ export function parseOutput(stdout, ts) {
         break;
       }
       case 'SERVICES': {
-        if (svcIdx < SVC_ORDER.length) {
-          sample.services[SVC_ORDER[svcIdx++]] = line.trim();
+        if (svcIdx < svcOrder.length) {
+          sample.services[svcOrder[svcIdx++]] = line.trim();
         }
         break;
       }

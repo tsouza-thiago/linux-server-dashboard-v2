@@ -492,7 +492,10 @@ de alertas (incluindo dedupe do alerta offline), sanitização de configuração
 anti-injeção de `NET_IF` e do host SSH), validação de `Host`/CSRF/token (com cookie
 `dash_csrf` e comparação a prova de timing), rate limit, error handler sem stack trace,
 escrita atômica assíncrona do histórico, guards de renderização do frontend,
-renderização de anotações e o toggle de tema claro/escuro.
+renderização de anotações e o toggle de tema claro/escuro. O parse do poller tem
+isolamento de ambiente (`parseOutput(..., { svcOrder, devSet })`, mesmo padrão de
+`buildCommand(overrides)`), de modo que o teste da amostra realista não depende
+do `SERVICES`/`DISK_DEVS` do `.env` local.
 
 ---
 
@@ -518,7 +521,7 @@ linux-server-dashboard/
 │   ├── config.js           (parser único do .env, validações, sanitização)
 │   ├── security.js         (Host check, CSRF c/ cookie, headers, token timing-safe, rate limit)
 │   ├── csv.js              (export CSV com escape anti-fórmula)
-│   ├── poller.js           (comando SSH, parse, taxas de rede/I/O, alertas)
+│   ├── poller.js           (comando SSH, parse com overrides p/ teste, taxas de rede/I/O, alertas)
 │   ├── history.js          (buffer em memória + persistência JSON atômica assíncrona)
 │   └── stores.js           (JsonStore genérico: AlertsStore, AnnotationsStore)
 ├── test/                   (suíte de testes — node --test)

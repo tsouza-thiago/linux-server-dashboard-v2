@@ -45,7 +45,7 @@ root       123  0.5  2.1 123456 45678 ?        S    ago15   0:05 /usr/sbin/sshd
 `;
 
 test('parseOutput interpreta uma amostra realista', () => {
-  const s = parseOutput(FIXTURE, '2026-08-15T09:12:00.000Z');
+  const s = parseOutput(FIXTURE, '2026-08-15T09:12:00.000Z', { svcOrder: ['smbd', 'nmbd'] });
   assert.equal(s.host, 'meu-host');
   assert.equal(s.os.kernel, '6.1.0-33-amd64');
   assert.equal(s.os.name, 'Debian GNU/Linux 12 (bookworm)');
