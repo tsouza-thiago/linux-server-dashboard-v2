@@ -57,6 +57,25 @@ responde **1 comando SSH por minuto** — requisito obrigatório (hardware muito
   linha (bloqueia injeção de diretiva); `ssh-copy-id` roda com `ConnectTimeout=10` e
   mostra a saída real em caso de falha
 
+## Desenvolvimento da V2 (obrigatório)
+
+A V2 está sendo construída neste repositório a partir da `v1.0.0`, seguindo o plano aprovado.
+
+- **Plano e decisões:** `docs/PLANO_V2.md` (fases F0–F9, invariantes I1–I10, bugs B1–B12) e
+  `docs/adr/` (uma ADR por decisão; ADR aceita não é editada, é substituída por outra).
+- **Invariantes:** as regras acima continuam valendo integralmente; o plano (seção 1) diz como
+  cada uma é garantida por teste.
+- **Antes de todo commit:** `npm run check` (sintaxe JS/shell, `.env`/`data/` fora do git,
+  testes + cobertura, `npm audit`). Nenhum commit vermelho.
+- **Commits:** Conventional Commits em PT-BR (`feat(escopo):`, `fix:`, `test:`, `docs:`,
+  `refactor:`, `style:`, `perf:`, `chore:`, `security:`), uma mudança lógica por commit.
+- **CHANGELOG.md** atualizado no mesmo commit da mudança (Keep a Changelog).
+- **Bugs conhecidos** ficam em `test/unit/bugs-v1.test.js` como `todo`; o commit que corrige
+  remove o `todo` (o teste vira regressão).
+- **Versões:** SemVer; uma pré-versão `2.0.0-alpha.N` por fase, com tag e release.
+- **Node.js 24** é a versão-alvo (ADR 0002).
+- **Exemplos** usam só IPs de documentação (`192.0.2.x`, RFC 5737) e nomes genéricos.
+
 ## Arquitetura
 
 ```
@@ -90,6 +109,10 @@ responde **1 comando SSH por minuto** — requisito obrigatório (hardware muito
 ./stop.sh                       # para com segurança (PID file → pgrep → lsof)
 npm start                       # equivalente ao ./start.sh
 npm test                        # suíte de testes (node --test, sem deps novas)
+npm run check                   # verificação completa — obrigatória antes de cada commit
+npm run test:unit               # só testes unitários (test/unit)
+npm run test:integration        # só integração (test/integration: HTTP, shell, ssh falso)
+npm run capturar-amostra        # 1 coleta real → data/amostra-{bruta,anonima}.txt (fixtures)
 node server/poller.js --once    # teste rápido do poller sem o servidor web
 ```
 
@@ -250,7 +273,10 @@ linux-server-dashboard/
 │   ├── poller.js           (comando SSH, parse, taxas de rede/I/O, alertas)
 │   ├── history.js          (buffer em memória + persistência JSON atômica assíncrona)
 │   └── stores.js           (JsonStore genérico: AlertsStore c/ ciclo de vida, AnnotationsStore)
-├── test/                   (suíte de testes — node --test)
+├── CHANGELOG.md            ← histórico de mudanças (Keep a Changelog)
+├── docs/                   (PLANO_V2.md + adr/ — plano e decisões da V2)
+├── scripts/                (check.mjs, capturar-amostra.mjs)
+├── test/                   (node --test: unit/ e integration/)
 ├── test-support/           (helpers de teste: VM p/ frontend, request HTTP)
 └── public/
     ├── index.html          (dashboard PT-BR, temas claro/escuro, sidebar multi-view + Ajuda/Anotações)

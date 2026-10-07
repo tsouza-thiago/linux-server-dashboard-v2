@@ -24,6 +24,7 @@ pré-versões `2.0.0-alpha.N` (uma por fase do plano), depois `beta`, `rc` e `2.
   O Express sai de vez na F4 (ADR 0003).
 
 ### Alterado
+- `AGENTS.md` com as regras de desenvolvimento da V2 e `README` com aviso de V2 em construção.
 - Suíte reorganizada em `test/unit` (171) e `test/integration` (25).
 - Exemplos e testes usam só IPs de documentação (RFC 5737).
 
