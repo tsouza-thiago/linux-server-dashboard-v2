@@ -1,0 +1,51 @@
+===HOST===
+servidor-exemplo
+===OS===
+6.12.111+deb13-amd64
+PRETTY_NAME="Debian GNU/Linux 13 (trixie)"
+NAME="Debian GNU/Linux"
+===CPU===
+1
+===UPTIME===
+12937.03 12726.82
+===LOAD===
+0.08 0.02 0.01 3/183 2359
+===FREE===
+               total        used        free      shared  buff/cache   available
+Mem:             840         405         120           3         479         434
+Swap:            885          24         861
+===DF===
+Mounted on  Size  Used Avail Use%
+/           145G  2.5G  135G   2%
+/mnt/sdb1   1.8T  472G  1.3T  28%
+/mnt/sdc1   1.8T  472G  1.3T  28%
+/mnt/sdc2   3.6T  5.4G  3.4T   1%
+===DFB===
+Mounted on     1B-blocks         Used         Avail Use%
+/           155475050496   2626056192  144876724224   2%
+/mnt/sdb1  1967845998592 506180972544 1361628360704  28%
+/mnt/sdc1  1967845998592 506180608000 1361628725248  28%
+/mnt/sdc2  3936809369600   5708095488 3731045715968   1%
+===NET===
+enp0s7: 1752505    7093    0    0    0     0          0      1599   771648    3629    0    0    0     0       0          0
+===IO===
+   8       0 sda 15783 6839 1156426 136971 3699 7132 118552 19880 0 91540 170221 0 0 0 0 1017 13369
+   8      16 sdb 7788 11924 166882 16462 6 0 24 121 0 9688 16704 0 0 0 0 4 120
+   8      32 sdc 10353 12439 200588 72103 25 8 328 234 0 39476 72517 0 0 0 0 12 179
+===SMART===
+sda:PASSED
+sdb:PASSED
+sdc:PASSED
+===TEMP===
+32000
+===SERVICES===
+active
+===PS===
+USER         PID %CPU %MEM    VSZ   RSS TTY      STAT START   TIME COMMAND
+root         990  0.0 11.4 2026128 98520 ?       Ssl  10:16   0:10 /usr/bin/dockerd -H fd:// --containerd=/run/containerd/containerd.sock
+root        1355  0.0  9.4 1364604 81628 ?       Ssl  10:16   0:05 /portainer
+root         834  0.0  5.0 1355568 43344 ?       Ssl  10:16   0:07 /usr/sbin/tailscaled --state=/var/lib/tailscale/tailscaled.state --socket=/run/tailscale/tailscaled.sock --port=41641
+root         840  0.0  3.2 1821492 28272 ?       Ssl  10:16   0:11 /usr/bin/containerd
+root        2318  4.1  2.7  93036 23536 ?        S    13:51   0:00 /usr/libexec/samba/rpcd_lsad --configfile=/etc/samba/smb.conf --worker-group=6 --worker-index=6 --debuglevel=0
+root        2316  3.9  2.7  93036 23464 ?        S    13:51   0:00 /usr/libexec/samba/rpcd_lsad --configfile=/etc/samba/smb.conf --worker-group=6 --worker-index=5 --debuglevel=0
+root         938  0.0  1.9  94772 16740 ?        Ss   10:16   0:00 /usr/sbin/smbd --foreground --no-process-group
