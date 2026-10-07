@@ -74,8 +74,10 @@ test('e2e: as 8 telas abrem com dados, gráficos e sem erro de JS/CSP', { skip: 
   for (const [id, title, charts] of VIEWS) {
     await s.page.goto(`${s.base}/#/${id}?p=6h`, { waitUntil: 'load' });
     await s.page.waitForFunction((txt) => document.getElementById('viewTitle')?.textContent === txt, title);
-    if (charts) await s.page.waitForFunction((n) => document.querySelectorAll('.uplot').length >= n, charts, { timeout: 5000 });
-    const count = await s.page.$$eval('.uplot', (els) => els.length);
+    // Conta só os gráficos da tela nova (trocar o hash mantém a tela anterior até a nova montar).
+    await s.page.waitForSelector(`.view-${id}`);
+    if (charts) await s.page.waitForFunction(([v, n]) => document.querySelectorAll(`.view-${v} .uplot`).length >= n, [id, charts], { timeout: 5000 });
+    const count = await s.page.$$eval(`.view-${id} .uplot`, (els) => els.length);
     assert.ok(count >= charts, `${id}: ${count} gráficos (esperado ≥ ${charts})`);
   }
   assert.match(await s.page.locator('.view-ajuda').innerText(), /Configuração ativa[\s\S]*DISK_MOUNTS/);
