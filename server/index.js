@@ -7,7 +7,7 @@ import { AlertsStore, AnnotationsStore } from './stores.js';
 import { OutageLog } from './storage/outages.js';
 import { AlertEngine } from './alerts/engine.js';
 import { collect } from './poller.js';
-import { config, ROOT, isPlaceholderHost } from './config.js';
+import { config, configWarnings, ROOT, isPlaceholderHost } from './config.js';
 import { hostCheck, csrfCheck, securityHeaders, makeRequireAuth, issueCsrfCookie, makeRateLimit } from './security.js';
 import { toCSV } from './csv.js';
 
@@ -328,6 +328,7 @@ export function startServer() {
     console.log(line);
     logStream.write(`${line}\n`);
   };
+  for (const w of configWarnings) log(`AVISO de configuração: ${w}`);
 
   const { app, runPoll, shutdown: flushAll } = createApp({ log });
 
