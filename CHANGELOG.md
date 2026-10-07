@@ -8,6 +8,10 @@ pré-versões `2.0.0-alpha.N` (uma por fase do plano), depois `beta`, `rc` e `2.
 
 ## [Não publicado]
 
+## [2.0.0-alpha.2] — 2026-10-07
+
+Fase F1 do plano (coleta). Validada no servidor real: comando V2 completo em 901 ms.
+
 ### Adicionado
 
 - Coletor V2 (`server/collector/`): script POSIX sh único e somente leitura, com
@@ -16,8 +20,9 @@ pré-versões `2.0.0-alpha.N` (uma por fase do plano), depois `beta`, `rc` e `2.
 - Amostra `schemaVersion: 2` com novas métricas: CPU % (user/system/iowait/steal), RAM
   `dirty`/`writeback`, inodes por disco e dispositivo de origem, erros/descartes de rede,
   utilização e latência de disco, PSI, todas as zonas térmicas e RSS/tempo dos processos.
-- Testes: goldens do parser sobre a amostra real anonimizada, casos-limite, fuzz com
-  semente fixa e execução do script real em `sh` local (bash e dash).
+- Testes: goldens do parser sobre a 1ª coleta V2 real (anonimizada) e sobre a amostra
+  convertida da V1, casos-limite, fuzz com semente fixa e execução do script real em `sh`
+  local (bash e dash).
 
 ### Alterado
 
@@ -76,6 +81,7 @@ Documentados no plano da V2 (seção 2.2, B1–B12), entre eles: alerta SMART fa
 rede zerada com contadores grandes, alerta duplicado a cada coleta e reescrita completa do
 histórico a cada minuto.
 
-[Não publicado]: https://github.com/tsouza-thiago/linux-server-dashboard-v2/compare/v2.0.0-alpha.1...HEAD
+[Não publicado]: https://github.com/tsouza-thiago/linux-server-dashboard-v2/compare/v2.0.0-alpha.2...HEAD
+[2.0.0-alpha.2]: https://github.com/tsouza-thiago/linux-server-dashboard-v2/compare/v2.0.0-alpha.1...v2.0.0-alpha.2
 [2.0.0-alpha.1]: https://github.com/tsouza-thiago/linux-server-dashboard-v2/compare/v1.0.0...v2.0.0-alpha.1
 [1.0.0]: https://github.com/tsouza-thiago/linux-server-dashboard-v2/releases/tag/v1.0.0

@@ -8,7 +8,7 @@ import { normalizeTargets, targetsHash } from '../../server/collector/builder.js
 import { collect, computeAlerts, buildCommand } from '../../server/poller.js';
 
 const FIX = path.join(path.dirname(fileURLToPath(import.meta.url)), '..', 'fixtures', 'coleta-v2');
-const REAL = fs.readFileSync(path.join(FIX, 'debian13-1nucleo.txt'), 'utf8');
+const REAL = fs.readFileSync(path.join(FIX, 'debian13-real.txt'), 'utf8');
 const TARGETS = { netIf: 'enp0s7', mounts: ['/', '/mnt/sdb1', '/mnt/sdc1', '/mnt/sdc2'], devs: ['sda', 'sdb', 'sdc'], services: ['smbd'] };
 const NOW = Date.parse('2026-10-07T13:51:00.000Z');
 const ok = (stdout) => async () => ({ stdout, stderr: '', code: 0, timedOut: false });
