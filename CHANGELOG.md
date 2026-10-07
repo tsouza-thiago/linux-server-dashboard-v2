@@ -12,6 +12,14 @@ pré-versões `2.0.0-alpha.N` (uma por fase do plano), depois `beta`, `rc` e `2.
 - Plano da V2 (`docs/PLANO_V2.md`) e registros de decisão `docs/adr/0001`–`0013`.
 - Este changelog.
 
+### Segurança
+- Dependências transitivas do Express atualizadas (`npm audit fix`): `proxy-addr` 2.0.8,
+  `qs` 6.16.0, `body-parser` 1.20.8, `express` 4.22.3 — zera os 4 alertas (1 crítico, 3 moderados).
+  O Express sai de vez na F4 (ADR 0003).
+
+### Alterado
+- Exemplos e testes usam só IPs de documentação (RFC 5737).
+
 ## [1.0.0] — 2026-09-13
 
 Última versão da V1, importada sem alterações como base da V2
