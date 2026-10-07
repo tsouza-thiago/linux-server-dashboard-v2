@@ -22,7 +22,7 @@ async function start(t, extra = {}) {
     ...extra,
   });
   const { server, port } = await listen(app.app);
-  t.after(async () => { app.sse.closeAll(); await close(server); fs.rmSync(dir, { recursive: true, force: true }); });
+  t.after(async () => { await app.shutdown(); await close(server); fs.rmSync(dir, { recursive: true, force: true }); });
   return { ...app, port, queue };
 }
 

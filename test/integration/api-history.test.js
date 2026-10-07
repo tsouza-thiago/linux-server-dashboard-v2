@@ -26,6 +26,7 @@ async function start(t, { v1 } = {}) {
   });
   const { server, port } = await listen(app.app);
   t.after(async () => {
+    await app.shutdown(); // espera as gravações pendentes antes de apagar a pasta
     await close(server);
     fs.rmSync(dir, { recursive: true, force: true });
   });
@@ -84,7 +85,7 @@ test('API: store sem agregação responde 501 em formato=baldes', async (t) => {
   const store = { length: 0, limit: 10, getLatest: () => null, getRange: () => [], append() {}, flush: async () => {} };
   const app = createApp({ store, log: () => {}, alertsFile: path.join(dir, 'a.json'), annotationsFile: path.join(dir, 'n.json') });
   const { server, port } = await listen(app.app);
-  t.after(async () => { await close(server); fs.rmSync(dir, { recursive: true, force: true }); });
+  t.after(async () => { await app.shutdown(); await close(server); fs.rmSync(dir, { recursive: true, force: true }); });
   const r = await request(port, { path: '/api/history?formato=baldes' });
   assert.equal(r.status, 501);
 });

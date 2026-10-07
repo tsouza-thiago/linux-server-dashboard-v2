@@ -20,7 +20,7 @@ async function start(t, extra = {}) {
     ...extra,
   });
   const { server, port } = await listen(app.app);
-  t.after(async () => { await close(server); fs.rmSync(dir, { recursive: true, force: true }); });
+  t.after(async () => { await app.shutdown(); await close(server); fs.rmSync(dir, { recursive: true, force: true }); });
   // Navegador: abre a página (recebe o cookie CSRF) e manda Origin nos POSTs.
   const page = await request(port, { path: '/' });
   const csrf = [].concat(page.headers['set-cookie'])[0].split(';')[0];
