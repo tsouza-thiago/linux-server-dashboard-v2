@@ -17,24 +17,55 @@ function baseCtx() {
   return c;
 }
 
-test('api.ackAlert e refreshAlerts enviam Authorization Bearer quando há token', async () => {
+test('sessão por cookie: a tela não guarda nem envia token; chamadas vão com o cookie do navegador', async () => {
   const calls = [];
   const ctx = loadAll(['analysis.js', 'charts.js', 'sections.js', 'router.js', 'main.js'], {
-    sessionStorage: { getItem: () => 'segredo', setItem: () => {} },
+    sessionStorage: { getItem: () => 'token-antigo-da-v1', setItem: () => { throw new Error('não deve gravar token'); } },
     fetch: async (url, opts) => {
       calls.push({ url, opts });
       return { ok: true, status: 200, json: async () => ({}), blob: async () => new Blob([]) };
     },
   });
-
   await ctx.Dash.api.ackAlert('id-1');
   const post = calls.find((c) => c.opts && c.opts.method === 'POST');
   assert.ok(post, 'POST de ack deve ocorrer');
-  assert.equal(post.opts.headers.Authorization, 'Bearer segredo');
+  assert.equal(post.opts.credentials, 'same-origin');
+  assert.equal((post.opts.headers || {}).Authorization, undefined, 'sem token no cabeçalho');
+  assert.ok(calls.every((c) => !String(c.url).includes('token=')), 'sem token na URL');
+});
 
-  const alerts = calls.find((c) => c.url === '/api/alerts?limit=200');
-  assert.ok(alerts, 'refreshAlerts deve ser chamado após o ack');
-  assert.equal(alerts.opts.headers.Authorization, 'Bearer segredo', 'refreshAlerts usa apiFetch com token');
+test('401 abre a janela de login; token certo entra e recarrega; errado mostra o erro', async () => {
+  let loginReply = { ok: false, status: 401, json: async () => ({ error: 'Token incorreto' }) };
+  const calls = [];
+  let reloaded = 0;
+  const ctx = loadAll(['analysis.js', 'charts.js', 'sections.js', 'router.js', 'main.js'], {
+    fetch: async (url, opts) => {
+      calls.push({ url, opts });
+      if (url === '/api/login') return loginReply;
+      if (url === '/api/session') return { ok: true, status: 200, json: async () => ({ authRequired: true, authenticated: false }) };
+      return { ok: false, status: 401, json: async () => ({ error: 'Não autorizado' }) };
+    },
+  });
+  ctx.sandbox.window.location.reload = () => { reloaded += 1; };
+  const doc = ctx.document;
+  await new Promise((r) => setTimeout(r, 20));
+  assert.equal(doc.getElementById('login').hidden, false, 'login aparece no 401');
+  assert.equal(doc.getElementById('sessionHelp').hidden, false, 'Ajuda mostra os botões de sessão');
+  const submit = doc.getElementById('loginForm').listeners.submit[0];
+  doc.getElementById('loginToken').value = '  errado  ';
+  await submit({ preventDefault() {} });
+  const sent = calls.find((c) => c.url === '/api/login');
+  assert.deepEqual(JSON.parse(sent.opts.body), { token: 'errado' });
+  assert.equal(doc.getElementById('loginError').textContent, 'Token incorreto');
+  assert.equal(reloaded, 0);
+  loginReply = { ok: false, status: 429, json: async () => ({}) };
+  await submit({ preventDefault() {} });
+  assert.match(doc.getElementById('loginError').textContent, /aguarde 1 minuto/);
+  loginReply = { ok: true, status: 200, json: async () => ({ ok: true }) };
+  doc.getElementById('loginToken').value = 'certo';
+  await submit({ preventDefault() {} });
+  assert.equal(reloaded, 1);
+  assert.equal(doc.getElementById('loginToken').value, '');
 });
 
 test('sections.overview tolera amostra sem campo load', () => {

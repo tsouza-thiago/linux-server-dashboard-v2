@@ -212,8 +212,9 @@ Pronto, o painel está aberto. **Deixe o terminal aberto** (no modo normal) — 
 estiver rodando, o painel funciona. Fechar a janela do navegador **não** para o serviço;
 fechar o terminal sim (no modo `--background` ou systemd, nem isso é problema).
 
-> Na **primeira vez**, o painel pode pedir o seu **token de acesso** (o que o instalador
-> mostrou no final). Digite uma vez e ele fica guardado na sessão do navegador.
+> Na **primeira vez**, o painel mostra uma tela de login pedindo o seu **token de acesso**
+> (o que o instalador mostrou no final). Depois disso o navegador fica conectado por 30
+> dias. Para sair, use **Ajuda → Sessão → Sair deste navegador**.
 
 > O painel só é acessível neste computador (127.0.0.1). Ninguém mais na rede
 > consegue abrir — isso é proposital e seguro.

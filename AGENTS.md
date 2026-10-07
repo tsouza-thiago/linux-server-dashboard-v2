@@ -38,15 +38,25 @@ responde **1 comando SSH por minuto** — requisito obrigatório (hardware muito
   saneia o nome do arquivo
 - **Permissões**: `data/` (0700), `.env` e arquivos de dados (0600) — reforçadas em
   `install.sh`/`start.sh` e na escrita (`writeFileSync { mode: 0o600 }`)
-- **Token por padrão**: o `install.sh` gera um `DASH_TOKEN` automático se vazio; com ele,
-  `/api/*` e `/api/stream` exigem `Authorization: Bearer <token>` (ou `?token=`); a
-  comparação usa `crypto.timingSafeEqual`; navegador pede 1x e guarda na sessão
+- **Token por padrão + sessão por cookie** (ADR 0007): o `install.sh` gera um `DASH_TOKEN`
+  automático se vazio; com ele, `/api/*` e `/api/stream` exigem sessão (cookie
+  `dash_session`, HttpOnly + SameSite=Strict, 30 dias renovados com o uso) ou
+  `Authorization: Bearer <token>` (scripts). O token é trocado 1x na tela de login
+  (`/api/login`, 10 tentativas/min/IP); em disco (`data/sessions.json`, 0600) fica só o
+  SHA-256 da sessão. `?token=` na URL **não** é aceito. Comparação com `crypto.timingSafeEqual`
 - **Throttle**: `/api/poll` com piso de 5s entre coletas manuais; rate limit de
   mutações da API (120/min/IP)
 - **CSRF em 2 camadas**: rejeita `Origin` ≠ Host e `Sec-Fetch-Site: cross-site`; além
   disso, mutações com `Origin` presente precisam carregar o cookie `dash_csrf`
   (SameSite=Lax, HttpOnly) emitido nos GETs
 - **Erros sem vazamento**: error handler central devolve JSON sem stack trace
+- **HTTP próprio** (ADR 0003): `node:http` + `server/http/` (roteador, corpo JSON ≤ 50 KB,
+  estáticos só de `public/` com lista de tipos, sem oculto/pasta/traversal); cabeçalhos de
+  segurança valem em **todas** as respostas, inclusive 401/403/404; backend sem
+  dependência de runtime. `test/integration/http-seguranca.test.js` é a caracterização
+  caixa-preta e precisa continuar verde
+- **SSE**: no máximo 20 conexões simultâneas (503 acima); reconexão com `Last-Event-ID`
+  recupera até 2000 amostras perdidas
 - **SSH seguro**: `BatchMode=yes` + `ConnectTimeout=10`; `SSH_HOST` saneado via
   `sanitizeHost()` — apenas rejeita `-` inicial e vazio (whitelist de caracteres é
   exclusiva do `sanitizeToken`, acima); alias do instalador usa
@@ -83,7 +93,7 @@ A V2 está sendo construída neste repositório a partir da `v1.0.0`, seguindo o
         ↑
 [Node.js local]  ── poller (intervalo 60s) → parse → histórico NDJSON (72h brutas + 90d agregados)
         ↓
-[Express local 127.0.0.1:3000]  ── dashboard + /api/status + /api/history + /api/alerts +
+[node:http local 127.0.0.1:3000] ── dashboard + /api/status + /api/history + /api/alerts +
                                    /api/annotations + /api/export + SSE
         ↓
 [Browser: http://localhost:3000]  — sidebar multi-view, zoom nos gráficos, health score,
@@ -283,14 +293,18 @@ echo '===FIM==='
 | `/api/annotations`| GET/POST | Lista / cria anotações (`{ts, text, label}`)    |
 | `/api/annotations/:id` | DELETE | Remove anotação                             |
 | `/api/export`     | GET    | `?format=csv\|json&from=&to=` → download do relatório |
-| `/api/stream`     | GET    | SSE: `hello`, `sample` (a cada poll), `alerts`, `annotations`, `status` |
+| `/api/stream`     | GET    | SSE: `hello`, `sample` (a cada poll, `id` = instante), `alerts`, `annotations`, `status`; `Last-Event-ID` → backfill |
+| `/api/session`    | GET    | `{authRequired, authenticated}` (sem exigir login) |
+| `/api/login`      | POST   | `{token}` → cookie de sessão; 401 se errado; 10 tentativas/min/IP |
+| `/api/logout`     | POST   | Encerra a sessão deste navegador |
+| `/api/logout-all` | POST   | Encerra todas as sessões (exige estar logado) |
 | `/api/poll`       | POST   | Dispara coleta imediata ("coletar agora"), piso de 5s |
 | `/api/outages`    | GET    | `?days=1..90` (padrão 30) → `{days, outages, uptime}`; uptime desde o início do monitoramento |
 
 > Proteções aplicadas em todas as rotas: `Host` check, CSRF (c/ cookie `dash_csrf`),
 > headers de segurança, rate limit de mutações, error handler sem stack trace.
-> Com `DASH_TOKEN` (gerado no install): `/api/*` e `/api/stream` exigem `Bearer <token>`
-> ou `?token=`, comparado com `crypto.timingSafeEqual`.
+> Com `DASH_TOKEN` (gerado no install): `/api/*` e `/api/stream` exigem sessão por cookie
+> ou `Bearer <token>`, comparado com `crypto.timingSafeEqual`; `?token=` não vale.
 
 ## Alertas (motor em `server/alerts/`, ADR 0006)
 
@@ -326,13 +340,14 @@ linux-server-dashboard/
 ├── install-lib.sh          ← funções puras de validação do instalador (segurança)
 ├── start.sh                ← inicia o serviço (primeiro plano, --background ou --status)
 ├── stop.sh                 ← para o serviço com segurança (PID file + fallbacks)
-├── package.json            (deps: express + chart.js + zoom/annotation plugins; type: module)
+├── package.json            (deps só do frontend: chart.js + zoom/annotation plugins; type: module)
 ├── .env                    (config local — NUNCA commitar)
 ├── .env.example            (modelo sem valores)
 ├── .gitignore              (exclui .env, data/, node_modules/)
 ├── data/                   (history/ + rollup/ + alerts.json + annotations.json + logs — runtime)
 ├── server/
-│   ├── index.js            (Express, SSE, API, loop de poll, export CSV)
+│   ├── index.js            (rotas da API, loop de poll, export CSV)
+│   ├── http/               (router.js, static.js, session.js: login por cookie, sse.js: SSE com backfill)
 │   ├── config.js           (parser único do .env, validações, sanitizeToken/sanitizeHost)
 │   ├── security.js         (Host check, CSRF c/ cookie, headers, token timing-safe, rate limit)
 │   ├── csv.js              (export CSV com escape anti-fórmula)
@@ -351,7 +366,7 @@ linux-server-dashboard/
     ├── style.css           (temas claro/escuro com paleta de console de operação, tipografia dupla sans/mono, tokens em CSS variables)
     ├── fonts/              (Inter + JetBrains Mono self-hosted, .woff2 — sem CDN)
     └── js/
-        ├── main.js         (orquestração: SSE, refresh por período, ações, modais, token, tema)
+        ├── main.js         (orquestração: SSE, refresh por período, ações, modais, login, tema)
         ├── router.js       (navegação por hash entre as views)
         ├── charts.js       (Chart.js + zoom/pan + anotações no timeline, cores do tema)
         ├── sections.js     (renderização de cada view, esc() anti-XSS, abas I/O dinâmicas)

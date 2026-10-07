@@ -371,12 +371,37 @@
                 <p class="help-note">warning = preste atenção · critical = aja. Tutorial completo (instalação, troubleshooting) em <code>TUTORIAL.md</code>.</p>
               </div>
             </details>
+
+            <details id="sessionHelp" hidden>
+              <summary>Sessão</summary>
+              <div class="help-body">
+                <p>O acesso fica guardado neste navegador por 30 dias (renovado com o uso).</p>
+                <p class="session-actions">
+                  <button id="logoutBtn" class="btn-ghost">Sair deste navegador</button>
+                  <button id="logoutAllBtn" class="btn-ghost">Encerrar todas as sessões</button>
+                </p>
+              </div>
+            </details>
           </div>
         </section>
       </main>
 
       <footer>Linux Server Dashboard · coleta via SSH a cada 60s · servidor sem carga extra · zoom nos gráficos: roda do mouse / arrastar com Shift</footer>
     </div>
+  </div>
+
+  <div id="login" class="modal" hidden role="dialog" aria-modal="true" aria-labelledby="loginTitle">
+    <form class="modal-box login-form" id="loginForm">
+      <div class="modal-head"><h3 id="loginTitle">Entrar no painel</h3></div>
+      <div class="modal-body">
+        <p>Cole o token de acesso (<code>DASH_TOKEN</code> do arquivo <code>.env</code>). Ele é pedido
+        uma vez por navegador; a sessão vale 30 dias e se renova com o uso.</p>
+        <label for="loginToken">Token de acesso</label>
+        <input id="loginToken" name="token" type="password" autocomplete="current-password" required>
+        <p id="loginError" class="login-error" role="alert"></p>
+      </div>
+      <div class="modal-foot"><button type="submit" id="loginSubmit">Entrar</button></div>
+    </form>
   </div>
 
   <div id="modal" class="modal" hidden role="dialog" aria-modal="true" aria-labelledby="modalTitle">

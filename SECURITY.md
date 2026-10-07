@@ -81,16 +81,20 @@ relevantes e suas mitigações:
 ### 9. Acesso à API sem credencial (camada extra)
 - **Ameaça (avançada):** se por algum motivo o painel for exposto, acesso aberto.
 - **Mitigação:** o instalador gera um `DASH_TOKEN` automático (configurável no `.env`).
-  Quando definido, toda a API/SSE exige `Authorization: Bearer <token>` (ou `?token=`
-  na URL do SSE). O navegador pede o token uma vez e guarda na sessão. A comparação usa
-  `crypto.timingSafeEqual` (imune a ataques de timing). A segurança-base continua sendo
-  o bind em `127.0.0.1` + as proteções acima.
+  Quando definido, toda a API/SSE exige uma sessão (cookie `dash_session` HttpOnly +
+  SameSite=Strict, 30 dias renovados com o uso, obtido 1x na tela de login) ou
+  `Authorization: Bearer <token>` para scripts. O token **nunca** vai na URL (`?token=`
+  não é aceito) nem fica guardado pelo JavaScript; em disco só o SHA-256 da sessão.
+  Login limitado a 10 tentativas/min/IP; "Sair" e "Encerrar todas as sessões" na Ajuda.
+  A comparação usa `crypto.timingSafeEqual` (imune a ataques de timing). A segurança-base
+  continua sendo o bind em `127.0.0.1` + as proteções acima.
 
 ### 10. Abuso de endpoints
 - **Ameaça:** spam de "coletar agora" sobrecarregando o servidor.
 - **Mitigação:** `/api/poll` é bloqueado enquanto houver coleta em andamento e tem piso
-  de 5 s entre coletas manuais; `express.json` tem limite de 50 KB; e todas as mutações
-  da API são **limitadas por IP** (rate limit de 120/min) via `makeRateLimit`.
+  de 5 s entre coletas manuais; o corpo JSON tem limite de 50 KB (413 acima, também sem
+  `Content-Length`); todas as mutações da API são **limitadas por IP** (120/min) via
+  `makeRateLimit`; o SSE aceita no máximo 20 conexões simultâneas.
 
 ### 11. Vazamento de detalhes internos em erros
 - **Ameaça:** erros com stack trace revelando caminhos/versões do ambiente.

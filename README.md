@@ -29,7 +29,7 @@ hardware muito limitado (1 núcleo, pouca RAM) — por exemplo, uma máquina vel
                ▲ gráficos em tempo real
                │
        [seu computador]
-       Node.js + Express (127.0.0.1:3000)
+       Node.js, sem dependências (127.0.0.1:3000)
                │
                │ 1 comando SSH por minuto (somente leitura)
                ▼
@@ -114,7 +114,7 @@ acontece por SSH, com chave criptográfica, e apenas **uma vez por minuto**.
       ↑
 [storage/]    histórico append-only em data/history/ (72h brutas) + data/rollup/ (90 dias em baldes de 5 min)
       ↑
-[index.js]  Express (127.0.0.1:3000) → dashboard + API REST + SSE (tempo real)
+[index.js]  node:http (127.0.0.1:3000) → dashboard + API REST + SSE (tempo real)
       ↑
 [Navegador]  sidebar multi-view, zoom nos gráficos, health score, alertas, anotações
 ```
@@ -127,7 +127,7 @@ O ciclo é simples e proposital:
 2. **Parse** — a resposta é interpretada localmente e vira uma "amostra" JSON
    (uma linha = um minuto da vida do servidor).
 3. **Persistência** — a amostra entra no histórico (3 dias, com escrita atômica).
-4. **Entrega** — o Express serve o dashboard e atualiza os gráficos em tempo real via
+4. **Entrega** — o servidor local (`node:http`) serve o dashboard e atualiza os gráficos em tempo real via
    **SSE** (Server-Sent Events), sem o navegador precisar recarregar.
 
 > **Toda a interatividade** (filtros, zoom, ordenação, ETA, agregações) acontece **no
@@ -399,9 +399,9 @@ princípio é o mesmo: o monitoramento não pesa em quem é monitorado.
 | `/api/poll` | POST | Dispara coleta imediata ("coletar agora") |
 
 > Se `DASH_TOKEN` estiver definido no `.env` (o instalador gera um automático), toda a
-> API/SSE exige `Authorization: Bearer <token>` (ou `?token=` na URL do SSE). O navegador
-> pede o token uma vez e guarda na sessão. Mutações são protegidas por CSRF (cookie
-> `dash_csrf`) e limitadas por IP.
+> API/SSE exige login: o token é pedido uma vez numa tela de login e trocado por um
+> cookie de sessão de 30 dias (scripts podem usar `Authorization: Bearer <token>`). O token
+> nunca vai na URL. Mutações são protegidas por CSRF (cookie `dash_csrf`) e limitadas por IP.
 
 ---
 
@@ -475,8 +475,8 @@ Este projeto foi desenhado com **segurança by design**. Os principais pontos:
   servidor estiver fora, sem travar nem pedir interação. O instalador grava o alias
   com `StrictHostKeyChecking accept-new` (verificação de host key segura).
 - **Token por padrão (`DASH_TOKEN`).** O instalador gera um token automático — a API/SSE
-  passa a exigir `Authorization: Bearer <token>` (ou `?token=`), e o navegador pede o
-  token uma única vez, guardando na sessão.
+  passa a exigir login; o navegador pede o token uma única vez e o troca por um cookie
+  de sessão (HttpOnly, 30 dias). O token nunca vai na URL.
 
 > Se você fosse auditar: o único contato com o servidor é o comando SSH construído em
 > `server/poller.js` (`buildCommand()`), com valores já filtrados por
@@ -517,12 +517,13 @@ linux-server-dashboard/
 ├── install-lib.sh          ← validação pura das entradas do instalador (segurança)
 ├── start.sh                ← inicia o serviço (primeiro plano, --background ou --status)
 ├── stop.sh                 ← para o serviço com segurança (PID file)
-├── package.json            (deps: express + chart.js + zoom/annotation plugins)
+├── package.json            (deps só do frontend: chart.js + zoom/annotation plugins)
 ├── .env.example            (modelo de configuração, sem valores reais)
 ├── .gitignore              (exclui .env, data/, node_modules/)
 ├── data/                   (runtime: history/, rollup/, alerts.json, annotations.json, log)
 ├── server/
-│   ├── index.js            (Express, SSE, API, loop de poll, export CSV)
+│   ├── index.js            (rotas da API, loop de poll, export CSV)
+│   ├── http/               (servidor próprio: rotas, estáticos, sessão, SSE)
 │   ├── config.js           (parser único do .env, validações, sanitização)
 │   ├── security.js         (Host check, CSRF c/ cookie, headers, token timing-safe, rate limit)
 │   ├── csv.js              (export CSV com escape anti-fórmula)
@@ -536,7 +537,7 @@ linux-server-dashboard/
     ├── style.css           (visual: paleta de console de operação, tipografia sans/mono, responsivo)
     ├── fonts/              (Inter + JetBrains Mono self-hosted, .woff2 — sem CDN)
     └── js/
-        ├── main.js         (orquestração: SSE, refresh, ações, modais, token, tema)
+        ├── main.js         (orquestração: SSE, refresh, ações, modais, login, tema)
         ├── router.js       (navegação por hash entre as views)
         ├── charts.js       (Chart.js + zoom/pan + anotações no timeline)
         ├── sections.js     (renderização das views, escape HTML, abas I/O dinâmicas)

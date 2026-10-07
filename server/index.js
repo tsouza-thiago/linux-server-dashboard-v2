@@ -1,6 +1,9 @@
 import fs from 'node:fs';
 import path from 'node:path';
-import express from 'express';
+import { createRouter, jsonBody } from './http/router.js';
+import { serveStatic, sendFile } from './http/static.js';
+import { SseHub, lastEventId, sampleId, MAX_BACKFILL } from './http/sse.js';
+import { SessionStore, SESSION_COOKIE, sessionCookie, clearSessionCookie, safeEqual } from './http/session.js';
 import { History } from './storage/index.js';
 import { migrateV1 } from './storage/migrate-v1.js';
 import { AlertsStore, AnnotationsStore } from './stores.js';
@@ -8,7 +11,7 @@ import { OutageLog } from './storage/outages.js';
 import { AlertEngine } from './alerts/engine.js';
 import { collect } from './poller.js';
 import { config, configWarnings, ROOT, isPlaceholderHost } from './config.js';
-import { hostCheck, csrfCheck, securityHeaders, makeRequireAuth, issueCsrfCookie, makeRateLimit } from './security.js';
+import { hostCheck, csrfCheck, securityHeaders, makeRequireAuth, issueCsrfCookie, makeRateLimit, parseCookies } from './security.js';
 import { toCSV } from './csv.js';
 
 export function createApp(deps = {}) {
@@ -57,12 +60,17 @@ export function createApp(deps = {}) {
   };
 
   const apiRateLimit = makeRateLimit({ windowMs: 60000, max: deps.rateLimitMax ?? 120 });
+  // Tentativas de login: limite próprio, bem menor (força bruta no token).
+  const loginRateLimit = makeRateLimit({ windowMs: 60000, max: deps.loginRateMax ?? 10 });
+  const sessions = deps.sessions || new SessionStore({
+    file: deps.sessionsFile ?? path.join(path.dirname(alertsStore.file), 'sessions.json'),
+    log,
+  });
 
-  const sseClients = new Set();
+  const sse = deps.sse || new SseHub({ maxClients: deps.sseMaxClients ?? 20 });
 
-  function broadcast(event, data) {
-    const payload = `event: ${event}\ndata: ${JSON.stringify(data)}\n\n`;
-    for (const res of sseClients) res.write(payload);
+  function broadcast(event, data, id) {
+    sse.send(event, data, id);
   }
 
   function broadcastAlerts() {
@@ -85,7 +93,7 @@ export function createApp(deps = {}) {
         store.append(res.sample);
         engine.onSample(res.sample);
         log(`poll OK (${Date.now() - started}ms) — amostras: ${store.length}`);
-        broadcast('sample', { sample: res.sample, alerts: alertsStore.active, health: engine.health(res.sample) });
+        broadcast('sample', { sample: res.sample, alerts: alertsStore.active, health: engine.health(res.sample) }, sampleId(res.sample));
         broadcastAlerts();
       } else {
         recordFailure(res.error);
@@ -155,18 +163,56 @@ export function createApp(deps = {}) {
     return { from, to, limit };
   }
 
-  const app = express();
-  app.disable('x-powered-by');
+  const app = createRouter();
+  // Cabeçalhos de segurança primeiro: valem também para as respostas 403/401 das checagens.
+  app.use(securityHeaders);
   app.use(hostCheck);
   app.use(csrfCheck);
-  app.use(securityHeaders);
   app.use(issueCsrfCookie);
-  app.use(express.json({ limit: '50kb' }));
+  app.use(jsonBody({ limit: 50 * 1024 }));
   app.use('/api', (req, res, next) => {
     if (['POST', 'PUT', 'PATCH', 'DELETE'].includes(req.method)) return apiRateLimit(req, res, next);
     next();
   });
-  app.use('/api', makeRequireAuth(DASH_TOKEN));
+
+  // ---- Sessão (ADR 0007): estas rotas ficam antes da exigência de autenticação ----
+  const currentSession = (req) => {
+    const sid = parseCookies(req.headers.cookie)[SESSION_COOKIE];
+    return sid && sessions.touch(sid) ? sid : null;
+  };
+
+  app.get('/api/session', (req, res) => {
+    res.json({ authRequired: Boolean(DASH_TOKEN), authenticated: !DASH_TOKEN || Boolean(currentSession(req)) });
+  });
+
+  app.post('/api/login', loginRateLimit, (req, res) => {
+    if (!DASH_TOKEN) return res.json({ ok: true, authRequired: false });
+    const token = req.body && req.body.token;
+    if (typeof token !== 'string' || !safeEqual(token.trim(), DASH_TOKEN)) {
+      log('login recusado: token incorreto');
+      return res.status(401).json({ error: 'Token incorreto' });
+    }
+    const id = sessions.create();
+    res.appendHeader('Set-Cookie', sessionCookie(id));
+    log(`login OK (${sessions.count} sessão(ões) ativa(s))`);
+    res.json({ ok: true });
+  });
+
+  app.post('/api/logout', (req, res) => {
+    const sid = parseCookies(req.headers.cookie)[SESSION_COOKIE];
+    if (sid) sessions.revoke(sid);
+    res.appendHeader('Set-Cookie', clearSessionCookie());
+    res.json({ ok: true });
+  });
+
+  app.use('/api', makeRequireAuth(DASH_TOKEN, sessions));
+
+  app.post('/api/logout-all', (req, res) => {
+    const revoked = sessions.revokeAll();
+    res.appendHeader('Set-Cookie', clearSessionCookie());
+    log(`todas as sessões encerradas (${revoked})`);
+    res.json({ ok: true, revoked });
+  });
 
   app.get('/api/status', (req, res) => {
     res.json(statusPayload());
@@ -259,19 +305,19 @@ export function createApp(deps = {}) {
   });
 
   app.get('/api/stream', (req, res) => {
-    res.writeHead(200, {
-      'Content-Type': 'text/event-stream',
-      'Cache-Control': 'no-cache',
-      Connection: 'keep-alive',
-    });
-    res.write(`event: hello\ndata: ${JSON.stringify(statusPayload())}\n\n`);
-    res.write(`event: annotations\ndata: ${JSON.stringify({ annotations: annotationsStore.data.slice(-500).reverse() })}\n\n`);
-    sseClients.add(res);
-    const keepAlive = setInterval(() => res.write(': ping\n\n'), 30000);
-    req.on('close', () => {
-      clearInterval(keepAlive);
-      sseClients.delete(res);
-    });
+    const initial = [];
+    // Reconexão: reenvia as amostras perdidas (depois do último id que o navegador viu).
+    const since = lastEventId(req);
+    if (since !== null) {
+      const missed = (store.samples || []).filter((s) => sampleId(s) > since).slice(-MAX_BACKFILL);
+      for (const sample of missed) initial.push(['sample', { sample, alerts: alertsStore.active, backfill: true }, sampleId(sample)]);
+    }
+    // O hello leva o id da amostra mais recente: assim até uma tela que ainda não recebeu
+    // nenhuma amostra ao vivo sabe de onde retomar se a conexão cair.
+    const payload = statusPayload();
+    initial.push(['hello', payload, sampleId(payload.sample)]);
+    initial.push(['annotations', { annotations: annotationsStore.data.slice(-500).reverse() }]);
+    sse.open(req, res, initial);
   });
 
   app.post('/api/poll', (req, res) => {
@@ -284,34 +330,31 @@ export function createApp(deps = {}) {
     res.json({ ok: true });
   });
 
-  app.use(express.static(path.join(ROOT, 'public'), { maxAge: '1h' }));
-  app.get('/vendor/chart.js', (req, res) => {
-    res.setHeader('Cache-Control', 'public, max-age=86400');
-    res.sendFile(path.join(ROOT, 'node_modules/chart.js/dist/chart.umd.js'));
-  });
-  app.get('/vendor/zoom.js', (req, res) => {
-    res.setHeader('Cache-Control', 'public, max-age=86400');
-    res.sendFile(path.join(ROOT, 'node_modules/chartjs-plugin-zoom/dist/chartjs-plugin-zoom.min.js'));
-  });
-  app.get('/vendor/annotation.js', (req, res) => {
-    res.setHeader('Cache-Control', 'public, max-age=86400');
-    res.sendFile(path.join(ROOT, 'node_modules/chartjs-plugin-annotation/dist/chartjs-plugin-annotation.min.js'));
-  });
+  app.use(serveStatic(path.join(ROOT, 'public'), { maxAge: 3600 }));
+  // Bibliotecas do frontend atual, servidas de node_modules por caminho fixo (saem na F5).
+  const VENDOR = {
+    '/vendor/chart.js': 'node_modules/chart.js/dist/chart.umd.js',
+    '/vendor/zoom.js': 'node_modules/chartjs-plugin-zoom/dist/chartjs-plugin-zoom.min.js',
+    '/vendor/annotation.js': 'node_modules/chartjs-plugin-annotation/dist/chartjs-plugin-annotation.min.js',
+  };
+  for (const [route, file] of Object.entries(VENDOR)) {
+    app.get(route, (req, res) => sendFile(res, path.join(ROOT, file), { cacheControl: 'public, max-age=86400' }));
+  }
 
   app.use((err, req, res, next) => {
     const status = err.status || err.statusCode || 500;
-    log(`ERRO não tratado: ${err.stack || err.message}`);
+    if (status >= 500) log(`ERRO não tratado: ${err.stack || err.message}`);
+    else log(`requisição recusada (${status}): ${err.message}`);
     res.status(status).json({ error: status >= 500 ? 'erro interno do servidor' : 'requisição inválida' });
   });
 
   /** Grava tudo o que está pendente (histórico, alertas, anotações) antes de sair (B11). */
   async function shutdown() {
-    for (const res of sseClients) res.end();
-    sseClients.clear();
-    await Promise.all([store.flush?.(), alertsStore.flush?.(), annotationsStore.flush?.(), outages.flush()]);
+    sse.closeAll();
+    await Promise.all([store.flush?.(), alertsStore.flush?.(), annotationsStore.flush?.(), outages.flush(), sessions.flush()]);
   }
 
-  return { app, state, store, alertsStore, annotationsStore, outages, engine, broadcast, runPoll, parseRange, statusPayload, sseClients, shutdown };
+  return { app, state, store, alertsStore, annotationsStore, outages, engine, sessions, broadcast, runPoll, parseRange, statusPayload, sse, shutdown };
 }
 
 export function startServer() {

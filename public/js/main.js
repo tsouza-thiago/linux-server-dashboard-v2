@@ -14,7 +14,6 @@ window.Dash = window.Dash || {};
   Dash.nextPollAt = null;
 
   const PERIOD_MS = { '1h': 3600000, '6h': 21600000, '24h': 86400000, '72h': 259200000 };
-  const TOKEN_KEY = 'dash_token';
   const THEME_KEY = 'dash_theme';
 
   function currentTheme() {
@@ -40,23 +39,66 @@ window.Dash = window.Dash || {};
     } catch { /* noop */ }
   }
 
-  function getToken() {
-    return sessionStorage.getItem(TOKEN_KEY);
+  // Sessão por cookie (ADR 0007): o navegador manda o cookie sozinho; nada de token na URL
+  // nem guardado pelo JavaScript. 401 abre a janela de login.
+  async function apiFetch(path, opts = {}) {
+    const res = await fetch(path, { credentials: 'same-origin', ...opts });
+    if (res.status === 401) showLogin();
+    return res;
   }
 
-  async function apiFetch(path, opts = {}) {
-    const t = getToken();
-    const headers = { ...(opts.headers || {}) };
-    if (t) headers.Authorization = `Bearer ${t}`;
-    const res = await fetch(path, { ...opts, headers });
-    if (res.status === 401 && !opts._retried) {
-      const tok = prompt('Token de acesso do dashboard (DASH_TOKEN):');
-      if (tok && tok.trim()) {
-        sessionStorage.setItem(TOKEN_KEY, tok.trim());
-        return apiFetch(path, { ...opts, _retried: true });
+  function showLogin(message = '') {
+    const box = $('login');
+    if (!box) return;
+    box.hidden = false;
+    $('loginError').textContent = message;
+    const input = $('loginToken');
+    if (input && typeof input.focus === 'function') input.focus();
+  }
+
+  async function submitLogin(ev) {
+    if (ev && typeof ev.preventDefault === 'function') ev.preventDefault();
+    const token = String($('loginToken').value || '').trim();
+    if (!token) return;
+    $('loginSubmit').disabled = true;
+    try {
+      const res = await fetch('/api/login', {
+        method: 'POST',
+        credentials: 'same-origin',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ token }),
+      });
+      if (res.ok) {
+        $('loginToken').value = '';
+        window.location.reload();
+        return;
       }
+      let msg = 'Token incorreto';
+      try { msg = (await res.json()).error || msg; } catch { /* resposta sem JSON */ }
+      $('loginError').textContent = res.status === 429 ? 'Muitas tentativas — aguarde 1 minuto.' : msg;
+    } catch {
+      $('loginError').textContent = 'Painel inacessível — confira se o serviço está rodando.';
+    } finally {
+      $('loginSubmit').disabled = false;
     }
-    return res;
+  }
+
+  async function logout(all) {
+    await fetch(all ? '/api/logout-all' : '/api/logout', { method: 'POST', credentials: 'same-origin' });
+    window.location.reload();
+  }
+
+  async function checkSession() {
+    try {
+      const res = await fetch('/api/session', { credentials: 'same-origin' });
+      if (!res.ok) return null;
+      const s = await res.json();
+      const box = $('sessionHelp');
+      if (box) box.hidden = !s.authRequired;
+      return s;
+    } catch {
+      return null;
+    }
   }
 
   function periodRange() {
@@ -217,8 +259,7 @@ window.Dash = window.Dash || {};
   }
 
   function openSSE() {
-    const t = getToken();
-    const es = new EventSource(t ? `/api/stream?token=${encodeURIComponent(t)}` : '/api/stream');
+    const es = new EventSource('/api/stream');
     es.addEventListener('hello', (e) => {
       const payload = JSON.parse(e.data);
       setStatus(payload);
@@ -231,6 +272,9 @@ window.Dash = window.Dash || {};
     });
     es.addEventListener('sample', (e) => {
       const payload = JSON.parse(e.data);
+      // Backfill após reconexão: ignora o que a tela já tem (amostras chegam em ordem).
+      const last = Dash.samples.length ? Dash.samples[Dash.samples.length - 1].ts : '';
+      if (payload.sample && payload.sample.ts <= last) return;
       Dash.latest = payload.sample;
       Dash.alerts.active = payload.alerts || [];
       if (payload.health) Dash.health = payload.health;
@@ -266,7 +310,15 @@ window.Dash = window.Dash || {};
       Dash.sections.health(Dash.latest);
       if (payload.meta && payload.meta.online === false) refreshOutages();
     });
-    es.onerror = () => { $('statusDot').className = 'dot dot-offline'; };
+    // Sem sessão o EventSource só vê "erro": confere a sessão em vez de tentar em loop.
+    es.onerror = async () => {
+      $('statusDot').className = 'dot dot-offline';
+      const s = await checkSession();
+      if (s && s.authRequired && !s.authenticated) {
+        es.close();
+        showLogin('Sessão expirada — entre de novo.');
+      }
+    };
   }
 
   function setNavOpen(open) {
@@ -356,6 +408,9 @@ window.Dash = window.Dash || {};
     });
 
     $('themeToggle').addEventListener('click', toggleTheme);
+    $('loginForm').addEventListener('submit', submitLogin);
+    $('logoutBtn').addEventListener('click', () => logout(false));
+    $('logoutAllBtn').addEventListener('click', () => logout(true));
 
     $('annotationAdd').addEventListener('click', () => Dash.api.addAnnotationNow());
     $('annotationText').addEventListener('keydown', (e) => {
@@ -378,5 +433,13 @@ window.Dash = window.Dash || {};
   Dash.charts.registerSpecs();
   Dash.router.init();
   wireUI();
-  refreshAll().then(openSSE);
+  // Sem sessão (e com token exigido): só o login, sem abrir API nem SSE. Se a checagem
+  // falhar (painel fora do ar), segue o fluxo normal, que trata o erro sozinho.
+  checkSession().then((s) => {
+    if (s && s.authRequired && !s.authenticated) {
+      showLogin();
+      return;
+    }
+    refreshAll().then(openSSE);
+  });
 })();
