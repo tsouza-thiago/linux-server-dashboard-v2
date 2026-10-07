@@ -31,8 +31,10 @@ export class History {
   get samples() { return this.raw.samples; }
 
   append(sample) {
-    this.raw.append(sample);
+    // Fecha os baldes ANTES de o bruto descartar as amostras antigas: depois de uma pausa
+    // maior que a janela bruta, o último balde aberto só existe nelas.
     this.rollup.close(this.raw.samples, Date.parse(sample?.ts));
+    this.raw.append(sample);
   }
 
   async flush() {
@@ -64,16 +66,20 @@ export class History {
       old = mergeBuckets(this.rollup.query(first, Math.min(toMs, boundary - 1)), step)
         .filter((b) => b.t < boundary);
     }
+    // Brutas a partir da fronteira, mais as anteriores a ela que ainda não viraram agregado
+    // (balde de 5 min aberto): cada amostra entra uma única vez.
+    const lastRolled = this.rollup.lastT;
     const recentSamples = raw.filter((s) => {
       const ms = Date.parse(s.ts);
-      return ms >= boundary && ms >= fromMs && ms <= toMs;
+      if (ms < fromMs || ms > toMs) return false;
+      return ms >= boundary || Math.floor(ms / ROLLUP_STEP_MS) * ROLLUP_STEP_MS > lastRolled;
     });
     const recent = aggregate(recentSamples, step);
     return {
       from: new Date(fromMs).toISOString(),
       to: new Date(toMs).toISOString(),
       step,
-      buckets: [...old, ...recent],
+      buckets: old.length ? mergeBuckets([...old, ...recent], step) : recent,
     };
   }
 }

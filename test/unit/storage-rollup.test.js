@@ -130,3 +130,31 @@ test('History.buckets: sem dados devolve lista vazia; maxPoints é limitado', ()
   h.append({ host: 'sem ts' });
   assert.equal(h.length, 0);
 });
+
+test('History: pausa maior que a janela bruta não perde o último balde aberto', async () => {
+  const dataDir = tmp();
+  const h = new History({ dataDir, log: silent });
+  for (let i = 0; i < 13; i++) h.append(sample(i)); // balde 10–15 fica aberto com 3 amostras
+  await h.flush();
+  const later = new History({ dataDir, log: silent });
+  later.append(sample(5 * 24 * 60)); // painel volta 5 dias depois
+  await later.flush();
+  assert.equal(later.length, 1, 'bruto antigo saiu da memória');
+  const r = later.buckets({ fromMs: BASE, toMs: Date.parse(at(5 * 24 * 60)), maxPoints: 2000 });
+  assert.equal(r.buckets.reduce((n, b) => n + b.n, 0), 14, 'as 13 amostras antigas + a nova');
+});
+
+test('History.buckets: amostra recente em balde ainda aberto aparece na visão longa', async () => {
+  const dataDir = tmp();
+  const h = new History({ dataDir, log: silent });
+  for (let i = 0; i < 13; i++) h.append(sample(i));
+  const back = 5 * 24 * 60 + 7; // volta 5 dias depois, fora do alinhamento de 5 min
+  h.append(sample(back, 70));
+  h.append(sample(back + 1, 71));
+  await h.flush();
+  const r = h.buckets({ fromMs: BASE, toMs: Date.parse(at(back + 1)), maxPoints: 2000 });
+  assert.equal(r.buckets.reduce((n, b) => n + b.n, 0), 15, '13 antigas + 2 novas, cada uma 1 vez');
+  assert.equal(r.buckets.at(-1).m.tempC[1], 71);
+  const ts = r.buckets.map((b) => b.t);
+  assert.deepEqual(ts, [...new Set(ts)], 'sem baldes repetidos');
+});
