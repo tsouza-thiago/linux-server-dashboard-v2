@@ -81,7 +81,7 @@ A V2 está sendo construída neste repositório a partir da `v1.0.0`, seguindo o
 ```
 [Servidor Debian 13]  ← 1 SSH/min (comando único, LC_ALL=C, não-interativo)
         ↑
-[Node.js local]  ── poller (intervalo 60s) → parse → histórico em memória (períodos de até 72h na UI) + JSON
+[Node.js local]  ── poller (intervalo 60s) → parse → histórico NDJSON (72h brutas + 90d agregados)
         ↓
 [Express local 127.0.0.1:3000]  ── dashboard + /api/status + /api/history + /api/alerts +
                                    /api/annotations + /api/export + SSE
@@ -113,6 +113,8 @@ npm run check                   # verificação completa — obrigatória antes 
 npm run test:unit               # só testes unitários (test/unit)
 npm run test:integration        # só integração (test/integration: HTTP, shell, ssh falso)
 npm run capturar-amostra        # 1 coleta real → data/amostra-{bruta,anonima}.txt (fixtures)
+npm run migrar-v1 -- --verificar  # resume o data/history.json da V1 sem gravar nada
+npm run migrar-v1               # migra a V1 agora (o painel também migra sozinho ao iniciar)
 node server/poller.js --once    # teste rápido do poller sem o servidor web
 ```
 
@@ -134,7 +136,7 @@ node server/poller.js --once    # teste rápido do poller sem o servidor web
 | `POLL_INTERVAL` | `60000`   | Intervalo de coleta em ms (mínimo 10000)         |
 | `PORT`          | `3000`    | Porta do dashboard local                         |
 | `HISTORY_LIMIT` | `4320`    | Amostras retidas (3 dias a 1/min; 4320 = 72h)    |
-| `HISTORY_FILE`  | `data/history.json` | Arquivo de persistência (dentro de `data/`) |
+| `HISTORY_FILE`  | `data/history.json` | Histórico da **V1** a migrar (1 vez, com backup); a pasta dele é a pasta de dados |
 | `LOG_FILE`      | `data/dashboard.log` | Arquivo de log (dentro de `data/`)        |
 | `NET_IF`        | *(vazio)* | Interface de rede a monitorar (vazio = seção Rede omitida) |
 | `DISK_MOUNTS`   | `/`       | Mount points monitorados, separados por espaço    |
@@ -241,16 +243,24 @@ echo '===FIM==='
 
 ## Persistência (data/)
 
-- **`history.json`** — append incremental a cada poll, gravação **atômica e assíncrona**
-  (`*.tmp` + rename, sem bloquear o poll), permissões 0600
-  - Retenção: `HISTORY_LIMIT` amostras (padrão 4320 = 3 dias), FIFO; no boot continua acumulando
+- **`history/AAAA-MM-DD.ndjson`** — amostras brutas, 1 linha por poll, **append-only** em fila
+  assíncrona (não bloqueia o poll), 1 arquivo por dia (UTC), 0600 (pasta 0700)
+  - Retenção: 72 h contadas da amostra mais recente (e no máximo `HISTORY_LIMIT` em memória);
+    dias fora da janela são apagados. Linha cortada por queda é ignorada na leitura
+  - ~3,7 KB por poll (~16 MB nas 72 h) — antes a V1 reescrevia o histórico inteiro (B7)
+- **`rollup/AAAA-MM-DD.ndjson`** — agregados de 5 min `{ t, n, m: { métrica: [mín, máx, média] } }`
+  por 90 dias, calculados das brutas; fechar de novo não duplica e o boot fecha os pendentes
+  - ~1,2 KB a cada 5 min (~29 MB em 90 dias com 4 mounts e 3 discos)
+- **`history.v1-migrado.json`** — backup do `history.json` da V1, criado pela migração
+  automática no 1º boot (idempotente; arquivo ilegível fica intacto). Pode ser apagado
 - **`alerts.json`** — histórico de alertas com ciclo de vida: `new` → `ack` → `resolved`
   - Auto-resolve: quando a condição deixa de existir no poll seguinte, o alerta é resolvido
   - Reconhecer/resolver também via UI (painel de alertas); retenção máx 500
   - Alerta offline tem **chave estável** (`servidor-inacessivel`): mensagens variadas de
     erro não duplicam o alerta ativo
 - **`annotations.json`** — anotações do usuário na linha do tempo (texto + rótulo + timestamp)
-- ~60-200 escritas/dia no SSD local (irrelevante; não toca o servidor)
+- Encerramento (SIGINT/SIGTERM) espera gravar histórico, alertas e anotações pendentes (B11)
+- Tudo no SSD local; nada é gravado no servidor
 
 ## API
 
@@ -258,7 +268,8 @@ echo '===FIM==='
 |-------------------|--------|-------------------------------------------------------|
 | `/`               | GET    | Dashboard web (sidebar multi-view, hash routing)      |
 | `/api/status`     | GET    | Última amostra + meta (online, lastPollAt, nextPollAt, offlineSince) + alertas ativos |
-| `/api/history`    | GET    | `?limit=N&from=&to=` → amostras no range (downsample p/ máx 720) |
+| `/api/history`    | GET    | `?limit=N&from=&to=` → amostras no range (redução p/ máx 720 com pior caso por grupo) |
+| `/api/history?formato=baldes` | GET | `&from=&to=&limit=` → `{from, to, step, buckets}` com mín/máx/média, até 90 dias (padrão 24 h) |
 | `/api/alerts`     | GET    | `?status=&level=&limit=` → `{active, all}` com ciclo de vida |
 | `/api/alerts/:id/ack`     | POST | Reconhece alerta                               |
 | `/api/alerts/:id/resolve` | POST | Resolve alerta                                 |
@@ -301,7 +312,7 @@ linux-server-dashboard/
 ├── .env                    (config local — NUNCA commitar)
 ├── .env.example            (modelo sem valores)
 ├── .gitignore              (exclui .env, data/, node_modules/)
-├── data/                   (history.json + alerts.json + annotations.json + logs — runtime)
+├── data/                   (history/ + rollup/ + alerts.json + annotations.json + logs — runtime)
 ├── server/
 │   ├── index.js            (Express, SSE, API, loop de poll, export CSV)
 │   ├── config.js           (parser único do .env, validações, sanitizeToken/sanitizeHost)
@@ -309,7 +320,7 @@ linux-server-dashboard/
 │   ├── csv.js              (export CSV com escape anti-fórmula)
 │   ├── poller.js           (fachada do coletor + alertas; CLI --once)
 │   ├── collector/          (builder.js: script; parser.js: amostra v2; rates.js: taxas; index.js: 1 SSH/poll)
-│   ├── history.js          (buffer em memória + persistência JSON atômica assíncrona)
+│   ├── storage/            (ndjson.js: bruto 72 h; rollup.js: 5 min/90 d; buckets.js: agregação; migrate-v1.js; index.js: History)
 │   └── stores.js           (JsonStore genérico: AlertsStore c/ ciclo de vida, AnnotationsStore)
 ├── CHANGELOG.md            ← histórico de mudanças (Keep a Changelog)
 ├── docs/                   (PLANO_V2.md + adr/ — plano e decisões da V2)
@@ -335,8 +346,8 @@ linux-server-dashboard/
   `ssh seu-host 'uptime'`
 - **Poll demorado/parado:** logs em `data/dashboard.log`; testar comando manual:
   `ssh seu-host 'LC_ALL=C free -m'`
-- **Nenhum dado (histórico vazio):** confirme `HISTORY_FILE` existente e permissões de
-  escrita na pasta `data/`
+- **Nenhum dado (histórico vazio):** confira `ls -la data/history/` (arquivos `.ndjson` de hoje) e
+  as permissões de escrita na pasta `data/`; veio da V1? `npm run migrar-v1 -- --verificar`
 - **Chave SSH quebrada:** `ssh seu-host 'echo ok'` deve responder `ok` sem pedir senha.
   Corrigir com `./install.sh --configure` ou `ssh-copy-id -i ~/.ssh/dashboard_ed25519.pub seu-host`
 - **Host key não autorizada:** primeira conexão — `ssh seu-host 'echo ok'` + `yes`,

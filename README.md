@@ -112,7 +112,7 @@ acontece por SSH, com chave criptográfica, e apenas **uma vez por minuto**.
       ↑
 [poller.js]  coleta → parse → taxas de rede/I/O → alertas → amostra JSON
       ↑
-[history.js]  histórico em memória (períodos de até 72h na UI) + persistência atômica em data/history.json
+[storage/]    histórico append-only em data/history/ (72h brutas) + data/rollup/ (90 dias em baldes de 5 min)
       ↑
 [index.js]  Express (127.0.0.1:3000) → dashboard + API REST + SSE (tempo real)
       ↑
@@ -264,7 +264,7 @@ As variáveis ficam no arquivo `.env` (o instalador já cria e preenche o `SSH_H
 | `POLL_INTERVAL` | `60000` | Intervalo entre coletas em ms. **Mínimo 10000** (protege o servidor) |
 | `PORT` | `3000` | Porta do dashboard no seu computador |
 | `HISTORY_LIMIT` | `4320` | Amostras retidas (4320 = 3 dias a 1/min) |
-| `HISTORY_FILE` | `data/history.json` | Arquivo de persistência (sempre dentro de `data/`) |
+| `HISTORY_FILE` | `data/history.json` | Histórico da V1 a migrar (1 vez, com backup; sempre dentro de `data/`) |
 | `LOG_FILE` | `data/dashboard.log` | Arquivo de log (sempre dentro de `data/`) |
 | `NET_IF` | *(vazio)* | Interface de rede a monitorar (vazio = seção Rede omitida) |
 | `DISK_MOUNTS` | `/` | Mount points monitorados, separados por espaço |
@@ -336,7 +336,7 @@ Deve devolver um JSON com `"online":true`.
 # ou Ctrl+C no terminal do ./start.sh
 ```
 
-> **Nada se perde ao parar.** O histórico fica salvo em `data/history.json` e os
+> **Nada se perde ao parar.** O histórico fica salvo em `data/history/` e `data/rollup/` e os
 > gráficos continuam de onde pararam. Parar o painel **não afeta o servidor**.
 
 ---
@@ -388,7 +388,7 @@ princípio é o mesmo: o monitoramento não pesa em quem é monitorado.
 |----------|--------|-----------|
 | `/` | GET | Dashboard web (sidebar multi-view, hash routing) |
 | `/api/status` | GET | Última amostra + meta (online, lastPollAt, nextPollAt, offlineSince) + alertas ativos |
-| `/api/history` | GET | `?limit=N&from=&to=` → amostras no range (downsample p/ máx 720) |
+| `/api/history` | GET | `?limit=N&from=&to=` → amostras no range (redução p/ máx 720 preservando picos); `formato=baldes` → mín/máx/média até 90 dias |
 | `/api/alerts` | GET | `?status=&level=&limit=` → `{active, all}` com ciclo de vida |
 | `/api/alerts/:id/ack` | POST | Reconhece um alerta |
 | `/api/alerts/:id/resolve` | POST | Resolve um alerta |
@@ -520,14 +520,14 @@ linux-server-dashboard/
 ├── package.json            (deps: express + chart.js + zoom/annotation plugins)
 ├── .env.example            (modelo de configuração, sem valores reais)
 ├── .gitignore              (exclui .env, data/, node_modules/)
-├── data/                   (runtime: history.json, alerts.json, annotations.json, log)
+├── data/                   (runtime: history/, rollup/, alerts.json, annotations.json, log)
 ├── server/
 │   ├── index.js            (Express, SSE, API, loop de poll, export CSV)
 │   ├── config.js           (parser único do .env, validações, sanitização)
 │   ├── security.js         (Host check, CSRF c/ cookie, headers, token timing-safe, rate limit)
 │   ├── csv.js              (export CSV com escape anti-fórmula)
 │   ├── poller.js           (comando SSH, parse com overrides p/ teste, taxas de rede/I/O, alertas)
-│   ├── history.js          (buffer em memória + persistência JSON atômica assíncrona)
+│   ├── storage/            (histórico NDJSON bruto + agregados de 5 min + migração da V1)
 │   └── stores.js           (JsonStore genérico: AlertsStore, AnnotationsStore)
 ├── test/                   (suíte de testes — node --test)
 ├── test-support/           (helpers de teste: VM p/ frontend, request HTTP)

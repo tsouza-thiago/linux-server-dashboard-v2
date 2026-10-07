@@ -91,7 +91,7 @@ test('arquivos de frontend passam no node --check', () => {
 test('arquivos essenciais existem (regressão de estrutura)', () => {
   const required = [
     'server/config.js', 'server/security.js', 'server/csv.js', 'server/index.js',
-    'server/poller.js', 'server/history.js', 'server/stores.js',
+    'server/poller.js', 'server/storage/index.js', 'server/stores.js',
     'install.sh', 'install-lib.sh', 'start.sh', 'stop.sh', '.env.example', 'public/index.html',
     'public/js/main.js', 'public/js/router.js', 'public/js/charts.js',
     'public/js/sections.js', 'public/js/analysis.js',

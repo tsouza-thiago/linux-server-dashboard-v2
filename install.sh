@@ -132,7 +132,8 @@ ensure_token() {
 ensure_data() {
   mkdir -p data
   chmod 700 data
-  chmod 600 data/history.json data/alerts.json data/annotations.json data/dashboard.log 2>/dev/null || true
+  chmod 700 data/history data/rollup 2>/dev/null || true
+  chmod 600 data/history/*.ndjson data/rollup/*.ndjson data/history*.json data/alerts.json data/annotations.json data/dashboard.log 2>/dev/null || true
   log "Pasta data/ pronta (permissões restritas)"
 }
 

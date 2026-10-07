@@ -1,7 +1,8 @@
 # Linux Server Dashboard — Plano da V2
 
 > Status: **plano aprovado por completo em 07/10/2026** · F0 concluída (`2.0.0-alpha.1`) ·
-> F1 concluída (`2.0.0-alpha.2`, validada no servidor real em 901 ms) · próxima: **F2** ·
+> F1 concluída (`2.0.0-alpha.2`, validada no servidor real em 901 ms) · F2 implementada, falta
+> validar a migração com o `data/` real da V1 ·
 > base: `v1.0.0` (= `tsouza-thiago/linux-server-dashboard` @ `11a3286`, 196 testes verdes)
 >
 > Referência visual: canvas "Dashboard V2 — direções de design" (privado, do mantenedor).
@@ -222,7 +223,7 @@ public/js/          ES modules nativos, sem bundler e sem build:
 - Eixo de tempo real; buracos visíveis nos períodos offline; só a view ativa renderiza.
 - Período na URL (`#/armazenamento?p=24h`); backfill após reconexão do SSE.
 - Amostra com `schemaVersion: 2`; amostras v1 continuam legíveis.
-- Armazenamento estimado: 72 h brutas ≈ 7 MB + 90 d agregados ≈ 10 MB, com escrita de ~1,5 KB/min (em vez de 6,8 MB/min).
+- Armazenamento medido na F2 (amostra real: 4 mounts, 3 discos): 72 h brutas ≈ 16 MB (3,7 KB/min) + 90 d agregados ≈ 29 MB (1,2 KB a cada 5 min), em vez de reescrever ~6,8 MB/min.
 
 ---
 
@@ -278,7 +279,7 @@ commit** (testes + cobertura + `npm audit` + `bash -n`), e nenhum commit vermelh
 |---|---|---|
 | **F0 — Base** ✅ | criar `linux-server-dashboard-v2` com histórico; tag `v1.0.0`; CHANGELOG; `docs/` + ADRs; `npm run check`; reorganizar `test/{unit,integration,e2e}`; testes de B1–B12 marcados como `todo` do `node:test` (reproduzem o bug sem deixar a suíte vermelha; o `todo` sai no commit que corrige); **você roda o comando de coleta 1x no servidor** para eu capturar fixtures | suíte organizada; bugs documentados por testes |
 | **F1 — Coleta** ✅ | probes, builder, parser v2, taxas (CPU%, util, rede e SMART corrigidos), hash/versão | goldens verdes; `--once` funciona no servidor real |
-| **F2 — Armazenamento** | NDJSON + rollups 90 d + migração v1 + `/api/history` com baldes | migração testada com `data/` real da V1 |
+| **F2 — Armazenamento** 🔶 código pronto | NDJSON + rollups 90 d + migração v1 + `/api/history` com baldes | migração testada com `data/` real da V1 |
 | **F3 — Alertas** | motor com chave estável, histerese e debounce; limiares no `.env`; outages; health derivado | B3/B9 resolvidos; testes de flapping |
 | **F4 — HTTP** | `node:http`, sessão por cookie, SSE com backfill, segurança portada | testes de segurança V1 + novos verdes; `npm audit` limpo |
 | **F5 — Fundação do front** | ES modules, store, router, `html` com escape, uPlot | e2e abre todas as views |

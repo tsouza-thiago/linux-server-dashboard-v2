@@ -11,7 +11,8 @@
     "test:unit": "node --test \"test/unit/**/*.test.js\"",
     "test:integration": "node --test \"test/integration/**/*.test.js\"",
     "check": "node scripts/check.mjs",
-    "capturar-amostra": "node scripts/capturar-amostra.mjs"
+    "capturar-amostra": "node scripts/capturar-amostra.mjs",
+    "migrar-v1": "node server/storage/migrate-v1.js"
   },
   "engines": {
     "node": ">=18"

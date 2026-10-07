@@ -243,7 +243,7 @@ O script encontra o processo, encerra com gentileza (SIGTERM) e confirma:
 
 ```
 Parando Linux Server Dashboard (PID 12345)...
-Serviço parado. O histórico foi preservado (data/history.json).
+Serviço parado. O histórico foi preservado (data/history/).
 ```
 
 ### Se você iniciou no terminal (Ctrl+C)
@@ -267,7 +267,7 @@ kill 12345
 ```
 
 > **O que acontece com os dados ao parar?** Nada se perde. O histórico fica salvo
-> em `data/history.json`. Na próxima vez que iniciar, os gráficos continuam de onde
+> em `data/history/` (72 h detalhadas) e `data/rollup/` (90 dias resumidos). Na próxima vez que iniciar, os gráficos continuam de onde
 > pararam. Enquanto parado, apenas não há novas coletas.
 
 > **O servidor é afetado?** Não. Parar o painel não altera nada no servidor.
@@ -450,7 +450,7 @@ ssh seu-host 'echo ok'
 
 ### Gráficos vazios ("sem amostras")
 
-- O histórico ficou vazio? Confira `ls -la data/history.json` (o arquivo deve ter tamanho > 0).
+- O histórico ficou vazio? Confira `ls -la data/history/` (deve haver um arquivo `.ndjson` de hoje com tamanho > 0).
 - O período escolhido pode ser maior que o histórico disponível: selecione `1h`.
 - Na primeira execução, aguarde 1-2 minutos para acumular amostras.
 
@@ -498,9 +498,9 @@ o problema é SSH/rede — os logs dirão o motivo.
 6. **Fique de olho na Análise** — o **ETA de discos** e a **pressão de RAM** avisam
    problemas com dias de antecedência, antes que virem alerta.
 7. **Mantenha o histórico** — não apague `data/` por acidente; ele guarda 3 dias de
-   amostras e todo o histórico de alertas e anotações.
-8. **Backup do histórico (opcional)** — se quiser guardar além de 3 dias, exporte CSV
-   periodicamente ou copie `data/history.json` para outro lugar.
+   amostras detalhadas, 90 dias resumidos e todo o histórico de alertas e anotações.
+8. **Backup do histórico (opcional)** — se quiser guardar além de 90 dias, exporte CSV
+   periodicamente ou copie as pastas `data/history/` e `data/rollup/` para outro lugar.
 9. **Segurança na prática** — não torne o painel acessível fora do seu computador.
    O endereço local `127.0.0.1` é de propósito. Se precisar acessar de longe, use VPN.
 

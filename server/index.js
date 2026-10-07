@@ -1,7 +1,8 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import express from 'express';
-import { HistoryStore } from './history.js';
+import { History } from './storage/index.js';
+import { migrateV1 } from './storage/migrate-v1.js';
 import { AlertsStore, AnnotationsStore } from './stores.js';
 import { collect } from './poller.js';
 import { config, ROOT, isPlaceholderHost } from './config.js';
@@ -20,10 +21,15 @@ export function createApp(deps = {}) {
     console.log(line);
   });
 
-  const store = deps.store || new HistoryStore({
-    limit: deps.historyLimit ?? config.HISTORY_LIMIT,
-    file: HISTORY_FILE,
-  });
+  // Histórico (ADR 0005) em data/: bruto em history/, agregados em rollup/. Na 1ª subida
+  // depois da V1, o data/history.json antigo é migrado e guardado como backup.
+  const DATA_DIR = deps.dataDir ?? path.dirname(HISTORY_FILE);
+  let store = deps.store;
+  if (!store) {
+    const migration = migrateV1({ v1File: HISTORY_FILE, dataDir: DATA_DIR, log });
+    if (migration.status === 'invalido') log(`[migração] histórico da V1 não migrado: ${migration.error}`);
+    store = new History({ dataDir: DATA_DIR, limit: deps.historyLimit ?? config.HISTORY_LIMIT, log });
+  }
   const alertsStore = deps.alertsStore || new AlertsStore({
     file: deps.alertsFile ?? path.join(ROOT, 'data/alerts.json'),
   });
@@ -110,6 +116,19 @@ export function createApp(deps = {}) {
     };
   }
 
+  const HOUR_MS = 3600000;
+  const MAX_RANGE_MS = 91 * 24 * HOUR_MS;
+
+  /** Intervalo de `formato=baldes`: padrão últimas 24 h; null se inválido. */
+  function parseBucketRange(req) {
+    const latest = store.getLatest();
+    const toMs = req.query.to ? Date.parse(req.query.to) : (latest ? Date.parse(latest.ts) : Date.now());
+    const fromMs = req.query.from ? Date.parse(req.query.from) : toMs - 24 * HOUR_MS;
+    if (!Number.isFinite(fromMs) || !Number.isFinite(toMs) || fromMs > toMs || toMs - fromMs > MAX_RANGE_MS) return null;
+    const maxPoints = Math.min(Math.max(parseInt(req.query.limit, 10) || 720, 1), 2000);
+    return { fromMs, toMs, maxPoints };
+  }
+
   function parseRange(req) {
     const from = req.query.from || undefined;
     const to = req.query.to || undefined;
@@ -135,6 +154,12 @@ export function createApp(deps = {}) {
   });
 
   app.get('/api/history', (req, res) => {
+    if (req.query.formato === 'baldes') {
+      const range = parseBucketRange(req);
+      if (!range) return res.status(400).json({ error: 'intervalo inválido (from ≤ to, até 90 dias)' });
+      if (typeof store.buckets !== 'function') return res.status(501).json({ error: 'histórico sem agregação' });
+      return res.json({ ...store.buckets(range), count: store.length });
+    }
     const { from, to, limit } = parseRange(req);
     res.json({ samples: store.getRange(from, to, limit), count: store.length });
   });
@@ -247,7 +272,14 @@ export function createApp(deps = {}) {
     res.status(status).json({ error: status >= 500 ? 'erro interno do servidor' : 'requisição inválida' });
   });
 
-  return { app, state, store, alertsStore, annotationsStore, broadcast, runPoll, parseRange, statusPayload, sseClients };
+  /** Grava tudo o que está pendente (histórico, alertas, anotações) antes de sair (B11). */
+  async function shutdown() {
+    for (const res of sseClients) res.end();
+    sseClients.clear();
+    await Promise.all([store.flush?.(), alertsStore.flush?.(), annotationsStore.flush?.()]);
+  }
+
+  return { app, state, store, alertsStore, annotationsStore, broadcast, runPoll, parseRange, statusPayload, sseClients, shutdown };
 }
 
 export function startServer() {
@@ -257,7 +289,7 @@ export function startServer() {
   const LOG_FILE = config.LOG_FILE;
 
   fs.mkdirSync(path.dirname(LOG_FILE), { recursive: true, mode: 0o700 });
-  const logStream = fs.createWriteStream(LOG_FILE, { flags: 'a' });
+  const logStream = fs.createWriteStream(LOG_FILE, { flags: 'a', mode: 0o600 });
   try { fs.chmodSync(LOG_FILE, 0o600); } catch { /* best-effort */ }
   const log = (msg) => {
     const line = `[${new Date().toISOString()}] ${msg}`;
@@ -265,7 +297,7 @@ export function startServer() {
     logStream.write(`${line}\n`);
   };
 
-  const { app, runPoll } = createApp({ log });
+  const { app, runPoll, shutdown: flushAll } = createApp({ log });
 
   let pollTimer = null;
   const server = app.listen(PORT, '127.0.0.1', () => {
@@ -274,11 +306,13 @@ export function startServer() {
     pollTimer = setInterval(runPoll, POLL_INTERVAL);
   });
 
-  function shutdown() {
+  async function shutdown() {
     log('encerrando...');
     if (pollTimer) clearInterval(pollTimer);
-    server.close(() => process.exit(0));
-    setTimeout(() => process.exit(0), 3000).unref();
+    setTimeout(() => process.exit(0), 5000).unref();
+    server.close();
+    try { await flushAll(); } catch (err) { log(`falha ao gravar no encerramento: ${err.message}`); }
+    process.exit(0);
   }
   process.on('SIGINT', shutdown);
   process.on('SIGTERM', shutdown);
