@@ -13,6 +13,8 @@ pré-versões `2.0.0-alpha.N` (uma por fase do plano), depois `beta`, `rc` e `2.
 - Este changelog.
 - `npm run check`: sintaxe JS e shell, `.env`/`data/` fora do git, testes com cobertura e
   `npm audit` — obrigatório antes de cada commit. `npm run test:unit` e `npm run test:integration`.
+- `test/unit/bugs-v1.test.js`: 14 testes que reproduzem os bugs B1–B12 e a regra I5,
+  marcados como `todo` até a fase que os corrige.
 
 ### Segurança
 - Dependências transitivas do Express atualizadas (`npm audit fix`): `proxy-addr` 2.0.8,
