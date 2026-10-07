@@ -7,6 +7,7 @@ import {
 import { buildScript, normalizeTargets } from './collector/builder.js';
 import { parseOutput } from './collector/parser.js';
 import { computeRates } from './collector/rates.js';
+import { evaluate } from './alerts/rules.js';
 
 export { describeError, runSSH, smartDue, SSH_OPTS, SMART_INTERVAL_MS, parseOutput, computeRates };
 
@@ -35,31 +36,12 @@ export function buildCommand(overrides = {}, mode = 'basico') {
   return buildScript(targets, mode).script;
 }
 
-// Estados de serviço que não indicam parada (o resto vira alerta crítico).
-const SERVICE_OK = new Set(['active', 'reloading', 'activating', 'desconhecido']);
-
-/** Alertas da V1 (o motor da V2 chega na F3). SMART só alerta em FAILED (B1). */
-export function computeAlerts(sample) {
-  const alerts = [];
-  for (const d of sample.disks || []) {
-    if (d.pct !== null && d.pct !== undefined && d.pct >= 90) {
-      alerts.push({ level: 'warning', message: `Disco ${d.mount} com ${d.pct}% usado` });
-    }
-  }
-  if (sample.ram && sample.ram.total > 0) {
-    const pct = (sample.ram.used / sample.ram.total) * 100;
-    if (pct >= 90) alerts.push({ level: 'warning', message: `RAM usada em ${pct.toFixed(0)}%` });
-  }
-  if (sample.tempC !== null && sample.tempC !== undefined && sample.tempC >= 60) {
-    alerts.push({ level: 'warning', message: `Temperatura CPU ${sample.tempC.toFixed(1)}°C` });
-  }
-  for (const s of sample.smart || []) {
-    if (s.status === 'FAILED') alerts.push({ level: 'critical', message: `SMART /dev/${s.dev}: ${s.status}` });
-  }
-  for (const [svc, state] of Object.entries(sample.services || {})) {
-    if (!SERVICE_OK.has(state)) alerts.push({ level: 'critical', message: `Serviço ${svc} ${state}` });
-  }
-  return alerts;
+/**
+ * Alertas de uma amostra isolada, pelas regras do motor (server/alerts/rules.js) com os
+ * limiares do .env. Sem estado: a histerese e o debounce do offline ficam no motor.
+ */
+export function computeAlerts(sample, thresholds = config.ALERTS) {
+  return evaluate(sample, thresholds).conditions;
 }
 
 /** Coleta com os alvos do .env; mesmos parâmetros da V1 (`runner` recebe host e comando). */

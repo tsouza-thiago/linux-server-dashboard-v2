@@ -85,7 +85,8 @@ function flash(el) {
 
 Dash.sections = {
   health(latest) {
-    const { score, level, parts } = Dash.analysis.healthScore(latest, Dash.alerts.active);
+    // Saúde calculada no servidor com os limiares do .env; o cálculo local é só reserva.
+    const { score, level, parts } = Dash.health || Dash.analysis.healthScore(latest, Dash.alerts.active);
     const color = level === 'ok' ? '#4FA98A' : level === 'warn' ? '#D6A23C' : '#E2604F';
     $('healthRing').style.background = `conic-gradient(${color} ${score * 3.6}deg, var(--bg-surface-2) 0deg)`;
     $('healthScore').textContent = score;
@@ -334,13 +335,15 @@ Dash.sections = {
   analysis() {
     const latest = Dash.latest;
     if (!latest) return;
-    const health = Dash.analysis.healthScore(latest, Dash.alerts.active);
+    const health = Dash.health || Dash.analysis.healthScore(latest, Dash.alerts.active);
     const ram = Dash.analysis.ramPressure(Dash.samples);
     const etas = Dash.analysis.diskEta(Dash.samples);
     const daily = Dash.analysis.dailySummary(Dash.samples);
-    const outages = Dash.analysis.outages(Dash.alerts.all);
+    // Quedas e uptime vêm do registro próprio do servidor (/api/outages), não dos alertas.
+    const server = Dash.outages;
+    const outages = server ? server.outages : Dash.analysis.outages(Dash.alerts.all);
     const winMs = 2592000000;
-    const uptime = Dash.analysis.uptimePct(Dash.alerts.all, winMs);
+    const uptime = server ? server.uptime : Dash.analysis.uptimePct(Dash.alerts.all, winMs);
 
     const rp = $('ramPressure');
     rp.innerHTML = `
@@ -375,11 +378,11 @@ Dash.sections = {
     ol.innerHTML = outages.length ? outages.map((o) => `
       <div class="outage-row">
         <span>${Dash.fmt.timeDate(o.from)} → ${o.to ? Dash.fmt.timeDate(o.to) : '<b>em curso</b>'}</span>
-        <span>${o.to ? `duração ${Dash.fmt.duration(o.durationSec)}` : `<span class="badge badge-bad">offline</span>`}</span>
+        <span>${o.to ? `duração ${Dash.fmt.duration(o.durationSec)}` : `<span class="badge badge-bad">offline</span>`}${o.reason ? ` · ${Dash.fmt.esc(o.reason)}` : ''}</span>
       </div>`).join('') : '<div class="stat-row"><span class="k">nenhum outage registrado nos últimos 30 dias</span></div>';
     const uptimeEl = document.createElement('div');
     uptimeEl.className = 'stat-row';
-    uptimeEl.innerHTML = `<span class="k">Uptime (últimos 30 dias)</span><span class="v">${uptime.uptimePct.toFixed(2)}%</span>`;
+    uptimeEl.innerHTML = `<span class="k">Uptime (últimos 30 dias)</span><span class="v">${typeof uptime.uptimePct === 'number' ? `${uptime.uptimePct.toFixed(2)}%` : '—'}</span>`;
     ol.prepend(uptimeEl);
   },
 

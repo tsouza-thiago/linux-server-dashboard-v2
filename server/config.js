@@ -44,6 +44,31 @@ export function clampInt(value, def, min, max) {
   return n;
 }
 
+/**
+ * Inteiro do .env validado: vazio usa o padrão; fora da faixa usa o padrão e registra um
+ * aviso (só o nome da variável e o valor numérico recusado — nunca o conteúdo do .env).
+ */
+export function intSetting(key, raw, def, min, max, warnings) {
+  if (raw === undefined || raw === null || String(raw).trim() === '') return def;
+  const n = Number(String(raw).trim());
+  if (!Number.isInteger(n) || n < min || n > max) {
+    warnings.push(`${key} inválido (aceita ${min}–${max}); usando ${def}`);
+    return def;
+  }
+  return n;
+}
+
+/** Limiares dos alertas (ADR 0006): fonte única para o motor, o índice de saúde e a UI. */
+export function alertThresholds(get = (k) => env(k, ''), warnings = []) {
+  return {
+    diskPct: intSetting('ALERT_DISK_PCT', get('ALERT_DISK_PCT'), 90, 50, 99, warnings),
+    ramPct: intSetting('ALERT_RAM_PCT', get('ALERT_RAM_PCT'), 90, 50, 99, warnings),
+    tempC: intSetting('ALERT_TEMP_C', get('ALERT_TEMP_C'), 60, 30, 110, warnings),
+    hysteresis: intSetting('ALERT_HYSTERESIS', get('ALERT_HYSTERESIS'), 5, 0, 20, warnings),
+    offlineAfter: intSetting('ALERT_OFFLINE_AFTER', get('ALERT_OFFLINE_AFTER'), 2, 1, 10, warnings),
+  };
+}
+
 export function clampPathToData(value, fallbackBasename) {
   const p = path.resolve(ROOT, value || '');
   const dataDir = path.join(ROOT, 'data');
@@ -62,6 +87,9 @@ export function sanitizeHost(value) {
   return v;
 }
 
+/** Avisos de configuração (valores recusados), mostrados no log ao iniciar. */
+export const configWarnings = [];
+
 export const config = {
   SSH_HOST: sanitizeHost(env('SSH_HOST', 'seu-host')),
   POLL_INTERVAL: clampInt(env('POLL_INTERVAL', ''), 60000, 10000, 3600000),
@@ -74,4 +102,5 @@ export const config = {
   DISK_DEVS: sanitizedDevs,
   SERVICES: sanitizedServices,
   DASH_TOKEN: env('DASH_TOKEN', '').trim(),
+  ALERTS: alertThresholds(undefined, configWarnings),
 };

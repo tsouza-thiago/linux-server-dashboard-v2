@@ -79,6 +79,7 @@ window.Dash = window.Dash || {};
     if (st) st.textContent = online ? 'online' : 'offline';
     $('lastPollAt').textContent = Dash.fmt.time(meta.lastPollAt) + (meta.lastError ? ` · ${meta.lastError}` : '');
     Dash.nextPollAt = meta.nextPollAt ? Date.parse(meta.nextPollAt) : null;
+    if (payload.health) Dash.health = payload.health;
     if (payload.sample && payload.sample.os && payload.sample.os.name) {
       $('osLabel').textContent = payload.sample.os.name;
     }
@@ -142,6 +143,16 @@ window.Dash = window.Dash || {};
     if (Dash.router.current() === 'alertas') Dash.sections.alertsView();
   }
 
+  // Quedas e uptime do registro próprio do servidor (atualizado em quedas e na volta).
+  async function refreshOutages() {
+    try {
+      const res = await apiFetch('/api/outages?days=30');
+      if (!res.ok) return;
+      Dash.outages = await res.json();
+      if (Dash.router.current() === 'analise') Dash.sections.analysis();
+    } catch { /* tenta de novo no próximo evento */ }
+  }
+
   async function refreshAll() {
     try {
       const [h, st, al, an] = await Promise.all([
@@ -164,6 +175,7 @@ window.Dash = window.Dash || {};
       Dash.sections.alertBar(Dash.alerts.active);
       Dash.sections.overview(Dash.latest);
       renderActiveView();
+      refreshOutages();
     } catch (err) {
       console.error('refreshAll falhou, tentando de novo em 10s', err);
       setTimeout(refreshAll, 10000);
@@ -221,6 +233,8 @@ window.Dash = window.Dash || {};
       const payload = JSON.parse(e.data);
       Dash.latest = payload.sample;
       Dash.alerts.active = payload.alerts || [];
+      if (payload.health) Dash.health = payload.health;
+      if (Dash.outages && Dash.outages.outages.some((o) => o.ongoing)) refreshOutages();
       Dash.samples.push(payload.sample);
       const fromTs = Date.now() - PERIOD_MS[Dash.period];
       Dash.samples = Dash.samples.filter((s) => Date.parse(s.ts) >= fromTs);
@@ -246,7 +260,12 @@ window.Dash = window.Dash || {};
       Dash.charts.applyAnnotations();
       if (Dash.router.current() === 'anotacoes') Dash.sections.annotationsView();
     });
-    es.addEventListener('status', (e) => setStatus(JSON.parse(e.data)));
+    es.addEventListener('status', (e) => {
+      const payload = JSON.parse(e.data);
+      setStatus(payload);
+      Dash.sections.health(Dash.latest);
+      if (payload.meta && payload.meta.online === false) refreshOutages();
+    });
     es.onerror = () => { $('statusDot').className = 'dot dot-offline'; };
   }
 

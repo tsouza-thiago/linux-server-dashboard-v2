@@ -158,10 +158,13 @@ test('API: runPoll com sucesso atualiza estado e status', async (t) => {
   assert.deepEqual(r.json.alerts, []);
 });
 
-test('API: runPoll com falha vira offline e cria alerta crítico', async (t) => {
+test('API: runPoll com falha vira offline e cria alerta crítico (após 2 falhas seguidas)', async (t) => {
   const s = await withServer(t, () => setupApp({
     collect: async () => ({ ok: false, error: 'SSH falhou (exit 255) — host não encontrado ou chave inválida', ts: new Date().toISOString() }),
   }));
+  await s.runPoll();
+  assert.equal(s.alertsStore.active.length, 0, '1 falha isolada não alerta (debounce)');
+  assert.equal(s.state.failures, 1);
   await s.runPoll();
   assert.equal(s.state.online, false);
   assert.ok(s.state.offlineSince);

@@ -52,21 +52,36 @@ export class JsonStore {
   }
 }
 
+// Atualizar só o valor de um alerta aberto (ex.: temperatura 61,2 → 61,5) não regrava o
+// arquivo a cada coleta: grava no máximo a cada 10 min, e sempre no encerramento.
+const VALUE_SAVE_MS = 10 * 60000;
+
 export class AlertsStore extends JsonStore {
-  constructor({ file = 'data/alerts.json', max = 500 } = {}) {
+  constructor({ file = 'data/alerts.json', max = 500, now = () => Date.now() } = {}) {
     super({ file });
     this.max = max;
+    this.now = now;
+    this._dirty = false;
+    this._savedAt = 0;
   }
 
-  add({ level, message, key }) {
-    const alert = {
-      id: randomUUID(),
-      ts: new Date().toISOString(),
-      level,
-      message,
-      status: 'new',
-    };
+  save() {
+    this._dirty = false;
+    this._savedAt = this.now();
+    return super.save();
+  }
+
+  async flush() {
+    if (this._dirty) this.save();
+    await super.flush();
+  }
+
+  add({ level, message, key, value }) {
+    const ts = new Date(this.now()).toISOString();
+    const alert = { id: randomUUID(), ts, level, message, status: 'new' };
     if (key) alert.key = key;
+    if (value !== undefined && value !== null) alert.value = value;
+    alert.lastSeenAt = ts;
     this.data.push(alert);
     this.trim();
     this.save();
@@ -77,7 +92,7 @@ export class AlertsStore extends JsonStore {
     const a = this.data.find((x) => x.id === id);
     if (!a) return null;
     a.status = status;
-    if (status === 'resolved') a.resolvedAt = new Date().toISOString();
+    if (status === 'resolved') a.resolvedAt = new Date(this.now()).toISOString();
     this.save();
     return a;
   }
@@ -99,22 +114,48 @@ export class AlertsStore extends JsonStore {
     return out.slice(-limit).reverse();
   }
 
-  reconcile(conditions) {
+  /**
+   * Sincroniza os alertas abertos com as condições atuais (ADR 0006). A chave estável da
+   * condição identifica o alerta (corrige B3): condição que persiste atualiza mensagem e
+   * valor do MESMO alerta; condição que sumiu é resolvida; nova condição abre um alerta.
+   * @param {object[]} conditions [{ key, level, message, value }]
+   * @param {{keep?: Set<string>|'all'}} [opts] chaves abertas a manter mesmo ausentes
+   *   (estado desconhecido nesta coleta; 'all' = servidor inacessível, nada foi medido)
+   */
+  reconcile(conditions, { keep } = {}) {
     const keyOf = (c) => c.key || c.message;
-    const present = new Set(conditions.map(keyOf));
-    const open = this.active;
-    for (const a of open) {
-      if (!present.has(keyOf(a))) {
+    const keepKey = keep === 'all' ? () => true : (k) => Boolean(keep && keep.has(k));
+    const nowIso = new Date(this.now()).toISOString();
+    const wanted = new Map();
+    for (const c of conditions) if (!wanted.has(keyOf(c))) wanted.set(keyOf(c), c);
+    let structural = false;
+    let valueChanged = false;
+    for (const a of this.active) {
+      const k = keyOf(a);
+      const c = wanted.get(k);
+      if (c) {
+        wanted.delete(k);
+        a.lastSeenAt = nowIso;
+        if (a.message !== c.message || (c.value !== undefined && a.value !== c.value)) {
+          a.message = c.message;
+          if (c.value !== undefined && c.value !== null) a.value = c.value;
+          valueChanged = true;
+        }
+      } else if (!keepKey(k)) {
         a.status = 'resolved';
-        a.resolvedAt = new Date().toISOString();
+        a.resolvedAt = nowIso;
+        structural = true;
       }
     }
-    for (const c of conditions) {
-      if (!open.some((a) => keyOf(a) === keyOf(c))) {
-        this.add(c);
-      }
+    for (const c of wanted.values()) {
+      this.add(c);
+      structural = true;
     }
-    if (open.length || conditions.length) this.save();
+    if (structural) this.save();
+    else if (valueChanged) {
+      if (this.now() - this._savedAt >= VALUE_SAVE_MS) this.save();
+      else this._dirty = true;
+    }
   }
 }
 
