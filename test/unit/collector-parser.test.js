@@ -4,7 +4,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { parseOutput, splitSections, humanBytes, SCHEMA_VERSION } from '../../server/collector/parser.js';
-import { normalizeTargets } from '../../server/collector/builder.js';
+import { normalizeTargets, targetsHash } from '../../server/collector/builder.js';
 
 const FIX = path.join(path.dirname(fileURLToPath(import.meta.url)), '..', 'fixtures', 'coleta-v2');
 const read = (name) => fs.readFileSync(path.join(FIX, name), 'utf8');
@@ -19,8 +19,8 @@ const EDGE_TARGETS = normalizeTargets({
 
 const sectionOnly = (body) => parseOutput(`===HOST===\nsrv\n${body}\n===FIM===\n`, TS, {});
 
-test('golden: amostra real do Debian 13 (1 núcleo, 3 discos) no formato V2', () => {
-  const s = parseOutput(read('debian13-1nucleo.txt'), TS, { targets: REAL_TARGETS });
+test('golden: amostra derivada da coleta V1 real (kernel sem PSI)', () => {
+  const s = parseOutput(read('debian13-derivada-v1.txt'), TS, { targets: REAL_TARGETS });
   assert.equal(s.schemaVersion, SCHEMA_VERSION);
   assert.deepEqual(s.collector, { version: 2, hash: '73cebb436c7c', mode: 'smart', complete: true, expectedVersion: 2 });
   assert.equal(s.host, 'servidor-exemplo');
@@ -64,6 +64,42 @@ test('golden: amostra real do Debian 13 (1 núcleo, 3 discos) no formato V2', ()
   assert.equal(s.topProcs.length, 7);
   assert.deepEqual(s.topProcs[0], {
     user: 'root', pid: 990, cpu: 0, mem: 11.4, rssKB: 98520, etimesSec: 12880,
+    cmd: '/usr/bin/dockerd -H fd:// --containerd=/run/containerd/containerd.sock',
+  });
+});
+
+test('golden: 1ª coleta V2 real (Debian 13, 1 núcleo, logo após boot, modo smart)', () => {
+  const s = parseOutput(read('debian13-real.txt'), TS, { targets: REAL_TARGETS });
+  assert.deepEqual(s.collector, { version: 2, hash: '73cebb436c7c', mode: 'smart', complete: true, expectedVersion: 2 });
+  assert.equal(s.collector.hash, targetsHash(REAL_TARGETS), 'servidor devolveu o hash que o builder calcula');
+  assert.equal(s.host, 'servidor-exemplo');
+  assert.equal(s.uptimeSec, 108.15);
+  assert.deepEqual(s.load, [1.39, 0.77, 0.3]);
+  assert.deepEqual(s.cpuTicks, { user: 1019, nice: 0, system: 1702, idle: 3951, iowait: 4048, irq: 0, softirq: 4, steal: 0, total: 10724 });
+  assert.deepEqual(s.ram, { total: 840, used: 382, free: 64, cache: 528, avail: 458, swapTotal: 886, swapUsed: 0, dirty: 0, writeback: 0 });
+  assert.deepEqual(s.disks.map((d) => [d.mount, d.source, d.dev, d.pct, d.inodesPct]), [
+    ['/', '/dev/sda2', 'sda', 2, 1],
+    ['/mnt/sdb1', '/dev/sdb1', 'sdb', 28, 1],
+    ['/mnt/sdc1', '/dev/sdc1', 'sdc', 28, 1],
+    ['/mnt/sdc2', '/dev/sdc2', 'sdc', 1, 1],
+  ]);
+  assert.deepEqual(s.missingMounts, []);
+  assert.equal(s.net.rxBytes, 297197);
+  assert.equal(s.net.txBytes, 129584);
+  assert.deepEqual(s.io.map((d) => [d.dev, d.readIos, d.writeIos, d.ioTicksMs]), [
+    ['sda', 7420, 1491, 53876], ['sdb', 1769, 6, 6872], ['sdc', 4325, 12, 34500],
+  ]);
+  assert.deepEqual(s.psi, {
+    cpu: { some10: 4.95, some60: 9.26, full10: 0, full60: 0 },
+    memory: { some10: 0.13, some60: 0.26, full10: 0.06, full60: 0.16 },
+    io: { some10: 5.89, some60: 32.32, full10: 4.7, full60: 22.51 },
+  }, 'formato real do /proc/pressure (linha some + full)');
+  assert.deepEqual(s.temps, [{ type: 'acpitz', c: 29 }]);
+  assert.deepEqual(s.smart, [{ dev: 'sda', status: 'PASSED' }, { dev: 'sdb', status: 'PASSED' }, { dev: 'sdc', status: 'PASSED' }]);
+  assert.deepEqual(s.services, { smbd: 'active' });
+  assert.equal(s.topProcs.length, 8, 'cabeçalho real do ps -eo (user:32, ELAPSED) ignorado');
+  assert.deepEqual(s.topProcs[0], {
+    user: 'root', pid: 934, cpu: 1.7, mem: 11.5, rssKB: 99044, etimesSec: 64,
     cmd: '/usr/bin/dockerd -H fd:// --containerd=/run/containerd/containerd.sock',
   });
 });
@@ -116,7 +152,7 @@ test('I5: amostra vazia ou só com HOST não inventa zeros', () => {
 });
 
 test('saída cortada no meio (timeout) fica marcada como incompleta', () => {
-  const full = read('debian13-1nucleo.txt');
+  const full = read('debian13-derivada-v1.txt');
   const cut = full.slice(0, full.indexOf('===PS==='));
   const s = parseOutput(cut, TS, { targets: REAL_TARGETS });
   assert.equal(s.collector.complete, false);

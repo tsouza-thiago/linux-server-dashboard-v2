@@ -1,0 +1,63 @@
+===VER===
+2 73cebb436c7c
+smart
+===HOST===
+servidor-exemplo
+===OS===
+6.12.111+deb13-amd64
+PRETTY_NAME="Debian GNU/Linux 13 (trixie)"
+NAME="Debian GNU/Linux"
+===CPU===
+1
+===UPTIME===
+108.15 39.51
+===LOAD===
+1.39 0.77 0.30 2/192 1397
+===STAT===
+cpu  1019 0 1702 3951 4048 0 4 0 0 0
+===MEM===
+MemTotal:         860208 kB
+MemFree:           65028 kB
+MemAvailable:     469124 kB
+Buffers:           50064 kB
+Cached:           456048 kB
+SwapTotal:        907260 kB
+SwapFree:         907248 kB
+Dirty:               300 kB
+Writeback:             0 kB
+SReclaimable:      34232 kB
+===DF===
+Filesystem     Mounted on     1B-blocks         Used         Avail Use% IUse%
+/dev/sda2      /           155475050496   2626097152  144876683264   2%    1%
+/dev/sdb1      /mnt/sdb1  1967845998592 506180972544 1361628360704  28%    1%
+/dev/sdc1      /mnt/sdc1  1967845998592 506180608000 1361628725248  28%    1%
+/dev/sdc2      /mnt/sdc2  3936809369600   5708095488 3731045715968   1%    1%
+===NET===
+enp0s7:  297197     562    0    0    0     0          0       100   129584     616    0    0    0     0       0          0
+===IO===
+   8       0 sda 7420 2529 808946 87587 1491 922 31440 7986 0 53876 98650 0 0 0 0 207 3077
+   8      16 sdb 1769 1655 36586 12781 6 0 24 119 0 6872 13018 0 0 0 0 4 117
+   8      32 sdc 4325 2077 70324 65527 12 0 48 159 0 34500 65804 0 0 0 0 8 117
+===PSI===
+cpu some avg10=4.95 avg60=9.26 avg300=4.51 total=17283683 full avg10=0.00 avg60=0.00 avg300=0.00 total=0 
+memory some avg10=0.13 avg60=0.26 avg300=0.09 total=471455 full avg10=0.06 avg60=0.16 avg300=0.06 total=336031 
+io some avg10=5.89 avg60=32.32 avg300=16.15 total=60241082 full avg10=4.70 avg60=22.51 avg300=10.97 total=40930480 
+===TEMP===
+acpitz 29000
+===SMART===
+sda PASSED
+sdb PASSED
+sdc PASSED
+===SERVICES===
+smbd active
+===PS===
+USER                                 PID %CPU %MEM   RSS ELAPSED COMMAND
+root                                 934  1.7 11.5 99044      64 /usr/bin/dockerd -H fd:// --containerd=/run/containerd/containerd.sock
+root                                1250  1.5 10.0 86048      53 /portainer
+root                                 816  0.6  6.0 51860      80 /usr/bin/containerd
+root                                 805  0.9  5.9 50944      80 /usr/sbin/tailscaled --state=/var/lib/tailscale/tailscaled.state --socket=/run/tailscale/tailscaled.sock --port=41641
+root                                 883  0.2  3.0 26300      67 /usr/sbin/smbd --foreground --no-process-group
+root                                1360  0.9  2.7 23760      15 /usr/libexec/samba/rpcd_lsad --configfile=/etc/samba/smb.conf --worker-group=6 --worker-index=5 --debuglevel=0
+root                                1362  0.9  2.7 23572      15 /usr/libexec/samba/rpcd_lsad --configfile=/etc/samba/smb.conf --worker-group=6 --worker-index=6 --debuglevel=0
+root                                 870  0.2  2.5 22276      70 /usr/sbin/winbindd --foreground --no-process-group
+===FIM===
