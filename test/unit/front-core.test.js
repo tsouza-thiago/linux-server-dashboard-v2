@@ -30,7 +30,7 @@ test('format: PT-BR e dado ausente vira "—" (I5)', () => {
   assert.equal(fmt.bytes(1967845998592), '1,8 TB');
   assert.equal(fmt.bytes(512), '512 B');
   assert.equal(fmt.mb(840), '840 MB');
-  assert.equal(fmt.mbps(0.02), '0,02 Mb/s');
+  assert.equal(fmt.mbps(0.02), '0,02 Mbps');
   assert.equal(fmt.mbs(12.34), '12,3 MB/s');
   assert.equal(fmt.celsius(32), '32,0 °C');
   assert.equal(fmt.ms(6.13), '6,1 ms');

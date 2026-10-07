@@ -1,0 +1,14 @@
+/* Impressão / PDF (Relatórios › Imprimir): versão clara e limpa, só o conteúdo da tela. */
+:root, :root[data-theme="dark"], :root[data-theme="light"] {
+  --bg: #FFFFFF; --side: #FFFFFF; --surface: #FFFFFF; --surface-2: #F5F7FA; --surface-3: #E5E9EF;
+  --border: #D5DBE3; --grid: #E5E9EF; --text: #0B0F17; --text-2: #364152; --text-3: #4B5565;
+  --glow: 0; --shadow-hero: none; --shadow-s3: none; --halo-s1: none; --halo-s3: none;
+}
+body { background: #FFFFFF; color: #0B0F17; }
+.side, .scrim, .mobile-bar, .strip, .page-actions, .toasts, .skip-link, .no-print, .login { display: none !important; }
+.app { display: block; }
+.page { padding: 0; }
+.panel, .card { break-inside: avoid; box-shadow: none; }
+.table-wrap { overflow: visible; }
+.table.daily { min-width: 0; }
+@page { margin: 14mm; }

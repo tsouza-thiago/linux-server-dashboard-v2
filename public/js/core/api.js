@@ -33,7 +33,7 @@ const qs = (params) => {
 
 export const api = {
   session: () => request('/api/session'),
-  login: (token) => request('/api/login', { method: 'POST', body: { token } }),
+  login: (token, { remember = true } = {}) => request('/api/login', { method: 'POST', body: { token, remember } }),
   logout: (all = false) => request(all ? '/api/logout-all' : '/api/logout', { method: 'POST', body: {} }),
   status: () => request('/api/status'),
   config: () => request('/api/config'),

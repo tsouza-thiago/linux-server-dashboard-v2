@@ -1,26 +1,47 @@
-// 5. Processos & serviços: estado de cada serviço monitorado e os processos que mais usam
-// memória, com filtro e ordenação (o filtro sobrevive às atualizações ao vivo).
+// 5. Processos & serviços (prancheta "V2 · Processos & serviços"): estado de cada serviço
+// monitorado com o histórico de quedas, os processos que mais usam memória (busca e
+// ordenação sobrevivem às atualizações ao vivo) e para onde vai a memória.
 import { html, mount } from '../core/html.js';
 import * as f from '../core/format.js';
-import { badge, $ } from './common.js';
+import { $, iconBox, meter, panelHead } from './common.js';
+
+export const sub = () => 'Serviços monitorados e os processos que mais usam memória, na última coleta';
 
 const COLS = [
-  { key: 'user', label: 'Usuário' }, { key: 'pid', label: 'PID', num: true },
-  { key: 'cpu', label: 'CPU %', num: true }, { key: 'mem', label: 'Mem %', num: true },
-  { key: 'rssKB', label: 'Memória', num: true }, { key: 'etimesSec', label: 'Rodando há', num: true },
+  { key: 'pid', label: 'PID', num: true },
   { key: 'cmd', label: 'Comando' },
+  { key: 'user', label: 'Usuário' },
+  { key: 'mem', label: 'Memória', num: true },
+  { key: 'rssKB', label: 'RSS', num: true },
+  { key: 'cpu', label: 'CPU média*', num: true },
+  { key: 'etimesSec', label: 'Rodando há', num: true },
 ];
-const SVC = { active: ['ok', 'ativo'], reloading: ['ok', 'recarregando'], activating: ['warn', 'iniciando'], desconhecido: ['neutral', 'sem resposta'] };
+const SVC = {
+  active: ['ok', 'ativo', 'check'], reloading: ['ok', 'recarregando', 'check'], activating: ['warn', 'iniciando', 'warn'],
+  desconhecido: ['neutral', 'sem resposta', 'serious'],
+};
+const view = { filter: '', sort: { key: 'mem', dir: -1 } };
+const cmdName = (cmd = '') => (cmd.split(/\s+/)[0] || '').split('/').pop() || cmd;
 
-const view = { filter: '', sort: { key: 'rssKB', dir: -1 } };
-
-function services(s) {
-  const list = Object.entries(s?.services || {});
-  if (!list.length) return html`<p class="empty">Nenhum serviço monitorado (SERVICES no .env).</p>`;
-  return html`<ul class="service-list">${list.map(([name, st]) => {
-    const [level, text] = SVC[st] || ['bad', st];
-    return html`<li><b>${name}</b> ${badge(level, text)}</li>`;
-  })}</ul>`;
+function services(state) {
+  const list = Object.entries(state.sample?.services || {});
+  const all = state.alerts?.all || [];
+  const cards = list.map(([name, st]) => {
+    const [level, text, ic] = SVC[st] || ['crit', st || 'parado', 'crit'];
+    const downs = all.filter((a) => a.key === `service:${name}`);
+    const last = downs[0];
+    const hist = !downs.length ? 'sem quedas registradas'
+      : `${downs.length} queda${downs.length > 1 ? 's' : ''} · a última em ${f.dateTime(last.ts)}${last.resolvedAt ? ` (${f.duration((Date.parse(last.resolvedAt) - Date.parse(last.ts)) / 1000)})` : ''}`;
+    return html`<article class="card svc-card stale">
+      ${iconBox(level, ic, 'lg')}
+      <div class="svc-text"><span class="mono svc-name">${name}</span><span class="ink-${level === 'neutral' ? '2' : level}">${text}</span><span class="note">${hist}</span></div>
+    </article>`;
+  });
+  return html`${cards}
+    <article class="card svc-card svc-add">
+      ${iconBox('', 'plus', 'lg')}
+      <div class="svc-text"><span class="ink-2">Monitorar ${list.length ? 'outro serviço' : 'um serviço'}</span><span class="note">adicione o nome em <span class="mono">SERVICES</span> no <span class="mono">.env</span></span></div>
+    </article>`;
 }
 
 function rows(s) {
@@ -34,38 +55,87 @@ function rows(s) {
       if (typeof x === 'number' && typeof y === 'number') return (x - y) * dir;
       return String(x ?? '').localeCompare(String(y ?? '')) * dir;
     });
-  if (!list.length) return html`<tr><td colspan="7" class="empty">${q ? 'Nada com esse filtro.' : 'Sem processos na última coleta.'}</td></tr>`;
+  if (!list.length) return html`<tr><td colspan="7" class="empty">${q ? 'Nada com essa busca.' : 'Sem processos na última coleta.'}</td></tr>`;
+  const maxMem = Math.max(...(s.topProcs || []).map((p) => p.mem || 0), 1);
   return list.map((p) => html`<tr>
-    <td>${p.user}</td><td>${p.pid}</td><td>${f.num(p.cpu, 1)}</td><td>${f.num(p.mem, 1)}</td>
-    <td>${f.bytes(typeof p.rssKB === 'number' ? p.rssKB * 1024 : null)}</td><td>${f.duration(p.etimesSec)}</td>
-    <td class="cmd" title="${p.cmd}">${p.cmd}</td></tr>`);
+    <td class="ink-3">${p.pid}</td>
+    <td title="${p.cmd}">${cmdName(p.cmd)}</td>
+    <td class="ink-2">${p.user}</td>
+    <td class="num"><span class="mem-cell">${meter({ pct: ((p.mem || 0) / maxMem) * 100, color: 's2' }, { size: 'sm' })}${f.pct(p.mem, 1)}</span></td>
+    <td class="num ink-2">${f.bytes(typeof p.rssKB === 'number' ? p.rssKB * 1024 : null)}</td>
+    <td class="num ink-2">${f.pct(p.cpu, 1)}</td>
+    <td class="num ink-2">${f.duration(p.etimesSec)}</td></tr>`);
+}
+
+function head() {
+  return html`<tr>${COLS.map((c) => {
+    const on = view.sort.key === c.key;
+    return html`<th scope="col" class="${c.num ? 'num' : ''}" ${on ? html`aria-sort="${view.sort.dir < 0 ? 'descending' : 'ascending'}"` : ''}>
+      <button class="th-sort" type="button" data-sort="${c.key}">${c.label}${on ? (view.sort.dir < 0 ? ' ↓' : ' ↑') : ''}</button></th>`;
+  })}</tr>`;
+}
+
+function memory(s) {
+  const r = s?.ram;
+  const procs = (s?.topProcs || []).slice().sort((a, b) => (b.rssKB ?? 0) - (a.rssKB ?? 0));
+  if (!r?.total) return html`<p class="empty">Sem dados de memória ainda.</p>`;
+  const mb = (kb) => (kb || 0) / 1024;
+  const top2 = procs.slice(0, 2);
+  const rest = procs.slice(2);
+  const restMb = rest.reduce((sum, p) => sum + mb(p.rssKB), 0);
+  const topMb = procs.reduce((sum, p) => sum + mb(p.rssKB), 0);
+  const othersMb = Math.max(0, r.used - topMb);
+  const pct = (v) => (v / r.total) * 100;
+  return html`
+    ${meter([
+    ...top2.map((p, i) => ({ pct: pct(mb(p.rssKB)), color: 's2', op: 1 - i * 0.2 })),
+    { pct: pct(restMb), color: 's2', op: 0.6 }, { pct: pct(othersMb), color: 's2', op: 0.35 }], { size: 'lg mem-split' })}
+    <div class="kv-list">
+      ${top2.map((p) => html`<div class="kv"><span>${cmdName(p.cmd)}</span><span class="mono ink-2">${f.bytes(p.rssKB * 1024)}</span></div>`)}
+      ${rest.length ? html`<div class="kv"><span>outros ${rest.length} do topo</span><span class="mono ink-2">${f.mb(restMb)}</span></div>` : ''}
+      <div class="kv"><span>demais processos e kernel</span><span class="mono ink-2">${f.mb(othersMb)}</span></div>
+      <div class="kv sep"><span class="ink-2">disponível</span><span class="mono ink-2">${f.mb(r.avail)}</span></div>
+    </div>`;
 }
 
 export function render(ctx) {
   mount(ctx.el, html`
-    <section class="panel"><h3 class="panel-title">Serviços</h3><div id="pr-services"></div></section>
-    <section class="panel">
-      <h3 class="panel-title">Processos que mais usam memória <span class="hint">top 8 da última coleta</span></h3>
-      <div class="toolbar"><input type="search" id="pr-filter" placeholder="Filtrar por usuário, PID ou comando (atalho /)" aria-label="Filtrar processos" value="${view.filter}"></div>
-      <div class="table-wrap"><table>
-        <thead><tr>${COLS.map((c) => html`<th><button class="th-sort" data-sort="${c.key}" aria-label="Ordenar por ${c.label}">${c.label}${view.sort.key === c.key ? (view.sort.dir < 0 ? ' ↓' : ' ↑') : ''}</button></th>`)}</tr></thead>
-        <tbody id="pr-rows"></tbody>
-      </table></div>
-    </section>`);
+    <section class="grid-cards svc-grid" aria-label="Serviços monitorados" id="pr-services"></section>
+    <div class="split">
+      <section class="panel flush stale split-main" aria-label="Top processos por memória">
+        <div class="panel-head">
+          <div><h2>Top processos · última coleta</h2></div>
+          <div class="search"><label for="pr-filter">Buscar</label><input class="input" type="search" id="pr-filter" placeholder="comando ou usuário (atalho /)" value="${view.filter}"></div>
+        </div>
+        <div class="table-wrap"><table class="table">
+          <thead id="pr-head"></thead>
+          <tbody class="mono" id="pr-rows"></tbody>
+        </table></div>
+        <p class="note table-foot">* A CPU de cada processo é a média desde que ele começou a rodar (é o que o servidor informa sem instalar nada). O uso de CPU <b>atual</b> está em Recursos.</p>
+      </section>
+      <section class="panel stale split-side" aria-label="Para onde vai a memória">
+        ${panelHead('Para onde vai a memória')}
+        <div class="vstack" id="pr-memory"></div>
+      </section>
+    </div>`);
   $('#pr-filter', ctx.el).addEventListener('input', (e) => { view.filter = e.target.value; update(ctx); });
-  for (const b of ctx.el.querySelectorAll('[data-sort]')) {
-    b.addEventListener('click', () => {
-      const k = b.dataset.sort;
-      view.sort = { key: k, dir: view.sort.key === k ? -view.sort.dir : (COLS.find((c) => c.key === k).num ? -1 : 1) };
-      render(ctx);
-    });
-  }
+  $('#pr-head', ctx.el).addEventListener('click', (e) => {
+    const b = e.target.closest('[data-sort]');
+    if (!b) return;
+    const k = b.dataset.sort;
+    view.sort = { key: k, dir: view.sort.key === k ? -view.sort.dir : (COLS.find((c) => c.key === k).num ? -1 : 1) };
+    update(ctx);
+    $(`[data-sort="${k}"]`, ctx.el)?.focus();
+  });
   update(ctx);
 }
 
 export function update(ctx) {
-  mount($('#pr-services', ctx.el), services(ctx.state.sample));
-  mount($('#pr-rows', ctx.el), html`${rows(ctx.state.sample)}`);
+  const s = ctx.state.sample;
+  mount($('#pr-services', ctx.el), services(ctx.state));
+  mount($('#pr-head', ctx.el), head());
+  mount($('#pr-rows', ctx.el), html`${rows(s)}`);
+  mount($('#pr-memory', ctx.el), memory(s));
 }
 
 export const focusSearch = (ctx) => $('#pr-filter', ctx.el)?.focus();

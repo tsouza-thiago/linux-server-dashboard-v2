@@ -1,0 +1,162 @@
+/* Tokens do design system V2 (D1: Aurora + Cockpit, escuro primeiro).
+   Fonte: pranchetas "V2 · Design system" e "V2 · Visão geral" do canvas aprovado.
+   O tema escuro é o padrão e a referência; o claro é a variante com os mesmos nomes.
+   Contraste dos textos sobre as superfícies conferido em test/unit/design-tokens.test.js. */
+
+:root,
+:root[data-theme="dark"] {
+  color-scheme: dark;
+
+  /* Superfícies */
+  --bg: #07090E;
+  --side: #0A0E15;
+  --surface: #0F141D;
+  --surface-2: #151C28;
+  --surface-3: #1D2635;
+  --border: rgba(148, 163, 184, 0.12);
+  --border-strong: rgba(148, 163, 184, 0.18);
+  --input-line: rgba(148, 163, 184, 0.22);
+  --grid: rgba(148, 163, 184, 0.08);
+  --scrim: rgba(5, 7, 11, 0.7);
+
+  /* Texto */
+  --text: #EDF1F7;
+  --text-2: #A9B4C5;
+  --text-3: #8390A4;
+
+  /* Destaque (ciano Aurora) */
+  --accent: #3EE0D0;
+  --accent-text: #5EEBDD;
+  --accent-soft: rgba(62, 224, 208, 0.10);
+  --accent-line: rgba(62, 224, 208, 0.35);
+  --on-accent: #06231F;
+  --accent-strong: #3EE0D0; /* fundo do botão principal */
+  --focus: rgba(62, 224, 208, 0.55);
+
+  /* Séries de dados, ordem fixa (a cor segue a métrica): CPU, RAM, disco, temperatura */
+  --s1: #0E9CB0;
+  --s2: #8064F0;
+  --s3: #D84B8A;
+  --s4: #3F86E8;
+  --s3-line: rgba(216, 75, 138, 0.35);
+
+  /* Status: reservados, nunca usados como série; sempre com ícone e texto */
+  --ok: #34D399;
+  --ok-soft: rgba(52, 211, 153, 0.12);
+  --ok-ink: #6EE7B7;
+  --warn: #F5B83D;
+  --warn-soft: rgba(245, 184, 61, 0.14);
+  --warn-ink: #FCD34D;
+  --serious: #F97A4A;
+  --serious-soft: rgba(249, 122, 74, 0.14);
+  --serious-ink: #FDBA8C;
+  --crit: #F0525C;
+  --crit-soft: rgba(240, 82, 92, 0.14);
+  --crit-ink: #FCA5A5;
+  --crit-line: rgba(240, 82, 92, 0.40);
+  --crit-bg: #1A0D11;
+  --row-warn: rgba(245, 184, 61, 0.04);
+  --row-crit: rgba(240, 82, 92, 0.05);
+
+  /* Brilho: só nas linhas de dados e nos indicadores, e só no escuro */
+  --glow: 1;
+  --halo-accent: 0 0 14px rgba(62, 224, 208, 0.55);
+  --halo-ok: 0 0 10px rgba(52, 211, 153, 0.8);
+  --halo-crit: 0 0 10px rgba(240, 82, 92, 0.9);
+  --halo-s1: 0 0 14px rgba(14, 156, 176, 0.6);
+  --halo-s3: 0 0 14px rgba(216, 75, 138, 0.55);
+  --shadow-hero: 0 0 0 1px rgba(62, 224, 208, 0.05), 0 30px 80px -40px rgba(62, 224, 208, 0.45);
+  --shadow-s3: 0 24px 60px -36px rgba(216, 75, 138, 0.6);
+  --shadow-crit: 0 30px 80px -40px rgba(240, 82, 92, 0.55);
+  --shadow-pop: 0 16px 40px rgba(0, 0, 0, 0.35);
+  --shadow-login: 0 0 0 1px rgba(62, 224, 208, 0.05), 0 40px 100px -50px rgba(62, 224, 208, 0.5);
+
+  /* Tipografia (Geist + Geist Mono, OFL, servidas localmente) */
+  --font: 'Geist', system-ui, -apple-system, 'Segoe UI', sans-serif;
+  --mono: 'Geist Mono', ui-monospace, 'SFMono-Regular', Menlo, monospace;
+  --fs-headline: 34px;
+  --fs-title: 28px;
+  --fs-section: 16px;
+  --fs-body: 15px;
+  --fs-small: 14px;
+  --fs-caption: 12px;
+  --fs-number: 38px;
+
+  /* Espaço, raio, toque e movimento */
+  --sp-1: 4px;
+  --sp-2: 8px;
+  --sp-3: 12px;
+  --sp-4: 16px;
+  --sp-5: 24px;
+  --sp-6: 32px;
+  --r-1: 8px;
+  --r-2: 12px;
+  --r-3: 18px;
+  --r-4: 22px;
+  --touch: 44px;
+  --t-fast: 150ms;
+  --t-base: 200ms;
+}
+
+:root[data-theme="light"] {
+  color-scheme: light;
+
+  --bg: #F3F5F8;
+  --side: #FFFFFF;
+  --surface: #FFFFFF;
+  --surface-2: #F1F3F7;
+  --surface-3: #E5E9EF;
+  --border: #E1E5EB;
+  --border-strong: #D5DBE3;
+  --input-line: #CBD2DB;
+  --grid: #ECEFF3;
+  --scrim: rgba(11, 15, 23, 0.45);
+
+  --text: #0B0F17;
+  --text-2: #475163;
+  --text-3: #5B6576;
+
+  --accent: #0B8FA3;
+  --accent-text: #087686;
+  --accent-soft: rgba(11, 143, 163, 0.08);
+  --accent-line: rgba(11, 143, 163, 0.35);
+  --on-accent: #FFFFFF;
+  /* Prancheta usa #0B8FA3 sob o texto branco (3,8:1); escurecido até o AA (4,6:1). */
+  --accent-strong: #0A8193;
+  --focus: rgba(11, 143, 163, 0.6);
+
+  --s1: #0B8FA3;
+  --s2: #6D4FE0;
+  --s3: #D23F7E;
+  --s4: #2F6FD6;
+  --s3-line: rgba(210, 63, 126, 0.35);
+
+  --ok: #12A15C;
+  --ok-soft: #E4F6EC;
+  --ok-ink: #0A6E3E;
+  --warn: #B98009; /* prancheta: #C98A0B (2,95:1); escurecido para 3:1 em linhas e marcas */
+  --warn-soft: #FDF1D8;
+  --warn-ink: #8A5A00;
+  --serious: #D9622B;
+  --serious-soft: #FDEBDD;
+  --serious-ink: #9A3E12;
+  --crit: #D03340;
+  --crit-soft: #FDE4E5;
+  --crit-ink: #B42330;
+  --crit-line: rgba(208, 51, 64, 0.35);
+  --crit-bg: #FDECEE;
+  --row-warn: #FFFBF0;
+  --row-crit: #FFF7F7;
+
+  --glow: 0;
+  --halo-accent: none;
+  --halo-ok: none;
+  --halo-crit: none;
+  --halo-s1: none;
+  --halo-s3: none;
+  --shadow-hero: 0 1px 2px rgba(11, 15, 23, 0.04), 0 20px 50px -30px rgba(11, 15, 23, 0.18);
+  --shadow-s3: none;
+  --shadow-crit: 0 20px 50px -30px rgba(208, 51, 64, 0.35);
+  --shadow-pop: 0 16px 40px rgba(11, 15, 23, 0.14);
+  --shadow-login: 0 20px 50px -30px rgba(11, 15, 23, 0.25);
+}
