@@ -1,7 +1,7 @@
 # Linux Server Dashboard — Plano da V2
 
 > Status: **plano aprovado por completo em 07/10/2026** · F0 concluída (`2.0.0-alpha.1`) ·
-> F1 implementada, falta validar o `--once` no servidor real ·
+> F1 concluída (`2.0.0-alpha.2`, validada no servidor real em 901 ms) · próxima: **F2** ·
 > base: `v1.0.0` (= `tsouza-thiago/linux-server-dashboard` @ `11a3286`, 196 testes verdes)
 >
 > Referência visual: canvas "Dashboard V2 — direções de design" (privado, do mantenedor).
@@ -277,7 +277,7 @@ commit** (testes + cobertura + `npm audit` + `bash -n`), e nenhum commit vermelh
 | Fase | Entrega | Critério de saída |
 |---|---|---|
 | **F0 — Base** ✅ | criar `linux-server-dashboard-v2` com histórico; tag `v1.0.0`; CHANGELOG; `docs/` + ADRs; `npm run check`; reorganizar `test/{unit,integration,e2e}`; testes de B1–B12 marcados como `todo` do `node:test` (reproduzem o bug sem deixar a suíte vermelha; o `todo` sai no commit que corrige); **você roda o comando de coleta 1x no servidor** para eu capturar fixtures | suíte organizada; bugs documentados por testes |
-| **F1 — Coleta** 🔶 código pronto | probes, builder, parser v2, taxas (CPU%, util, rede e SMART corrigidos), hash/versão | goldens verdes; `--once` funciona no servidor real |
+| **F1 — Coleta** ✅ | probes, builder, parser v2, taxas (CPU%, util, rede e SMART corrigidos), hash/versão | goldens verdes; `--once` funciona no servidor real |
 | **F2 — Armazenamento** | NDJSON + rollups 90 d + migração v1 + `/api/history` com baldes | migração testada com `data/` real da V1 |
 | **F3 — Alertas** | motor com chave estável, histerese e debounce; limiares no `.env`; outages; health derivado | B3/B9 resolvidos; testes de flapping |
 | **F4 — HTTP** | `node:http`, sessão por cookie, SSE com backfill, segurança portada | testes de segurança V1 + novos verdes; `npm audit` limpo |
