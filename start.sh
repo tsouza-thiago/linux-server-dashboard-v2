@@ -55,7 +55,8 @@ fi
 mkdir -p data
 chmod 700 data
 chmod 600 .env 2>/dev/null || true
-chmod 600 data/history.json data/alerts.json data/annotations.json data/dashboard.log data/nohup.log data/dashboard.pid 2>/dev/null || true
+chmod 700 data/history data/rollup 2>/dev/null || true
+chmod 600 data/history/*.ndjson data/rollup/*.ndjson data/history*.json data/alerts.json data/annotations.json data/dashboard.log data/nohup.log data/dashboard.pid 2>/dev/null || true
 
 # 5. Porta
 PORT=$(grep -E '^PORT=' .env 2>/dev/null | head -1 | cut -d= -f2- | tr -d '"')

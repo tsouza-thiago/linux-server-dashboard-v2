@@ -6,7 +6,7 @@
 # Como usar (na pasta do projeto):
 #   ./stop.sh
 #
-# O histórico fica salvo em data/history.json — nada se perde.
+# O histórico fica salvo em data/history/ e data/rollup/ — nada se perde.
 # O servidor monitorado não é afetado.
 # ============================================================
 cd "$(dirname "$0")"
@@ -46,7 +46,7 @@ kill "$PID" 2>/dev/null
 # Aguarda até 5 segundos para o encerramento limpo
 for _ in 1 2 3 4 5; do
   if ! kill -0 "$PID" 2>/dev/null; then
-    echo "Serviço parado. O histórico foi preservado (data/history.json)."
+    echo "Serviço parado. O histórico foi preservado (data/history/)."
     exit 0
   fi
   sleep 1

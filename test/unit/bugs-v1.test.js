@@ -2,7 +2,7 @@
 // Cada teste descreve o comportamento CORRETO. Os ainda abertos estão marcados como `todo`
 // (aparecem no relatório sem deixar a suíte vermelha); o commit que corrige o bug remove o
 // `todo` e o teste passa a valer como regressão. Corrigidos na F1: B1, B2, B6, I5.
-// Corrigidos na F2: B7, B8 (detalhes em test/unit/storage-*.test.js).
+// Corrigidos na F2: B4, B7, B8, B11 (detalhes em test/unit/storage-*.test.js).
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
@@ -54,7 +54,7 @@ test('B3 — condição que persiste mantém UM alerta, só com o valor atualiza
   assert.equal(store.active.length, 1);
 });
 
-test('B4 — CSV com 2+ discos de I/O tem o mesmo número de colunas no cabeçalho e nas linhas', { todo: 'B4 · corrigir na F2 (armazenamento/export)' }, () => {
+test('B4 — CSV com 2+ discos de I/O tem o mesmo número de colunas no cabeçalho e nas linhas', () => {
   const sample = {
     ts: TS, host: 'srv', load: [0, 0, 0], disks: [],
     io: [{ dev: 'sda', readMBps: 1, writeMBps: 2 }, { dev: 'sdb', readMBps: 3, writeMBps: 4 }],
@@ -125,7 +125,7 @@ test('B10 — eixo de tempo real nos gráficos (anotações caem no instante cer
   assert.ok(['time', 'linear'].includes(chart.options.scales.x.type), `eixo x é "${chart.options.scales.x.type ?? 'category'}"`);
 });
 
-test('B11 — encerramento grava o histórico pendente antes de sair', { todo: 'B11 · corrigir na F4 (HTTP)' }, async () => {
+test('B11 — encerramento grava o histórico pendente antes de sair', async () => {
   let flushed = false;
   const store = { length: 0, limit: 10, getLatest: () => null, getRange: () => [], append() {}, flush: async () => { flushed = true; } };
   const app = createApp({ store, log: () => {}, alertsFile: path.join(tmpDir(), 'a.json'), annotationsFile: path.join(tmpDir(), 'n.json') });

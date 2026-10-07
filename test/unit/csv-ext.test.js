@@ -30,8 +30,8 @@ test('toCSV inclui colunas IO quando presentes', () => {
   })];
   const csv = toCSV(samples);
   const lines = csv.split('\n');
-  assert.ok(lines[0].includes('ioDev,ioReadMBps,ioWriteMBps'));
-  assert.ok(lines[1].includes('sda,1.5,0.3'));
+  assert.ok(lines[0].endsWith('io_sda_readMBps,io_sda_writeMBps'));
+  assert.ok(lines[1].endsWith('1.5,0.3'));
 });
 
 test('toCSV cria coluna por mount com caracteres especiais saneados', () => {
