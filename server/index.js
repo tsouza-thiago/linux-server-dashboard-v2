@@ -157,9 +157,10 @@ export function createApp(deps = {}) {
 
   const app = express();
   app.disable('x-powered-by');
+  // Cabeçalhos de segurança primeiro: valem também para as respostas 403/401 das checagens.
+  app.use(securityHeaders);
   app.use(hostCheck);
   app.use(csrfCheck);
-  app.use(securityHeaders);
   app.use(issueCsrfCookie);
   app.use(express.json({ limit: '50kb' }));
   app.use('/api', (req, res, next) => {
