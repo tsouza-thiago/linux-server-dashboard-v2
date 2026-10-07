@@ -289,7 +289,7 @@ export function startServer() {
   const LOG_FILE = config.LOG_FILE;
 
   fs.mkdirSync(path.dirname(LOG_FILE), { recursive: true, mode: 0o700 });
-  const logStream = fs.createWriteStream(LOG_FILE, { flags: 'a' });
+  const logStream = fs.createWriteStream(LOG_FILE, { flags: 'a', mode: 0o600 });
   try { fs.chmodSync(LOG_FILE, 0o600); } catch { /* best-effort */ }
   const log = (msg) => {
     const line = `[${new Date().toISOString()}] ${msg}`;

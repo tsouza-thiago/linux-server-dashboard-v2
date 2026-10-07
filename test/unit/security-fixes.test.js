@@ -112,3 +112,8 @@ test('securityHeaders inclui proteções extras e frame-ancestors', () => {
   assert.ok(res.headers['permissions-policy'].includes('geolocation=()'));
   assert.ok(res.headers['content-security-policy'].includes("frame-ancestors 'none'"));
 });
+test('log do painel nasce com permissão 0600 (não depende do chmod depois de abrir)', async () => {
+  const { readFileSync } = await import('node:fs');
+  const src = readFileSync(new URL('../../server/index.js', import.meta.url), 'utf8');
+  assert.match(src, /createWriteStream\(LOG_FILE, \{[^}]*mode: 0o600/);
+});
