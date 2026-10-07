@@ -56,9 +56,20 @@ function setBar(el, pct, color) {
   el.style.background = color || Dash.fmt.pctColor(p);
 }
 
+/* SMART do disco que contém o ponto de montagem (dev vem da coleta V2; source como reserva) */
 function smartOf(sample, mount) {
-  const devMatch = (sample.smart || []).find((x) => mount.includes(x.dev));
-  return devMatch || {};
+  const disk = (sample.disks || []).find((d) => d.mount === mount) || {};
+  const fromSource = String(disk.source || '').match(/^\/dev\/(nvme\d+n\d+|mmcblk\d+|[a-z]+)/);
+  const dev = disk.dev || (fromSource && fromSource[1]);
+  const match = dev && (sample.smart || []).find((x) => x.dev === dev);
+  return match || {};
+}
+
+/* PASSED = ok, FAILED = ruim; sem permissão/desconhecido não é falha do disco */
+function smartBadge(status) {
+  if (status === 'PASSED') return 'badge-ok';
+  if (status === 'FAILED') return 'badge-bad';
+  return 'badge-neutral';
 }
 
 /* Pisca uma vez o elemento atualizado via SSE (DS §8); noop em testes/headless */
@@ -164,7 +175,6 @@ Dash.sections = {
     el.innerHTML = '';
     for (const d of latest.disks || []) {
       const smart = smartOf(latest, d.mount);
-      const smartOk = !smart.status || smart.status === 'PASSED';
       const row = document.createElement('div');
       row.className = 'overview-disk';
       row.title = 'ver detalhes';
@@ -172,7 +182,7 @@ Dash.sections = {
         <span class="mount">${Dash.fmt.esc(d.mount)}</span>
         <div class="bar"><div class="bar-fill" style="width:${d.pct}%;background:${Dash.fmt.pctColor(d.pct)}"></div></div>
         <span class="pct">${d.pct}%</span>
-        <span class="smart"><span class="badge ${smartOk ? 'badge-ok' : 'badge-bad'}">${Dash.fmt.esc(smart.status || '—')}</span></span>`;
+        <span class="smart"><span class="badge ${smartBadge(smart.status)}">${Dash.fmt.esc(smart.status || '—')}</span></span>`;
       row.addEventListener('click', () => {
         Dash.diskDetailMount = d.mount;
         location.hash = '#/discos';
@@ -211,12 +221,11 @@ Dash.sections = {
     el.innerHTML = '';
     for (const d of latest.disks || []) {
       const smart = smartOf(latest, d.mount);
-      const smartOk = !smart.status || smart.status === 'PASSED';
       const eta = etaFor(d.mount);
       const card = document.createElement('div');
       card.className = `disk-card ${Dash.diskDetailMount === d.mount ? 'selected' : ''}`;
       card.innerHTML = `
-        <h3><span>${Dash.fmt.esc(d.mount)}</span><span class="badge ${smartOk ? 'badge-ok' : 'badge-bad'}">${Dash.fmt.esc(smart.status || 'SMART —')}</span></h3>
+        <h3><span>${Dash.fmt.esc(d.mount)}</span><span class="badge ${smartBadge(smart.status)}">${Dash.fmt.esc(smart.status || 'SMART —')}</span></h3>
         <div class="big">${d.pct}%</div>
         <div class="bar"><div class="bar-fill" style="width:${d.pct}%;background:${Dash.fmt.pctColor(d.pct)}"></div></div>
         <div class="meta">${Dash.fmt.esc(d.used)} de ${Dash.fmt.esc(d.size)} · livre ${Dash.fmt.esc(d.avail)}</div>
@@ -386,8 +395,8 @@ Dash.sections = {
         <td class="num">${s.load ? s.load[0].toFixed(2) : '—'}</td>
         <td class="num">${ramPct}%</td>
         <td class="num">${s.tempC !== null && s.tempC !== undefined ? s.tempC.toFixed(0) + '°C' : '—'}</td>
-        <td class="num">${s.net ? s.net.rxMbps.toFixed(2) : '—'}</td>
-        <td class="num">${s.net ? s.net.txMbps.toFixed(2) : '—'}</td>
+        <td class="num">${s.net && typeof s.net.rxMbps === 'number' ? s.net.rxMbps.toFixed(2) : '—'}</td>
+        <td class="num">${s.net && typeof s.net.txMbps === 'number' ? s.net.txMbps.toFixed(2) : '—'}</td>
         <td class="mono">${disks}</td>
       </tr>`;
     }).join('') || '<tr><td colspan="7" style="color:var(--text-secondary)">sem amostras no período</td></tr>';
@@ -421,7 +430,7 @@ Dash.sections = {
       const procs = (sample.topProcs || []).slice(0, 3).map((p) => `
         <div class="k">PID ${p.pid} · ${E(p.user)}</div>
         <div class="v">${p.cpu.toFixed(1)}% CPU · ${p.mem.toFixed(1)}% MEM · ${E(p.cmd)}</div>`).join('');
-      const smart = (sample.smart || []).map((s) => `<span class="badge ${s.status === 'PASSED' ? 'badge-ok' : 'badge-bad'}">${E(s.dev)}: ${E(s.status)}</span>`).join(' ');
+      const smart = (sample.smart || []).map((s) => `<span class="badge ${smartBadge(s.status)}">${E(s.dev)}: ${E(s.status)}</span>`).join(' ');
       const services = Object.entries(sample.services || {}).map(([s, st]) => `<span class="badge ${st === 'active' ? 'badge-ok' : 'badge-bad'}">${E(s)}: ${E(st)}</span>`).join(' ');
       $('modalTitle').textContent = `Amostra — ${Dash.fmt.timeDate(sample.ts)}`;
       $('sampleModalBody').innerHTML = `

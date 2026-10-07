@@ -34,7 +34,7 @@ Dash.analysis = {
       else if (d.pct >= 80) add(`Disco ${d.mount} ${d.pct}%`, 5, 'warn');
     }
     for (const s of latest.smart || []) {
-      if (s.status !== 'PASSED') add(`SMART /dev/${s.dev}`, 40, 'bad');
+      if (s.status === 'FAILED') add(`SMART /dev/${s.dev}`, 40, 'bad');
     }
     for (const [svc, st] of Object.entries(latest.services || {})) {
       if (st !== 'active') add(`Serviço ${svc} ${st}`, 25, 'bad');

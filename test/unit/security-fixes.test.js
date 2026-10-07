@@ -32,7 +32,7 @@ test('buildCommand sanea NET_IF mesmo em override perigoso (anti injeção)', ()
   const cmd = buildCommand({ netIf: 'enp0s7; rm -rf /' });
   assert.ok(!cmd.includes('rm -rf'), 'não deve conter o payload');
   assert.ok(!cmd.includes('; rm'), 'não deve conter separador de comando');
-  assert.ok(!cmd.includes('grep ;'), 'não deve grepar payload');
+  assert.ok(!cmd.includes("i='enp0s7;"), 'não deve filtrar pelo payload');
 
   const opt = buildCommand({ netIf: '-o ProxyCommand=echo;pwned' });
   assert.ok(!opt.includes('ProxyCommand'));
@@ -40,7 +40,7 @@ test('buildCommand sanea NET_IF mesmo em override perigoso (anti injeção)', ()
   assert.ok(!opt.includes('===NET==='), 'interface perigosa deve ficar vazia (seção Rede omitida)');
 
   const safe = buildCommand({ netIf: 'enp0s7:1' });
-  assert.ok(safe.includes('grep enp0s7:1'), 'interface segura é usada normalmente');
+  assert.ok(safe.includes("i='enp0s7:1'"), 'interface segura é usada normalmente');
 });
 
 test('issueCsrfCookie emite cookie no GET e não re-emite quando presente', () => {
