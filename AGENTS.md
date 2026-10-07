@@ -148,59 +148,96 @@ node server/poller.js --once    # teste rápido do poller sem o servidor web
 
 ## Comando SSH de coleta (1 por poll)
 
-> O comando é montado dinamicamente pelo poller a partir das variáveis acima.
-> Exemplo com `NET_IF=enpXsY`, `DISK_MOUNTS=/ /mnt/disco1`, `DISK_DEVS=sda sdb`, `SERVICES=smbd nmbd`:
+> O comando é montado por `server/collector/builder.js` a partir das variáveis acima: é um
+> único script POSIX sh, somente leitura. Exemplo com `NET_IF=enpXsY`,
+> `DISK_MOUNTS=/ /mnt/disco1`, `DISK_DEVS=sda sdb`, `SERVICES=smbd nmbd` (modo `smart`):
 
 ```sh
-echo '===HOST==='; hostname; echo '===OS==='; uname -r; head -2 /etc/os-release 2>/dev/null;
-echo '===CPU==='; getconf _NPROCESSORS_ONLN 2>/dev/null; echo '===UPTIME==='; cat /proc/uptime;
-echo '===LOAD==='; cat /proc/loadavg; echo '===FREE==='; LC_ALL=C free -m;
-echo '===DF==='; LC_ALL=C df -h --output=target,size,used,avail,pcent / /mnt/disco1 2>/dev/null;
-echo '===DFB==='; LC_ALL=C df -B1 --output=target,size,used,avail,pcent / /mnt/disco1 2>/dev/null;
-echo '===NET==='; cat /proc/net/dev | grep enpXsY;
-echo '===IO==='; cat /proc/diskstats | awk '$3=="sda"||$3=="sdb"';
-echo '===TEMP==='; cat /sys/class/thermal/thermal_zone0/temp 2>/dev/null;
-echo '===SMART==='; for d in sda sdb; do printf '%s:' "$d"; smartctl -H /dev/$d 2>/dev/null | grep -oE 'PASSED|FAILED' | head -1; done;
-echo '===SERVICES==='; LC_ALL=C systemctl is-active smbd nmbd;
-echo '===PS==='; LC_ALL=C ps aux --sort=-%mem | head -8
+LC_ALL=C; export LC_ALL; M="${SSH_ORIGINAL_COMMAND:-smart}";
+echo '===VER==='; echo '2 6443f6bd222e'; echo "$M";
+echo '===HOST==='; cat /proc/sys/kernel/hostname;
+echo '===OS==='; uname -r; grep -E '^(PRETTY_NAME|NAME)=' /etc/os-release 2>/dev/null;
+echo '===CPU==='; getconf _NPROCESSORS_ONLN 2>/dev/null;
+echo '===UPTIME==='; cat /proc/uptime;
+echo '===LOAD==='; cat /proc/loadavg;
+echo '===STAT==='; head -1 /proc/stat;
+echo '===MEM==='; grep -E '^(MemTotal|MemFree|MemAvailable|Buffers|Cached|SReclaimable|SwapTotal|SwapFree|Dirty|Writeback):' /proc/meminfo;
+echo '===DF==='; df -B1 --output=source,target,size,used,avail,pcent,ipcent / /mnt/disco1 2>/dev/null;
+echo '===NET==='; awk -F: -v i='enpXsY' '{n=$1; gsub(/[ \t]/,"",n)} n==i' /proc/net/dev;
+echo '===IO==='; awk '$3=="sda"||$3=="sdb"' /proc/diskstats;
+echo '===PSI==='; for f in cpu memory io; do printf '%s ' "$f"; grep -h . /proc/pressure/$f 2>/dev/null | tr '\n' ' '; echo; done;
+echo '===TEMP==='; for z in /sys/class/thermal/thermal_zone*; do [ -r "$z/temp" ] && printf '%s %s\n' "$(cat "$z/type" 2>/dev/null)" "$(cat "$z/temp" 2>/dev/null)"; done 2>/dev/null; true;
+echo '===SMART==='; case "$M" in smart) for d in sda sdb; do <smartctl -H como root ou sudo -n>; <classifica>; printf '%s %s\n' "$d" "$s"; done;; *) echo pulado;; esac;
+echo '===SERVICES==='; for s in smbd nmbd; do printf '%s %s\n' "$s" "$(systemctl is-active "$s" 2>/dev/null)"; done;
+echo '===PS==='; ps -eo user:32,pid,pcpu,pmem,rss,etimes,args --sort=-rss 2>/dev/null | head -9;
+echo '===FIM==='
 ```
 
-- `LC_ALL=C` obrigatório (locale pt_BR mudaria cabeçalhos de `free`/`df`/`ps`)
+- `LC_ALL=C` no início do script; as métricas vêm de `/proc` e `/sys` (imunes a locale)
 - `ssh -o BatchMode=yes -o ConnectTimeout=10` — falha rápido se o servidor estiver off
-- Temperatura vem de `/sys/class/thermal/thermal_zone0/temp` (lm-sensors não instalado no servidor)
+- Seções `NET`/`IO`/`SMART`/`SERVICES` só entram quando configuradas; `===FIM===` indica
+  saída completa (`collector.complete`)
+- `===VER===` traz a versão do coletor e um hash de 12 hex da configuração: hash
+  divergente sinaliza `authorized_keys` desatualizado (`hashMismatch`)
+- **Modo**: `basico` (padrão) ou `smart`. O SMART roda **1x por hora**; nos demais polls a
+  seção imprime `pulado` e o último resultado é reaproveitado. No comando forçado
+  (`authorized_keys`, ADR 0008) o cliente envia só a palavra do modo, que chega como
+  `$SSH_ORIGINAL_COMMAND` e é usada apenas num `case`, nunca executada
+- SMART: root roda `smartctl -H` direto; usuário comum usa `sudo -n` (nunca pede senha).
+  Estados: `PASSED`, `FAILED`, `SEM_PERMISSAO`, `SEM_SMARTCTL`, `DESCONHECIDO`
+- Temperatura: todas as `thermal_zone*`; prioridade `x86_pkg_temp` > `coretemp` > `k10temp`
+  > `cpu-thermal`/`cpu_thermal`/`soc_thermal` > `acpitz` > maior valor
 - Falhas SSH viram mensagens amigáveis via `describeError()` (timeout, host key, exit 255)
 
 ## Formato da amostra (1 por poll)
 
+> `schemaVersion: 2`, gerada por `server/collector/parser.js`. Dado ausente é `null`,
+> nunca zero inventado (I5). Taxas (`cpu`, `rxMbps`, `readMBps`, `utilPct`...) são `null`
+> no primeiro poll, após reboot ou com contador regredindo. Exemplo (listas encurtadas):
+
 ```json
 {
-  "ts": "2026-08-15T09:12:00.000Z",
-  "host": "seu-host",
-  "os": { "kernel": "6.1.0-33-amd64", "name": "Debian GNU/Linux 12 (bookworm)" },
+  "schemaVersion": 2,
+  "ts": "2026-10-07T13:51:00.000Z",
+  "collector": { "version": 2, "hash": "73cebb436c7c", "mode": "smart", "complete": true,
+                 "expectedVersion": 2 },
+  "host": "servidor-exemplo",
+  "os": { "kernel": "6.12.111+deb13-amd64", "name": "Debian GNU/Linux 13 (trixie)" },
   "cores": 1,
-  "uptimeSec": 720,
-  "bootAt": "2026-08-15T09:00:00.000Z",
-  "load": [0.15, 0.09, 0.10],
-  "ram": { "total": 2000, "used": 900, "free": 200, "cache": 800, "avail": 900,
-           "swapTotal": 1024, "swapUsed": 0 },
+  "uptimeSec": 12937.03,
+  "bootAt": "2026-10-07T10:15:22.970Z",
+  "load": [0.08, 0.02, 0.01],
+  "cpuTicks": { "user": 102345, "nice": 120, "system": 45678, "idle": 1234567,
+                "iowait": 8901, "irq": 0, "softirq": 1234, "steal": 0, "total": 1392845 },
+  "cpu": { "pct": 3.2, "user": 2.1, "system": 0.9, "iowait": 0.2, "steal": 0 },
+  "ram": { "total": 840, "used": 406, "free": 120, "cache": 479, "avail": 434,
+           "swapTotal": 885, "swapUsed": 24, "dirty": 0, "writeback": 0 },
   "disks": [
-    { "mount": "/", "size": "100G", "used": "12G", "avail": "83G", "pct": 12,
-      "sizeBytes": 107374182400, "usedBytes": 12884901888, "availBytes": 89120571392 },
-    { "mount": "/mnt/disco1", "size": "1.0T", "used": "300G", "avail": "700G", "pct": 29,
-      "sizeBytes": 1099511627776, "usedBytes": 322122547200, "availBytes": 751619276800 }
+    { "mount": "/", "source": "/dev/sda2", "dev": "sda", "size": "145G", "used": "2.5G",
+      "avail": "135G", "pct": 2, "sizeBytes": 155475050496, "usedBytes": 2626056192,
+      "availBytes": 144876724224, "inodesPct": 3 }
   ],
-  "net": { "rxBytes": 206460, "txBytes": 1739375,
-           "rxMbps": 0.0, "txMbps": 0.0 },
-  "io": [ { "dev": "sda", "sectorsRead": 290554, "sectorsWrite": 61168,
-            "readMBps": 0.0, "writeMBps": 0.0 } ],
-  "tempC": 29.0,
+  "missingMounts": [],
+  "net": { "iface": "enp0s7", "rxBytes": 1752505, "rxErrors": 0, "rxDrops": 0,
+           "txBytes": 771648, "txErrors": 0, "txDrops": 0, "rxMbps": 0.02, "txMbps": 0.01 },
+  "io": [ { "dev": "sda", "readIos": 15783, "sectorsRead": 1156426, "readTicksMs": 136971,
+            "writeIos": 3699, "sectorsWrite": 118552, "writeTicksMs": 19880,
+            "ioTicksMs": 91540, "readMBps": 0.0, "writeMBps": 0.01, "utilPct": 0.4,
+            "latencyMs": 6.1 } ],
+  "psi": null,
+  "temps": [ { "type": "acpitz", "c": 32 } ],
+  "tempC": 32,
+  "tempSensor": "acpitz",
   "smart": [ { "dev": "sda", "status": "PASSED" } ],
-  "services": { "smbd": "active", "nmbd": "active" },
-  "topProcs": [ { "user": "root", "pid": 1, "cpu": 0.0, "mem": 0.3, "cmd": "systemd" } ]
+  "smartAt": "2026-10-07T13:51:00.000Z",
+  "services": { "smbd": "active" },
+  "topProcs": [ { "user": "root", "pid": 990, "cpu": 0.0, "mem": 11.4, "rssKB": 98520,
+                  "etimesSec": 12880, "cmd": "/usr/bin/dockerd -H fd://" } ]
 }
 ```
 
-> Amostras antigas (sem os campos novos) continuam válidas — o frontend trata campos ausentes.
+> Amostras V1 (sem `schemaVersion` e sem os campos novos) continuam válidas — o frontend
+> trata campos ausentes.
 
 ## Persistência (data/)
 
@@ -243,8 +280,8 @@ echo '===PS==='; LC_ALL=C ps aux --sort=-%mem | head -8
 | Disco ≥ 90% usado                     | warning |
 | RAM usada ≥ 90%                       | warning |
 | Temperatura CPU ≥ 60°C                | warning |
-| SMART diferente de PASSED             | critical |
-| Serviço monitorado inativo            | critical |
+| SMART `FAILED` (sem permissão/sem smartctl é neutro) | critical |
+| Serviço monitorado fora de `active`/`reloading`/`activating` (sem resposta é neutro) | critical |
 | SSH falhou (servidor inacessível)     | critical (offline) |
 
 ## Estrutura
@@ -270,7 +307,8 @@ linux-server-dashboard/
 │   ├── config.js           (parser único do .env, validações, sanitizeToken/sanitizeHost)
 │   ├── security.js         (Host check, CSRF c/ cookie, headers, token timing-safe, rate limit)
 │   ├── csv.js              (export CSV com escape anti-fórmula)
-│   ├── poller.js           (comando SSH, parse, taxas de rede/I/O, alertas)
+│   ├── poller.js           (fachada do coletor + alertas; CLI --once)
+│   ├── collector/          (builder.js: script; parser.js: amostra v2; rates.js: taxas; index.js: 1 SSH/poll)
 │   ├── history.js          (buffer em memória + persistência JSON atômica assíncrona)
 │   └── stores.js           (JsonStore genérico: AlertsStore c/ ciclo de vida, AnnotationsStore)
 ├── CHANGELOG.md            ← histórico de mudanças (Keep a Changelog)
