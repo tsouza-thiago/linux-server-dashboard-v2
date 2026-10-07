@@ -8,6 +8,13 @@ pré-versões `2.0.0-alpha.N` (uma por fase do plano), depois `beta`, `rc` e `2.
 
 ## [Não publicado]
 
+## [2.0.0-alpha.7] — 2026-10-07
+
+Fase F6 do plano (design). O design system aprovado no canvas (Aurora + Cockpit, escuro
+primeiro) entra nas 8 telas, nos estados, no login e no celular. Contraste AA conferido
+por teste nos dois temas; capturas do Chromium comparadas com as pranchetas. Falta a
+revisão visual do mantenedor (critério de saída da F6).
+
 ### Adicionado
 
 - Amostra registra o custo da coleta no servidor: `collector.durationMs` (tempo do SSH) e
