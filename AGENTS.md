@@ -143,6 +143,11 @@ node server/poller.js --once    # teste rápido do poller sem o servidor web
 | `DISK_DEVS`     | *(vazio)* | Dispositivos de bloco p/ IO/SMART (vazio = omitido) |
 | `SERVICES`      | *(vazio)* | Serviços systemd monitorados, separados por espaço |
 | `DASH_TOKEN`    | *(gerado no install)* | Token da API/SSE (`Bearer <token>`); instalador gera automático |
+| `ALERT_DISK_PCT` | `90` | Alerta de disco (% usado, 50–99) |
+| `ALERT_RAM_PCT` | `90` | Alerta de RAM (% usada, 50–99) |
+| `ALERT_TEMP_C` | `60` | Alerta de temperatura da CPU (°C, 30–110) |
+| `ALERT_HYSTERESIS` | `5` | Quanto o valor precisa cair abaixo do limiar para o alerta limpar (0–20) |
+| `ALERT_OFFLINE_AFTER` | `2` | Falhas seguidas antes de "servidor inacessível" (1–10) |
 
 > Todos os valores de `NET_IF`/`DISK_MOUNTS`/`DISK_DEVS`/`SERVICES` passam por
 > `sanitizeToken()` (whitelist de caracteres) antes de entrarem no comando SSH;
@@ -256,9 +261,11 @@ echo '===FIM==='
 - **`alerts.json`** — histórico de alertas com ciclo de vida: `new` → `ack` → `resolved`
   - Auto-resolve: quando a condição deixa de existir no poll seguinte, o alerta é resolvido
   - Reconhecer/resolver também via UI (painel de alertas); retenção máx 500
-  - Alerta offline tem **chave estável** (`servidor-inacessivel`): mensagens variadas de
-    erro não duplicam o alerta ativo
+  - Cada condição tem **chave estável** (ver Alertas): valor novo atualiza o mesmo alerta;
+    só regrava o arquivo em mudança de estado (valor novo: no máximo a cada 10 min)
 - **`annotations.json`** — anotações do usuário na linha do tempo (texto + rótulo + timestamp)
+- **`outages.ndjson`** — quedas do servidor (`off`/`on`, 2 linhas por queda, 90 dias), separadas
+  dos alertas: o limite de 500 alertas não apaga mais o histórico de quedas (B9)
 - Encerramento (SIGINT/SIGTERM) espera gravar histórico, alertas e anotações pendentes (B11)
 - Tudo no SSD local; nada é gravado no servidor
 
@@ -278,22 +285,33 @@ echo '===FIM==='
 | `/api/export`     | GET    | `?format=csv\|json&from=&to=` → download do relatório |
 | `/api/stream`     | GET    | SSE: `hello`, `sample` (a cada poll), `alerts`, `annotations`, `status` |
 | `/api/poll`       | POST   | Dispara coleta imediata ("coletar agora"), piso de 5s |
+| `/api/outages`    | GET    | `?days=1..90` (padrão 30) → `{days, outages, uptime}`; uptime desde o início do monitoramento |
 
 > Proteções aplicadas em todas as rotas: `Host` check, CSRF (c/ cookie `dash_csrf`),
 > headers de segurança, rate limit de mutações, error handler sem stack trace.
 > Com `DASH_TOKEN` (gerado no install): `/api/*` e `/api/stream` exigem `Bearer <token>`
 > ou `?token=`, comparado com `crypto.timingSafeEqual`.
 
-## Alertas (calculados no poller)
+## Alertas (motor em `server/alerts/`, ADR 0006)
 
-| Condição                              | Nível  |
-|---------------------------------------|--------|
-| Disco ≥ 90% usado                     | warning |
-| RAM usada ≥ 90%                       | warning |
-| Temperatura CPU ≥ 60°C                | warning |
-| SMART `FAILED` (sem permissão/sem smartctl é neutro) | critical |
-| Serviço monitorado fora de `active`/`reloading`/`activating` (sem resposta é neutro) | critical |
-| SSH falhou (servidor inacessível)     | critical (offline) |
+| Condição | Chave estável | Nível | Limiar (`.env`) |
+|---|---|---|---|
+| Disco usado ≥ limiar | `disk:<mount>:usage` | warning | `ALERT_DISK_PCT` (90) |
+| RAM usada ≥ limiar | `ram:usage` | warning | `ALERT_RAM_PCT` (90) |
+| Temperatura CPU ≥ limiar | `temp:cpu` | warning | `ALERT_TEMP_C` (60) |
+| SMART `FAILED` (sem permissão/sem smartctl é neutro) | `smart:<dev>` | critical | — |
+| Serviço fora de `active`/`reloading`/`activating` (sem resposta é neutro) | `service:<nome>` | critical | — |
+| Servidor inacessível após N falhas seguidas | `servidor-inacessivel` | critical | `ALERT_OFFLINE_AFTER` (2) |
+
+- **Chave estável**: a condição que persiste atualiza mensagem e valor do MESMO alerta (B3)
+- **Histerese**: dispara no limiar e só limpa quando cai `ALERT_HYSTERESIS` (5) abaixo
+  (disco/RAM em pontos de %, temperatura em °C) — sem flapping
+- **Debounce do offline**: 1 falha isolada não alerta nem muda o status; a queda começa no
+  instante da 1ª falha. Durante a queda os outros alertas ficam como estão (nada foi medido)
+- **Dado ausente** não resolve nem cria alerta (estado desconhecido)
+- **Saúde (0–100)** em `server/alerts/health.js`, com os mesmos limiares (fonte única);
+  a UI só exibe o que vem em `/api/status` (`health`)
+- Limiar fora da faixa volta ao padrão com aviso no log (`config.js`, `alertThresholds`)
 
 ## Estrutura
 
@@ -320,7 +338,8 @@ linux-server-dashboard/
 │   ├── csv.js              (export CSV com escape anti-fórmula)
 │   ├── poller.js           (fachada do coletor + alertas; CLI --once)
 │   ├── collector/          (builder.js: script; parser.js: amostra v2; rates.js: taxas; index.js: 1 SSH/poll)
-│   ├── storage/            (ndjson.js: bruto 72 h; rollup.js: 5 min/90 d; buckets.js: agregação; migrate-v1.js; index.js: History)
+│   ├── storage/            (ndjson.js: bruto 72 h; rollup.js: 5 min/90 d; buckets.js: agregação; migrate-v1.js; outages.js: quedas; index.js: History)
+│   ├── alerts/             (rules.js: regras + chaves + histerese; health.js: saúde; engine.js: motor + debounce do offline)
 │   └── stores.js           (JsonStore genérico: AlertsStore c/ ciclo de vida, AnnotationsStore)
 ├── CHANGELOG.md            ← histórico de mudanças (Keep a Changelog)
 ├── docs/                   (PLANO_V2.md + adr/ — plano e decisões da V2)

@@ -8,6 +8,33 @@ pré-versões `2.0.0-alpha.N` (uma por fase do plano), depois `beta`, `rc` e `2.
 
 ## [Não publicado]
 
+### Adicionado
+
+- Motor de alertas em `server/alerts/` (ADR 0006): regras declarativas com chave estável
+  por condição (`disk:/mnt/x:usage`, `temp:cpu`, `service:smbd`...), histerese e debounce
+  do offline.
+- Limiares no `.env`: `ALERT_DISK_PCT`, `ALERT_RAM_PCT`, `ALERT_TEMP_C`,
+  `ALERT_HYSTERESIS` e `ALERT_OFFLINE_AFTER`, validados (fora da faixa volta ao padrão com
+  aviso no log).
+- Registro de quedas próprio em `data/outages.ndjson` e `/api/outages?days=` com uptime
+  calculado desde o início do monitoramento.
+- `/api/status` traz `health` e os limiares ativos (`meta.thresholds`).
+
+### Alterado
+
+- "Servidor inacessível" só depois de 2 falhas seguidas (≈2 min); 1 falha isolada não
+  alerta nem muda o status. A queda conta desde a 1ª falha.
+- Índice de saúde, quedas e uptime calculados no servidor com os mesmos limiares dos
+  alertas; antes a tela usava limiares próprios (75/80/70).
+- Alerta aberto só regrava `alerts.json` quando muda de estado (valor novo: no máximo a
+  cada 10 min, e sempre ao encerrar).
+
+### Corrigido
+
+- B3: a condição que persiste mantém UM alerta, com o valor atualizado (antes, 1 alerta
+  novo por coleta).
+- B9: as quedas não são mais apagadas pelo limite de 500 alertas; o uptime é confiável.
+
 ## [2.0.0-alpha.3] — 2026-10-07
 
 Fase F2 do plano (armazenamento). Leitura validada com o `data/history.json` real da V1
