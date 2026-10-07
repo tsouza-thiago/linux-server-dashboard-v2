@@ -681,6 +681,23 @@ tr:hover td { background: var(--bg-surface-2); }
 .sample-grid .v { font-size: 13px; line-height: 20px; font-family: var(--font-mono); }
 .sample-grid .v.full { grid-column: 1 / -1; }
 
+/* ===== Login (sessão por cookie) ===== */
+.login-form label { display: block; margin: 12px 0 6px; font-size: 12px; line-height: 16px; font-weight: 500; color: var(--text-secondary); }
+.login-form input {
+  width: 100%;
+  background: var(--bg-surface-2);
+  border: 1px solid var(--border-hairline);
+  color: var(--text-primary);
+  border-radius: var(--radius-sm);
+  padding: 8px 12px;
+  font-size: 13px;
+  line-height: 20px;
+  font-family: var(--font-mono);
+}
+.login-form input:focus { outline: 2px solid var(--accent-primary); outline-offset: 1px; border-color: var(--accent-primary); }
+.login-error { min-height: 20px; margin-top: 8px; font-size: 13px; line-height: 20px; color: var(--status-critical); }
+.session-actions { display: flex; gap: 8px; flex-wrap: wrap; }
+
 /* ===== Outages ===== */
 .outage-row { display: flex; justify-content: space-between; padding: 7px 0; border-bottom: 1px solid var(--border-hairline); font-size: 13px; line-height: 20px; font-family: var(--font-mono); }
 

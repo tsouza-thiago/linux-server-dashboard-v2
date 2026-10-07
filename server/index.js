@@ -2,6 +2,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { createRouter, jsonBody } from './http/router.js';
 import { serveStatic, sendFile } from './http/static.js';
+import { SessionStore, SESSION_COOKIE, sessionCookie, clearSessionCookie, safeEqual } from './http/session.js';
 import { History } from './storage/index.js';
 import { migrateV1 } from './storage/migrate-v1.js';
 import { AlertsStore, AnnotationsStore } from './stores.js';
@@ -9,7 +10,7 @@ import { OutageLog } from './storage/outages.js';
 import { AlertEngine } from './alerts/engine.js';
 import { collect } from './poller.js';
 import { config, configWarnings, ROOT, isPlaceholderHost } from './config.js';
-import { hostCheck, csrfCheck, securityHeaders, makeRequireAuth, issueCsrfCookie, makeRateLimit } from './security.js';
+import { hostCheck, csrfCheck, securityHeaders, makeRequireAuth, issueCsrfCookie, makeRateLimit, parseCookies } from './security.js';
 import { toCSV } from './csv.js';
 
 export function createApp(deps = {}) {
@@ -58,6 +59,12 @@ export function createApp(deps = {}) {
   };
 
   const apiRateLimit = makeRateLimit({ windowMs: 60000, max: deps.rateLimitMax ?? 120 });
+  // Tentativas de login: limite próprio, bem menor (força bruta no token).
+  const loginRateLimit = makeRateLimit({ windowMs: 60000, max: deps.loginRateMax ?? 10 });
+  const sessions = deps.sessions || new SessionStore({
+    file: deps.sessionsFile ?? path.join(path.dirname(alertsStore.file), 'sessions.json'),
+    log,
+  });
 
   const sseClients = new Set();
 
@@ -167,7 +174,45 @@ export function createApp(deps = {}) {
     if (['POST', 'PUT', 'PATCH', 'DELETE'].includes(req.method)) return apiRateLimit(req, res, next);
     next();
   });
-  app.use('/api', makeRequireAuth(DASH_TOKEN));
+
+  // ---- Sessão (ADR 0007): estas rotas ficam antes da exigência de autenticação ----
+  const currentSession = (req) => {
+    const sid = parseCookies(req.headers.cookie)[SESSION_COOKIE];
+    return sid && sessions.touch(sid) ? sid : null;
+  };
+
+  app.get('/api/session', (req, res) => {
+    res.json({ authRequired: Boolean(DASH_TOKEN), authenticated: !DASH_TOKEN || Boolean(currentSession(req)) });
+  });
+
+  app.post('/api/login', loginRateLimit, (req, res) => {
+    if (!DASH_TOKEN) return res.json({ ok: true, authRequired: false });
+    const token = req.body && req.body.token;
+    if (typeof token !== 'string' || !safeEqual(token.trim(), DASH_TOKEN)) {
+      log('login recusado: token incorreto');
+      return res.status(401).json({ error: 'Token incorreto' });
+    }
+    const id = sessions.create();
+    res.appendHeader('Set-Cookie', sessionCookie(id));
+    log(`login OK (${sessions.count} sessão(ões) ativa(s))`);
+    res.json({ ok: true });
+  });
+
+  app.post('/api/logout', (req, res) => {
+    const sid = parseCookies(req.headers.cookie)[SESSION_COOKIE];
+    if (sid) sessions.revoke(sid);
+    res.appendHeader('Set-Cookie', clearSessionCookie());
+    res.json({ ok: true });
+  });
+
+  app.use('/api', makeRequireAuth(DASH_TOKEN, sessions));
+
+  app.post('/api/logout-all', (req, res) => {
+    const revoked = sessions.revokeAll();
+    res.appendHeader('Set-Cookie', clearSessionCookie());
+    log(`todas as sessões encerradas (${revoked})`);
+    res.json({ ok: true, revoked });
+  });
 
   app.get('/api/status', (req, res) => {
     res.json(statusPayload());
@@ -307,10 +352,10 @@ export function createApp(deps = {}) {
   async function shutdown() {
     for (const res of sseClients) res.end();
     sseClients.clear();
-    await Promise.all([store.flush?.(), alertsStore.flush?.(), annotationsStore.flush?.(), outages.flush()]);
+    await Promise.all([store.flush?.(), alertsStore.flush?.(), annotationsStore.flush?.(), outages.flush(), sessions.flush()]);
   }
 
-  return { app, state, store, alertsStore, annotationsStore, outages, engine, broadcast, runPoll, parseRange, statusPayload, sseClients, shutdown };
+  return { app, state, store, alertsStore, annotationsStore, outages, engine, sessions, broadcast, runPoll, parseRange, statusPayload, sseClients, shutdown };
 }
 
 export function startServer() {

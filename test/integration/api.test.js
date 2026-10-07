@@ -114,7 +114,7 @@ test('API: headers de segurança presentes e sem X-Powered-By', async (t) => {
 
 // ---- DASH_TOKEN ----
 
-test('API: DASH_TOKEN exige autenticação em /api e /api/stream', async (t) => {
+test('API: DASH_TOKEN exige autenticação em /api e /api/stream (Bearer; token na URL não vale mais)', async (t) => {
   const s = await withServer(t, () => setupApp({ token: 'segredo123' }));
   const noAuth = await request(s.port, { path: '/api/status' });
   assert.equal(noAuth.status, 401);
@@ -123,13 +123,15 @@ test('API: DASH_TOKEN exige autenticação em /api e /api/stream', async (t) => 
   assert.equal(bearer.status, 200);
 
   const query = await request(s.port, { path: '/api/status?token=segredo123' });
-  assert.equal(query.status, 200);
+  assert.equal(query.status, 401, 'ADR 0007: ?token= vazava em histórico e logs');
 
   const wrong = await request(s.port, { path: '/api/status', headers: { Authorization: 'Bearer errado' } });
   assert.equal(wrong.status, 401);
 
-  const stream = await readSSE(s.port, { path: '/api/stream?token=segredo123', until: 1 });
+  const stream = await readSSE(s.port, { path: '/api/stream', headers: { Authorization: 'Bearer segredo123' }, until: 1 });
   assert.equal(stream.status, 200);
+  const streamQuery = await readSSE(s.port, { path: '/api/stream?token=segredo123', until: 1 });
+  assert.equal(streamQuery.status, 401);
 
   const staticOk = await request(s.port, { path: '/' });
   assert.equal(staticOk.status, 200, 'rota estática não exige token');

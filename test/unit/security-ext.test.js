@@ -127,7 +127,7 @@ test('makeRequireAuth: token errado ou ausente vira 401', () => {
   assert.equal(res.body.error, 'Não autorizado');
 });
 
-test('makeRequireAuth: Bearer e query corretos passam', () => {
+test('makeRequireAuth: Bearer correto passa; token na query é recusado (ADR 0007)', () => {
   const res = fakeRes();
   let called = false;
   makeRequireAuth('segredo')(
@@ -142,5 +142,6 @@ test('makeRequireAuth: Bearer e query corretos passam', () => {
     { headers: {}, query: { token: 'segredo' } },
     res2, () => { called2 = true; },
   );
-  assert.equal(called2, true);
+  assert.equal(called2, false);
+  assert.equal(res2.statusCode, 401);
 });
