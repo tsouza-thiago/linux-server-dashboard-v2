@@ -81,7 +81,7 @@ async function main() {
   console.log('Capturando 1 amostra (1 conexão SSH, somente leitura)…');
   console.log('Se o painel estiver rodando, esta será uma coleta extra neste minuto.');
   const started = Date.now();
-  const { stdout, stderr, code } = await runOnce(host, buildCommand());
+  const { stdout, stderr, code } = await runOnce(host, buildCommand({}, 'smart'));
   const ms = Date.now() - started;
   if (code !== 0 || !stdout.includes('===HOST===')) {
     console.error(`ERRO: a coleta falhou (código ${code}). ${stderr.trim()}`);

@@ -94,14 +94,14 @@ test('sections.overview lida com amostra sem ram e sem temp', () => {
 
 test('sections.renderOverviewDisks cria linha com badge SMART', () => {
   const { Dash, document } = ctx();
-  Dash.sections.renderOverviewDisks(makeSample({ disks: [{ mount: '/dev/sda1', size: '100G', used: '12G', avail: '83G', pct: 50, usedBytes: 1.2e10, sizeBytes: 1e11 }] }));
+  Dash.sections.renderOverviewDisks(makeSample({ disks: [{ mount: '/', source: '/dev/sda1', dev: 'sda', size: '100G', used: '12G', avail: '83G', pct: 50, usedBytes: 1.2e10, sizeBytes: 1e11 }] }));
   const el = document.getElementById('overviewDisks');
   assert.equal(el.children.length, 1);
   assert.ok(el.children[0].innerHTML.includes('badge-ok'));
   assert.ok(el.children[0].innerHTML.includes('PASSED'));
 
   el.children[0].click();
-  assert.equal(Dash.diskDetailMount, '/dev/sda1');
+  assert.equal(Dash.diskDetailMount, '/');
 });
 
 test('sections.renderServices cria badges por estado', () => {

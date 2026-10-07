@@ -9,6 +9,35 @@ pré-versões `2.0.0-alpha.N` (uma por fase do plano), depois `beta`, `rc` e `2.
 ## [Não publicado]
 
 ### Adicionado
+
+- Coletor V2 (`server/collector/`): script POSIX sh único e somente leitura, com
+  marcador de completude `===FIM===`, versão e hash da configuração (`===VER===`) e modo
+  `basico`/`smart` compatível com comando forçado no `authorized_keys` (ADR 0008).
+- Amostra `schemaVersion: 2` com novas métricas: CPU % (user/system/iowait/steal), RAM
+  `dirty`/`writeback`, inodes por disco e dispositivo de origem, erros/descartes de rede,
+  utilização e latência de disco, PSI, todas as zonas térmicas e RSS/tempo dos processos.
+- Testes: goldens do parser sobre a amostra real anonimizada, casos-limite, fuzz com
+  semente fixa e execução do script real em `sh` local (bash e dash).
+
+### Alterado
+
+- SMART roda 1x por hora; nos demais polls o último resultado é reaproveitado.
+- Métricas lidas direto de `/proc` e `/sys` (sem `free`/`df -h`/`ps aux`).
+- `server/poller.js` vira fachada do coletor, mantendo a API usada pelo servidor.
+- Amostras ficam temporariamente maiores (novos campos) até a nova persistência da F2 (B7).
+
+### Corrigido
+
+- B1: SMART sem permissão não vira mais falso crítico; só `FAILED` alerta.
+- B2: interface de rede filtrada pelo nome exato e contador colado ao nome lido corretamente.
+- B6: o SMART de cada disco é encontrado pelo dispositivo de origem do mount.
+- I5: dado ausente vira `null`; taxa de rede ausente não aparece como 0.
+
+## [2.0.0-alpha.1] — 2026-10-07
+
+Fase F0 do plano (base da V2). Nenhuma mudança de comportamento no painel.
+
+### Adicionado
 - Plano da V2 (`docs/PLANO_V2.md`) e registros de decisão `docs/adr/0001`–`0013`.
 - Este changelog.
 - `npm run check`: sintaxe JS e shell, `.env`/`data/` fora do git, testes com cobertura e
@@ -47,5 +76,6 @@ Documentados no plano da V2 (seção 2.2, B1–B12), entre eles: alerta SMART fa
 rede zerada com contadores grandes, alerta duplicado a cada coleta e reescrita completa do
 histórico a cada minuto.
 
-[Não publicado]: https://github.com/tsouza-thiago/linux-server-dashboard-v2/compare/v1.0.0...HEAD
+[Não publicado]: https://github.com/tsouza-thiago/linux-server-dashboard-v2/compare/v2.0.0-alpha.1...HEAD
+[2.0.0-alpha.1]: https://github.com/tsouza-thiago/linux-server-dashboard-v2/compare/v1.0.0...v2.0.0-alpha.1
 [1.0.0]: https://github.com/tsouza-thiago/linux-server-dashboard-v2/releases/tag/v1.0.0

@@ -1,0 +1,61 @@
+===VER===
+2 000000000000
+smart
+===HOST===
+servidor-exemplo
+===OS===
+6.1.0-33-amd64
+NAME="Debian GNU/Linux"
+===CPU===
+2
+===UPTIME===
+86400.50 170000.00
+===LOAD===
+2,50 1,75 1,10 4/210 9999
+===STAT===
+cpu  500000 0 100000 3000000 250000 0 5000 1000 0 0
+===MEM===
+MemTotal:        2048000 kB
+MemFree:           51200 kB
+MemAvailable:     102400 kB
+Buffers:           10240 kB
+Cached:            81920 kB
+SwapTotal:             0 kB
+SwapFree:              0 kB
+Dirty:             65536 kB
+Writeback:          4096 kB
+SReclaimable:      10240 kB
+===DF===
+Filesystem     Mounted on        1B-blocks         Used         Avail Use% IUse%
+/dev/nvme0n1p2 /             500000000000 480000000000   20000000000  96%   99%
+/dev/sdb1      /mnt/dados   4000000000000 100000000000 3900000000000   3%     -
+===NET===
+  eth0:123456789012 98765    1    2    0     0          0         0 9876543210 54321    3    4    0     0       0          0
+===IO===
+ 259       0 nvme0n1 1000 0 80000 500 2000 0 160000 1500 0 900 2000
+   8      16 sdb 50 0 400 10 0 0 0 0 0 5 10 0 0 0 0 0 0
+===PSI===
+cpu some avg10=12.50 avg60=8.25 avg300=3.10 total=1234567 full avg10=0.00 avg60=0.00 avg300=0.00 total=0
+memory some avg10=1.00 avg60=0.50 avg300=0.20 total=4567 full avg10=0.40 avg60=0.10 avg300=0.05 total=890
+io some avg10=30.00 avg60=22.00 avg300=10.00 total=99999 full avg10=25.00 avg60=18.00 avg300=8.00 total=88888
+===TEMP===
+acpitz 27800
+pch_cannonlake 41000
+x86_pkg_temp 61500
+iwlwifi_1 0
+===SMART===
+nvme0n1 SEM_PERMISSAO
+sdb FAILED
+sdc ALGO_ESTRANHO
+===SERVICES===
+smbd active
+nmbd failed
+jellyfin inactive
+docker
+===PS===
+USER                                    PID %CPU %MEM   RSS ELAPSED COMMAND
+www-data                               1200 12.5 30.1 630000  3600 /usr/bin/php-fpm: pool www
+root                                      1  0.0  0.5  10240 86400 /sbin/init
+root                                   4321  0.0  0.0   4096     0 ps -eo user:32,pid,pcpu,pmem,rss,etimes,args --sort=-rss
+linha-curta 1
+===FIM===

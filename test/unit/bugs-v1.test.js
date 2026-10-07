@@ -1,7 +1,7 @@
 // Bugs conhecidos da V1 (plano da V2, seção 2.2).
-// Cada teste descreve o comportamento CORRETO e hoje falha; por isso está marcado como
-// `todo` (aparece no relatório sem deixar a suíte vermelha). O commit que corrigir o bug
-// remove o `todo` e o teste passa a valer como regressão.
+// Cada teste descreve o comportamento CORRETO. Os ainda abertos estão marcados como `todo`
+// (aparecem no relatório sem deixar a suíte vermelha); o commit que corrige o bug remove o
+// `todo` e o teste passa a valer como regressão. Corrigidos na F1: B1, B2, B6, I5.
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
@@ -21,25 +21,25 @@ const TS = '2026-10-07T12:00:00.000Z';
 const OPTS = { svcOrder: [], devSet: new Set() };
 const tmpDir = () => fs.mkdtempSync(path.join(os.tmpdir(), 'lsd-bugs-'));
 
-test('B1 — smartctl sem saída (sem permissão) não gera alerta SMART crítico falso', { todo: 'B1 · corrigir na F1 (coleta)' }, () => {
-  // sda sem permissão não imprime nada; o printf sem \n cola a linha com a do sdb
-  const s = parseOutput('===HOST===\nsrv\n===SMART===\nsda:sdb:PASSED\n', TS, OPTS);
+test('B1 — smartctl sem permissão não gera alerta SMART crítico falso', () => {
+  // V2: o comando imprime 1 linha por disco com o estado já classificado (ver collector-builder)
+  const s = parseOutput('===HOST===\nsrv\n===SMART===\nsda SEM_PERMISSAO\nsdb PASSED\n', TS, OPTS);
   assert.ok(s.smart.some((x) => x.dev === 'sdb' && x.status === 'PASSED'), 'sdb deve ser PASSED');
   assert.equal(computeAlerts(s).filter((a) => a.level === 'critical').length, 0);
 });
 
-test('B2 — /proc/net/dev com contador colado ao nome da interface é lido', { todo: 'B2 · corrigir na F1 (coleta)' }, () => {
+test('B2 — /proc/net/dev com contador colado ao nome da interface é lido', () => {
   const out = '===HOST===\nsrv\n===NET===\n  eth0:123456789012 100 0 0 0 0 0 0 9999 50 0 0 0 0 0 0\n';
   const s = parseOutput(out, TS, OPTS);
   assert.equal(s.net.rxBytes, 123456789012);
   assert.equal(s.net.txBytes, 9999);
 });
 
-test('B2 — a interface certa é escolhida mesmo com nome parecido (veth0 × eth0)', { todo: 'B2 · corrigir na F1 (coleta)' }, () => {
+test('B2 — a interface certa é escolhida mesmo com nome parecido (veth0 × eth0)', () => {
   const out = '===HOST===\nsrv\n===NET===\n'
     + '  eth0: 1000 1 0 0 0 0 0 0 2000 1 0 0 0 0 0 0\n'
     + ' veth0: 7 1 0 0 0 0 0 0 8 1 0 0 0 0 0 0\n';
-  const s = parseOutput(out, TS, { ...OPTS, netIf: 'eth0' });
+  const s = parseOutput(out, TS, { targets: { netIf: 'eth0' } });
   assert.equal(s.net.rxBytes, 1000);
   assert.equal(s.net.txBytes, 2000);
 });
@@ -75,7 +75,7 @@ test('B5 — resumo diário agrupa pelo dia do fuso local, não UTC', { todo: 'B
   }
 });
 
-test('B6 — selo SMART de um ponto de montagem vem do disco que o contém', { todo: 'B6 · corrigir na F1 (device do mount) + F6' }, () => {
+test('B6 — selo SMART de um ponto de montagem vem do disco que o contém', () => {
   const { sandbox } = loadAll(['analysis.js', 'sections.js']);
   const sample = { smart: [{ dev: 'sda', status: 'PASSED' }], disks: [{ mount: '/', source: '/dev/sda2' }] };
   assert.equal(sandbox.smartOf(sample, '/').status, 'PASSED');
@@ -140,7 +140,7 @@ test('B12 — stop.sh só encerra o processo que o próprio painel registrou', {
   assert.doesNotMatch(stop, /pgrep\s+-f/, 'fallback por nome pode matar processo alheio');
 });
 
-test('I5 — seção ausente vira "sem dado", nunca zero inventado', { todo: 'I5 · corrigir na F1 (coleta)' }, () => {
+test('I5 — seção ausente vira "sem dado", nunca zero inventado', () => {
   const s = parseOutput('===HOST===\nsrv\n', TS, OPTS);
   assert.equal(s.load, null, 'load ausente virou [0,0,0]');
   assert.equal(s.net, null, 'rede ausente virou zeros');
