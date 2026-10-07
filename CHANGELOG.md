@@ -8,6 +8,45 @@ pré-versões `2.0.0-alpha.N` (uma por fase do plano), depois `beta`, `rc` e `2.
 
 ## [Não publicado]
 
+## [2.0.0-alpha.6] — 2026-10-07
+
+Fase F5 do plano (fundação da tela nova). As 8 telas abrem no Chromium com dados, gráficos
+e sem erro de JavaScript nem violação de CSP (teste e2e). O visual aprovado no canvas
+entra na F6; por ora a tela usa o CSS atual.
+
+### Adicionado
+
+- Tela nova em ES modules nativos, sem build (ADR 0010): `public/js/core/` (template
+  `html` com escape automático, formatação PT-BR, rotas com período na URL, estado
+  central, API, SSE, cálculos), `charts/` e `views/`.
+- 8 telas (D6): Visão geral (manchete de saúde em linguagem simples, cartões com
+  mini-gráfico, eventos recentes), Recursos, Armazenamento (SMART por disco e previsão de
+  disco cheio), Rede, Processos & serviços, Eventos (alertas, quedas e anotações numa
+  linha do tempo, com "Desfazer" e uptime de 90 dias), Relatórios (resumo diário e
+  exportação) e Ajuda (configuração ativa, atalhos, sessão).
+- Gráficos com uPlot 1.6.32 versionado com SHA-256 (ADR 0004): eixo de tempo real, cursor
+  sincronizado, arrastar/roda = zoom (mantido nas atualizações ao vivo), duplo clique volta.
+- Atalhos `1`–`8`, `C`, `T`, `N`, `/` e `?`; avisos rápidos; faixa de servidor offline.
+- `/api/config` (só leitura, sem segredos) e `server/version.js`.
+- Testes ponta a ponta no Chromium (`npm run test:e2e`, `playwright-core` só em dev).
+
+### Alterado
+
+- O projeto fica **sem nenhuma dependência**: saem Chart.js e seus plugins.
+- Telas Histórico, Análise e Anotações da V1 saem; o conteúdo foi para Eventos,
+  Armazenamento e Relatórios.
+- Períodos 7d, 30d e 90d (dos agregados de 5 min).
+- CSP mais estrita: estilos só de `'self'`, sem `'unsafe-inline'`.
+
+### Corrigido
+
+- B5: o resumo diário agrupa pelo dia do fuso local, não UTC.
+- B10: eixo de tempo real nos gráficos; anotações caem no instante certo.
+- Logo após reiniciar o painel, a Visão geral não acusa mais "Servidor inacessível".
+- Com `LANG=C`, alguns Chromium informam o idioma "en-US@posix", que impedia o uPlot de
+  carregar (nenhum gráfico).
+- Testes de API instáveis sob carga: a limpeza esperava gravações pendentes.
+
 ## [2.0.0-alpha.5] — 2026-10-07
 
 Fase F4 do plano (HTTP). Backend sem dependência de runtime; segurança caracterizada pela
@@ -170,7 +209,8 @@ Documentados no plano da V2 (seção 2.2, B1–B12), entre eles: alerta SMART fa
 rede zerada com contadores grandes, alerta duplicado a cada coleta e reescrita completa do
 histórico a cada minuto.
 
-[Não publicado]: https://github.com/tsouza-thiago/linux-server-dashboard-v2/compare/v2.0.0-alpha.5...HEAD
+[Não publicado]: https://github.com/tsouza-thiago/linux-server-dashboard-v2/compare/v2.0.0-alpha.6...HEAD
+[2.0.0-alpha.6]: https://github.com/tsouza-thiago/linux-server-dashboard-v2/compare/v2.0.0-alpha.5...v2.0.0-alpha.6
 [2.0.0-alpha.5]: https://github.com/tsouza-thiago/linux-server-dashboard-v2/compare/v2.0.0-alpha.4...v2.0.0-alpha.5
 [2.0.0-alpha.4]: https://github.com/tsouza-thiago/linux-server-dashboard-v2/compare/v2.0.0-alpha.3...v2.0.0-alpha.4
 [2.0.0-alpha.3]: https://github.com/tsouza-thiago/linux-server-dashboard-v2/compare/v2.0.0-alpha.2...v2.0.0-alpha.3

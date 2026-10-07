@@ -3,73 +3,28 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <meta name="color-scheme" content="light dark">
-  <title>Linux Server Dashboard</title>
-  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='6' fill='%23D68A3C'/%3E%3Cpath d='M9 16h4l2-5 4 10 2-5h2' stroke='white' stroke-width='2.4' fill='none' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E">
+  <meta name="color-scheme" content="dark light">
+  <title>Server Dashboard</title>
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='6' fill='%230E9CB0'/%3E%3Cpath d='M9 16h4l2-5 4 10 2-5h2' stroke='white' stroke-width='2.4' fill='none' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E">
   <link rel="stylesheet" href="style.css">
+  <link rel="stylesheet" href="vendor/uplot/uPlot.min.css">
+  <script src="js/locale-guard.js" defer></script>
+  <script src="vendor/uplot/uPlot.iife.min.js" defer></script>
+  <script type="module" src="js/main.js"></script>
 </head>
 <body>
+  <a class="skip-link" href="#view">Pular para o conteúdo</a>
   <div class="app">
     <aside class="sidebar" id="sidebar" aria-label="Barra lateral">
       <div class="brand">
-        <span class="status-pill"><span class="dot" id="statusDot" role="status" aria-label="Status do servidor"></span><span class="status-text" id="statusText">offline</span></span>
         <div class="brand-text">
-          <h1>Dashboard</h1>
-          <span class="subtitle" id="osLabel">—</span>
+          <h1>Server Dashboard</h1>
+          <span class="subtitle" id="hostLabel">—</span>
         </div>
       </div>
-
-      <nav class="nav" aria-label="Navegação principal">
-        <a href="#/" data-view="overview" class="nav-item active" aria-current="page">
-          <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="4" y="4" width="7" height="7" rx="1.5"/><rect x="13" y="4" width="7" height="7" rx="1.5"/><rect x="4" y="13" width="7" height="7" rx="1.5"/><rect x="13" y="13" width="7" height="7" rx="1.5"/></svg>
-          <span>Visão Geral</span>
-        </a>
-        <a href="#/discos" data-view="discos" class="nav-item">
-          <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><line x1="22" y1="12" x2="2" y2="12"/><path d="M5.45 5.11L2 12v6a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-6l-3.45-6.89A2 2 0 0 0 16.76 4H7.24a2 2 0 0 0-1.79 1.11z"/><line x1="6" y1="16" x2="6.01" y2="16"/><line x1="10" y1="16" x2="10.01" y2="16"/></svg>
-          <span>Discos</span>
-        </a>
-        <a href="#/rede" data-view="rede" class="nav-item">
-          <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>
-          <span>Rede</span>
-        </a>
-        <a href="#/processos" data-view="processos" class="nav-item">
-          <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="4" y="4" width="16" height="16" rx="2"/><rect x="9" y="9" width="6" height="6"/><path d="M9 1v3M15 1v3M9 20v3M15 20v3M1 9h3M1 15h3M20 9h3M20 15h3"/></svg>
-          <span>Processos</span>
-        </a>
-        <a href="#/alertas" data-view="alertas" class="nav-item">
-          <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg>
-          <span>Alertas</span> <span class="nav-badge" id="alertBadge" hidden></span>
-        </a>
-        <a href="#/anotacoes" data-view="anotacoes" class="nav-item">
-          <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 4h16v12l-6 4H4z"/><path d="M14 16v4l4-4"/></svg>
-          <span>Anotações</span>
-        </a>
-        <a href="#/analise" data-view="analise" class="nav-item">
-          <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><line x1="12" y1="20" x2="12" y2="10"/><line x1="18" y1="20" x2="18" y2="4"/><line x1="6" y1="20" x2="6" y2="16"/></svg>
-          <span>Análise</span>
-        </a>
-        <a href="#/historico" data-view="historico" class="nav-item">
-          <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
-          <span>Histórico</span>
-        </a>
-        <a href="#/ajuda" data-view="ajuda" class="nav-item">
-          <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="10"/><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
-          <span>Ajuda</span>
-        </a>
-      </nav>
-
+      <nav class="nav" aria-label="Telas" id="nav"></nav>
       <div class="sidebar-footer">
-        <div class="health-box" id="healthBox" title="Índice de saúde calculado de uso e alertas">
-          <div class="health-ring" id="healthRing"><span id="healthScore">—</span></div>
-          <div class="health-info">
-            <div class="health-label">Índice de saúde</div>
-            <div class="health-note" id="healthNote">calculando…</div>
-          </div>
-        </div>
-        <button id="pollBtn" title="Coletar agora">
-          <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
-          Coletar agora
-        </button>
+        <button id="pollBtn" type="button" title="Coletar agora (C)">Coletar agora</button>
       </div>
     </aside>
     <button class="nav-scrim" id="navScrim" aria-label="Fechar navegação" tabindex="-1"></button>
@@ -77,318 +32,22 @@
     <div class="main">
       <header class="topbar">
         <div class="topbar-left">
-          <button id="navToggle" class="btn-icon nav-toggle" aria-label="Abrir navegação" aria-expanded="false" aria-controls="sidebar">
-            <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="18" x2="21" y2="18"/></svg>
-          </button>
-          <h2 id="viewTitle">Visão Geral</h2>
-          <span class="subtitle" id="hostLabel">—</span>
+          <button id="navToggle" class="btn-icon nav-toggle" aria-label="Abrir navegação" aria-expanded="false" aria-controls="sidebar">☰</button>
+          <h2 id="viewTitle">Visão geral</h2>
         </div>
         <div class="topbar-meta">
-          <div class="meta-item">
-            <span class="label">Última coleta</span>
-            <span id="lastPollAt">—</span>
-          </div>
-          <div class="meta-item">
-            <span class="label">Próxima em</span>
-            <span id="countdown">—</span>
-          </div>
-          <div class="period-toggle" id="periodToggle" role="group" aria-label="Período dos gráficos">
-            <button data-period="1h">1h</button>
-            <button data-period="6h">6h</button>
-            <button data-period="24h" class="active">24h</button>
-            <button data-period="72h">72h</button>
-          </div>
-          <button id="exportBtn" class="btn-ghost" title="Exportar CSV do período atual">
-            <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
-            Exportar
-          </button>
-          <button id="themeToggle" class="btn-icon" title="Alternar tema (claro/escuro)" aria-label="Alternar tema">
-            <svg class="icon icon-moon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg>
-            <svg class="icon icon-sun" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="5"/><line x1="12" y1="1" x2="12" y2="3"/><line x1="12" y1="21" x2="12" y2="23"/><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/><line x1="1" y1="12" x2="3" y2="12"/><line x1="21" y1="12" x2="23" y2="12"/><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/></svg>
-          </button>
+          <span class="status-pill" id="statusPill" role="status" aria-live="polite"><span class="dot" id="statusDot"></span><span id="statusText">conectando…</span></span>
+          <span class="meta-item"><span class="label">Última coleta</span><span id="lastPoll">—</span></span>
+          <div class="period-toggle" id="periodToggle" role="group" aria-label="Período dos gráficos"></div>
+          <button id="themeToggle" class="btn-icon" type="button" title="Alternar tema (T)" aria-label="Alternar tema claro/escuro">◐</button>
         </div>
       </header>
-
-      <div id="alerts" class="alerts-bar" aria-live="polite"></div>
-
-      <main id="content">
-        <section id="view-overview" class="view active">
-          <div class="cards">
-            <div class="card">
-              <div class="card-title">Load (1 / 5 / 15)</div>
-              <div class="card-value"><span id="load1">—</span> <span class="dim" id="load5">—</span> <span class="dim" id="load15">—</span></div>
-              <div class="bar"><div class="bar-fill" id="loadBar" style="width:0%"></div></div>
-              <div class="card-note" id="loadNote">—</div>
-            </div>
-            <div class="card">
-              <div class="card-title">Memória RAM</div>
-              <div class="card-value"><span id="ramUsed">—</span> <span class="dim" id="ramTotal">/ —</span></div>
-              <div class="bar"><div class="bar-fill" id="ramBar" style="width:0%"></div></div>
-              <div class="card-note" id="ramNote">—</div>
-            </div>
-            <div class="card">
-              <div class="card-title">Swap</div>
-              <div class="card-value"><span id="swapUsed">—</span> <span class="dim" id="swapTotal">/ —</span></div>
-              <div class="bar"><div class="bar-fill" id="swapBar" style="width:0%"></div></div>
-              <div class="card-note" id="swapNote">—</div>
-            </div>
-            <div class="card">
-              <div class="card-title">Temperatura CPU</div>
-              <div class="card-value"><span id="tempValue">—</span> <span class="dim">°C</span></div>
-              <div class="bar"><div class="bar-fill" id="tempBar" style="width:0%"></div></div>
-              <div class="card-note" id="tempNote">limite: 60°C</div>
-            </div>
-            <div class="card">
-              <div class="card-title">Uptime</div>
-              <div class="card-value" id="uptimeValue">—</div>
-              <div class="card-note" id="bootAt">—</div>
-            </div>
-            <div class="card">
-              <div class="card-title">Sistema</div>
-              <div class="card-value" id="coresValue">—</div>
-              <div class="card-note" id="kernelLabel">—</div>
-            </div>
-          </div>
-
-          <div class="grid-2">
-            <div class="chart-box"><h2>Load (1/5/15 min)</h2><canvas id="chartLoad"></canvas></div>
-            <div class="chart-box"><h2>RAM usada %</h2><canvas id="chartRam"></canvas></div>
-            <div class="chart-box"><h2>Temperatura °C</h2><canvas id="chartTemp"></canvas></div>
-            <div class="chart-box"><h2>Discos — uso %</h2><canvas id="chartDisk"></canvas></div>
-          </div>
-
-          <div class="grid-2">
-            <section class="panel">
-              <h2>Discos <span class="hint">clique para detalhes</span></h2>
-              <div id="overviewDisks"></div>
-            </section>
-            <section class="panel">
-              <h2>Rede</h2>
-              <div class="net-row">
-                <div class="net-box"><div class="label">Download</div><div class="net-value" id="rxMbps">—</div><div class="dim" id="rxTotal">—</div></div>
-                <div class="net-box"><div class="label">Upload</div><div class="net-value" id="txMbps">—</div><div class="dim" id="txTotal">—</div></div>
-              </div>
-            </section>
-          </div>
-
-          <section class="panel">
-            <h2>Serviços</h2>
-            <div id="services" class="badges"></div>
-          </section>
-        </section>
-
-        <section id="view-discos" class="view">
-          <div id="diskCards" class="disk-grid"></div>
-          <div class="chart-box wide">
-            <h2>Uso % — <span id="diskDetailMount">—</span></h2>
-            <canvas id="chartDiskDetail"></canvas>
-          </div>
-        </section>
-
-        <section id="view-rede" class="view">
-          <div class="net-row wide">
-            <div class="net-box"><div class="label">Download</div><div class="net-value" id="rxMbps2">—</div><div class="dim" id="rxTotal2">—</div></div>
-            <div class="net-box"><div class="label">Upload</div><div class="net-value" id="txMbps2">—</div><div class="dim" id="txTotal2">—</div></div>
-          </div>
-          <div class="chart-box wide"><h2>Tráfego de rede (Mbps)</h2><canvas id="chartNet"></canvas></div>
-          <div class="chart-box wide">
-            <h2>I/O por disco (MB/s) — <span class="io-tabs" id="ioTabs"></span></h2>
-            <canvas id="chartIO"></canvas>
-          </div>
-        </section>
-
-        <section id="view-processos" class="view">
-          <div class="panel wide">
-            <h2>Top processos <span class="hint">clique no cabeçalho para ordenar</span></h2>
-            <div class="toolbar">
-              <input type="search" id="procSearch" placeholder="Buscar por comando ou usuário…" aria-label="Buscar processos">
-            </div>
-            <div class="table-wrap"><table id="procsTable">
-              <thead><tr>
-                <th data-key="pid">PID</th>
-                <th data-key="user">Usuário</th>
-                <th data-key="cpu">CPU%</th>
-                <th data-key="mem">MEM%</th>
-                <th data-key="cmd">Comando</th>
-              </tr></thead>
-              <tbody></tbody>
-            </table></div>
-          </div>
-        </section>
-
-        <section id="view-alertas" class="view">
-          <div class="panel wide">
-            <h2>Alertas</h2>
-            <div class="toolbar" id="alertFilters" role="group" aria-label="Filtro de alertas">
-              <button data-filter="active" class="active">Ativos</button>
-              <button data-filter="all">Todos</button>
-              <button data-filter="warning">Warning</button>
-              <button data-filter="critical">Critical</button>
-            </div>
-            <div id="alertsList"></div>
-          </div>
-        </section>
-
-        <section id="view-anotacoes" class="view">
-          <div class="panel wide">
-            <h2>Anotações <span class="hint">marcadores na linha do tempo dos gráficos</span></h2>
-            <div class="annotation-form">
-              <input type="text" id="annotationText" placeholder="Nova anotação (marcada no momento atual)…" maxlength="500" aria-label="Texto da nova anotação">
-              <button id="annotationAdd" class="btn-ghost">Adicionar agora</button>
-            </div>
-            <div id="annotationsList" class="annotations-list"></div>
-          </div>
-        </section>
-
-        <section id="view-analise" class="view">
-          <div class="grid-2">
-            <div class="panel">
-              <h2>Índice de saúde</h2>
-              <div class="health-hero"><span id="healthHeroScore">—</span><span class="health-hero-note" id="healthHeroNote">calculando…</span></div>
-              <div id="healthBreakdown"></div>
-            </div>
-            <div class="panel">
-              <h2>Pressão de RAM (6h)</h2>
-              <div id="ramPressure" class="stats"></div>
-            </div>
-          </div>
-          <div class="panel wide">
-            <h2>ETA — discos cheios</h2>
-            <div class="table-wrap"><table id="etaTable">
-              <thead><tr><th>Mount</th><th>Usado</th><th>Crescimento/dia</th><th>Previsão de lotação</th><th>Amostras</th></tr></thead>
-              <tbody></tbody>
-            </table></div>
-          </div>
-          <div class="panel wide">
-            <h2>Resumo diário <span class="hint">min / máx / média no período</span></h2>
-            <div class="table-wrap"><table id="dailyTable">
-              <thead><tr><th>Dia</th><th>Load 1m</th><th>RAM %</th><th>Temp °C</th><th>Rx máx Mbps</th><th>Tx máx Mbps</th></tr></thead>
-              <tbody></tbody>
-            </table></div>
-          </div>
-          <div class="panel wide">
-            <h2>Outages (indisponibilidade)</h2>
-            <div id="outagesList"></div>
-          </div>
-        </section>
-
-        <section id="view-historico" class="view">
-          <div class="panel wide">
-            <h2>Histórico de amostras <span class="hint" id="historyHint">—</span></h2>
-            <div class="table-wrap"><table id="historyTable">
-              <thead><tr><th>Data/hora</th><th>Load 1m</th><th>RAM %</th><th>Temp</th><th>Rx Mbps</th><th>Tx Mbps</th><th>Discos</th></tr></thead>
-              <tbody></tbody>
-            </table></div>
-          </div>
-        </section>
-
-        <section id="view-ajuda" class="view help">
-          <div class="panel wide">
-            <h2>Ajuda <span class="hint">tutorial completo em TUTORIAL.md (na pasta do projeto)</span></h2>
-
-            <details open>
-              <summary>Iniciar e parar o serviço</summary>
-              <div class="help-body">
-                <p><b>Iniciar</b> (na pasta do projeto <code>~/projeto/linux-server-dashboard</code>):</p>
-                <pre>./start.sh</pre>
-                <p>ou <code>npm start</code>. Depois abra o navegador em <code>http://localhost:3000</code>.
-                Deixe o terminal aberto — fechar a janela do navegador não para o serviço, fechar o terminal sim.</p>
-                <p><b>Parar</b>: pressione <code>Ctrl+C</code> no terminal, ou em outro terminal:</p>
-                <pre>./stop.sh</pre>
-                <p>O histórico fica salvo em <code>data/history/</code> (72 h) e <code>data/rollup/</code> (90 dias) — nada se perde ao parar.
-                Parar o painel <b>não afeta o servidor</b>.</p>
-              </div>
-            </details>
-
-            <details>
-              <summary>O que cada tela mostra</summary>
-              <div class="help-body">
-                <ul>
-                  <li><b>Visão Geral</b> — resumo: load, RAM, swap, temperatura, uptime, kernel, gráficos, discos, rede, serviços.</li>
-                  <li><b>Discos</b> — uso de cada disco, saúde SMART e previsão de lotação (ETA). Clique no cartão para ver o gráfico.</li>
-                  <li><b>Rede</b> — download/upload (Mbps) e I/O por disco (MB/s, abas sda/sdb/sdc).</li>
-                  <li><b>Processos</b> — top 7 por memória. Busque no campo e clique nos cabeçalhos para ordenar.</li>
-                  <li><b>Alertas</b> — lista com filtros; reconheça (✓) ou resolva cada alerta.</li>
-                  <li><b>Anotações</b> — marque momentos na linha do tempo e remova anotações.</li>
-                  <li><b>Análise</b> — índice de saúde detalhado, pressão de RAM, ETA dos discos, resumo diário, outages.</li>
-                  <li><b>Histórico</b> — cada coleta em tabela, no período selecionado.</li>
-                </ul>
-              </div>
-            </details>
-
-            <details>
-              <summary>Interações: zoom, cliques, anotações, exportação</summary>
-              <div class="help-body">
-                <table class="help-table">
-                  <thead><tr><th>Ação</th><th>Como fazer</th></tr></thead>
-                  <tbody>
-                    <tr><td>Mudar período</td><td>botões 1h / 6h / 24h / 72h no topo</td></tr>
-                    <tr><td>Zoom no gráfico</td><td>roda do mouse sobre o gráfico</td></tr>
-                    <tr><td>Mover (pan)</td><td>Shift + arrastar com o mouse</td></tr>
-                    <tr><td>Voltar o zoom</td><td>trocar o período ou recarregar a página</td></tr>
-                    <tr><td>Detalhe de uma coleta</td><td>clicar em um ponto do gráfico</td></tr>
-                    <tr><td>Anotar no tempo</td><td>na janela de detalhe, "Anotar neste momento" (linha roxa no gráfico)</td></tr>
-                    <tr><td>Tema claro/escuro</td><td>botão sol/lua no topo</td></tr>
-                    <tr><td>Coletar agora</td><td>botão no rodapé da coluna esquerda</td></tr>
-                    <tr><td>Exportar CSV</td><td>botão "Exportar" no topo (abre no Excel)</td></tr>
-                  </tbody>
-                </table>
-                <p class="help-note">Toda interação acontece no seu navegador — o servidor só responde 1 comando por minuto.</p>
-              </div>
-            </details>
-
-            <details>
-              <summary>Entendendo os números</summary>
-              <div class="help-body">
-                <table class="help-table">
-                  <thead><tr><th>Termo</th><th>Significado</th><th>Saudável</th></tr></thead>
-                  <tbody>
-                    <tr><td>Load</td><td>carga do processador (1 núcleo aqui)</td><td>&lt; 1,0</td></tr>
-                    <tr><td>RAM</td><td>memória em uso</td><td>&lt; 90%</td></tr>
-                    <tr><td>Swap</td><td>memória emprestada do disco</td><td>0</td></tr>
-                    <tr><td>Temperatura</td><td>calor da CPU em °C</td><td>&lt; 60 °C</td></tr>
-                    <tr><td>SMART</td><td>saúde do disco</td><td>PASSED</td></tr>
-                    <tr><td>ETA</td><td>previsão de quando o disco enche</td><td>quanto mais longe, melhor</td></tr>
-                  </tbody>
-                </table>
-              </div>
-            </details>
-
-            <details>
-              <summary>Alertas — o que fazer</summary>
-              <div class="help-body">
-                <table class="help-table">
-                  <thead><tr><th>Alerta</th><th>O que fazer</th></tr></thead>
-                  <tbody>
-                    <tr><td>Disco ≥ 90%</td><td>liberar espaço (atenção em /)</td></tr>
-                    <tr><td>RAM ≥ 90%</td><td>ver Processos; reduzir carga</td></tr>
-                    <tr><td>Temperatura ≥ 60 °C</td><td>verificar ventilação e poeira</td></tr>
-                    <tr><td>SMART ≠ PASSED</td><td><b>backup imediato</b> — possível falha física</td></tr>
-                    <tr><td>smbd/nmbd parados</td><td>reiniciar os serviços SMB no servidor</td></tr>
-                    <tr><td>Servidor inacessível</td><td>servidor desligado/fora da rede; o painel se recupera sozinho</td></tr>
-                  </tbody>
-                </table>
-                <p class="help-note">warning = preste atenção · critical = aja. Tutorial completo (instalação, troubleshooting) em <code>TUTORIAL.md</code>.</p>
-              </div>
-            </details>
-
-            <details id="sessionHelp" hidden>
-              <summary>Sessão</summary>
-              <div class="help-body">
-                <p>O acesso fica guardado neste navegador por 30 dias (renovado com o uso).</p>
-                <p class="session-actions">
-                  <button id="logoutBtn" class="btn-ghost">Sair deste navegador</button>
-                  <button id="logoutAllBtn" class="btn-ghost">Encerrar todas as sessões</button>
-                </p>
-              </div>
-            </details>
-          </div>
-        </section>
-      </main>
-
-      <footer>Linux Server Dashboard · coleta via SSH a cada 60s · servidor sem carga extra · zoom nos gráficos: roda do mouse / arrastar com Shift</footer>
+      <div id="offlineBanner" class="offline-banner" role="alert" hidden></div>
+      <main id="view" tabindex="-1"></main>
     </div>
   </div>
+
+  <div id="toasts" class="toasts" aria-live="polite"></div>
 
   <div id="login" class="modal" hidden role="dialog" aria-modal="true" aria-labelledby="loginTitle">
     <form class="modal-box login-form" id="loginForm">
@@ -403,27 +62,5 @@
       <div class="modal-foot"><button type="submit" id="loginSubmit">Entrar</button></div>
     </form>
   </div>
-
-  <div id="modal" class="modal" hidden role="dialog" aria-modal="true" aria-labelledby="modalTitle">
-    <div class="modal-box">
-      <div class="modal-head">
-        <h3 id="modalTitle">Amostra</h3>
-        <button class="btn-ghost" id="modalClose" aria-label="Fechar">✕</button>
-      </div>
-      <div class="modal-body" id="sampleModalBody"></div>
-      <div class="modal-foot">
-        <button id="modalAnnotate" class="btn-ghost">Anotar neste momento</button>
-      </div>
-    </div>
-  </div>
-
-  <script src="/vendor/chart.js"></script>
-  <script src="/vendor/zoom.js"></script>
-  <script src="/vendor/annotation.js"></script>
-  <script src="js/analysis.js"></script>
-  <script src="js/charts.js"></script>
-  <script src="js/sections.js"></script>
-  <script src="js/router.js"></script>
-  <script src="js/main.js"></script>
 </body>
 </html>

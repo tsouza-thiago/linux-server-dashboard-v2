@@ -1,445 +1,303 @@
-window.Dash = window.Dash || {};
+// Orquestração da tela: tema, login, navegação, dados, SSE ao vivo e atalhos de teclado.
+import { createStore } from './core/store.js';
+import { api, onAuthRequired } from './core/api.js';
+import { connect } from './core/sse.js';
+import { VIEWS, PERIODS, parseHash, buildHash, viewByKey } from './core/router.js';
+import { html, mount } from './core/html.js';
+import { isOffline } from './core/analysis.js';
+import * as f from './core/format.js';
+import * as visaoGeral from './views/visao-geral.js';
+import * as recursos from './views/recursos.js';
+import * as armazenamento from './views/armazenamento.js';
+import * as rede from './views/rede.js';
+import * as processos from './views/processos.js';
+import * as eventos from './views/eventos.js';
+import * as relatorios from './views/relatorios.js';
+import * as ajuda from './views/ajuda.js';
 
-(function init() {
-  Dash.period = '24h';
-  Dash.samples = [];
-  Dash.latest = null;
-  Dash.alerts = { active: [], all: [] };
-  Dash.annotations = [];
-  Dash.diskDetailMount = null;
-  Dash.ioDev = 'sda';
-  Dash.procsSort = { key: 'mem', dir: -1 };
-  Dash.procsFilter = '';
-  Dash.alertFilter = 'active';
-  Dash.nextPollAt = null;
+const MODULES = {
+  'visao-geral': visaoGeral, recursos, armazenamento, rede, processos, eventos, relatorios, ajuda,
+};
+const USES_BUCKETS = new Set(['visao-geral', 'recursos', 'armazenamento', 'rede']);
+const ICONS = {
+  'visao-geral': 'M4 4h7v7H4zM13 4h7v7h-7zM4 13h7v7H4zM13 13h7v7h-7z',
+  recursos: 'M6 6h12v12H6zM9 9h6v6H9zM9 2v4M15 2v4M9 18v4M15 18v4M2 9h4M2 15h4M18 9h4M18 15h4',
+  armazenamento: 'M3 6h18v5H3zM3 13h18v5H3zM7 8.5h.01M7 15.5h.01',
+  rede: 'M22 12h-4l-3 9L9 3l-3 9H2',
+  processos: 'M4 6h16M4 12h16M4 18h10',
+  eventos: 'M18 8a6 6 0 0 0-12 0c0 7-3 9-3 9h18s-3-2-3-9M13.7 21a2 2 0 0 1-3.4 0',
+  relatorios: 'M6 20V14M12 20V4M18 20v-9',
+  ajuda: 'M12 22a10 10 0 1 0 0-20 10 10 0 0 0 0 20zM9.1 9a3 3 0 0 1 5.8 1c0 2-3 3-3 3M12 17h.01',
+};
+const THEME_KEY = 'dash_theme';
+const $ = (id) => document.getElementById(id);
 
-  const PERIOD_MS = { '1h': 3600000, '6h': 21600000, '24h': 86400000, '72h': 259200000 };
-  const THEME_KEY = 'dash_theme';
+const route = parseHash(location.hash);
+const store = createStore({
+  view: route.view, period: route.period, session: null, meta: null, sample: null, health: null,
+  alerts: { active: [], all: [] }, annotations: [], outages: null, config: null, buckets: [], live: 'conectando',
+});
 
-  function currentTheme() {
-    let stored = null;
-    try { stored = localStorage.getItem(THEME_KEY); } catch { /* noop */ }
-    if (stored === 'light' || stored === 'dark') return stored;
-    if (typeof window.matchMedia === 'function' && window.matchMedia('(prefers-color-scheme: light)').matches) {
-      return 'light';
+// ---------------- Tema (escuro é o padrão — D1) ----------------
+function applyTheme(theme) {
+  document.documentElement.dataset.theme = theme;
+  try { localStorage.setItem(THEME_KEY, theme); } catch { /* armazenamento bloqueado */ }
+}
+function currentTheme() {
+  try { return localStorage.getItem(THEME_KEY) === 'light' ? 'light' : 'dark'; } catch { return 'dark'; }
+}
+function toggleTheme() {
+  applyTheme(document.documentElement.dataset.theme === 'dark' ? 'light' : 'dark');
+  renderView(); // gráficos leem as cores do tema ao serem criados
+}
+
+// ---------------- Avisos rápidos (4 s, com "Desfazer" quando faz sentido) ----------------
+function toast(text, { action, level = 'info' } = {}) {
+  const box = $('toasts');
+  const el = document.createElement('div');
+  el.className = `toast toast-${level}`;
+  mount(el, html`<span>${text}</span>${action ? html`<button class="btn-ghost" type="button">${action.label}</button>` : ''}`);
+  if (action) el.querySelector('button').addEventListener('click', () => { action.fn(); el.remove(); });
+  box.appendChild(el);
+  setTimeout(() => el.remove(), 4000);
+}
+
+// ---------------- Login (ADR 0007) ----------------
+let loginShown = false;
+function showLogin(message = '') {
+  loginShown = true;
+  $('login').hidden = false;
+  $('loginError').textContent = message;
+  $('loginToken').focus();
+}
+onAuthRequired(() => showLogin());
+$('loginForm').addEventListener('submit', async (e) => {
+  e.preventDefault();
+  const token = $('loginToken').value.trim();
+  if (!token) return;
+  $('loginSubmit').disabled = true;
+  try {
+    await api.login(token);
+    $('loginToken').value = '';
+    location.reload();
+  } catch (err) {
+    $('loginError').textContent = err.status === 429 ? 'Muitas tentativas — aguarde 1 minuto.'
+      : err.status === 401 ? 'Token incorreto' : 'Painel inacessível — confira se o serviço está rodando.';
+  } finally {
+    $('loginSubmit').disabled = false;
+  }
+});
+
+// ---------------- Ações usadas pelas telas ----------------
+async function refreshAlerts() {
+  const a = await api.alerts();
+  store.set({ alerts: { active: a.active || [], all: a.all || [] } });
+}
+const act = {
+  async ack(id) { await api.ack(id); await refreshAlerts(); toast('Alerta reconhecido'); },
+  async resolve(id) { await api.resolve(id); await refreshAlerts(); toast('Alerta resolvido'); },
+  async addAnnotation({ text, label, ts }) {
+    await api.addAnnotation({ text, label, ts });
+    store.set({ annotations: (await api.annotations()).annotations || [] });
+    toast('Anotação criada');
+  },
+  async removeAnnotation(id) {
+    const old = store.get().annotations.find((a) => a.id === id);
+    await api.removeAnnotation(id);
+    store.set({ annotations: (await api.annotations()).annotations || [] });
+    toast('Anotação removida', old ? { action: { label: 'Desfazer', fn: () => act.addAnnotation(old) } } : {});
+  },
+  async logout(all) { await api.logout(all); location.reload(); },
+  async poll() {
+    try { await api.poll(); toast('Coleta pedida — chega em segundos'); } catch (err) { toast(err.message, { level: 'warn' }); }
+  },
+};
+
+// ---------------- Navegação e cabeçalho ----------------
+function renderNav() {
+  const { view, alerts } = store.get();
+  const open = alerts.active.length;
+  mount($('nav'), html`${VIEWS.map((v) => html`
+    <a href="${buildHash({ view: v.id, period: store.get().period })}" class="nav-item${v.id === view ? ' active' : ''}" ${v.id === view ? html`aria-current="page"` : ''} title="${v.title} (${v.key})">
+      <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="${ICONS[v.id]}"/></svg>
+      <span>${v.title}</span>${v.id === 'eventos' && open ? html` <span class="nav-badge" aria-label="${open} alerta(s) aberto(s)">${open}</span>` : ''}
+    </a>`)}`);
+  mount($('periodToggle'), html`${Object.keys(PERIODS).map((p) => html`
+    <button type="button" data-period="${p}" class="${p === store.get().period ? 'active' : ''}" aria-pressed="${p === store.get().period}">${p}</button>`)}`);
+}
+
+function renderStatus() {
+  const { meta, live, sample } = store.get();
+  const offline = isOffline(meta);
+  const text = live === 'caiu' ? 'reconectando…' : offline ? 'offline' : meta?.online ? 'online' : 'aguardando coleta';
+  $('statusDot').className = `dot ${offline ? 'dot-offline' : meta?.online ? 'dot-online' : 'dot-polling'}`;
+  $('statusText').textContent = text;
+  $('lastPoll').textContent = meta?.lastPollAt ? f.ago(meta.lastPollAt) : '—';
+  $('hostLabel').textContent = sample?.host ? `${sample.host} · ${sample.os?.name || ''}` : (meta?.host || '—');
+  const banner = $('offlineBanner');
+  banner.hidden = !offline;
+  if (offline) {
+    const next = meta.nextPollAt ? Math.max(0, Math.round((Date.parse(meta.nextPollAt) - Date.now()) / 1000)) : null;
+    banner.textContent = `Servidor inacessível desde ${f.dateTime(meta.offlineSince)}${meta.lastError ? ` — ${meta.lastError}` : ''}. Valores abaixo são da última coleta.${next !== null ? ` Nova tentativa em ${next} s.` : ''}`;
+  }
+}
+
+// ---------------- Telas ----------------
+let current = null;
+function destroyCurrent() {
+  if (!current) return;
+  for (const c of current.ctx.charts.values()) c.destroy();
+  current = null;
+}
+
+function renderView() {
+  const { view } = store.get();
+  destroyCurrent();
+  const mod = MODULES[view];
+  const el = document.createElement('div');
+  el.className = `view view-${view}`;
+  $('view').replaceChildren(el);
+  const ctx = { el, charts: new Map(), local: {}, api, act, get state() { return store.get(); } };
+  current = { view, mod, ctx };
+  $('viewTitle').textContent = VIEWS.find((v) => v.id === view).title;
+  document.title = `${VIEWS.find((v) => v.id === view).title} · Server Dashboard`;
+  mod.render(ctx);
+}
+
+function refreshView() {
+  if (!current) return renderView();
+  if (current.mod.update) current.mod.update(current.ctx);
+  else renderView();
+}
+
+let bucketsTimer = null;
+async function loadBuckets() {
+  const { period } = store.get();
+  const to = new Date();
+  const from = new Date(to.getTime() - PERIODS[period]);
+  try {
+    const r = await api.buckets({ from: from.toISOString(), to: to.toISOString(), limit: 600 });
+    store.set({ buckets: r.buckets || [], bucketsRange: [from.getTime() / 1000, to.getTime() / 1000] });
+  } catch { /* 401 já abre o login; outros erros: tenta na próxima coleta */ }
+}
+function scheduleBuckets() {
+  clearTimeout(bucketsTimer);
+  bucketsTimer = setTimeout(() => { if (USES_BUCKETS.has(store.get().view)) loadBuckets(); }, 300);
+}
+
+async function loadOutages() {
+  try { store.set({ outages: await api.outages(90) }); } catch { /* tenta de novo depois */ }
+}
+
+store.subscribe((state, patch) => {
+  if ('alerts' in patch || 'view' in patch || 'period' in patch) renderNav();
+  if ('meta' in patch || 'live' in patch || 'sample' in patch) renderStatus();
+  if (loginShown) return;
+  if ('view' in patch || 'period' in patch) return; // a navegação redesenha depois de carregar
+  const relevant = ['sample', 'buckets', 'alerts', 'annotations', 'outages', 'config', 'health', 'session'];
+  if (relevant.some((k) => k in patch)) refreshView();
+});
+
+async function navigate() {
+  const { view, period } = parseHash(location.hash);
+  const changed = view !== store.get().view || period !== store.get().period;
+  store.set({ view, period });
+  $('viewTitle').textContent = VIEWS.find((v) => v.id === view).title; // na hora, antes dos dados
+  closeNav();
+  if (USES_BUCKETS.has(view) && (changed || !store.get().buckets.length)) await loadBuckets();
+  renderView();
+  $('view').focus({ preventScroll: true });
+}
+
+// ---------------- Ao vivo (SSE) ----------------
+function onEvent(name, data) {
+  if (name === 'hello' || name === 'status') {
+    store.set({ meta: data.meta, health: data.health ?? store.get().health, ...(data.sample ? { sample: data.sample } : {}),
+      alerts: { ...store.get().alerts, active: data.alerts || store.get().alerts.active } });
+    if (name === 'status' && data.meta?.online === false) loadOutages();
+  } else if (name === 'sample') {
+    const cur = store.get().sample;
+    if (!cur || data.sample.ts > cur.ts) {
+      const wasOffline = store.get().meta?.online === false;
+      store.set({ sample: data.sample, health: data.health ?? store.get().health, alerts: { ...store.get().alerts, active: data.alerts || [] },
+        meta: { ...store.get().meta, online: true, lastPollAt: data.sample.ts, offlineSince: null, lastError: null } });
+      if (wasOffline) loadOutages();
     }
-    return 'dark';
+    scheduleBuckets();
+  } else if (name === 'alerts') {
+    store.set({ alerts: { active: data.alerts || [], all: data.all || store.get().alerts.all } });
+  } else if (name === 'annotations') {
+    store.set({ annotations: data.annotations || [] });
   }
+}
 
-  function applyTheme(theme) {
-    Dash.theme = theme;
-    try { document.documentElement.dataset.theme = theme; } catch { /* noop */ }
-    try { localStorage.setItem(THEME_KEY, theme); } catch { /* noop */ }
-  }
+// ---------------- Teclado ----------------
+function onKey(e) {
+  if (e.ctrlKey || e.metaKey || e.altKey) return;
+  const tag = (e.target.tagName || '').toLowerCase();
+  if (['input', 'textarea', 'select'].includes(tag)) return;
+  const v = viewByKey(e.key);
+  const go = (view) => { location.hash = buildHash({ view, period: store.get().period }); };
+  if (v) go(v.id);
+  else if (e.key === 'c' || e.key === 'C') act.poll();
+  else if (e.key === 't' || e.key === 'T') toggleTheme();
+  else if (e.key === '?') go('ajuda');
+  else if (e.key === 'n' || e.key === 'N') {
+    e.preventDefault();
+    if (store.get().view === 'eventos') eventos.focusNew(current.ctx); else { go('eventos'); setTimeout(() => current && eventos.focusNew(current.ctx), 50); }
+  } else if (e.key === '/') {
+    e.preventDefault();
+    if (store.get().view === 'processos') processos.focusSearch(current.ctx); else { go('processos'); setTimeout(() => current && processos.focusSearch(current.ctx), 50); }
+  } else if (e.key === 'Escape') closeNav();
+}
 
-  function toggleTheme() {
-    applyTheme(Dash.theme === 'dark' ? 'light' : 'dark');
-    try {
-      if (Dash.charts && typeof Dash.charts.retheme === 'function') Dash.charts.retheme();
-    } catch { /* noop */ }
-  }
+function closeNav() {
+  document.body.classList.remove('nav-open');
+  $('navToggle').setAttribute('aria-expanded', 'false');
+}
 
-  // Sessão por cookie (ADR 0007): o navegador manda o cookie sozinho; nada de token na URL
-  // nem guardado pelo JavaScript. 401 abre a janela de login.
-  async function apiFetch(path, opts = {}) {
-    const res = await fetch(path, { credentials: 'same-origin', ...opts });
-    if (res.status === 401) showLogin();
-    return res;
-  }
-
-  function showLogin(message = '') {
-    const box = $('login');
-    if (!box) return;
-    box.hidden = false;
-    $('loginError').textContent = message;
-    const input = $('loginToken');
-    if (input && typeof input.focus === 'function') input.focus();
-  }
-
-  async function submitLogin(ev) {
-    if (ev && typeof ev.preventDefault === 'function') ev.preventDefault();
-    const token = String($('loginToken').value || '').trim();
-    if (!token) return;
-    $('loginSubmit').disabled = true;
-    try {
-      const res = await fetch('/api/login', {
-        method: 'POST',
-        credentials: 'same-origin',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ token }),
-      });
-      if (res.ok) {
-        $('loginToken').value = '';
-        window.location.reload();
-        return;
-      }
-      let msg = 'Token incorreto';
-      try { msg = (await res.json()).error || msg; } catch { /* resposta sem JSON */ }
-      $('loginError').textContent = res.status === 429 ? 'Muitas tentativas — aguarde 1 minuto.' : msg;
-    } catch {
-      $('loginError').textContent = 'Painel inacessível — confira se o serviço está rodando.';
-    } finally {
-      $('loginSubmit').disabled = false;
-    }
-  }
-
-  async function logout(all) {
-    await fetch(all ? '/api/logout-all' : '/api/logout', { method: 'POST', credentials: 'same-origin' });
-    window.location.reload();
-  }
-
-  async function checkSession() {
-    try {
-      const res = await fetch('/api/session', { credentials: 'same-origin' });
-      if (!res.ok) return null;
-      const s = await res.json();
-      const box = $('sessionHelp');
-      if (box) box.hidden = !s.authRequired;
-      return s;
-    } catch {
-      return null;
-    }
-  }
-
-  function periodRange() {
-    const from = new Date(Date.now() - PERIOD_MS[Dash.period]).toISOString();
-    return `from=${encodeURIComponent(from)}`;
-  }
-
-  function updateAlertBadge() {
-    const n = Dash.alerts.active.length;
-    const b = $('alertBadge');
-    b.hidden = n === 0;
-    b.textContent = n;
-  }
-
-  function setStatus(payload) {
-    const meta = payload.meta || {};
-    const online = !!meta.online;
-    $('statusDot').className = `dot ${online ? 'dot-online' : 'dot-offline'}`;
-    const st = $('statusText');
-    if (st) st.textContent = online ? 'online' : 'offline';
-    $('lastPollAt').textContent = Dash.fmt.time(meta.lastPollAt) + (meta.lastError ? ` · ${meta.lastError}` : '');
-    Dash.nextPollAt = meta.nextPollAt ? Date.parse(meta.nextPollAt) : null;
-    if (payload.health) Dash.health = payload.health;
-    if (payload.sample && payload.sample.os && payload.sample.os.name) {
-      $('osLabel').textContent = payload.sample.os.name;
-    }
-  }
-
-  Dash.api = {
-    async ackAlert(id) {
-      await apiFetch(`/api/alerts/${id}/ack`, { method: 'POST' });
-      await refreshAlerts();
-    },
-    async resolveAlert(id) {
-      await apiFetch(`/api/alerts/${id}/resolve`, { method: 'POST' });
-      await refreshAlerts();
-    },
-    async addAnnotation(sample) {
-      const text = prompt(`Anotação para ${Dash.fmt.timeDate(sample.ts)}:`);
-      if (!text || !text.trim()) return;
-      await apiFetch('/api/annotations', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ ts: sample.ts, text: text.trim(), label: text.trim().slice(0, 40) }),
-      });
-      const res = await apiFetch('/api/annotations');
-      Dash.annotations = (await res.json()).annotations || [];
-      Dash.charts.applyAnnotations();
-      Dash.sections.annotationsView();
-    },
-    async deleteAnnotation(id) {
-      await apiFetch(`/api/annotations/${id}`, { method: 'DELETE' });
-      const res = await apiFetch('/api/annotations');
-      Dash.annotations = (await res.json()).annotations || [];
-      Dash.charts.applyAnnotations();
-      Dash.sections.annotationsView();
-    },
-    async addAnnotationNow() {
-      const input = $('annotationText');
-      const text = input.value.trim();
-      if (!text) return;
-      input.value = '';
-      await apiFetch('/api/annotations', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ text, label: text.slice(0, 40) }),
-      });
-      const res = await apiFetch('/api/annotations');
-      Dash.annotations = (await res.json()).annotations || [];
-      Dash.charts.applyAnnotations();
-      Dash.sections.annotationsView();
-    },
-  };
-
-  async function refreshAlerts() {
-    const res = await apiFetch('/api/alerts?limit=200');
-    if (!res.ok) return;
-    const data = await res.json();
-    Dash.alerts.active = data.active || [];
-    Dash.alerts.all = data.all || [];
-    updateAlertBadge();
-    Dash.sections.alertBar(Dash.alerts.active);
-    Dash.sections.health(Dash.latest);
-    if (Dash.router.current() === 'alertas') Dash.sections.alertsView();
-  }
-
-  // Quedas e uptime do registro próprio do servidor (atualizado em quedas e na volta).
-  async function refreshOutages() {
-    try {
-      const res = await apiFetch('/api/outages?days=30');
-      if (!res.ok) return;
-      Dash.outages = await res.json();
-      if (Dash.router.current() === 'analise') Dash.sections.analysis();
-    } catch { /* tenta de novo no próximo evento */ }
-  }
-
-  async function refreshAll() {
-    try {
-      const [h, st, al, an] = await Promise.all([
-        apiFetch(`/api/history?limit=720&${periodRange()}`).then((r) => r.json()),
-        apiFetch('/api/status').then((r) => r.json()),
-        apiFetch('/api/alerts?limit=200').then((r) => r.json()),
-        apiFetch('/api/annotations').then((r) => r.json()),
-      ]);
-      Dash.samples = h.samples || [];
-      Dash.alerts.active = al.active || [];
-      Dash.alerts.all = al.all || [];
-      Dash.annotations = an.annotations || [];
-      setStatus(st);
-      if (st.sample) Dash.latest = st.sample;
-      updateAlertBadge();
-      Dash.charts.resetZoom();
-      Dash.charts.sync();
-      Dash.charts.applyAnnotations();
-      Dash.sections.health(Dash.latest);
-      Dash.sections.alertBar(Dash.alerts.active);
-      Dash.sections.overview(Dash.latest);
-      renderActiveView();
-      refreshOutages();
-    } catch (err) {
-      console.error('refreshAll falhou, tentando de novo em 10s', err);
-      setTimeout(refreshAll, 10000);
-    }
-  }
-
-  function renderActiveView() {
-    const view = Dash.router.current();
-    const latest = Dash.latest;
-    switch (view) {
-      case 'discos':
-        Dash.sections.disks(latest);
-        if (latest && Dash.diskDetailMount) $('diskDetailMount').textContent = Dash.diskDetailMount;
-        Dash.charts.sync();
-        break;
-      case 'rede':
-        Dash.sections.net(latest);
-        Dash.sections.ioDevTabs();
-        Dash.charts.sync();
-        break;
-      case 'processos':
-        Dash.sections.procs(latest);
-        break;
-      case 'alertas':
-        Dash.sections.alertsView();
-        break;
-      case 'anotacoes':
-        Dash.sections.annotationsView();
-        break;
-      case 'analise':
-        Dash.sections.analysis();
-        break;
-      case 'historico':
-        Dash.sections.history();
-        break;
-      default:
-        break;
-    }
-  }
-
-  function openSSE() {
-    const es = new EventSource('/api/stream');
-    es.addEventListener('hello', (e) => {
-      const payload = JSON.parse(e.data);
-      setStatus(payload);
-      if (payload.sample) {
-        Dash.latest = payload.sample;
-        Dash.sections.health(Dash.latest);
-        Dash.sections.overview(Dash.latest);
-        renderActiveView();
-      }
-    });
-    es.addEventListener('sample', (e) => {
-      const payload = JSON.parse(e.data);
-      // Backfill após reconexão: ignora o que a tela já tem (amostras chegam em ordem).
-      const last = Dash.samples.length ? Dash.samples[Dash.samples.length - 1].ts : '';
-      if (payload.sample && payload.sample.ts <= last) return;
-      Dash.latest = payload.sample;
-      Dash.alerts.active = payload.alerts || [];
-      if (payload.health) Dash.health = payload.health;
-      if (Dash.outages && Dash.outages.outages.some((o) => o.ongoing)) refreshOutages();
-      Dash.samples.push(payload.sample);
-      const fromTs = Date.now() - PERIOD_MS[Dash.period];
-      Dash.samples = Dash.samples.filter((s) => Date.parse(s.ts) >= fromTs);
-      if (Dash.samples.length > 1500) Dash.samples.splice(0, Dash.samples.length - 1500);
-      Dash.sections.health(Dash.latest);
-      Dash.sections.alertBar(Dash.alerts.active);
-      Dash.sections.overview(Dash.latest);
-      updateAlertBadge();
-      Dash.charts.sync();
-      renderActiveView();
-    });
-    es.addEventListener('alerts', (e) => {
-      const payload = JSON.parse(e.data);
-      Dash.alerts.active = payload.alerts || [];
-      Dash.alerts.all = payload.all || Dash.alerts.all;
-      updateAlertBadge();
-      Dash.sections.alertBar(Dash.alerts.active);
-      Dash.sections.health(Dash.latest);
-      if (Dash.router.current() === 'alertas') Dash.sections.alertsView();
-    });
-    es.addEventListener('annotations', (e) => {
-      Dash.annotations = JSON.parse(e.data).annotations || [];
-      Dash.charts.applyAnnotations();
-      if (Dash.router.current() === 'anotacoes') Dash.sections.annotationsView();
-    });
-    es.addEventListener('status', (e) => {
-      const payload = JSON.parse(e.data);
-      setStatus(payload);
-      Dash.sections.health(Dash.latest);
-      if (payload.meta && payload.meta.online === false) refreshOutages();
-    });
-    // Sem sessão o EventSource só vê "erro": confere a sessão em vez de tentar em loop.
-    es.onerror = async () => {
-      $('statusDot').className = 'dot dot-offline';
-      const s = await checkSession();
-      if (s && s.authRequired && !s.authenticated) {
-        es.close();
-        showLogin('Sessão expirada — entre de novo.');
-      }
-    };
-  }
-
-  function setNavOpen(open) {
-    const btn = $('navToggle');
-    if (btn) {
-      if (typeof btn.setAttribute === 'function') {
-        btn.setAttribute('aria-expanded', open ? 'true' : 'false');
-        btn.setAttribute('aria-label', open ? 'Fechar navegação' : 'Abrir navegação');
-      } else {
-        btn['aria-expanded'] = open ? 'true' : 'false';
-      }
-    }
-    try {
-      document.documentElement.classList.toggle('nav-open', !!open);
-    } catch { /* noop */ }
-  }
-
-  function wireUI() {
-    const navToggle = $('navToggle');
-    if (navToggle) navToggle.addEventListener('click', () => {
-      let open = false;
-      try { open = document.documentElement.classList.contains('nav-open'); } catch { /* noop */ }
-      setNavOpen(!open);
-    });
-    const navScrim = $('navScrim');
-    if (navScrim) navScrim.addEventListener('click', () => setNavOpen(false));
-    try {
-      document.querySelectorAll('.nav-item').forEach((a) => a.addEventListener('click', () => setNavOpen(false)));
-    } catch { /* noop */ }
-    $('pollBtn').addEventListener('click', async () => {
-      $('pollBtn').disabled = true;
-      try {
-        await apiFetch('/api/poll', { method: 'POST' });
-      } finally {
-        setTimeout(() => { $('pollBtn').disabled = false; }, 5000);
-      }
-    });
-
-    $('periodToggle').querySelectorAll('button').forEach((btn) => {
-      btn.addEventListener('click', () => {
-        $('periodToggle').querySelectorAll('button').forEach((b) => b.classList.toggle('active', b === btn));
-        Dash.period = btn.dataset.period;
-        refreshAll();
-      });
-    });
-
-    $('exportBtn').addEventListener('click', async () => {
-      const res = await apiFetch(`/api/export?format=csv&${periodRange()}`);
-      if (!res.ok) return;
-      const blob = await res.blob();
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = `dashboard-${new Date().toISOString().slice(0, 19).replace(/[:T]/g, '-')}.csv`;
-      a.click();
-      setTimeout(() => URL.revokeObjectURL(url), 5000);
-    });
-
-    $('procSearch').addEventListener('input', (e) => {
-      Dash.procsFilter = e.target.value;
-      Dash.sections.procs(Dash.latest);
-    });
-    $('procsTable').querySelectorAll('th').forEach((th) => {
-      th.addEventListener('click', () => {
-        const key = th.dataset.key;
-        if (!key) return;
-        if (Dash.procsSort.key === key) Dash.procsSort.dir *= -1;
-        else Dash.procsSort = { key, dir: -1 };
-        Dash.sections.procs(Dash.latest);
-      });
-    });
-
-    $('alertFilters').querySelectorAll('button').forEach((btn) => {
-      btn.addEventListener('click', () => {
-        $('alertFilters').querySelectorAll('button').forEach((b) => b.classList.toggle('active', b === btn));
-        Dash.alertFilter = btn.dataset.filter;
-        Dash.sections.alertsView();
-      });
-    });
-
-    $('modalClose').addEventListener('click', () => Dash.sections.modal.close());
-    $('modal').addEventListener('click', (e) => {
-      if (e.target === $('modal')) Dash.sections.modal.close();
-    });
-    $('modalAnnotate').addEventListener('click', () => {
-      if (Dash.sections.modal.sample) Dash.api.addAnnotation(Dash.sections.modal.sample);
-    });
-
-    $('themeToggle').addEventListener('click', toggleTheme);
-    $('loginForm').addEventListener('submit', submitLogin);
-    $('logoutBtn').addEventListener('click', () => logout(false));
-    $('logoutAllBtn').addEventListener('click', () => logout(true));
-
-    $('annotationAdd').addEventListener('click', () => Dash.api.addAnnotationNow());
-    $('annotationText').addEventListener('keydown', (e) => {
-      if (e.key === 'Enter') Dash.api.addAnnotationNow();
-    });
-    document.addEventListener('keydown', (e) => {
-      if (e.key === 'Escape') Dash.sections.modal.close();
-    });
-
-    setInterval(() => {
-      if (!Dash.nextPollAt) return;
-      const ms = Dash.nextPollAt - Date.now();
-      $('countdown').textContent = ms > 0 ? `${Math.ceil(ms / 1000)}s` : 'coletando…';
-    }, 500);
-  }
-
-  Dash.sections.renderActiveView = renderActiveView;
-
+// ---------------- Início ----------------
+async function start() {
   applyTheme(currentTheme());
-  Dash.charts.registerSpecs();
-  Dash.router.init();
-  wireUI();
-  // Sem sessão (e com token exigido): só o login, sem abrir API nem SSE. Se a checagem
-  // falhar (painel fora do ar), segue o fluxo normal, que trata o erro sozinho.
-  checkSession().then((s) => {
-    if (s && s.authRequired && !s.authenticated) {
-      showLogin();
-      return;
-    }
-    refreshAll().then(openSSE);
+  renderNav();
+  renderStatus();
+  $('themeToggle').addEventListener('click', toggleTheme);
+  $('pollBtn').addEventListener('click', () => act.poll());
+  $('periodToggle').addEventListener('click', (e) => {
+    const p = e.target.closest('[data-period]')?.dataset.period;
+    if (p) location.hash = buildHash({ view: store.get().view, period: p });
   });
-})();
+  $('navToggle').addEventListener('click', () => {
+    const open = document.body.classList.toggle('nav-open');
+    $('navToggle').setAttribute('aria-expanded', String(open));
+  });
+  $('navScrim').addEventListener('click', closeNav);
+  document.addEventListener('keydown', onKey);
+  setInterval(renderStatus, 15000);
+
+  let session;
+  try { session = await api.session(); } catch { session = null; }
+  store.set({ session });
+  if (session && session.authRequired && !session.authenticated) { showLogin(); return; }
+
+  window.addEventListener('hashchange', navigate);
+  try {
+    const [status, alerts, notes, outages, config] = await Promise.all([
+      api.status(), api.alerts(), api.annotations(), api.outages(90), api.config(),
+    ]);
+    store.set({
+      meta: status.meta, sample: status.sample, health: status.health,
+      alerts: { active: alerts.active || [], all: alerts.all || [] },
+      annotations: notes.annotations || [], outages, config,
+    });
+  } catch { /* 401 abre o login; painel fora do ar: o SSE avisa e tenta de novo */ }
+  if (loginShown) return;
+  await navigate();
+  connect({
+    onEvent,
+    onState: (live) => store.set({ live }),
+    onAuthLost: () => showLogin('Sessão expirada — entre de novo.'),
+  });
+}
+
+start();

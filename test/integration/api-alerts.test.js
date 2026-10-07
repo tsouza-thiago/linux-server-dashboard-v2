@@ -22,7 +22,7 @@ async function start(t, { results, thresholds = T } = {}) {
     log: () => {},
   });
   const { server, port } = await listen(app.app);
-  t.after(async () => { await close(server); fs.rmSync(dir, { recursive: true, force: true }); });
+  t.after(async () => { await app.shutdown(); await close(server); fs.rmSync(dir, { recursive: true, force: true }); });
   return { ...app, dir, port };
 }
 

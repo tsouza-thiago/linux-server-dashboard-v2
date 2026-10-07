@@ -116,7 +116,7 @@ acontece por SSH, com chave criptográfica, e apenas **uma vez por minuto**.
       ↑
 [index.js]  node:http (127.0.0.1:3000) → dashboard + API REST + SSE (tempo real)
       ↑
-[Navegador]  sidebar multi-view, zoom nos gráficos, health score, alertas, anotações
+[Navegador]  8 telas (ES modules + uPlot), manchete de saúde, eventos, relatórios
 ```
 
 O ciclo é simples e proposital:
@@ -160,30 +160,28 @@ O ciclo é simples e proposital:
 
 ## Funcionalidades do dashboard
 
-O painel tem **9 telas**, navegáveis pela coluna da esquerda:
+O painel tem **8 telas**, navegáveis pela coluna da esquerda ou pelas teclas `1` a `8`:
 
 | Tela | O que mostra |
 |------|--------------|
-| **Visão Geral** | Cartões de load, RAM, swap, temperatura, uptime + 4 gráficos (load, RAM, temp, discos) + rede + serviços |
-| **Discos** | Cartão por disco com % usado, espaço livre e **previsão de lotação (ETA)**; gráfico por disco; selo SMART |
-| **Rede** | Download/upload em Mbps, tráfego ao longo do tempo, I/O por disco (abas dinâmicas conforme `DISK_DEVS`) |
-| **Processos** | Top 7 por consumo de memória, com busca e ordenação por qualquer coluna |
-| **Alertas** | Ciclo de vida completo, filtros (ativos/todos/warning/critical), reconhecer e resolver |
-| **Anotações** | Linha do tempo de eventos marcados por você (ex.: "troquei o cooler"), com formulário rápido e remoção |
-| **Análise** | **Índice de saúde** com os descontos, pressão de RAM (6h), ETA de discos, resumo diário, **outages** e % de uptime (30 dias) |
-| **Histórico** | Tabela com todas as amostras do período — "rolar o passado" com valores exatos |
-| **Ajuda** | Guia rápido embutido no próprio painel |
+| **1 Visão geral** | Manchete de saúde em linguagem simples ("Servidor saudável" / "Atenção" / "Crítico" e por quê), cartões com mini-gráfico (processador, memória, disco mais cheio com previsão, temperatura, rede, serviços) e eventos recentes |
+| **2 Recursos** | CPU % com espera de disco, load, RAM e swap, pressão (PSI) e temperatura; linha tracejada = pico do intervalo |
+| **3 Armazenamento** | Espaço, inodes, SMART e **previsão de disco cheio** por ponto de montagem; leitura/gravação, ocupação e latência por disco |
+| **4 Rede** | Vazão de entrada/saída, totais desde o boot, erros e descartes |
+| **5 Processos & serviços** | Estado de cada serviço e os processos que mais usam memória, com filtro e ordenação |
+| **6 Eventos** | Linha do tempo única de alertas, quedas e anotações; reconhecer/resolver; nova anotação; uptime de até 90 dias |
+| **7 Relatórios** | Resumo por dia (fuso local) dos últimos 30 dias; exportação CSV/JSON; impressão |
+| **8 Ajuda** | Guia rápido, atalhos, configuração ativa (só leitura) e sessão |
 
 **Interações em todas as telas:**
 
-- **Período**: botões `1h` / `6h` / `24h` / `72h` no topo.
-- **Tema**: botão no topo alterna entre **escuro e claro** (guarda a preferência).
-- **Zoom**: roda do mouse sobre o gráfico. **Pan**: `Shift` + arrastar.
-- **Detalhe**: clique num ponto do gráfico para abrir tudo daquela coleta.
-- **Anotações**: marque eventos na linha do tempo (ex.: "troquei o cooler") para
-  entender mudanças semanas depois.
-- **Coletar agora**: botão que força uma coleta imediata, sem esperar o minuto.
-- **Exportar**: baixa o período atual em CSV (abre direto no Excel).
+- **Período**: botões `1h` · `6h` · `24h` · `72h` · `7d` · `30d` · `90d` no topo (fica na URL).
+- **Gráficos**: arrastar = aproximar um trecho · roda do mouse = zoom · duplo clique = voltar.
+  O cursor fica sincronizado entre os gráficos da tela.
+- **Atalhos**: `1`–`8` telas · `C` coletar agora · `T` tema · `N` nova anotação · `/` buscar processo · `?` ajuda.
+- **Tema**: escuro é o padrão; o botão ◐ (ou `T`) alterna para o claro (fica salvo).
+- **Anotações**: em Eventos, marque manutenções ("troquei o cooler"); viram linhas tracejadas nos gráficos.
+- **Coletar agora**: força uma coleta imediata, sem esperar o minuto.
 
 ---
 
@@ -386,7 +384,8 @@ princípio é o mesmo: o monitoramento não pesa em quem é monitorado.
 
 | Endpoint | Método | Descrição |
 |----------|--------|-----------|
-| `/` | GET | Dashboard web (sidebar multi-view, hash routing) |
+| `/` | GET | Dashboard web (8 telas, rota por hash com período) |
+| `/api/config` | GET | Configuração ativa (só leitura, sem segredos) |
 | `/api/status` | GET | Última amostra + meta (online, lastPollAt, nextPollAt, offlineSince) + alertas ativos |
 | `/api/history` | GET | `?limit=N&from=&to=` → amostras no range (redução p/ máx 720 preservando picos); `formato=baldes` → mín/máx/média até 90 dias |
 | `/api/alerts` | GET | `?status=&level=&limit=` → `{active, all}` com ciclo de vida |
@@ -517,7 +516,7 @@ linux-server-dashboard/
 ├── install-lib.sh          ← validação pura das entradas do instalador (segurança)
 ├── start.sh                ← inicia o serviço (primeiro plano, --background ou --status)
 ├── stop.sh                 ← para o serviço com segurança (PID file)
-├── package.json            (deps só do frontend: chart.js + zoom/annotation plugins)
+├── package.json            (sem dependências; playwright-core só para testes e2e)
 ├── .env.example            (modelo de configuração, sem valores reais)
 ├── .gitignore              (exclui .env, data/, node_modules/)
 ├── data/                   (runtime: history/, rollup/, alerts.json, annotations.json, log)
@@ -533,15 +532,9 @@ linux-server-dashboard/
 ├── test/                   (suíte de testes — node --test)
 ├── test-support/           (helpers de teste: VM p/ frontend, request HTTP)
 └── public/
-    ├── index.html          (dashboard PT-BR, temas claro/escuro, sidebar multi-view)
-    ├── style.css           (visual: paleta de console de operação, tipografia sans/mono, responsivo)
-    ├── fonts/              (Inter + JetBrains Mono self-hosted, .woff2 — sem CDN)
-    └── js/
-        ├── main.js         (orquestração: SSE, refresh, ações, modais, login, tema)
-        ├── router.js       (navegação por hash entre as views)
-        ├── charts.js       (Chart.js + zoom/pan + anotações no timeline)
-        ├── sections.js     (renderização das views, escape HTML, abas I/O dinâmicas)
-        └── analysis.js     (health score, ETA de disco, pressão de RAM, outages)
+    ├── index.html          (casca das 8 telas, login e avisos)
+    ├── vendor/uplot/       (uPlot versionado com SHA-256)
+    └── js/                 (ES modules: core/, charts/, views/ e main.js — sem build)
 ```
 
 ---

@@ -4,6 +4,7 @@
 // `todo` e o teste passa a valer como regressão. Corrigidos na F1: B1, B2, B6, I5.
 // Corrigidos na F2: B4, B7, B8, B11 (detalhes em test/unit/storage-*.test.js).
 // Corrigidos na F3: B3, B9 (detalhes em test/unit/alerts-*.test.js).
+// Corrigidos na F5: B5, B10 (detalhes em test/unit/front-core.test.js).
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
@@ -17,7 +18,8 @@ import { toCSV } from '../../server/csv.js';
 import { RawStore } from '../../server/storage/ndjson.js';
 import { downsample } from '../../server/storage/buckets.js';
 import { createApp } from '../../server/index.js';
-import { loadAll, loadFrontend } from '../../test-support/frontend.js';
+import { dailySummary } from '../../public/js/core/analysis.js';
+import { markersInRange } from '../../public/js/charts/timeseries.js';
 
 const ROOT = path.join(path.dirname(fileURLToPath(import.meta.url)), '..', '..');
 const TS = '2026-10-07T12:00:00.000Z';
@@ -65,23 +67,16 @@ test('B4 — CSV com 2+ discos de I/O tem o mesmo número de colunas no cabeçal
   assert.equal(row.split(',').length, header.split(',').length);
 });
 
-test('B5 — resumo diário agrupa pelo dia do fuso local, não UTC', { todo: 'B5 · corrigir na F5/F6 (frontend)' }, () => {
+test('B5 — resumo diário agrupa pelo dia do fuso local, não UTC', () => {
   const prevTZ = process.env.TZ;
   process.env.TZ = 'America/Sao_Paulo';
   try {
-    const { Dash } = loadFrontend('analysis.js');
     // 01:00 UTC de 07/10 = 22:00 de 06/10 em São Paulo
-    const [day] = Dash.analysis.dailySummary([{ ts: '2026-10-07T01:00:00.000Z', load: [1, 1, 1] }]);
+    const [day] = dailySummary([{ t: Date.parse('2026-10-07T01:00:00.000Z'), n: 60, m: { load1: [1, 1, 1] } }], ['load1']);
     assert.equal(day.day, '2026-10-06');
   } finally {
     if (prevTZ === undefined) delete process.env.TZ; else process.env.TZ = prevTZ;
   }
-});
-
-test('B6 — selo SMART de um ponto de montagem vem do disco que o contém', () => {
-  const { sandbox } = loadAll(['analysis.js', 'sections.js']);
-  const sample = { smart: [{ dev: 'sda', status: 'PASSED' }], disks: [{ mount: '/', source: '/dev/sda2' }] };
-  assert.equal(sandbox.smartOf(sample, '/').status, 'PASSED');
 });
 
 test('B7 — gravar uma amostra não reescreve o histórico inteiro', async () => {
@@ -119,11 +114,13 @@ test('B9 — registro de quedas sobrevive a muitos alertas (base do uptime)', ()
   assert.equal(outages.list()[0].durationSec, 1800);
 });
 
-test('B10 — eixo de tempo real nos gráficos (anotações caem no instante certo)', { todo: 'B10 · corrigir na F5 (uPlot)' }, () => {
-  const { Dash } = loadFrontend('charts.js');
-  Dash.charts.registerSpecs();
-  const chart = Object.values(Dash.charts.charts)[0];
-  assert.ok(['time', 'linear'].includes(chart.options.scales.x.type), `eixo x é "${chart.options.scales.x.type ?? 'category'}"`);
+test('B10 — eixo de tempo real nos gráficos (anotações caem no instante certo)', () => {
+  // uPlot com eixo x em segundos: a anotação é posicionada pelo instante, não pelo índice
+  // do ponto (na V1 o eixo era de categorias "HH:MM:SS").
+  const ts = '2026-10-07T12:34:56.000Z';
+  const sec = Date.parse(ts) / 1000;
+  assert.deepEqual(markersInRange([{ ts, text: 'troquei o disco' }], sec - 60, sec + 60), [{ x: sec, label: 'troquei o disco' }]);
+  assert.deepEqual(markersInRange([{ ts, text: 'fora' }], sec + 1, sec + 60), [], 'fora da janela visível não aparece');
 });
 
 test('B11 — encerramento grava o histórico pendente antes de sair', async () => {

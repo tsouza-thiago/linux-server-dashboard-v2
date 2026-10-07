@@ -1,7 +1,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { createRouter, jsonBody } from './http/router.js';
-import { serveStatic, sendFile } from './http/static.js';
+import { serveStatic } from './http/static.js';
 import { SseHub, lastEventId, sampleId, MAX_BACKFILL } from './http/sse.js';
 import { SessionStore, SESSION_COOKIE, sessionCookie, clearSessionCookie, safeEqual } from './http/session.js';
 import { History } from './storage/index.js';
@@ -9,7 +9,8 @@ import { migrateV1 } from './storage/migrate-v1.js';
 import { AlertsStore, AnnotationsStore } from './stores.js';
 import { OutageLog } from './storage/outages.js';
 import { AlertEngine } from './alerts/engine.js';
-import { collect } from './poller.js';
+import { collect, configTargets } from './poller.js';
+import { VERSION } from './version.js';
 import { config, configWarnings, ROOT, isPlaceholderHost } from './config.js';
 import { hostCheck, csrfCheck, securityHeaders, makeRequireAuth, issueCsrfCookie, makeRateLimit, parseCookies } from './security.js';
 import { toCSV } from './csv.js';
@@ -229,6 +230,20 @@ export function createApp(deps = {}) {
     res.json({ samples: store.getRange(from, to, limit), count: store.length });
   });
 
+  // Configuração ativa para a Ajuda: só leitura e sem segredos (nada de DASH_TOKEN).
+  app.get('/api/config', (req, res) => {
+    const latest = store.getLatest();
+    res.json({
+      version: VERSION,
+      sshHost: SSH_HOST,
+      pollIntervalMs: POLL_INTERVAL,
+      targets: deps.targets ?? configTargets(),
+      thresholds,
+      historyLimit: store.limit,
+      collector: latest?.collector ?? null,
+    });
+  });
+
   // Quedas e disponibilidade (ADR 0006): ?days=1..90 (padrão 30).
   app.get('/api/outages', (req, res) => {
     const days = Math.min(Math.max(parseInt(req.query.days, 10) || 30, 1), 90);
@@ -331,15 +346,6 @@ export function createApp(deps = {}) {
   });
 
   app.use(serveStatic(path.join(ROOT, 'public'), { maxAge: 3600 }));
-  // Bibliotecas do frontend atual, servidas de node_modules por caminho fixo (saem na F5).
-  const VENDOR = {
-    '/vendor/chart.js': 'node_modules/chart.js/dist/chart.umd.js',
-    '/vendor/zoom.js': 'node_modules/chartjs-plugin-zoom/dist/chartjs-plugin-zoom.min.js',
-    '/vendor/annotation.js': 'node_modules/chartjs-plugin-annotation/dist/chartjs-plugin-annotation.min.js',
-  };
-  for (const [route, file] of Object.entries(VENDOR)) {
-    app.get(route, (req, res) => sendFile(res, path.join(ROOT, file), { cacheControl: 'public, max-age=86400' }));
-  }
 
   app.use((err, req, res, next) => {
     const status = err.status || err.statusCode || 500;

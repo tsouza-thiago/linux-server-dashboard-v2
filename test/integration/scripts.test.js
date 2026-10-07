@@ -93,8 +93,8 @@ test('arquivos essenciais existem (regressão de estrutura)', () => {
     'server/config.js', 'server/security.js', 'server/csv.js', 'server/index.js',
     'server/poller.js', 'server/storage/index.js', 'server/stores.js',
     'install.sh', 'install-lib.sh', 'start.sh', 'stop.sh', '.env.example', 'public/index.html',
-    'public/js/main.js', 'public/js/router.js', 'public/js/charts.js',
-    'public/js/sections.js', 'public/js/analysis.js',
+    'public/js/main.js', 'public/js/core/html.js', 'public/js/core/router.js',
+    'public/js/charts/timeseries.js', 'public/js/views/visao-geral.js', 'public/vendor/uplot/uPlot.iife.min.js',
   ];
   for (const rel of required) {
     assert.ok(fs.existsSync(path.join(ROOT, rel)), `${rel} deveria existir`);

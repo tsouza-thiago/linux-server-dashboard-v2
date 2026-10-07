@@ -52,8 +52,11 @@ relevantes e suas mitigações:
 ### 4. XSS (conteúdo renderizado)
 - **Ameaça:** dados vindos do servidor (montagens de disco, nomes de serviço, comandos
   de processo, status SMART, mensagens de alerta) com HTML/JavaScript malicioso.
-- **Mitigação:** todo dado exibido no painel passa por escape (`Dash.fmt.esc`) antes de
-  virar HTML. Anotações são desenhadas em canvas (Chart.js) e limitadas em tamanho.
+- **Mitigação:** a tela só monta HTML pelo template `html` (`public/js/core/html.js`), que
+  escapa toda interpolação; HTML cru só via `raw()` explícito (fácil de auditar). A CSP não
+  permite script nem estilo inline (`'unsafe-inline'`) nem `eval`. Anotações são texto
+  limitado em tamanho e aparecem como linhas no canvas do gráfico (uPlot). O teste e2e
+  confirma que uma anotação com `<img onerror=…>` aparece como texto.
 
 ### 5. Formula injection no export (CSV/Excel)
 - **Ameaça:** células começando com `=`, `+`, `-` ou `@` virarem fórmula no Excel.

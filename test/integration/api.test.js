@@ -27,6 +27,7 @@ async function withServer(t, setup) {
   const app = setup();
   const { server, port } = await listen(app.app);
   t.after(async () => {
+    await app.shutdown(); // espera as gravações pendentes antes de apagar a pasta
     await close(server);
     app.cleanup();
   });
@@ -350,11 +351,15 @@ test('API: serve index.html e vendor', async (t) => {
   const index = await request(s.port, { path: '/' });
   assert.equal(index.status, 200);
   assert.ok(index.headers['content-type'].includes('text/html'));
-  assert.ok(index.text.includes('Linux Server Dashboard'));
+  assert.ok(index.text.includes('Server Dashboard'));
+  assert.ok(index.text.includes('type="module"'), 'tela nova em ES modules');
 
-  const chart = await request(s.port, { path: '/vendor/chart.js' });
-  assert.equal(chart.status, 200);
-  assert.ok(chart.text.includes('Chart'));
+  const uplot = await request(s.port, { path: '/vendor/uplot/uPlot.iife.min.js' });
+  assert.equal(uplot.status, 200);
+  assert.ok(uplot.text.includes('uPlot'));
+  const mod = await request(s.port, { path: '/js/core/html.js' });
+  assert.match(mod.headers['content-type'], /javascript/);
+  assert.equal((await request(s.port, { path: '/vendor/chart.js' })).status, 404, 'Chart.js saiu');
 
   const notFound = await request(s.port, { path: '/nao-existe' });
   assert.equal(notFound.status, 404);

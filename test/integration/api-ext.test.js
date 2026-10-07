@@ -27,6 +27,7 @@ async function withServer(t, setup) {
   const app = setup();
   const { server, port } = await listen(app.app);
   t.after(async () => {
+    await app.shutdown(); // espera as gravações pendentes antes de apagar a pasta
     await close(server);
     app.cleanup();
   });
