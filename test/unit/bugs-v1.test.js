@@ -2,17 +2,18 @@
 // Cada teste descreve o comportamento CORRETO. Os ainda abertos estão marcados como `todo`
 // (aparecem no relatório sem deixar a suíte vermelha); o commit que corrige o bug remove o
 // `todo` e o teste passa a valer como regressão. Corrigidos na F1: B1, B2, B6, I5.
+// Corrigidos na F2: B7, B8 (detalhes em test/unit/storage-*.test.js).
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
-import fsp from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { parseOutput, computeAlerts } from '../../server/poller.js';
 import { AlertsStore } from '../../server/stores.js';
 import { toCSV } from '../../server/csv.js';
-import { HistoryStore, downsample } from '../../server/history.js';
+import { RawStore } from '../../server/storage/ndjson.js';
+import { downsample } from '../../server/storage/buckets.js';
 import { createApp } from '../../server/index.js';
 import { loadAll, loadFrontend } from '../../test-support/frontend.js';
 
@@ -81,28 +82,27 @@ test('B6 — selo SMART de um ponto de montagem vem do disco que o contém', () 
   assert.equal(sandbox.smartOf(sample, '/').status, 'PASSED');
 });
 
-test('B7 — gravar uma amostra não reescreve o histórico inteiro', { todo: 'B7 · corrigir na F2 (NDJSON append-only)' }, async () => {
-  const store = new HistoryStore({ limit: 5000, file: path.join(tmpDir(), 'history.json') });
-  const sample = { ts: TS, host: 'srv', topProcs: Array(7).fill({ user: 'root', pid: 1, cpu: 0, mem: 0.3, cmd: '/usr/sbin/smbd --foreground' }) };
-  store.samples = Array(2000).fill(sample);
-  const sizes = [];
-  const original = fsp.writeFile;
-  fsp.writeFile = async (file, data, opts) => { sizes.push(Buffer.byteLength(data)); return original(file, data, opts); };
-  try {
-    store.append({ ...sample, ts: '2026-10-07T12:01:00.000Z' });
-    await store.flush();
-  } finally {
-    fsp.writeFile = original;
-  }
-  assert.ok(sizes.length > 0, 'deveria ter gravado algo');
-  assert.ok(Math.max(...sizes) < 64 * 1024, `gravou ${Math.max(...sizes)} bytes para 1 amostra`);
+test('B7 — gravar uma amostra não reescreve o histórico inteiro', async () => {
+  const dir = tmpDir();
+  const store = new RawStore({ dir, limit: 5000, log: () => {} });
+  const base = { host: 'srv', topProcs: Array(7).fill({ user: 'root', pid: 1, cpu: 0, mem: 0.3, cmd: '/usr/sbin/smbd --foreground' }) };
+  const tsAt = (i) => new Date(Date.parse(TS) + i * 60000).toISOString();
+  for (let i = 0; i < 2000; i++) store.append({ ...base, ts: tsAt(i) });
+  await store.flush();
+  const total = () => fs.readdirSync(dir).reduce((n, f) => n + fs.statSync(path.join(dir, f)).size, 0);
+  const before = total();
+  store.append({ ...base, ts: tsAt(2000) });
+  await store.flush();
+  const written = total() - before;
+  assert.ok(written > 0, 'deveria ter gravado algo');
+  assert.ok(written < 64 * 1024, `gravou ${written} bytes para 1 amostra`);
 });
 
-test('B8 — redução de pontos para o gráfico preserva picos', { todo: 'B8 · corrigir na F2 (agregação por balde)' }, () => {
-  const list = Array.from({ length: 1440 }, (_, i) => ({ ts: String(i).padStart(5, '0'), v: 1 }));
-  list[701].v = 100; // pico em índice ímpar: a amostragem por passo 2 descarta
+test('B8 — redução de pontos para o gráfico preserva picos', () => {
+  const list = Array.from({ length: 1440 }, (_, i) => ({ ts: new Date(Date.parse(TS) + i * 60000).toISOString(), tempC: 40 }));
+  list[701].tempC = 100; // pico em índice ímpar: a amostragem por passo 2 da V1 descartava
   const out = downsample(list, 720);
-  assert.ok(out.some((s) => s.v === 100), 'o pico de 100 sumiu');
+  assert.ok(out.some((s) => s.tempC === 100), 'o pico de 100 sumiu');
 });
 
 test('B9 — registro de quedas sobrevive a muitos alertas (base do uptime)', { todo: 'B9 · corrigir na F3 (log de outages)' }, () => {
