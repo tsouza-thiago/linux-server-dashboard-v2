@@ -8,6 +8,35 @@ pré-versões `2.0.0-alpha.N` (uma por fase do plano), depois `beta`, `rc` e `2.
 
 ## [Não publicado]
 
+## [2.0.0-alpha.5] — 2026-10-07
+
+Fase F4 do plano (HTTP). Backend sem dependência de runtime; segurança caracterizada pela
+rede antes da troca e verde depois dela; `npm audit` limpo.
+
+### Adicionado
+
+- Servidor HTTP próprio em `server/http/` (ADR 0003): roteador, corpo JSON com limite de
+  50 KB e estáticos só de `public/` com lista de tipos.
+- Sessão por cookie (ADR 0007): tela de login no lugar do `prompt()`; o `DASH_TOKEN` é
+  trocado 1x por um cookie HttpOnly + SameSite=Strict de 30 dias, renovado com o uso.
+  Rotas `/api/session`, `/api/login`, `/api/logout` e `/api/logout-all`; "Sair" e
+  "Encerrar todas as sessões" na Ajuda.
+- SSE com backfill: amostras com `id`; na reconexão o painel reenvia o que a tela perdeu.
+- Suíte de caracterização de segurança pela rede (`test/integration/http-seguranca.test.js`).
+
+### Alterado
+
+- Express removido (saem 68 pacotes); o backend não tem mais dependências de runtime.
+- `?token=` na URL não é mais aceito: navegador usa a sessão; scripts usam
+  `Authorization: Bearer`.
+- Login limitado a 10 tentativas/min/IP; SSE limitado a 20 conexões simultâneas.
+
+### Segurança
+
+- Respostas 403 (Host não permitido, CSRF) passam a sair com os cabeçalhos de segurança.
+- O token não fica mais guardado pelo JavaScript nem aparece em URLs ou logs; em disco
+  fica só o SHA-256 da sessão.
+
 ## [2.0.0-alpha.4] — 2026-10-07
 
 Fase F3 do plano (alertas). B3 e B9 corrigidos; testes de flapping cobrem a histerese.
@@ -141,7 +170,8 @@ Documentados no plano da V2 (seção 2.2, B1–B12), entre eles: alerta SMART fa
 rede zerada com contadores grandes, alerta duplicado a cada coleta e reescrita completa do
 histórico a cada minuto.
 
-[Não publicado]: https://github.com/tsouza-thiago/linux-server-dashboard-v2/compare/v2.0.0-alpha.4...HEAD
+[Não publicado]: https://github.com/tsouza-thiago/linux-server-dashboard-v2/compare/v2.0.0-alpha.5...HEAD
+[2.0.0-alpha.5]: https://github.com/tsouza-thiago/linux-server-dashboard-v2/compare/v2.0.0-alpha.4...v2.0.0-alpha.5
 [2.0.0-alpha.4]: https://github.com/tsouza-thiago/linux-server-dashboard-v2/compare/v2.0.0-alpha.3...v2.0.0-alpha.4
 [2.0.0-alpha.3]: https://github.com/tsouza-thiago/linux-server-dashboard-v2/compare/v2.0.0-alpha.2...v2.0.0-alpha.3
 [2.0.0-alpha.2]: https://github.com/tsouza-thiago/linux-server-dashboard-v2/compare/v2.0.0-alpha.1...v2.0.0-alpha.2

@@ -1,6 +1,6 @@
 {
   "name": "linux-server-dashboard",
-  "version": "2.0.0-alpha.4",
+  "version": "2.0.0-alpha.5",
   "description": "Dashboard de monitoramento em tempo real de servidor Linux via SSH",
   "type": "module",
   "main": "server/index.js",
