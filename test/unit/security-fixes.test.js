@@ -2,11 +2,11 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {
   sanitizeHost,
-} from '../server/config.js';
-import { buildCommand } from '../server/poller.js';
+} from '../../server/config.js';
+import { buildCommand } from '../../server/poller.js';
 import {
   hasCsrfCookie, issueCsrfCookie, securityHeaders, makeRateLimit,
-} from '../server/security.js';
+} from '../../server/security.js';
 
 function fakeRes() {
   const headers = {};

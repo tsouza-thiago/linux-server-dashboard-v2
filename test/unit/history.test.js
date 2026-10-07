@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { downsample } from '../server/history.js';
+import { downsample } from '../../server/history.js';
 
 test('downsample mantém pontos quando abaixo do limite', () => {
   const list = Array.from({ length: 10 }, (_, i) => ({ ts: String(i), v: i }));

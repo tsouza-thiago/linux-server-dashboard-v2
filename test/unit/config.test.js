@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {
   sanitizeToken, isPlaceholderHost, clampInt, clampPathToData, config,
-} from '../server/config.js';
+} from '../../server/config.js';
 
 test('sanitizeToken remove tokens perigosos', () => {
   assert.deepEqual(sanitizeToken('sda sdb'), ['sda', 'sdb']);

@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {
   parseHost, isAllowedHost, originAllowed, makeRequireAuth,
-} from '../server/security.js';
+} from '../../server/security.js';
 
 test('parseHost extrai o hostname ignorando porta', () => {
   assert.equal(parseHost('localhost:3000'), 'localhost');

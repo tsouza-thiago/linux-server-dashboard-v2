@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { toCSV, csvEscape } from '../server/csv.js';
+import { toCSV, csvEscape } from '../../server/csv.js';
 
 test('csvEscape protege contra formula injection do Excel', () => {
   assert.equal(csvEscape('=cmd()'), "'=cmd()");

@@ -3,8 +3,8 @@ import assert from 'node:assert/strict';
 import { mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
-import { createApp } from '../server/index.js';
-import { listen, close, request } from '../test-support/request.js';
+import { createApp } from '../../server/index.js';
+import { listen, close, request } from '../../test-support/request.js';
 
 function setupApp({ collect, token, rateLimitMax } = {}) {
   const dir = mkdtempSync(path.join(tmpdir(), 'dash-api-ext-'));

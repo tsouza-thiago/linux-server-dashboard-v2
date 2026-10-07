@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { mkdtempSync, readFileSync, existsSync, rmSync, statSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
-import { HistoryStore } from '../server/history.js';
+import { HistoryStore } from '../../server/history.js';
 
 function tempFile(name = 'history.json', content) {
   const dir = mkdtempSync(path.join(tmpdir(), 'dash-hist-'));

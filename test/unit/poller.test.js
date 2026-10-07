@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { parseOutput, computeAlerts, describeError, buildCommand } from '../server/poller.js';
+import { parseOutput, computeAlerts, describeError, buildCommand } from '../../server/poller.js';
 
 const FIXTURE = `===HOST===
 meu-host

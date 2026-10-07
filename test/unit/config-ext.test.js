@@ -5,7 +5,7 @@ import { tmpdir } from 'node:os';
 import path from 'node:path';
 import {
   loadEnvFile, env, sanitizeToken, isPlaceholderHost, clampInt, clampPathToData,
-} from '../server/config.js';
+} from '../../server/config.js';
 
 function tempFile(content) {
   const dir = mkdtempSync(path.join(tmpdir(), 'dash-cfg-'));

@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import {
   parseHost, isAllowedHost, originAllowed,
   hostCheck, csrfCheck, securityHeaders, makeRequireAuth,
-} from '../server/security.js';
+} from '../../server/security.js';
 
 function fakeRes() {
   const headers = {};

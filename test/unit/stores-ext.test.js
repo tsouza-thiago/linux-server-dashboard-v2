@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { mkdtempSync, writeFileSync, rmSync, existsSync, readFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
-import { JsonStore, AlertsStore, AnnotationsStore } from '../server/stores.js';
+import { JsonStore, AlertsStore, AnnotationsStore } from '../../server/stores.js';
 
 function tempFile(name, content) {
   const dir = mkdtempSync(path.join(tmpdir(), 'dash-store-'));

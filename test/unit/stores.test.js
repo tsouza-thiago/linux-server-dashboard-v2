@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
-import { AlertsStore } from '../server/stores.js';
+import { AlertsStore } from '../../server/stores.js';
 
 function tempStore() {
   const dir = mkdtempSync(path.join(tmpdir(), 'dash-test-'));

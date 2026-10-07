@@ -3,10 +3,10 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { loadAll } from '../test-support/frontend.js';
+import { loadAll } from '../../test-support/frontend.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
-const ROOT = path.join(__dirname, '..');
+const ROOT = path.join(__dirname, '..', '..');
 const JS_DIR = path.join(ROOT, 'public', 'js');
 const FILES = ['analysis.js', 'router.js', 'sections.js', 'charts.js', 'main.js'];
 

@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {
   collect, buildCommand, computeNetRates, computeIoRates, describeError,
-} from '../server/poller.js';
+} from '../../server/poller.js';
 
 const OK_STDOUT = `===HOST===
 meu-host

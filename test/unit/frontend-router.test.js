@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { loadFrontend } from '../test-support/frontend.js';
+import { loadFrontend } from '../../test-support/frontend.js';
 
 const { Dash, location, document } = loadFrontend('router.js');
 Dash.charts = { resize() {} };

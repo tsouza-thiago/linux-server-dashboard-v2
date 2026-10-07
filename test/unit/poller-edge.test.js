@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { parseOutput, DEV_SET, SVC_ORDER } from '../server/poller.js';
+import { parseOutput, DEV_SET, SVC_ORDER } from '../../server/poller.js';
 
 const TS = '2026-08-15T09:12:00.000Z';
 

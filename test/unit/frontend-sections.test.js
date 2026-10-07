@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { loadAll } from '../test-support/frontend.js';
+import { loadAll } from '../../test-support/frontend.js';
 
 function makeSample(over = {}) {
   return {

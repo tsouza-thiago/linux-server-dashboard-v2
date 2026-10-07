@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { toCSV, csvEscape } from '../server/csv.js';
+import { toCSV, csvEscape } from '../../server/csv.js';
 
 function baseSample(over = {}) {
   return {
