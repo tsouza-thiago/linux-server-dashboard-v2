@@ -86,6 +86,15 @@ export class RollupStore {
     }
   }
 
+  /** Início (ms) do balde mais antigo guardado, ou null. */
+  firstT() {
+    for (const day of listDays(this.dir)) {
+      const first = readNdjson(this.fileFor(day)).items.find(validBucket);
+      if (first) return first.t;
+    }
+    return null;
+  }
+
   /** Baldes de 5 min com início em [fromMs, toMs], em ordem, sem duplicatas. */
   query(fromMs, toMs) {
     const firstDay = dayOf(Math.max(fromMs, 0));

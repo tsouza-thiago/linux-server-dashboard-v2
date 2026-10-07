@@ -83,6 +83,9 @@ test('OutageLog: abre e fecha quedas, ignora repetição e sobrevive a reinício
   assert.equal(log.isOpen, true);
   log.end(BASE + 30 * MIN);
   assert.equal(log.end(BASE + 31 * MIN), null);
+  const skew = new OutageLog({ file: path.join(tmp(), 's.ndjson') });
+  skew.start(BASE + 10 * MIN, 'x');
+  assert.equal(skew.end(BASE).ts, new Date(BASE + 10 * MIN).toISOString(), 'fim antes do início vira duração 0');
   log.start(BASE + 50 * MIN, 'x'.repeat(500));
   await log.flush();
   assert.equal(fs.statSync(file).mode & 0o777, 0o600);

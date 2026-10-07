@@ -41,6 +41,14 @@ export class History {
     await Promise.all([this.raw.flush(), this.rollup.flush()]);
   }
 
+  /** Instante (ms) do dado mais antigo conhecido: início do monitoramento, ou null. */
+  firstMs() {
+    const rolled = this.rollup.firstT();
+    const raw = this.raw.samples.length ? Date.parse(this.raw.samples[0].ts) : null;
+    const known = [rolled, raw].filter((v) => v !== null);
+    return known.length ? Math.min(...known) : null;
+  }
+
   getLatest() { return this.raw.getLatest(); }
   getSamples(limit) { return this.raw.getSamples(limit); }
   getRange(from, to, limit) { return this.raw.getRange(from, to, limit); }

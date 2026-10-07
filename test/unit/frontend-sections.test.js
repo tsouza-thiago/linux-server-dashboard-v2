@@ -57,6 +57,35 @@ test('sections.health renderiza anel, nota e breakdown', () => {
   assert.match(document.getElementById('healthBreakdown').innerHTML, /Sem dados/);
 });
 
+test('sections.health usa a saúde calculada no servidor quando disponível', () => {
+  const { Dash, document } = ctx();
+  Dash.health = { score: 70, level: 'warn', parts: [{ label: 'Temp 65.0°C', pts: 15, level: 'warn' }] };
+  Dash.sections.health(makeSample());
+  assert.equal(document.getElementById('healthScore').textContent, '70');
+  assert.equal(document.getElementById('healthNote').textContent, 'atenção');
+  assert.match(document.getElementById('healthBreakdown').innerHTML, /Temp 65\.0°C/);
+});
+
+test('sections.analysis usa quedas e uptime do servidor (/api/outages)', () => {
+  const { Dash, document } = ctx();
+  Dash.latest = makeSample();
+  document.getElementById('etaTable').appendChild(document.createElement('tbody'));
+  document.getElementById('dailyTable').appendChild(document.createElement('tbody'));
+  Dash.outages = {
+    days: 30,
+    outages: [{ from: '2026-08-01T00:00:00Z', to: null, durationSec: 120, ongoing: true, reason: '<b>Tempo esgotado</b>' }],
+    uptime: { uptimePct: 99.5 },
+  };
+  Dash.sections.analysis();
+  const el = document.getElementById('outagesList');
+  assert.match(el.children[0].innerHTML, /99\.50%/);
+  assert.match(el.innerHTML, /em curso/);
+  assert.match(el.innerHTML, /&lt;b&gt;Tempo esgotado/, 'motivo escapado (anti-XSS)');
+  Dash.outages = { days: 30, outages: [], uptime: { uptimePct: null } };
+  Dash.sections.analysis();
+  assert.match(document.getElementById('outagesList').children[0].innerHTML, /—/, 'sem dados não inventa 100%');
+});
+
 test('sections.alertBar renderiza com esc e anexa botões', () => {
   const { Dash, document } = ctx();
   Dash.sections.alertBar([{ level: 'warning', message: '<img src=x onerror=alert(1)>', id: 'abc' }]);

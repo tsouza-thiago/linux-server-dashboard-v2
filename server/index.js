@@ -4,6 +4,8 @@ import express from 'express';
 import { History } from './storage/index.js';
 import { migrateV1 } from './storage/migrate-v1.js';
 import { AlertsStore, AnnotationsStore } from './stores.js';
+import { OutageLog } from './storage/outages.js';
+import { AlertEngine } from './alerts/engine.js';
 import { collect } from './poller.js';
 import { config, ROOT, isPlaceholderHost } from './config.js';
 import { hostCheck, csrfCheck, securityHeaders, makeRequireAuth, issueCsrfCookie, makeRateLimit } from './security.js';
@@ -36,6 +38,12 @@ export function createApp(deps = {}) {
   const annotationsStore = deps.annotationsStore || new AnnotationsStore({
     file: deps.annotationsFile ?? path.join(ROOT, 'data/annotations.json'),
   });
+  const thresholds = deps.thresholds ?? config.ALERTS;
+  const outages = deps.outages || new OutageLog({
+    file: deps.outagesFile ?? path.join(path.dirname(alertsStore.file), 'outages.ndjson'),
+    log,
+  });
+  const engine = new AlertEngine({ alerts: alertsStore, outages, thresholds });
 
   const state = {
     online: false,
@@ -45,6 +53,7 @@ export function createApp(deps = {}) {
     lastError: null,
     polling: false,
     lastManualPollAt: 0,
+    failures: 0,
   };
 
   const apiRateLimit = makeRateLimit({ windowMs: 60000, max: deps.rateLimitMax ?? 120 });
@@ -72,29 +81,36 @@ export function createApp(deps = {}) {
         state.online = true;
         state.offlineSince = null;
         state.lastError = null;
+        state.failures = 0;
         store.append(res.sample);
-        alertsStore.reconcile(res.alerts);
+        engine.onSample(res.sample);
         log(`poll OK (${Date.now() - started}ms) — amostras: ${store.length}`);
-        broadcast('sample', { sample: res.sample, alerts: alertsStore.active });
+        broadcast('sample', { sample: res.sample, alerts: alertsStore.active, health: engine.health(res.sample) });
         broadcastAlerts();
       } else {
-        const wasOnline = state.online;
-        state.online = false;
-        if (wasOnline || !state.offlineSince) state.offlineSince = new Date().toISOString();
-        state.lastError = res.error;
-        alertsStore.reconcile([{ level: 'critical', message: `Servidor inacessível: ${res.error}`, key: 'servidor-inacessivel' }]);
-        log(`poll FALHOU: ${res.error}`);
-        broadcast('status', statusPayload());
-        broadcastAlerts();
+        recordFailure(res.error);
       }
     } catch (err) {
-      state.online = false;
-      if (!state.offlineSince) state.offlineSince = new Date().toISOString();
-      state.lastError = err.message;
       log(`poll ERRO: ${err.stack || err.message}`);
+      recordFailure(err.message);
     } finally {
       state.polling = false;
     }
+  }
+
+  // Falha de coleta: o motor decide quando vira "servidor inacessível" (debounce). Até lá o
+  // estado online não pisca; antes da 1ª coleta OK ele já começa como offline.
+  function recordFailure(error) {
+    state.lastError = error;
+    const { offline, failures } = engine.onFailure(error);
+    state.failures = failures;
+    if (offline) {
+      state.online = false;
+      state.offlineSince = engine.offlineSince;
+    }
+    log(`poll FALHOU (${failures}x seguidas): ${error}`);
+    broadcast('status', statusPayload());
+    broadcastAlerts();
   }
 
   function statusPayload() {
@@ -106,6 +122,8 @@ export function createApp(deps = {}) {
         lastPollAt: state.lastPollAt,
         nextPollAt: state.nextPollAt,
         lastError: state.lastError,
+        failures: state.failures,
+        thresholds,
         pollIntervalMs: POLL_INTERVAL,
         historySize: store.length,
         historyLimit: store.limit,
@@ -113,6 +131,7 @@ export function createApp(deps = {}) {
       },
       sample: store.getLatest(),
       alerts: alertsStore.active,
+      health: engine.health(store.getLatest()),
     };
   }
 
@@ -162,6 +181,19 @@ export function createApp(deps = {}) {
     }
     const { from, to, limit } = parseRange(req);
     res.json({ samples: store.getRange(from, to, limit), count: store.length });
+  });
+
+  // Quedas e disponibilidade (ADR 0006): ?days=1..90 (padrão 30).
+  app.get('/api/outages', (req, res) => {
+    const days = Math.min(Math.max(parseInt(req.query.days, 10) || 30, 1), 90);
+    const toMs = Date.now();
+    const fromMs = toMs - days * 24 * HOUR_MS;
+    const since = typeof store.firstMs === 'function' ? store.firstMs() : null;
+    res.json({
+      days,
+      outages: outages.list({ fromMs, toMs }),
+      uptime: outages.uptime({ fromMs, toMs, sinceMs: since ?? toMs }),
+    });
   });
 
   app.get('/api/alerts', (req, res) => {
@@ -276,10 +308,10 @@ export function createApp(deps = {}) {
   async function shutdown() {
     for (const res of sseClients) res.end();
     sseClients.clear();
-    await Promise.all([store.flush?.(), alertsStore.flush?.(), annotationsStore.flush?.()]);
+    await Promise.all([store.flush?.(), alertsStore.flush?.(), annotationsStore.flush?.(), outages.flush()]);
   }
 
-  return { app, state, store, alertsStore, annotationsStore, broadcast, runPoll, parseRange, statusPayload, sseClients, shutdown };
+  return { app, state, store, alertsStore, annotationsStore, outages, engine, broadcast, runPoll, parseRange, statusPayload, sseClients, shutdown };
 }
 
 export function startServer() {

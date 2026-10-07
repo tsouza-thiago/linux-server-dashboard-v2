@@ -65,7 +65,9 @@ export class OutageLog {
   /** Fecha a queda aberta em `ts` (servidor respondeu de novo). */
   end(ts) {
     if (!this.isOpen) return null;
-    const event = { ts: new Date(ts).toISOString(), ev: 'on' };
+    // Relógio da amostra atrás do instante da falha: a queda nunca termina antes de começar.
+    const endMs = Math.max(new Date(ts).getTime(), Date.parse(this.events.at(-1).ts));
+    const event = { ts: new Date(endMs).toISOString(), ev: 'on' };
     this._append(event);
     return event;
   }
