@@ -8,6 +8,30 @@ pré-versões `2.0.0-alpha.N` (uma por fase do plano), depois `beta`, `rc` e `2.
 
 ## [Não publicado]
 
+### Adicionado
+
+- Histórico em `server/storage/` (ADR 0005): amostras brutas append-only em
+  `data/history/AAAA-MM-DD.ndjson` (72 h) e agregados de 5 min com mín/máx/média em
+  `data/rollup/` (90 dias), atrás da mesma interface que o servidor já usava.
+- `/api/history?formato=baldes&from=&to=&limit=`: série agregada de qualquer intervalo de
+  até 90 dias, com 1 min de resolução dentro das 72 h brutas.
+- Migração automática do `data/history.json` da V1 no 1º boot, com backup em
+  `data/history.v1-migrado.json`; `npm run migrar-v1` (e `-- --verificar`, sem gravar nada).
+
+### Alterado
+
+- Cada poll grava ~3,7 KB no SSD local em vez de reescrever o histórico inteiro.
+- Encerramento (SIGINT/SIGTERM) espera gravar histórico, alertas e anotações.
+- `HISTORY_FILE` passa a indicar o histórico da V1 a migrar.
+
+### Corrigido
+
+- B4: export CSV com 1 par de colunas por dispositivo de I/O (cabeçalho e linhas alinhados).
+- B7: gravar uma amostra não reescreve mais o histórico inteiro.
+- B8: a redução de pontos para os gráficos preserva picos (pior caso de cada grupo).
+- B11: o histórico pendente é gravado antes de o painel encerrar.
+- `data/dashboard.log` nasce com permissão 0600 (antes ficava 0644 ao ser criado).
+
 ## [2.0.0-alpha.2] — 2026-10-07
 
 Fase F1 do plano (coleta). Validada no servidor real: comando V2 completo em 901 ms.
