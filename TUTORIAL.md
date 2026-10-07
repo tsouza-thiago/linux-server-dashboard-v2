@@ -277,96 +277,40 @@ kill 12345
 
 ## 6. Como usar o dashboard
 
-O painel tem 9 telas, listadas na coluna esquerda. Clique em cada item para trocar de tela.
+O painel tem 8 telas, listadas na coluna esquerda (ou nas teclas `1` a `8`).
 
-### 🏠 Visão Geral (primeira tela)
+| Tela | O que mostra |
+|------|--------------|
+| **1 Visão geral** | Manchete de saúde em linguagem simples ("Servidor saudável" / "Atenção" / "Crítico" e por quê), cartões com mini-gráfico (processador, memória, disco mais cheio com previsão, temperatura, rede, serviços) e eventos recentes |
+| **2 Recursos** | CPU % com espera de disco, load, RAM e swap, pressão (PSI) e temperatura; linha tracejada = pico do intervalo |
+| **3 Armazenamento** | Espaço, inodes, SMART e **previsão de disco cheio** por ponto de montagem; leitura/gravação, ocupação e latência por disco |
+| **4 Rede** | Vazão de entrada/saída, totais desde o boot, erros e descartes |
+| **5 Processos & serviços** | Estado de cada serviço e os processos que mais usam memória, com filtro e ordenação |
+| **6 Eventos** | Linha do tempo única de alertas, quedas e anotações; reconhecer/resolver; nova anotação; uptime de até 90 dias |
+| **7 Relatórios** | Resumo por dia (fuso local) dos últimos 30 dias; exportação CSV/JSON; impressão |
+| **8 Ajuda** | Guia rápido, atalhos, configuração ativa (só leitura) e sessão |
 
-É o "resumo do dia". Mostra, em cartões:
+Dicas por tela:
 
-- **Load (1/5/15)** — a carga do processador agora, nos últimos 5 e 15 minutos
-  (quanto menor, melhor; o valor deve ficar abaixo de 1,0).
-- **Memória RAM** — memória em uso e total (ex.: `900 / 2000 MB`).
-- **Swap** — memória de reserva no disco (deve ficar em 0).
-- **Temperatura CPU** — limite de segurança: 60 °C (alerta) / 70 °C (crítico).
-- **Uptime** — há quanto tempo o servidor está ligado.
-- **Sistema** — número de núcleos e versão do kernel.
-
-Abaixo, 4 gráficos: load, RAM, temperatura e uso dos discos.
-E ainda: lista de discos (clique em um para ver detalhes), rede (download/upload) e
-serviços com selo verde (ativo) ou vermelho (parado).
-
-### 💾 Discos
-
-- Um **cartão por disco** com % usado, espaço livre e **previsão de lotação** (ETA).
-- Clique em um cartão para ver o gráfico de uso daquele disco.
-- A previsão é feita pela tendência de crescimento: se o disco cresce
-  `+0,5 GB/dia`, ele avisa em quantos dias vai encher. Se não cresce, mostra
-  "Crescimento estável — sem previsão de lotação".
-- O selo **SMART** mostra a saúde do disco: `PASSED` (bom) ou outro status (ruim).
-
-### 🌐 Rede
-
-- Download e upload em **Mbps** (megabits por segundo) — leitura/escrita em tempo real.
-- Gráfico de tráfego de rede ao longo do tempo.
-- Gráfico de **I/O por disco** (MB/s de leitura/escrita). As abas são criadas
-  automaticamente a partir dos discos monitorados (`DISK_DEVS`).
-
-### ⚙️ Processos
-
-- Lista os 7 processos que mais consomem **memória** no servidor.
-- **Buscar**: digite no campo de busca para filtrar por comando ou usuário.
-- **Ordenar**: clique no cabeçalho de uma coluna (PID, Usuário, CPU%, MEM%, Comando)
-  para ordenar. Clique de novo para inverter.
-
-### 🔔 Alertas
-
-- Lista de alertas com filtros: **Ativos** (não resolvidos), **Todos**, **Warning**, **Critical**.
-- Cada alerta tem um ciclo de vida: `new` (novo) → `ack` (reconhecido) → `resolved` (resolvido).
-  - **Reconhecer** (✓): você viu o alerta e está ciente.
-  - **Resolver**: o alerta deixou de existir (auto-resolve) ou você o encerrou manualmente.
-- Os alertas ativos também aparecem como barras coloridas no topo de todas as telas
-  (amarelo = warning, vermelho = critical) com botão ✓ para reconhecer.
-
-### 📝 Anotações
-
-- Linha do tempo de eventos que você mesmo marca (ex.: "troquei o cooler", "desliguei
-  para limpeza").
-- **Criar**: use o formulário no topo da tela, ou clique num ponto de um gráfico e
-  escolha **"Anotar neste momento"**.
-- **Remover**: clique em "Remover" na anotação (a linha do gráfico some junto).
-
-### 📊 Análise
-
-- **Índice de saúde**: detalhe de cada desconto na nota (ex.: "-15 RAM 92%").
-- **Pressão de RAM (6h)**: média, pico e tendência (subindo/estável/caindo).
-- **ETA — discos cheios**: tabela com crescimento por dia e previsão de lotação.
-- **Resumo diário**: min / média / máx de load, RAM, temperatura e rede por dia.
-- **Outages**: períodos em que o servidor ficou inacessível + % de uptime nos últimos 30 dias.
-
-### 📜 Histórico
-
-- Tabela com as amostras do período selecionado (cada linha = 1 coleta).
-- Ótima para "rolar" o passado e conferir valores exatos.
-
-### ❓ Ajuda (esta tela!)
-
-- Resumo rápido deste tutorial, sempre à mão dentro do painel.
-
----
+- **Visão geral** responde "está tudo bem?" em uma frase. Se não estiver, diz o porquê
+  ("RAM 92%", "SMART /dev/sda"). O número de 0 a 100 é só um detalhe.
+- **Armazenamento** mostra "enche em ~N dias" quando há pelo menos ~1 dia de dados e o
+  disco está crescendo; "estável" quando não cresce.
+- **Eventos** junta tudo o que aconteceu. Alertas abertos podem ser **reconhecidos**
+  (você viu) ou **resolvidos**; ao remover uma anotação, aparece **Desfazer** por 4 s.
+- **Relatórios** agrupa por dia no fuso do seu computador.
 
 ### Interações comuns a todas as telas
 
-| Ação | Como fazer | Para quê |
-|------|-----------|----------|
-| **Mudar período** | Botões `1h` / `6h` / `24h` / `72h` no topo | Ver gráficos de hoje, ou dos últimos 3 dias |
-| **Alternar tema** | Botão (lua/sol) no topo da tela | Trocar entre tema escuro e claro (fica salvo) |
-| **Zoom no gráfico** | Roda do mouse sobre o gráfico | Ampliar um intervalo para ver detalhes |
-| **Mover (pan)** | `Shift` + arrastar com o mouse | Navegar dentro do zoom |
-| **Voltar o zoom** | Trocar o período (1h/6h/...) ou atualizar a página | Restaurar a visão normal |
-| **Detalhe de uma amostra** | Clicar em um ponto do gráfico | Abrir janela com tudo daquela coleta (RAM, discos, processos, SMART...) |
-| **Anotar no gráfico** | Na janela de detalhe, clicar em "Anotar neste momento" | Marcar um evento na linha do tempo (linha roxa tracejada) |
-| **Coletar agora** | Botão no rodapé da coluna esquerda | Forçar uma coleta imediata (não espera o minuto) |
-| **Exportar CSV** | Botão "Exportar" no topo | Baixar o período atual em planilha (Excel abre direto) |
+**Interações em todas as telas:**
+
+- **Período**: botões `1h` · `6h` · `24h` · `72h` · `7d` · `30d` · `90d` no topo (fica na URL).
+- **Gráficos**: arrastar = aproximar um trecho · roda do mouse = zoom · duplo clique = voltar.
+  O cursor fica sincronizado entre os gráficos da tela.
+- **Atalhos**: `1`–`8` telas · `C` coletar agora · `T` tema · `N` nova anotação · `/` buscar processo · `?` ajuda.
+- **Tema**: escuro é o padrão; o botão ◐ (ou `T`) alterna para o claro (fica salvo).
+- **Anotações**: em Eventos, marque manutenções ("troquei o cooler"); viram linhas tracejadas nos gráficos.
+- **Coletar agora**: força uma coleta imediata, sem esperar o minuto.
 
 > A interatividade toda (filtros, zoom, ordenação) acontece **no seu navegador** —
 > o servidor não é incomodado por nada disso. A única "conversa" com ele
@@ -492,12 +436,12 @@ o problema é SSH/rede — os logs dirão o motivo.
    (o programa já bloqueia abaixo de 10 segundos). O servidor responde 1 comando por minuto, por projeto.
 3. **Discos SMR** — evite cópias massivas e aleatórias de arquivos no
    servidor; são lentos para reescrever.
-4. **Anote os eventos** — quando fizer manutenção no servidor, clique num ponto do
-   gráfico e adicione uma anotação. Daqui a semanas você saberá o que aconteceu naquele dia.
-5. **Exporte relatórios** — o botão **Exportar** baixa CSV do período atual. Dá para
-   abrir no Excel/LibreOffice e comparar semanas diferentes.
-6. **Fique de olho na Análise** — o **ETA de discos** e a **pressão de RAM** avisam
-   problemas com dias de antecedência, antes que virem alerta.
+4. **Anote os eventos** — quando fizer manutenção no servidor, use **Eventos → Nova
+   anotação** (ou a tecla `N`). Daqui a semanas você saberá o que aconteceu naquele dia.
+5. **Exporte relatórios** — em **Relatórios**, baixe CSV ou JSON do período escolhido.
+   Dá para abrir no Excel/LibreOffice e comparar semanas diferentes.
+6. **Fique de olho na previsão de disco** — em **Armazenamento**, "enche em ~N dias"
+   avisa com antecedência, antes que vire alerta.
 7. **Mantenha o histórico** — não apague `data/` por acidente; ele guarda 3 dias de
    amostras detalhadas, 90 dias resumidos e todo o histórico de alertas e anotações.
 8. **Backup do histórico (opcional)** — se quiser guardar além de 90 dias, exporte CSV

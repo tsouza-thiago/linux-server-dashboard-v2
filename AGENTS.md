@@ -32,8 +32,9 @@ responde **1 comando SSH por minuto** — requisito obrigatório (hardware muito
 - **CSRF**: POST/PUT/PATCH/DELETE rejeitam `Origin` ≠ Host validado e `Sec-Fetch-Site: cross-site`
 - **Headers**: `X-Powered-By` desligado; CSP restritivo, `nosniff`, `X-Frame-Options: DENY`,
   `Referrer-Policy: no-referrer`
-- **Anti-XSS**: todo dado remoto renderizado no frontend passa por `Dash.fmt.esc()` antes
-  de `innerHTML`
+- **Anti-XSS** (ADR 0010): a tela monta HTML só pelo template `html` de
+  `public/js/core/html.js`, que escapa toda interpolação; HTML cru só via `raw()` explícito.
+  CSP sem `'unsafe-inline'` nem `'unsafe-eval'` (scripts e estilos só de `'self'`)
 - **Export seguro**: `server/csv.js` previne formula-injection (`=+-@` → prefixo `'`) e
   saneia o nome do arquivo
 - **Permissões**: `data/` (0700), `.env` e arquivos de dados (0600) — reforçadas em
@@ -96,8 +97,8 @@ A V2 está sendo construída neste repositório a partir da `v1.0.0`, seguindo o
 [node:http local 127.0.0.1:3000] ── dashboard + /api/status + /api/history + /api/alerts +
                                    /api/annotations + /api/export + SSE
         ↓
-[Browser: http://localhost:3000]  — sidebar multi-view, zoom nos gráficos, health score,
-                                   alertas acionáveis, anotações, exportação CSV/JSON
+[Browser: http://localhost:3000]  — 8 telas (ES modules, uPlot), manchete de saúde, eventos,
+                                   relatórios, exportação CSV/JSON; zero dependências
 ```
 
 > **Interatividade é 100% client-side** (filtros, ordenação, zoom, ETA, agregações). O
@@ -122,6 +123,7 @@ npm test                        # suíte de testes (node --test, sem deps novas)
 npm run check                   # verificação completa — obrigatória antes de cada commit
 npm run test:unit               # só testes unitários (test/unit)
 npm run test:integration        # só integração (test/integration: HTTP, shell, ssh falso)
+npm run test:e2e                # ponta a ponta no Chromium (playwright-core; pula sem navegador)
 npm run capturar-amostra        # 1 coleta real → data/amostra-{bruta,anonima}.txt (fixtures)
 npm run migrar-v1 -- --verificar  # resume o data/history.json da V1 sem gravar nada
 npm run migrar-v1               # migra a V1 agora (o painel também migra sozinho ao iniciar)
@@ -283,7 +285,8 @@ echo '===FIM==='
 
 | Endpoint          | Método | Descrição                                             |
 |-------------------|--------|-------------------------------------------------------|
-| `/`               | GET    | Dashboard web (sidebar multi-view, hash routing)      |
+| `/`               | GET    | Dashboard web (8 telas, rota por hash com período: `#/rede?p=24h`) |
+| `/api/config`     | GET    | Configuração ativa para a Ajuda (versões, alvos, limiares) — sem segredos |
 | `/api/status`     | GET    | Última amostra + meta (online, lastPollAt, nextPollAt, offlineSince) + alertas ativos |
 | `/api/history`    | GET    | `?limit=N&from=&to=` → amostras no range (redução p/ máx 720 com pior caso por grupo) |
 | `/api/history?formato=baldes` | GET | `&from=&to=&limit=` → `{from, to, step, buckets}` com mín/máx/média, até 90 dias (padrão 24 h) |
@@ -340,7 +343,7 @@ linux-server-dashboard/
 ├── install-lib.sh          ← funções puras de validação do instalador (segurança)
 ├── start.sh                ← inicia o serviço (primeiro plano, --background ou --status)
 ├── stop.sh                 ← para o serviço com segurança (PID file + fallbacks)
-├── package.json            (deps só do frontend: chart.js + zoom/annotation plugins; type: module)
+├── package.json            (sem dependências; devDependency: playwright-core p/ e2e; type: module)
 ├── .env                    (config local — NUNCA commitar)
 ├── .env.example            (modelo sem valores)
 ├── .gitignore              (exclui .env, data/, node_modules/)
@@ -359,18 +362,19 @@ linux-server-dashboard/
 ├── CHANGELOG.md            ← histórico de mudanças (Keep a Changelog)
 ├── docs/                   (PLANO_V2.md + adr/ — plano e decisões da V2)
 ├── scripts/                (check.mjs, capturar-amostra.mjs)
-├── test/                   (node --test: unit/ e integration/)
-├── test-support/           (helpers de teste: VM p/ frontend, request HTTP)
+├── test/                   (node --test: unit/, integration/ e e2e/ no Chromium)
+├── test-support/           (helpers de teste: request HTTP e SSE)
 └── public/
-    ├── index.html          (dashboard PT-BR, temas claro/escuro, sidebar multi-view + Ajuda/Anotações)
-    ├── style.css           (temas claro/escuro com paleta de console de operação, tipografia dupla sans/mono, tokens em CSS variables)
+    ├── index.html          (casca: navegação das 8 telas, status, período, login, avisos)
+    ├── style.css           (tokens claro/escuro + componentes; reorganizado em css/ na F6)
     ├── fonts/              (Inter + JetBrains Mono self-hosted, .woff2 — sem CDN)
+    ├── vendor/             (uPlot 1.6.32 com SHA-256 em vendor.json — sem npm install)
     └── js/
-        ├── main.js         (orquestração: SSE, refresh por período, ações, modais, login, tema)
-        ├── router.js       (navegação por hash entre as views)
-        ├── charts.js       (Chart.js + zoom/pan + anotações no timeline, cores do tema)
-        ├── sections.js     (renderização de cada view, esc() anti-XSS, abas I/O dinâmicas)
-        └── analysis.js     (health score, ETA de disco, pressão de RAM, outages, resumo diário)
+        ├── main.js         (orquestração: estado, rotas, SSE, atalhos, login, avisos)
+        ├── locale-guard.js (idioma inválido do navegador não derruba o uPlot)
+        ├── core/           (html.js anti-XSS, format.js, router.js, store.js, api.js, sse.js, analysis.js)
+        ├── charts/         (timeseries.js: uPlot com eixo de tempo real, zoom e cursor sincronizado)
+        └── views/          (as 8 telas: render() monta, update() troca só os dados)
 ```
 
 ## Troubleshooting
