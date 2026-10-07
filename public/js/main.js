@@ -272,6 +272,9 @@ window.Dash = window.Dash || {};
     });
     es.addEventListener('sample', (e) => {
       const payload = JSON.parse(e.data);
+      // Backfill após reconexão: ignora o que a tela já tem (amostras chegam em ordem).
+      const last = Dash.samples.length ? Dash.samples[Dash.samples.length - 1].ts : '';
+      if (payload.sample && payload.sample.ts <= last) return;
       Dash.latest = payload.sample;
       Dash.alerts.active = payload.alerts || [];
       if (payload.health) Dash.health = payload.health;

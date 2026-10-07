@@ -334,9 +334,10 @@ test('API: /api/export CSV e JSON com nome de arquivo saneado', async (t) => {
 
 test('API: /api/stream emite hello e annotations', async (t) => {
   const s = await withServer(t, () => setupApp());
-  const res = await readSSE(s.port, { until: 2 });
+  const res = await readSSE(s.port, { until: 3 });
   assert.equal(res.status, 200);
   assert.ok(res.headers['content-type'].includes('text/event-stream'));
+  assert.ok(res.data.startsWith('retry: 5000'), 'navegador reconecta em 5 s');
   assert.ok(res.data.includes('event: hello'));
   assert.ok(res.data.includes('event: annotations'));
   assert.ok(res.data.includes('"online":false'));

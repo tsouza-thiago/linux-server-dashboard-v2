@@ -2,6 +2,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { createRouter, jsonBody } from './http/router.js';
 import { serveStatic, sendFile } from './http/static.js';
+import { SseHub, lastEventId, sampleId, MAX_BACKFILL } from './http/sse.js';
 import { SessionStore, SESSION_COOKIE, sessionCookie, clearSessionCookie, safeEqual } from './http/session.js';
 import { History } from './storage/index.js';
 import { migrateV1 } from './storage/migrate-v1.js';
@@ -66,11 +67,10 @@ export function createApp(deps = {}) {
     log,
   });
 
-  const sseClients = new Set();
+  const sse = deps.sse || new SseHub({ maxClients: deps.sseMaxClients ?? 20 });
 
-  function broadcast(event, data) {
-    const payload = `event: ${event}\ndata: ${JSON.stringify(data)}\n\n`;
-    for (const res of sseClients) res.write(payload);
+  function broadcast(event, data, id) {
+    sse.send(event, data, id);
   }
 
   function broadcastAlerts() {
@@ -93,7 +93,7 @@ export function createApp(deps = {}) {
         store.append(res.sample);
         engine.onSample(res.sample);
         log(`poll OK (${Date.now() - started}ms) — amostras: ${store.length}`);
-        broadcast('sample', { sample: res.sample, alerts: alertsStore.active, health: engine.health(res.sample) });
+        broadcast('sample', { sample: res.sample, alerts: alertsStore.active, health: engine.health(res.sample) }, sampleId(res.sample));
         broadcastAlerts();
       } else {
         recordFailure(res.error);
@@ -305,19 +305,19 @@ export function createApp(deps = {}) {
   });
 
   app.get('/api/stream', (req, res) => {
-    res.writeHead(200, {
-      'Content-Type': 'text/event-stream',
-      'Cache-Control': 'no-cache',
-      Connection: 'keep-alive',
-    });
-    res.write(`event: hello\ndata: ${JSON.stringify(statusPayload())}\n\n`);
-    res.write(`event: annotations\ndata: ${JSON.stringify({ annotations: annotationsStore.data.slice(-500).reverse() })}\n\n`);
-    sseClients.add(res);
-    const keepAlive = setInterval(() => res.write(': ping\n\n'), 30000);
-    req.on('close', () => {
-      clearInterval(keepAlive);
-      sseClients.delete(res);
-    });
+    const initial = [];
+    // Reconexão: reenvia as amostras perdidas (depois do último id que o navegador viu).
+    const since = lastEventId(req);
+    if (since !== null) {
+      const missed = (store.samples || []).filter((s) => sampleId(s) > since).slice(-MAX_BACKFILL);
+      for (const sample of missed) initial.push(['sample', { sample, alerts: alertsStore.active, backfill: true }, sampleId(sample)]);
+    }
+    // O hello leva o id da amostra mais recente: assim até uma tela que ainda não recebeu
+    // nenhuma amostra ao vivo sabe de onde retomar se a conexão cair.
+    const payload = statusPayload();
+    initial.push(['hello', payload, sampleId(payload.sample)]);
+    initial.push(['annotations', { annotations: annotationsStore.data.slice(-500).reverse() }]);
+    sse.open(req, res, initial);
   });
 
   app.post('/api/poll', (req, res) => {
@@ -350,12 +350,11 @@ export function createApp(deps = {}) {
 
   /** Grava tudo o que está pendente (histórico, alertas, anotações) antes de sair (B11). */
   async function shutdown() {
-    for (const res of sseClients) res.end();
-    sseClients.clear();
+    sse.closeAll();
     await Promise.all([store.flush?.(), alertsStore.flush?.(), annotationsStore.flush?.(), outages.flush(), sessions.flush()]);
   }
 
-  return { app, state, store, alertsStore, annotationsStore, outages, engine, sessions, broadcast, runPoll, parseRange, statusPayload, sseClients, shutdown };
+  return { app, state, store, alertsStore, annotationsStore, outages, engine, sessions, broadcast, runPoll, parseRange, statusPayload, sse, shutdown };
 }
 
 export function startServer() {
