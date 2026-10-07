@@ -3,6 +3,7 @@
 // (aparecem no relatório sem deixar a suíte vermelha); o commit que corrige o bug remove o
 // `todo` e o teste passa a valer como regressão. Corrigidos na F1: B1, B2, B6, I5.
 // Corrigidos na F2: B4, B7, B8, B11 (detalhes em test/unit/storage-*.test.js).
+// Corrigidos na F3: B3, B9 (detalhes em test/unit/alerts-*.test.js).
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
@@ -11,6 +12,7 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { parseOutput, computeAlerts } from '../../server/poller.js';
 import { AlertsStore } from '../../server/stores.js';
+import { OutageLog } from '../../server/storage/outages.js';
 import { toCSV } from '../../server/csv.js';
 import { RawStore } from '../../server/storage/ndjson.js';
 import { downsample } from '../../server/storage/buckets.js';
@@ -45,7 +47,7 @@ test('B2 — a interface certa é escolhida mesmo com nome parecido (veth0 × et
   assert.equal(s.net.txBytes, 2000);
 });
 
-test('B3 — condição que persiste mantém UM alerta, só com o valor atualizado', { todo: 'B3 · corrigir na F3 (alertas)' }, () => {
+test('B3 — condição que persiste mantém UM alerta, só com o valor atualizado', () => {
   const store = new AlertsStore({ file: path.join(tmpDir(), 'alerts.json') });
   for (const tempC of [61.2, 61.5, 62.0, 61.8]) {
     store.reconcile(computeAlerts({ disks: [], ram: null, tempC, smart: [], services: {} }));
@@ -105,17 +107,16 @@ test('B8 — redução de pontos para o gráfico preserva picos', () => {
   assert.ok(out.some((s) => s.tempC === 100), 'o pico de 100 sumiu');
 });
 
-test('B9 — registro de quedas sobrevive a muitos alertas (base do uptime)', { todo: 'B9 · corrigir na F3 (log de outages)' }, () => {
-  const store = new AlertsStore({ file: path.join(tmpDir(), 'alerts.json') });
+test('B9 — registro de quedas sobrevive a muitos alertas (base do uptime)', () => {
+  const dir = tmpDir();
+  const store = new AlertsStore({ file: path.join(dir, 'alerts.json') });
+  const outages = new OutageLog({ file: path.join(dir, 'outages.ndjson') });
   const now = Date.now();
-  store.data.push({
-    id: 'queda', key: 'servidor-inacessivel', level: 'critical', status: 'resolved',
-    message: 'Servidor inacessível: timeout',
-    ts: new Date(now - 3600e3).toISOString(), resolvedAt: new Date(now - 1800e3).toISOString(),
-  });
+  outages.start(now - 3600e3, 'timeout');
+  outages.end(now - 1800e3);
   for (let i = 0; i < 600; i++) store.add({ level: 'warning', message: `RAM usada em ${90 + (i % 10)}% #${i}` });
-  const { Dash } = loadFrontend('analysis.js');
-  assert.equal(Dash.analysis.outages(store.data).length, 1, 'a queda de 30 min foi apagada pelo limite de 500 alertas');
+  assert.equal(outages.list().length, 1, 'a queda de 30 min foi apagada pelo limite de 500 alertas');
+  assert.equal(outages.list()[0].durationSec, 1800);
 });
 
 test('B10 — eixo de tempo real nos gráficos (anotações caem no instante certo)', { todo: 'B10 · corrigir na F5 (uPlot)' }, () => {
