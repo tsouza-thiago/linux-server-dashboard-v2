@@ -3,7 +3,7 @@
 > Status: **plano aprovado por completo em 07/10/2026** · F0 concluída (`2.0.0-alpha.1`) ·
 > F1 concluída (`2.0.0-alpha.2`, validada no servidor real em 901 ms) · F2 concluída
 > (`2.0.0-alpha.3`, migração validada com o `data/` real da V1) · F3 concluída (`2.0.0-alpha.4`) ·
-> F4 concluída (`2.0.0-alpha.5`) · próxima: **F5** ·
+> F4 concluída (`2.0.0-alpha.5`) · F5 concluída (`2.0.0-alpha.6`) · próxima: **F6** ·
 > base: `v1.0.0` (= `tsouza-thiago/linux-server-dashboard` @ `11a3286`, 196 testes verdes)
 >
 > Referência visual: canvas "Dashboard V2 — direções de design" (privado, do mantenedor).
@@ -283,7 +283,7 @@ commit** (testes + cobertura + `npm audit` + `bash -n`), e nenhum commit vermelh
 | **F2 — Armazenamento** ✅ | NDJSON + rollups 90 d + migração v1 + `/api/history` com baldes | migração testada com `data/` real da V1 |
 | **F3 — Alertas** ✅ | motor com chave estável, histerese e debounce; limiares no `.env`; outages; health derivado | B3/B9 resolvidos; testes de flapping |
 | **F4 — HTTP** ✅ | `node:http`, sessão por cookie, SSE com backfill, segurança portada | testes de segurança V1 + novos verdes; `npm audit` limpo |
-| **F5 — Fundação do front** | ES modules, store, router, `html` com escape, uPlot | e2e abre todas as views |
+| **F5 — Fundação do front** ✅ | ES modules, store, router, `html` com escape, uPlot | e2e abre todas as views |
 | **F6 — Design** | implementar em CSS/JS o design system **já aprovado no canvas** (tokens, componentes, estados, AA nos 2 temas, teclado, mobile, `prefers-reduced-motion`) + 8 telas | screenshots do Chromium comparados com as pranchetas aprovadas + **sua revisão visual** |
 | **F7 — Instalação** | comando `dashboard`, assistente no navegador + TUI reserva, detecção automática, configuração do servidor assistida/manual, SSH isolado, tag assinada, atalho e systemd de usuário, atualizar/desinstalar, upgrade V1→V2 | instalação de ponta a ponta numa VM Debian e numa Ubuntu limpas (sem git? sem Node?) + upgrade testado numa cópia de `data/` da V1 |
 | **F8 — Docs** | README enxuto, TUTORIAL, AGENTS e SECURITY (threat model com SSH restrito e sudo) → `beta` | docs batem com o código |
