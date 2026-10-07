@@ -69,6 +69,7 @@ test('sessão: no máximo 50 guardadas (as mais antigas saem) e arquivo ilegíve
 
 test('cookie da sessão: HttpOnly, SameSite=Strict, 30 dias; limpar zera', () => {
   assert.equal(sessionCookie('abc'), 'dash_session=abc; Path=/; HttpOnly; SameSite=Strict; Max-Age=2592000');
+  assert.equal(sessionCookie('abc', null), 'dash_session=abc; Path=/; HttpOnly; SameSite=Strict', 'cookie de sessão do navegador');
   assert.equal(clearSessionCookie(), 'dash_session=; Path=/; HttpOnly; SameSite=Strict; Max-Age=0');
   assert.equal(safeEqual('a', 'a'), true);
   assert.equal(safeEqual('a', 'ab'), false);

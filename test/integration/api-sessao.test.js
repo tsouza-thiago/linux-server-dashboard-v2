@@ -39,7 +39,7 @@ const sessionFrom = (res) => {
 test('login: token certo vira cookie de sessão que dá acesso à API e ao SSE', async (t) => {
   const s = await start(t);
   const before = await request(s.port, { path: '/api/session' });
-  assert.deepEqual(before.json, { authRequired: true, authenticated: false });
+  assert.deepEqual(before.json, { authRequired: true, authenticated: false, expiresAt: null });
   assert.equal((await request(s.port, { path: '/api/status' })).status, 401);
 
   const login = await s.post('/api/login', { token: ` ${TOKEN} ` });
@@ -52,9 +52,23 @@ test('login: token certo vira cookie de sessão que dá acesso à API e ao SSE',
 
   const st = await request(s.port, { path: '/api/status', headers: { Cookie: cookie } });
   assert.equal(st.status, 200);
-  assert.deepEqual((await request(s.port, { path: '/api/session', headers: { Cookie: cookie } })).json, { authRequired: true, authenticated: true });
+  const me = (await request(s.port, { path: '/api/session', headers: { Cookie: cookie } })).json;
+  assert.equal(me.authenticated, true);
+  const left = Date.parse(me.expiresAt) - Date.now();
+  assert.ok(left > 29 * 86400e3 && left <= 30 * 86400e3, `sessão expira em ~30 dias (${left} ms)`);
   const sse = await readSSE(s.port, { headers: { Cookie: cookie }, until: 1 });
   assert.equal(sse.status, 200, 'SSE autenticado pelo cookie, sem token na URL');
+});
+
+test('login sem "manter conectado": cookie some ao fechar o navegador (sem Max-Age)', async (t) => {
+  const s = await start(t);
+  const login = await s.post('/api/login', { token: TOKEN, remember: false });
+  assert.equal(login.status, 200);
+  const raw = [].concat(login.headers['set-cookie']).find((x) => x.startsWith('dash_session='));
+  assert.doesNotMatch(raw, /Max-Age/);
+  assert.match(raw, /HttpOnly; SameSite=Strict/);
+  const st = await request(s.port, { path: '/api/status', headers: { Cookie: sessionFrom(login) } });
+  assert.equal(st.status, 200);
 });
 
 test('login: token errado → 401; tentativas limitadas por minuto (força bruta)', async (t) => {
@@ -99,7 +113,7 @@ test('sair encerra esta sessão; encerrar todas derruba as outras também', asyn
 
 test('sem DASH_TOKEN: tudo aberto e o login é desnecessário', async (t) => {
   const s = await start(t, { dashToken: '' });
-  assert.deepEqual((await request(s.port, { path: '/api/session' })).json, { authRequired: false, authenticated: true });
+  assert.deepEqual((await request(s.port, { path: '/api/session' })).json, { authRequired: false, authenticated: true, expiresAt: null });
   assert.deepEqual((await s.post('/api/login', {})).json, { ok: true, authRequired: false });
   assert.equal((await request(s.port, { path: '/api/status' })).status, 200);
 });

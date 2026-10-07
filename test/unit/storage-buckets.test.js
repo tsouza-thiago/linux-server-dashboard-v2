@@ -7,7 +7,7 @@ const at = (min) => new Date(Date.UTC(2026, 9, 7, 12, 0) + min * MIN).toISOStrin
 
 function sample(min, over = {}) {
   return {
-    ts: at(min), host: 'srv', load: [0.5, 0.4, 0.3], cpu: { pct: 10, iowait: 1, steal: 0 },
+    ts: at(min), host: 'srv', load: [0.5, 0.4, 0.3], cpu: { pct: 10, user: 7, system: 2, iowait: 1, steal: 0 },
     ram: { total: 1000, used: 400, avail: 600, free: 100, swapUsed: 0 }, tempC: 40,
     net: { iface: 'eth0', rxMbps: 1, txMbps: 2 },
     disks: [{ mount: '/', pct: 10, usedBytes: 100, availBytes: 900, size: '1K' }],
@@ -20,7 +20,7 @@ function sample(min, over = {}) {
 test('flatten: métricas numéricas da amostra, ausentes ficam de fora (I5)', () => {
   const f = flatten(sample(0));
   assert.deepEqual(f, {
-    load1: 0.5, load5: 0.4, load15: 0.3, cpu: 10, cpuIowait: 1, cpuSteal: 0,
+    load1: 0.5, load5: 0.4, load15: 0.3, cpu: 10, cpuUser: 7, cpuSystem: 2, cpuIowait: 1, cpuSteal: 0,
     ramUsed: 400, ramAvail: 600, swapUsed: 0, ramPct: 40, tempC: 40, rxMbps: 1, txMbps: 2,
     'disk:/:pct': 10, 'disk:/:avail': 900,
     'io:sda:read': 1, 'io:sda:write': 1, 'io:sda:util': 5, 'io:sda:lat': 2,

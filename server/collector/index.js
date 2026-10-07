@@ -70,13 +70,18 @@ export async function collect({ host, prev = null, targets, runner = runSSH, ale
   const ts = new Date(now).toISOString();
   const mode = smartDue(t, prev, now) ? 'smart' : 'basico';
   const { script, hash } = buildScript(t, mode);
+  const started = performance.now();
   const { stdout, stderr, code, timedOut, error } = await runner(host, script);
+  const durationMs = Math.round(performance.now() - started);
   if (code !== 0 || !stdout || !stdout.includes('===HOST===')) {
     return { ok: false, error: describeError({ code, error, stderr, timedOut }), ts };
   }
   const sample = parseOutput(stdout, ts, { targets: t });
   sample.collector.expectedHash = hash;
   sample.collector.hashMismatch = sample.collector.hash !== null && sample.collector.hash !== hash;
+  // Custo da coleta no servidor (faixa de status e Visão geral): tempo do SSH e tamanho da saída.
+  sample.collector.durationMs = durationMs;
+  sample.collector.outputBytes = Buffer.byteLength(stdout);
   if (sample.smart === null && prev && prev.smart) {
     sample.smart = prev.smart;
     sample.smartAt = prev.smartAt ?? null;

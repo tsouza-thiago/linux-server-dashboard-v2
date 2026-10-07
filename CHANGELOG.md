@@ -8,6 +8,16 @@ pré-versões `2.0.0-alpha.N` (uma por fase do plano), depois `beta`, `rc` e `2.
 
 ## [Não publicado]
 
+### Adicionado
+
+- Amostra registra o custo da coleta no servidor: `collector.durationMs` (tempo do SSH) e
+  `collector.outputBytes` (tamanho da saída), mostrados na faixa de status.
+- Histórico guarda a CPU separada em usuário e sistema (`cpuUser`, `cpuSystem`) para o
+  gráfico empilhado de Recursos.
+- `/api/session` informa quando a sessão expira (`expiresAt`); `/api/login` aceita
+  `remember: false` ("Manter conectado" desmarcado: cookie some ao fechar o navegador).
+- `/api/config` informa a retenção do histórico e a versão do Node.
+
 ## [2.0.0-alpha.6] — 2026-10-07
 
 Fase F5 do plano (fundação da tela nova). As 8 telas abrem no Chromium com dados, gráficos

@@ -4,7 +4,7 @@ import { createRouter, jsonBody } from './http/router.js';
 import { serveStatic } from './http/static.js';
 import { SseHub, lastEventId, sampleId, MAX_BACKFILL } from './http/sse.js';
 import { SessionStore, SESSION_COOKIE, sessionCookie, clearSessionCookie, safeEqual } from './http/session.js';
-import { History } from './storage/index.js';
+import { History, RAW_RETENTION_MS, ROLLUP_DAYS } from './storage/index.js';
 import { migrateV1 } from './storage/migrate-v1.js';
 import { AlertsStore, AnnotationsStore } from './stores.js';
 import { OutageLog } from './storage/outages.js';
@@ -177,13 +177,14 @@ export function createApp(deps = {}) {
   });
 
   // ---- Sessão (ADR 0007): estas rotas ficam antes da exigência de autenticação ----
-  const currentSession = (req) => {
-    const sid = parseCookies(req.headers.cookie)[SESSION_COOKIE];
-    return sid && sessions.touch(sid) ? sid : null;
-  };
-
   app.get('/api/session', (req, res) => {
-    res.json({ authRequired: Boolean(DASH_TOKEN), authenticated: !DASH_TOKEN || Boolean(currentSession(req)) });
+    const sid = DASH_TOKEN ? parseCookies(req.headers.cookie)[SESSION_COOKIE] : null;
+    const s = sid ? sessions.touch(sid) : null;
+    res.json({
+      authRequired: Boolean(DASH_TOKEN),
+      authenticated: !DASH_TOKEN || Boolean(s),
+      expiresAt: s ? new Date(s.expiresAt).toISOString() : null,
+    });
   });
 
   app.post('/api/login', loginRateLimit, (req, res) => {
@@ -194,7 +195,8 @@ export function createApp(deps = {}) {
       return res.status(401).json({ error: 'Token incorreto' });
     }
     const id = sessions.create();
-    res.appendHeader('Set-Cookie', sessionCookie(id));
+    // "Manter conectado por 30 dias" desmarcado: cookie some ao fechar o navegador.
+    res.appendHeader('Set-Cookie', sessionCookie(id, req.body.remember === false ? null : undefined));
     log(`login OK (${sessions.count} sessão(ões) ativa(s))`);
     res.json({ ok: true });
   });
@@ -240,6 +242,8 @@ export function createApp(deps = {}) {
       targets: deps.targets ?? configTargets(),
       thresholds,
       historyLimit: store.limit,
+      retention: { rawHours: RAW_RETENTION_MS / HOUR_MS, rollupDays: ROLLUP_DAYS },
+      runtime: { node: process.versions.node },
       collector: latest?.collector ?? null,
     });
   });
