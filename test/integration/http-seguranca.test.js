@@ -60,6 +60,7 @@ function assertSecurityHeaders(res, where) {
   // Página de erro pode ter CSP ainda mais restrita (default-src 'none'), nunca mais frouxa.
   assert.match(res.headers['content-security-policy'] || '', /default-src 'none'|default-src 'self'.*frame-ancestors 'none'/, `CSP em ${where}`);
   assert.equal(res.headers['x-powered-by'], undefined, `X-Powered-By em ${where}`);
+  assert.doesNotMatch(res.headers['content-security-policy'] || '', /unsafe-inline|unsafe-eval/, `CSP sem inline/eval em ${where}`);
 }
 
 test('cabeçalhos de segurança em TODAS as respostas: página, estático, API, 404, 401, 403 e erro', async (t) => {

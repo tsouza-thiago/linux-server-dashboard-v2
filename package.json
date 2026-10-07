@@ -12,10 +12,14 @@
     "test:integration": "node --test \"test/integration/**/*.test.js\"",
     "check": "node scripts/check.mjs",
     "capturar-amostra": "node scripts/capturar-amostra.mjs",
-    "migrar-v1": "node server/storage/migrate-v1.js"
+    "migrar-v1": "node server/storage/migrate-v1.js",
+    "test:e2e": "node --test \"test/e2e/**/*.test.js\""
   },
   "engines": {
     "node": ">=18"
   },
-  "license": "MIT"
+  "license": "MIT",
+  "devDependencies": {
+    "playwright-core": "1.56.1"
+  }
 }
