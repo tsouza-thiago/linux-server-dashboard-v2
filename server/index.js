@@ -1,6 +1,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
-import express from 'express';
+import { createRouter, jsonBody } from './http/router.js';
+import { serveStatic, sendFile } from './http/static.js';
 import { History } from './storage/index.js';
 import { migrateV1 } from './storage/migrate-v1.js';
 import { AlertsStore, AnnotationsStore } from './stores.js';
@@ -155,14 +156,13 @@ export function createApp(deps = {}) {
     return { from, to, limit };
   }
 
-  const app = express();
-  app.disable('x-powered-by');
+  const app = createRouter();
   // Cabeçalhos de segurança primeiro: valem também para as respostas 403/401 das checagens.
   app.use(securityHeaders);
   app.use(hostCheck);
   app.use(csrfCheck);
   app.use(issueCsrfCookie);
-  app.use(express.json({ limit: '50kb' }));
+  app.use(jsonBody({ limit: 50 * 1024 }));
   app.use('/api', (req, res, next) => {
     if (['POST', 'PUT', 'PATCH', 'DELETE'].includes(req.method)) return apiRateLimit(req, res, next);
     next();
@@ -285,23 +285,21 @@ export function createApp(deps = {}) {
     res.json({ ok: true });
   });
 
-  app.use(express.static(path.join(ROOT, 'public'), { maxAge: '1h' }));
-  app.get('/vendor/chart.js', (req, res) => {
-    res.setHeader('Cache-Control', 'public, max-age=86400');
-    res.sendFile(path.join(ROOT, 'node_modules/chart.js/dist/chart.umd.js'));
-  });
-  app.get('/vendor/zoom.js', (req, res) => {
-    res.setHeader('Cache-Control', 'public, max-age=86400');
-    res.sendFile(path.join(ROOT, 'node_modules/chartjs-plugin-zoom/dist/chartjs-plugin-zoom.min.js'));
-  });
-  app.get('/vendor/annotation.js', (req, res) => {
-    res.setHeader('Cache-Control', 'public, max-age=86400');
-    res.sendFile(path.join(ROOT, 'node_modules/chartjs-plugin-annotation/dist/chartjs-plugin-annotation.min.js'));
-  });
+  app.use(serveStatic(path.join(ROOT, 'public'), { maxAge: 3600 }));
+  // Bibliotecas do frontend atual, servidas de node_modules por caminho fixo (saem na F5).
+  const VENDOR = {
+    '/vendor/chart.js': 'node_modules/chart.js/dist/chart.umd.js',
+    '/vendor/zoom.js': 'node_modules/chartjs-plugin-zoom/dist/chartjs-plugin-zoom.min.js',
+    '/vendor/annotation.js': 'node_modules/chartjs-plugin-annotation/dist/chartjs-plugin-annotation.min.js',
+  };
+  for (const [route, file] of Object.entries(VENDOR)) {
+    app.get(route, (req, res) => sendFile(res, path.join(ROOT, file), { cacheControl: 'public, max-age=86400' }));
+  }
 
   app.use((err, req, res, next) => {
     const status = err.status || err.statusCode || 500;
-    log(`ERRO não tratado: ${err.stack || err.message}`);
+    if (status >= 500) log(`ERRO não tratado: ${err.stack || err.message}`);
+    else log(`requisição recusada (${status}): ${err.message}`);
     res.status(status).json({ error: status >= 500 ? 'erro interno do servidor' : 'requisição inválida' });
   });
 
