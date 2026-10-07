@@ -45,3 +45,27 @@ test('config tem defaults seguros', () => {
   assert.ok(Array.isArray(config.DISK_DEVS));
   assert.ok(Array.isArray(config.SERVICES));
 });
+test('intSetting: vazio usa o padrão; fora da faixa ou não inteiro avisa e usa o padrão', async () => {
+  const { intSetting } = await import('../../server/config.js');
+  const w = [];
+  assert.equal(intSetting('X', '', 90, 50, 99, w), 90);
+  assert.equal(intSetting('X', undefined, 90, 50, 99, w), 90);
+  assert.equal(intSetting('X', ' 80 ', 90, 50, 99, w), 80);
+  assert.deepEqual(w, []);
+  assert.equal(intSetting('X', '120', 90, 50, 99, w), 90);
+  assert.equal(intSetting('X', '85.5', 90, 50, 99, w), 90);
+  assert.equal(intSetting('X', 'muito', 90, 50, 99, w), 90);
+  assert.equal(w.length, 3);
+  assert.match(w[0], /^X inválido \(aceita 50–99\); usando 90$/);
+  assert.ok(!w.join(' ').includes('muito'), 'o valor recusado não é ecoado');
+});
+
+test('alertThresholds: padrões da V1 e valores do .env validados', async () => {
+  const { alertThresholds } = await import('../../server/config.js');
+  assert.deepEqual(alertThresholds(() => ''), { diskPct: 90, ramPct: 90, tempC: 60, hysteresis: 5, offlineAfter: 2 });
+  const vals = { ALERT_DISK_PCT: '85', ALERT_RAM_PCT: '95', ALERT_TEMP_C: '70', ALERT_HYSTERESIS: '3', ALERT_OFFLINE_AFTER: '11' };
+  const w = [];
+  assert.deepEqual(alertThresholds((k) => vals[k], w), { diskPct: 85, ramPct: 95, tempC: 70, hysteresis: 3, offlineAfter: 2 });
+  assert.deepEqual(w, ['ALERT_OFFLINE_AFTER inválido (aceita 1–10); usando 2']);
+  assert.deepEqual(config.ALERTS, alertThresholds(() => ''), 'sem ALERT_* no ambiente de teste');
+});
