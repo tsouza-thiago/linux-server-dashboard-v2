@@ -34,7 +34,9 @@ responde **1 comando SSH por minuto** — requisito obrigatório (hardware muito
   `Referrer-Policy: no-referrer`
 - **Anti-XSS** (ADR 0010): a tela monta HTML só pelo template `html` de
   `public/js/core/html.js`, que escapa toda interpolação; HTML cru só via `raw()` explícito.
-  CSP sem `'unsafe-inline'` nem `'unsafe-eval'` (scripts e estilos só de `'self'`)
+  CSP sem `'unsafe-inline'` nem `'unsafe-eval'` (scripts e estilos só de `'self'`): medidas
+  vindas dos dados (largura de barra, cor de série) vão em `data-w`/`data-bg`/… e são
+  aplicadas pelo CSSOM em `mount()` — nunca `style="…"` no HTML
 - **Export seguro**: `server/csv.js` previne formula-injection (`=+-@` → prefixo `'`) e
   saneia o nome do arquivo
 - **Permissões**: `data/` (0700), `.env` e arquivos de dados (0600) — reforçadas em
@@ -219,7 +221,7 @@ echo '===FIM==='
   "schemaVersion": 2,
   "ts": "2026-10-07T13:51:00.000Z",
   "collector": { "version": 2, "hash": "73cebb436c7c", "mode": "smart", "complete": true,
-                 "expectedVersion": 2 },
+                 "expectedVersion": 2, "durationMs": 901, "outputBytes": 6350 },
   "host": "servidor-exemplo",
   "os": { "kernel": "6.12.111+deb13-amd64", "name": "Debian GNU/Linux 13 (trixie)" },
   "cores": 1,
@@ -297,8 +299,8 @@ echo '===FIM==='
 | `/api/annotations/:id` | DELETE | Remove anotação                             |
 | `/api/export`     | GET    | `?format=csv\|json&from=&to=` → download do relatório |
 | `/api/stream`     | GET    | SSE: `hello`, `sample` (a cada poll, `id` = instante), `alerts`, `annotations`, `status`; `Last-Event-ID` → backfill |
-| `/api/session`    | GET    | `{authRequired, authenticated}` (sem exigir login) |
-| `/api/login`      | POST   | `{token}` → cookie de sessão; 401 se errado; 10 tentativas/min/IP |
+| `/api/session`    | GET    | `{authRequired, authenticated, expiresAt}` (sem exigir login) |
+| `/api/login`      | POST   | `{token, remember?}` → cookie de sessão (30 dias; `remember: false` = some ao fechar o navegador); 401 se errado; 10 tentativas/min/IP |
 | `/api/logout`     | POST   | Encerra a sessão deste navegador |
 | `/api/logout-all` | POST   | Encerra todas as sessões (exige estar logado) |
 | `/api/poll`       | POST   | Dispara coleta imediata ("coletar agora"), piso de 5s |
@@ -366,15 +368,17 @@ linux-server-dashboard/
 ├── test-support/           (helpers de teste: request HTTP e SSE)
 └── public/
     ├── index.html          (casca: navegação das 8 telas, status, período, login, avisos)
-    ├── style.css           (tokens claro/escuro + componentes; reorganizado em css/ na F6)
-    ├── fonts/              (Inter + JetBrains Mono self-hosted, .woff2 — sem CDN)
+    ├── css/                (design system V2 — D1: tokens.css escuro/claro, base, components,
+    │                        views e print; contraste AA conferido em design-tokens.test.js)
+    ├── fonts/              (Geist + Geist Mono 1.7.2, OFL, .woff2 — sem CDN; SHA-256 em vendor.json)
     ├── vendor/             (uPlot 1.6.32 com SHA-256 em vendor.json — sem npm install)
     └── js/
         ├── main.js         (orquestração: estado, rotas, SSE, atalhos, login, avisos)
         ├── locale-guard.js (idioma inválido do navegador não derruba o uPlot)
         ├── core/           (html.js anti-XSS, format.js, router.js, store.js, api.js, sse.js, analysis.js)
         ├── charts/         (timeseries.js: uPlot com eixo de tempo real, zoom e cursor sincronizado)
-        └── views/          (as 8 telas: render() monta, update() troca só os dados)
+        └── views/          (as 8 telas: render() monta, update() troca só os dados;
+                             common.js: ícones, selos, medidores, faixas sincronizadas)
 ```
 
 ## Troubleshooting

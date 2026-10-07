@@ -63,6 +63,7 @@ pré-versões `2.0.0-alpha.N` (uma por fase do plano), depois `beta`, `rc` e `2.
   do tempo.
 - Previsão de disco que levaria mais de 10 anos para encher aparece como "estável".
 - Taxa de rede exibida em "Mbps" (antes "Mb/s"), como nas pranchetas.
+- Documentação (README, TUTORIAL, AGENTS, SECURITY, plano) descreve a tela nova.
 
 ### Removido
 

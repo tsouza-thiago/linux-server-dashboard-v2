@@ -3,7 +3,8 @@
 > Status: **plano aprovado por completo em 07/10/2026** · F0 concluída (`2.0.0-alpha.1`) ·
 > F1 concluída (`2.0.0-alpha.2`, validada no servidor real em 901 ms) · F2 concluída
 > (`2.0.0-alpha.3`, migração validada com o `data/` real da V1) · F3 concluída (`2.0.0-alpha.4`) ·
-> F4 concluída (`2.0.0-alpha.5`) · F5 concluída (`2.0.0-alpha.6`) · próxima: **F6** ·
+> F4 concluída (`2.0.0-alpha.5`) · F5 concluída (`2.0.0-alpha.6`) · F6 entregue (`2.0.0-alpha.7`,
+> aguardando a revisão visual do mantenedor) · próxima: **F7** ·
 > base: `v1.0.0` (= `tsouza-thiago/linux-server-dashboard` @ `11a3286`, 196 testes verdes)
 >
 > Referência visual: canvas "Dashboard V2 — direções de design" (privado, do mantenedor).
@@ -164,6 +165,11 @@ vem do halo luminoso só nas linhas e nos indicadores de dado, nunca no fundo.
 As séries passaram no validador de daltonismo e contraste nos dois temas (vizinhas: todas as
 4; todas contra todas: as 3 primeiras).
 
+Ajustes da F6 (o teste `test/unit/design-tokens.test.js` mede todos os pares de texto e
+selo nos dois temas): no claro, o fundo do botão principal passa a `#0A8193` (o `#0B8FA3`
+da prancheta dava 3,8:1 com o texto branco) e o amarelo de atenção a `#B98009` (o `#C98A0B`
+dava 2,95:1 nas linhas de limite; elemento gráfico pede 3:1).
+
 **Tipografia.** Geist (texto) + Geist Mono (números e dados), licença OFL, `.woff2` em
 `public/fonts/` (sem CDN). Escala: manchete 34 · título 28 · seção 16 · corpo 15/14 ·
 legenda 12; números grandes 38 mono. Espaço 4/8/12/16/24/32; raios 8/12/18/22;
@@ -284,7 +290,7 @@ commit** (testes + cobertura + `npm audit` + `bash -n`), e nenhum commit vermelh
 | **F3 — Alertas** ✅ | motor com chave estável, histerese e debounce; limiares no `.env`; outages; health derivado | B3/B9 resolvidos; testes de flapping |
 | **F4 — HTTP** ✅ | `node:http`, sessão por cookie, SSE com backfill, segurança portada | testes de segurança V1 + novos verdes; `npm audit` limpo |
 | **F5 — Fundação do front** ✅ | ES modules, store, router, `html` com escape, uPlot | e2e abre todas as views |
-| **F6 — Design** | implementar em CSS/JS o design system **já aprovado no canvas** (tokens, componentes, estados, AA nos 2 temas, teclado, mobile, `prefers-reduced-motion`) + 8 telas | screenshots do Chromium comparados com as pranchetas aprovadas + **sua revisão visual** |
+| **F6 — Design** ✅ entregue | implementar em CSS/JS o design system **já aprovado no canvas** (tokens, componentes, estados, AA nos 2 temas, teclado, mobile, `prefers-reduced-motion`) + 8 telas | screenshots do Chromium comparados com as pranchetas aprovadas + **sua revisão visual** |
 | **F7 — Instalação** | comando `dashboard`, assistente no navegador + TUI reserva, detecção automática, configuração do servidor assistida/manual, SSH isolado, tag assinada, atalho e systemd de usuário, atualizar/desinstalar, upgrade V1→V2 | instalação de ponta a ponta numa VM Debian e numa Ubuntu limpas (sem git? sem Node?) + upgrade testado numa cópia de `data/` da V1 |
 | **F8 — Docs** | README enxuto, TUTORIAL, AGENTS e SECURITY (threat model com SSH restrito e sudo) → `beta` | docs batem com o código |
 | **F9 — Release** | soak de 72 h → `rc` → `v2.0.0` | dentro do orçamento (tempo do comando no servidor, saída, RAM/CPU local) |
