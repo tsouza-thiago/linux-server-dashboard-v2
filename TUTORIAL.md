@@ -61,7 +61,7 @@ Só são necessários 3 itens, e normalmente já estão prontos neste computador
 
 1. **Node.js versão 18 ou mais nova** — é o "motor" do programa.
 2. **O servidor ligado e na rede** (ex.: `ping 192.0.2.10`).
-3. **O endereço do servidor** no formato `usuario@IP` (ex.: `root@192.168.100.75`).
+3. **O endereço do servidor** no formato `usuario@IP` (ex.: `root@192.0.2.10`).
 
 > Não se preocupe com chave SSH: o instalador cria e configura tudo sozinho na seção 3.
 
@@ -118,10 +118,10 @@ O instalador vai:
    - Caso contrário, aperte Enter e digite o servidor:
 
      ```
-     Endereço do servidor (ex.: root@192.168.100.75, ou só o IP/host):
+     Endereço do servidor (ex.: root@192.0.2.10, ou só o IP/host):
      ```
 
-     Você pode digitar `root@192.168.100.75` **ou** só `192.168.100.75` (aí ele pergunta
+     Você pode digitar `root@192.0.2.10` **ou** só `192.0.2.10` (aí ele pergunta
      o usuário, padrão `root`). Depois informa a **porta SSH** (padrão 22).
 
    Ele mostra o **plano** (servidor, chave e alias que serão criados) e pede confirmação.

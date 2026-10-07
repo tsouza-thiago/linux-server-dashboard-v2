@@ -34,7 +34,7 @@ test('install-lib.sh valida entradas (segurança)', () => {
 
   const cases = [
     // host válido
-    ['valid_host 192.168.100.75 && echo ok', 'ok'],
+    ['valid_host 192.0.2.10 && echo ok', 'ok'],
     ['valid_host meu-servidor && echo ok', 'ok'],
     ['valid_host localhost && echo ok', 'ok'],
     // host inválido (injeção)
@@ -63,7 +63,7 @@ test('install-lib.sh valida entradas (segurança)', () => {
     ['is_placeholder_host seu_host_ou_alias_ssh && echo ok', 'ok'],
     ['is_placeholder_host SEU-HOST && echo ok', 'ok'],
     ['is_placeholder_host dash-192_168_100_75 && echo ok', ''],
-    ['is_placeholder_host 192.168.100.75 && echo ok', ''],
+    ['is_placeholder_host 192.0.2.10 && echo ok', ''],
   ];
   for (const [expr, expected] of cases) {
     assert.equal(run(expr), expected, `falhou: ${expr}`);

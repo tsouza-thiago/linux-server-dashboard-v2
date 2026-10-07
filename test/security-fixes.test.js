@@ -25,7 +25,7 @@ test('sanitizeHost rejeita vazio e host iniciado com hífen (injeção de opçã
   assert.equal(sanitizeHost('  '), 'seu-host');
   assert.equal(sanitizeHost(''), 'seu-host');
   assert.equal(sanitizeHost('meu-host'), 'meu-host');
-  assert.equal(sanitizeHost('user@192.168.1.5'), 'user@192.168.1.5');
+  assert.equal(sanitizeHost('user@192.0.2.5'), 'user@192.0.2.5');
 });
 
 test('buildCommand sanea NET_IF mesmo em override perigoso (anti injeção)', () => {

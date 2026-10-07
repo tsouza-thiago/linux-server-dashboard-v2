@@ -17,7 +17,7 @@ test('isAllowedHost só aceita origens locais', () => {
   assert.equal(isAllowedHost('127.0.0.1'), true);
   assert.equal(isAllowedHost('[::1]'), true);
   assert.equal(isAllowedHost('evil.com'), false);
-  assert.equal(isAllowedHost('192.168.100.75'), false);
+  assert.equal(isAllowedHost('192.0.2.10'), false);
 });
 
 test('originAllowed bloqueia origem cruzada e aceita local/sem origin', () => {
