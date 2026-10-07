@@ -11,6 +11,8 @@ pré-versões `2.0.0-alpha.N` (uma por fase do plano), depois `beta`, `rc` e `2.
 ### Adicionado
 - Plano da V2 (`docs/PLANO_V2.md`) e registros de decisão `docs/adr/0001`–`0013`.
 - Este changelog.
+- `npm run check`: sintaxe JS e shell, `.env`/`data/` fora do git, testes com cobertura e
+  `npm audit` — obrigatório antes de cada commit. `npm run test:unit` e `npm run test:integration`.
 
 ### Segurança
 - Dependências transitivas do Express atualizadas (`npm audit fix`): `proxy-addr` 2.0.8,
@@ -18,6 +20,7 @@ pré-versões `2.0.0-alpha.N` (uma por fase do plano), depois `beta`, `rc` e `2.
   O Express sai de vez na F4 (ADR 0003).
 
 ### Alterado
+- Suíte reorganizada em `test/unit` (171) e `test/integration` (25).
 - Exemplos e testes usam só IPs de documentação (RFC 5737).
 
 ## [1.0.0] — 2026-09-13
