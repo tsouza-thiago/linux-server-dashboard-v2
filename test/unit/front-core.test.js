@@ -144,3 +144,19 @@ test('analysis: manchete, disco mais cheio e linha do tempo', () => {
   assert.deepEqual(items.map((i) => i.kind), ['anotacao', 'queda', 'alerta']);
   assert.equal(items[1].ongoing, true);
 });
+
+test('gráficos: rótulos do eixo de tempo em PT-BR e 24 h; anotações pelo instante (B10)', async () => {
+  const { timeTicks, markersInRange } = await import('../../public/js/charts/timeseries.js');
+  const tz = process.env.TZ;
+  process.env.TZ = 'America/Sao_Paulo';
+  try {
+    const t = Date.parse('2026-10-07T18:30:00Z') / 1000; // 15:30 em São Paulo
+    assert.deepEqual(timeTicks([t, null], 3600), ['15:30', '']);
+    assert.deepEqual(timeTicks([t], 7 * 86400), ['07/10']);
+  } finally {
+    if (tz === undefined) delete process.env.TZ; else process.env.TZ = tz;
+  }
+  const marks = markersInRange([{ ts: 'lixo' }, { ts: '2026-10-07T12:00:00Z', label: 'x' }, { ts: '2026-10-07T12:00:00Z', text: 'y' }], 0, 2e9);
+  assert.deepEqual(marks.map((m) => m.label), ['x', 'y']);
+  assert.deepEqual(markersInRange(null, 0, 1), []);
+});
