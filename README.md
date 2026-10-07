@@ -3,6 +3,11 @@
 **Monitoramento em tempo real do seu servidor Linux, direto do navegador — sem instalar
 nada no servidor, sem senha, sem agente.**
 
+> **V2 em construção.** Este repositório é a reformulação completa do projeto, iniciada a
+> partir da versão estável [`v1.0.0`](https://github.com/tsouza-thiago/linux-server-dashboard-v2/releases/tag/v1.0.0).
+> Plano e decisões: [`docs/PLANO_V2.md`](docs/PLANO_V2.md) · [`docs/adr/`](docs/adr/README.md) ·
+> mudanças: [`CHANGELOG.md`](CHANGELOG.md). Até a `2.0.0`, as instruções abaixo valem para a V1.
+
 Uma vez por minuto, este painel conecta no servidor por SSH (somente leitura), coleta
 dezenas de métricas e as mostra em gráficos interativos. Feito para funcionar até em
 hardware muito limitado (1 núcleo, pouca RAM) — por exemplo, uma máquina velha em casa.

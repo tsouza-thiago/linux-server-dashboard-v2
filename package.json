@@ -7,7 +7,11 @@
   "scripts": {
     "start": "node server/index.js",
     "poll": "node server/poller.js --once",
-    "test": "node --test"
+    "test": "node --test",
+    "test:unit": "node --test \"test/unit/**/*.test.js\"",
+    "test:integration": "node --test \"test/integration/**/*.test.js\"",
+    "check": "node scripts/check.mjs",
+    "capturar-amostra": "node scripts/capturar-amostra.mjs"
   },
   "engines": {
     "node": ">=18"

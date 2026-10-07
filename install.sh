@@ -223,7 +223,7 @@ wizard_ssh() {
   # Caminho completo: usuário + host (+ porta). Aceita usuario@host ou separado.
   local user_="" host_="" port_="22" input_=""
   while :; do
-    read -rp "Endereço do servidor (ex.: root@192.168.100.75, ou só o IP/host): " input_
+    read -rp "Endereço do servidor (ex.: root@192.0.2.10, ou só o IP/host): " input_
     [ -z "$input_" ] && { echo "Campo vazio. Ctrl+C para cancelar."; continue; }
     case "$input_" in
       *@*)
@@ -236,7 +236,7 @@ wizard_ssh() {
         ;;
     esac
     if [ -z "$host_" ] || ! valid_host "$host_"; then
-      echo "Host inválido. Use um IP ou hostname (ex.: 192.168.100.75)."; continue
+      echo "Host inválido. Use um IP ou hostname (ex.: 192.0.2.10)."; continue
     fi
     if [ -z "$user_" ]; then
       read -rp "Usuário do servidor [root]: " user_
