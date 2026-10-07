@@ -19,12 +19,14 @@ test('bibliotecas versionadas batem com o SHA-256 registrado em vendor.json', ()
   }
 });
 
-test('nenhum arquivo solto em public/vendor fora do manifesto', () => {
+test('nenhum arquivo solto em public/vendor nem em public/fonts fora do manifesto', () => {
   const manifest = JSON.parse(fs.readFileSync(path.join(VENDOR, 'vendor.json'), 'utf8'));
-  const listed = new Set(Object.values(manifest).flatMap((lib) => Object.keys(lib.sha256).map((f) => `${lib.dir}/${f}`)));
-  for (const dir of fs.readdirSync(VENDOR, { withFileTypes: true }).filter((d) => d.isDirectory())) {
-    for (const f of fs.readdirSync(path.join(VENDOR, dir.name))) {
-      assert.ok(listed.has(`${dir.name}/${f}`), `${dir.name}/${f} sem soma no manifesto`);
+  const listed = new Set(Object.values(manifest).flatMap((lib) => Object.keys(lib.sha256).map((f) => path.join(VENDOR, lib.dir, f))));
+  const dirs = fs.readdirSync(VENDOR, { withFileTypes: true }).filter((d) => d.isDirectory()).map((d) => path.join(VENDOR, d.name));
+  dirs.push(path.join(VENDOR, '..', 'fonts'));
+  for (const dir of dirs) {
+    for (const f of fs.readdirSync(dir)) {
+      assert.ok(listed.has(path.join(dir, f)), `${path.relative(VENDOR, path.join(dir, f))} sem soma no manifesto`);
     }
   }
 });

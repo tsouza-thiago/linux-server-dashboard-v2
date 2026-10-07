@@ -8,6 +8,75 @@ pré-versões `2.0.0-alpha.N` (uma por fase do plano), depois `beta`, `rc` e `2.
 
 ## [Não publicado]
 
+## [2.0.0-alpha.7] — 2026-10-07
+
+Fase F6 do plano (design). O design system aprovado no canvas (Aurora + Cockpit, escuro
+primeiro) entra nas 8 telas, nos estados, no login e no celular. Contraste AA conferido
+por teste nos dois temas; capturas do Chromium comparadas com as pranchetas. Falta a
+revisão visual do mantenedor (critério de saída da F6).
+
+### Adicionado
+
+- Amostra registra o custo da coleta no servidor: `collector.durationMs` (tempo do SSH) e
+  `collector.outputBytes` (tamanho da saída), mostrados na faixa de status.
+- Histórico guarda a CPU separada em usuário e sistema (`cpuUser`, `cpuSystem`) para o
+  gráfico empilhado de Recursos.
+- `/api/session` informa quando a sessão expira (`expiresAt`); `/api/login` aceita
+  `remember: false` ("Manter conectado" desmarcado: cookie some ao fechar o navegador).
+- `/api/config` informa a retenção do histórico e a versão do Node.
+- **Design system V2 (D1, Aurora + Cockpit, escuro primeiro)** implementado das pranchetas
+  aprovadas: tokens em `public/css/tokens.css` (escuro padrão e claro com os mesmos nomes),
+  `base.css`, `components.css`, `views.css` e `print.css`.
+- Fontes Geist e Geist Mono 1.7.2 (OFL) servidas de `public/fonts/`, com SHA-256 em
+  `public/vendor/vendor.json`.
+- Navegação agrupada (Monitorar / Analisar) com contagem de alertas, "Próxima coleta" com
+  contagem regressiva, faixa de status (online / coletando / offline / reconectando) com
+  host, sistema, uptime, idade da coleta, custo do SSH e retenção.
+- Visão geral: anel de saúde 0–100, frase em linguagem simples, disponibilidade de 90
+  dias, eventos de 24 h e custo no servidor; 5 indicadores com mini-gráfico; telemetria em
+  faixas com cursor, dica e zoom sincronizados; resumos de armazenamento, eventos e
+  processos.
+- Recursos: CPU empilhada (usuário, sistema, espera de disco), carga, memória com média,
+  pico, tendência e swap, temperatura com o limite e os sensores, pressão (PSI) em faixas.
+- Armazenamento: cartões por ponto de montagem, previsão de lotação com projeção e datas
+  (alerta e cheio), atividade de cada disco em faixas e saúde SMART com o histórico.
+- Rede: download e upload com o pico do período, volume do dia, erros e descartes,
+  volume por dia (7 dias) e maiores picos.
+- Processos & serviços: cartões dos serviços com histórico de quedas, tabela com busca e
+  ordenação, "Para onde vai a memória".
+- Eventos: disponibilidade de 90 dias por dia, filtros por tipo e situação, anotar na
+  própria linha do tempo, agrupamento por dia, "ver no gráfico", notificações do navegador
+  para alertas novos (com o painel em segundo plano).
+- Relatórios: 7, 30, 90 dias ou datas escolhidas; resumo do período, tabela diária com
+  disponibilidade e eventos, exportar CSV/JSON e imprimir (versão clara para PDF).
+- Ajuda: o que fazer em cada alerta, como ler o painel, configuração ativa, estado da
+  chave restrita e do sudo do SMART com a linha do sudoers pronta para copiar, versões e
+  sessão.
+- Estados: carregando (blocos no formato final), primeiro uso (checklist), alerta crítico
+  (o que fazer + Reconhecer), aviso de configuração (comando do servidor desatualizado) e
+  offline (últimos valores em cinza).
+- Login em página própria, com "Manter conectado por 30 dias" e erro acessível.
+- Celular (≤ 860 px): barra com menu, menu lateral deslizante, faixas de telemetria
+  empilhadas, períodos em pílulas roláveis.
+- Testes: contraste AA dos tokens nos dois temas (`design-tokens.test.js`), cálculos das
+  telas (`front-telas.test.js`) e e2e no celular, no tema claro, offline e com "reduzir
+  movimento".
+
+### Alterado
+
+- Tema claro: botão principal e amarelo de atenção um pouco mais escuros que na
+  prancheta (`#0A8193` e `#B98009`) para passar no contraste AA.
+- O alerta "servidor inacessível" e a queda registrada aparecem como um item só na linha
+  do tempo.
+- Previsão de disco que levaria mais de 10 anos para encher aparece como "estável".
+- Taxa de rede exibida em "Mbps" (antes "Mb/s"), como nas pranchetas.
+- Documentação (README, TUTORIAL, AGENTS, SECURITY, plano) descreve a tela nova.
+
+### Removido
+
+- `public/style.css` e as fontes Inter e JetBrains Mono (substituídas pelo design system
+  V2 e pela Geist).
+
 ## [2.0.0-alpha.6] — 2026-10-07
 
 Fase F5 do plano (fundação da tela nova). As 8 telas abrem no Chromium com dados, gráficos

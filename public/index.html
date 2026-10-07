@@ -5,62 +5,90 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <meta name="color-scheme" content="dark light">
   <title>Server Dashboard</title>
-  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='6' fill='%230E9CB0'/%3E%3Cpath d='M9 16h4l2-5 4 10 2-5h2' stroke='white' stroke-width='2.4' fill='none' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E">
-  <link rel="stylesheet" href="style.css">
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='8' fill='%2307090E'/%3E%3Cpolyline points='5 16 10 16 13 7 19 25 22 16 27 16' stroke='%233EE0D0' stroke-width='2.6' fill='none' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E">
+  <link rel="preload" href="fonts/geist-variable.woff2" as="font" type="font/woff2" crossorigin>
+  <link rel="preload" href="fonts/geist-mono-variable.woff2" as="font" type="font/woff2" crossorigin>
   <link rel="stylesheet" href="vendor/uplot/uPlot.min.css">
+  <link rel="stylesheet" href="css/tokens.css">
+  <link rel="stylesheet" href="css/base.css">
+  <link rel="stylesheet" href="css/components.css">
+  <link rel="stylesheet" href="css/views.css">
+  <link rel="stylesheet" href="css/print.css" media="print">
   <script src="js/locale-guard.js" defer></script>
   <script src="vendor/uplot/uPlot.iife.min.js" defer></script>
   <script type="module" src="js/main.js"></script>
 </head>
 <body>
   <a class="skip-link" href="#view">Pular para o conteúdo</a>
-  <div class="app">
-    <aside class="sidebar" id="sidebar" aria-label="Barra lateral">
-      <div class="brand">
-        <div class="brand-text">
-          <h1>Server Dashboard</h1>
-          <span class="subtitle" id="hostLabel">—</span>
+  <div class="app" id="app">
+    <nav class="side" id="side" aria-label="Navegação principal">
+      <div class="side-head">
+        <div class="brand">
+          <span class="brand-mark"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="3 12 7 12 10 5 14 19 17 12 21 12"/></svg></span>
+          <span class="brand-text"><span class="brand-name">Server Dashboard</span><span class="brand-meta" id="brandMeta">127.0.0.1</span></span>
         </div>
+        <button class="icon-btn side-close" id="navClose" type="button" aria-label="Fechar menu"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M6 6l12 12M18 6 6 18"/></svg></button>
       </div>
-      <nav class="nav" aria-label="Telas" id="nav"></nav>
-      <div class="sidebar-footer">
-        <button id="pollBtn" type="button" title="Coletar agora (C)">Coletar agora</button>
+      <div class="side-nav" id="nav"></div>
+      <div class="side-poll">
+        <div class="side-poll-row"><span>Próxima coleta</span><span class="mono" id="nextPoll">—</span></div>
+        <div class="progress" aria-hidden="true"><div class="progress-fill" id="nextPollBar"></div></div>
+        <button class="btn btn-soft btn-block" id="pollBtn" type="button" title="Coletar agora (C)">Coletar agora</button>
+        <span class="side-poll-note" id="pollNote">1 SSH por coleta · somente leitura</span>
       </div>
-    </aside>
-    <button class="nav-scrim" id="navScrim" aria-label="Fechar navegação" tabindex="-1"></button>
+    </nav>
+    <div class="scrim" id="navScrim" hidden></div>
 
     <div class="main">
-      <header class="topbar">
-        <div class="topbar-left">
-          <button id="navToggle" class="btn-icon nav-toggle" aria-label="Abrir navegação" aria-expanded="false" aria-controls="sidebar">☰</button>
-          <h2 id="viewTitle">Visão geral</h2>
-        </div>
-        <div class="topbar-meta">
-          <span class="status-pill" id="statusPill" role="status" aria-live="polite"><span class="dot" id="statusDot"></span><span id="statusText">conectando…</span></span>
-          <span class="meta-item"><span class="label">Última coleta</span><span id="lastPoll">—</span></span>
-          <div class="period-toggle" id="periodToggle" role="group" aria-label="Período dos gráficos"></div>
-          <button id="themeToggle" class="btn-icon" type="button" title="Alternar tema (T)" aria-label="Alternar tema claro/escuro">◐</button>
-        </div>
+      <header class="mobile-bar">
+        <button class="icon-btn" id="navToggle" type="button" aria-label="Abrir menu" aria-expanded="false" aria-controls="side"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M4 6h16M4 12h16M4 18h16"/></svg></button>
+        <div class="mobile-title"><span id="mobileTitle">Visão geral</span><span class="mono" id="mobileMeta">—</span></div>
+        <span class="live" id="mobileLive"></span>
       </header>
-      <div id="offlineBanner" class="offline-banner" role="alert" hidden></div>
-      <main id="view" tabindex="-1"></main>
+      <div class="strip" id="strip" aria-label="Estado da coleta" data-state="coletando"></div>
+      <div class="visually-hidden" id="liveRegion" role="status" aria-live="polite"></div>
+      <div class="page">
+        <header class="page-head">
+          <div class="page-title"><h1 id="viewTitle">Visão geral</h1><p id="viewSub"></p></div>
+          <div class="page-actions">
+            <div class="page-actions-extra" id="viewActions"></div>
+            <div class="segmented" id="periodToggle" role="group" aria-label="Período dos gráficos"></div>
+            <button id="themeToggle" class="icon-btn" type="button" aria-label="Alternar tema claro/escuro (T)" title="Alternar tema (T)"></button>
+          </div>
+        </header>
+        <main id="view" tabindex="-1"></main>
+      </div>
     </div>
   </div>
 
   <div id="toasts" class="toasts" aria-live="polite"></div>
 
-  <div id="login" class="modal" hidden role="dialog" aria-modal="true" aria-labelledby="loginTitle">
-    <form class="modal-box login-form" id="loginForm">
-      <div class="modal-head"><h3 id="loginTitle">Entrar no painel</h3></div>
-      <div class="modal-body">
-        <p>Cole o token de acesso (<code>DASH_TOKEN</code> do arquivo <code>.env</code>). Ele é pedido
-        uma vez por navegador; a sessão vale 30 dias e se renova com o uso.</p>
-        <label for="loginToken">Token de acesso</label>
-        <input id="loginToken" name="token" type="password" autocomplete="current-password" required>
-        <p id="loginError" class="login-error" role="alert"></p>
+  <div id="login" class="login" hidden>
+    <div class="login-brand">
+      <span class="brand-mark"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="3 12 7 12 10 5 14 19 17 12 21 12"/></svg></span>
+      <span>Server Dashboard</span>
+    </div>
+    <form class="login-card" id="loginForm" aria-labelledby="loginTitle">
+      <div class="field">
+        <h1 id="loginTitle">Entrar no painel</h1>
+        <p>Digite o token de acesso. Ele é pedido uma vez por navegador.</p>
       </div>
-      <div class="modal-foot"><button type="submit" id="loginSubmit">Entrar</button></div>
+      <div class="field">
+        <label for="loginToken">Token de acesso</label>
+        <input class="input" id="loginToken" name="token" type="password" autocomplete="current-password" required aria-describedby="loginError">
+        <span class="login-error" id="loginError" role="alert"></span>
+      </div>
+      <div class="check">
+        <input id="loginRemember" type="checkbox" checked>
+        <label for="loginRemember">Manter conectado por 30 dias</label>
+      </div>
+      <button class="btn btn-primary" type="submit" id="loginSubmit">Entrar</button>
+      <div class="login-help">
+        <b>Onde encontro o token?</b>
+        <span>Ele foi mostrado no fim do <span class="mono">./install.sh</span> e fica na linha <span class="mono">DASH_TOKEN</span> do arquivo <span class="mono">.env</span>, na pasta do projeto.</span>
+      </div>
     </form>
+    <span class="login-foot" id="loginFoot">somente nesta máquina</span>
   </div>
 </body>
 </html>

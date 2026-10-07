@@ -21,7 +21,7 @@ export function bytes(v, digits) {
 }
 
 export const mb = (v) => (isNum(v) ? bytes(v * 1024 * 1024) : DASH);
-export const mbps = (v) => (isNum(v) ? `${num(v, v < 10 ? 2 : 1)} Mb/s` : DASH);
+export const mbps = (v) => (isNum(v) ? `${num(v, v < 10 ? 2 : 1)} Mbps` : DASH);
 export const mbs = (v) => (isNum(v) ? `${num(v, v < 10 ? 2 : 1)} MB/s` : DASH);
 export const celsius = (v) => (isNum(v) ? `${num(v, 1)} °C` : DASH);
 export const ms = (v) => (isNum(v) ? `${num(v, v < 10 ? 1 : 0)} ms` : DASH);

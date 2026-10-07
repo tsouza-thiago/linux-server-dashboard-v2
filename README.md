@@ -164,14 +164,14 @@ O painel tem **8 telas**, navegáveis pela coluna da esquerda ou pelas teclas `1
 
 | Tela | O que mostra |
 |------|--------------|
-| **1 Visão geral** | Manchete de saúde em linguagem simples ("Servidor saudável" / "Atenção" / "Crítico" e por quê), cartões com mini-gráfico (processador, memória, disco mais cheio com previsão, temperatura, rede, serviços) e eventos recentes |
-| **2 Recursos** | CPU % com espera de disco, load, RAM e swap, pressão (PSI) e temperatura; linha tracejada = pico do intervalo |
-| **3 Armazenamento** | Espaço, inodes, SMART e **previsão de disco cheio** por ponto de montagem; leitura/gravação, ocupação e latência por disco |
-| **4 Rede** | Vazão de entrada/saída, totais desde o boot, erros e descartes |
-| **5 Processos & serviços** | Estado de cada serviço e os processos que mais usam memória, com filtro e ordenação |
-| **6 Eventos** | Linha do tempo única de alertas, quedas e anotações; reconhecer/resolver; nova anotação; uptime de até 90 dias |
-| **7 Relatórios** | Resumo por dia (fuso local) dos últimos 30 dias; exportação CSV/JSON; impressão |
-| **8 Ajuda** | Guia rápido, atalhos, configuração ativa (só leitura) e sessão |
+| **1 Visão geral** | Anel de saúde 0–100 com a frase "Servidor saudável" / "Atenção" / "Crítico" e por quê; disponibilidade de 90 dias e custo da coleta no servidor; 5 indicadores com mini-gráfico (processador, memória, disco mais cheio com previsão, temperatura, rede); telemetria em faixas com cursor sincronizado; resumo de discos, eventos e processos |
+| **2 Recursos** | CPU empilhada (usuário, sistema, espera de disco), carga, memória (média, pico, tendência, swap), temperatura com o limite e os sensores, pressão do sistema (PSI) |
+| **3 Armazenamento** | Espaço e inodes por ponto de montagem, **previsão de lotação** com as datas do alerta e de "cheio", atividade de cada disco (ocupação, leitura/gravação, latência) e saúde SMART |
+| **4 Rede** | Download e upload agora com o pico do período, volume do dia, erros e descartes, tráfego no período, volume por dia (7 dias) e maiores picos |
+| **5 Processos & serviços** | Cada serviço com o histórico de quedas, os processos que mais usam memória (busca e ordenação) e "para onde vai a memória" |
+| **6 Eventos** | Disponibilidade de 90 dias dia a dia; linha do tempo única de alertas, quedas e anotações, agrupada por dia; filtros; reconhecer; anotar; notificações do navegador |
+| **7 Relatórios** | Resumo de 7, 30, 90 dias ou de datas escolhidas, tabela por dia (fuso local) com disponibilidade e eventos; exportação CSV/JSON; impressão/PDF |
+| **8 Ajuda** | O que fazer em cada alerta, como ler o painel, atalhos, configuração ativa (só leitura), acesso ao servidor (linha do sudoers para copiar), versões e sessão |
 
 **Interações em todas as telas:**
 
@@ -179,9 +179,13 @@ O painel tem **8 telas**, navegáveis pela coluna da esquerda ou pelas teclas `1
 - **Gráficos**: arrastar = aproximar um trecho · roda do mouse = zoom · duplo clique = voltar.
   O cursor fica sincronizado entre os gráficos da tela.
 - **Atalhos**: `1`–`8` telas · `C` coletar agora · `T` tema · `N` nova anotação · `/` buscar processo · `?` ajuda.
-- **Tema**: escuro é o padrão; o botão ◐ (ou `T`) alterna para o claro (fica salvo).
+- **Tema**: escuro é o padrão; o botão da lua/sol (ou `T`) alterna para o claro (fica salvo).
 - **Anotações**: em Eventos, marque manutenções ("troquei o cooler"); viram linhas tracejadas nos gráficos.
-- **Coletar agora**: força uma coleta imediata, sem esperar o minuto.
+- **Coletar agora**: força uma coleta imediata, sem esperar o minuto (embaixo do menu, com a
+  contagem para a próxima coleta).
+- **Faixa de status** no topo: online / coletando / offline, host, sistema, uptime, idade da
+  última coleta e quanto ela custou ao servidor (tempo do SSH e tamanho da resposta).
+- **Celular**: o menu vira o botão ☰ no canto superior esquerdo.
 
 ---
 
@@ -533,6 +537,8 @@ linux-server-dashboard/
 ├── test-support/           (helpers de teste: VM p/ frontend, request HTTP)
 └── public/
     ├── index.html          (casca das 8 telas, login e avisos)
+    ├── css/                (design system V2: tokens, base, componentes, telas, impressão)
+    ├── fonts/              (Geist e Geist Mono, OFL — sem CDN)
     ├── vendor/uplot/       (uPlot versionado com SHA-256)
     └── js/                 (ES modules: core/, charts/, views/ e main.js — sem build)
 ```

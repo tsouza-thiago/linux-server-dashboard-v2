@@ -21,8 +21,14 @@ export function safeEqual(a, b) {
   return crypto.timingSafeEqual(ab, bb);
 }
 
+/**
+ * Cookie da sessão. Com `maxAgeMs = null` vira cookie de sessão do navegador (sem Max-Age:
+ * some ao fechar o navegador — "Manter conectado" desmarcado); a sessão no servidor continua
+ * com o mesmo prazo de 30 dias.
+ */
 export function sessionCookie(id, maxAgeMs = SESSION_TTL_MS) {
-  return `${SESSION_COOKIE}=${id}; Path=/; HttpOnly; SameSite=Strict; Max-Age=${Math.floor(maxAgeMs / 1000)}`;
+  const base = `${SESSION_COOKIE}=${id}; Path=/; HttpOnly; SameSite=Strict`;
+  return maxAgeMs === null ? base : `${base}; Max-Age=${Math.floor(maxAgeMs / 1000)}`;
 }
 
 export const clearSessionCookie = () => `${SESSION_COOKIE}=; Path=/; HttpOnly; SameSite=Strict; Max-Age=0`;

@@ -17,7 +17,10 @@ export function flatten(s) {
   const out = {};
   const put = (key, v) => { if (isNum(v)) out[key] = v; };
   if (Array.isArray(s.load)) { put('load1', s.load[0]); put('load5', s.load[1]); put('load15', s.load[2]); }
-  if (s.cpu) { put('cpu', s.cpu.pct); put('cpuIowait', s.cpu.iowait); put('cpuSteal', s.cpu.steal); }
+  if (s.cpu) {
+    put('cpu', s.cpu.pct); put('cpuUser', s.cpu.user); put('cpuSystem', s.cpu.system);
+    put('cpuIowait', s.cpu.iowait); put('cpuSteal', s.cpu.steal);
+  }
   if (s.ram) {
     put('ramUsed', s.ram.used);
     put('ramAvail', s.ram.avail);

@@ -66,7 +66,7 @@ function assertSecurityHeaders(res, where) {
 test('cabeçalhos de segurança em TODAS as respostas: página, estático, API, 404, 401, 403 e erro', async (t) => {
   const s = await start(t, { dashToken: 'x'.repeat(32) });
   const cases = [
-    ['/', 'página'], ['/style.css', 'estático'], ['/js/main.js', 'script'],
+    ['/', 'página'], ['/css/tokens.css', 'estático'], ['/js/main.js', 'script'],
     ['/nao-existe', '404'], ['/api/status', '401'],
   ];
   for (const [p, where] of cases) assertSecurityHeaders(await request(s.port, { path: p }), where);
@@ -110,7 +110,7 @@ test('estáticos: path traversal, arquivo oculto e pasta não vazam nada', async
 
 test('estáticos: tipos corretos e nosniff', async (t) => {
   const s = await start(t);
-  const types = { '/': /text\/html/, '/style.css': /text\/css/, '/js/main.js': /javascript/, '/fonts/inter-400.woff2': /font\/woff2/ };
+  const types = { '/': /text\/html/, '/css/tokens.css': /text\/css/, '/js/main.js': /javascript/, '/fonts/geist-variable.woff2': /font\/woff2/ };
   for (const [p, re] of Object.entries(types)) {
     const r = await request(s.port, { path: p });
     assert.equal(r.status, 200, p);

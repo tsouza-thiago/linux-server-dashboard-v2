@@ -1,14 +1,15 @@
 // Rotas por hash com o período na URL (`#/armazenamento?p=24h`): recarregar ou mandar o
 // link mantém a tela e o período. Atalhos 1–8 seguem a ordem das telas.
+// `group` separa a navegação (Monitorar / Analisar); `period` = a tela usa o período do topo.
 export const VIEWS = [
-  { id: 'visao-geral', title: 'Visão geral', key: '1' },
-  { id: 'recursos', title: 'Recursos', key: '2' },
-  { id: 'armazenamento', title: 'Armazenamento', key: '3' },
-  { id: 'rede', title: 'Rede', key: '4' },
-  { id: 'processos', title: 'Processos & serviços', key: '5' },
-  { id: 'eventos', title: 'Eventos', key: '6' },
-  { id: 'relatorios', title: 'Relatórios', key: '7' },
-  { id: 'ajuda', title: 'Ajuda', key: '8' },
+  { id: 'visao-geral', title: 'Visão geral', key: '1', group: 'Monitorar', period: true },
+  { id: 'recursos', title: 'Recursos', key: '2', group: 'Monitorar', period: true },
+  { id: 'armazenamento', title: 'Armazenamento', key: '3', group: 'Monitorar', period: true },
+  { id: 'rede', title: 'Rede', key: '4', group: 'Monitorar', period: true },
+  { id: 'processos', title: 'Processos & serviços', key: '5', group: 'Monitorar', period: false },
+  { id: 'eventos', title: 'Eventos', key: '6', group: 'Analisar', period: false },
+  { id: 'relatorios', title: 'Relatórios', key: '7', group: 'Analisar', period: false },
+  { id: 'ajuda', title: 'Ajuda', key: '8', group: 'Analisar', period: false },
 ];
 
 export const PERIODS = {

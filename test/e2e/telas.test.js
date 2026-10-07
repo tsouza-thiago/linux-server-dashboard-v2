@@ -12,8 +12,10 @@ import { listen, close } from '../../test-support/request.js';
 let chromium = null;
 try { ({ chromium } = await import('playwright-core')); } catch { /* sem playwright-core */ }
 
+// Gráficos mínimos por tela: Visão geral = 3 mini-gráficos + 5 faixas de telemetria;
+// Recursos = CPU, RAM, temperatura + 3 faixas de PSI; Armazenamento = previsão + 1 faixa por disco.
 const VIEWS = [
-  ['visao-geral', 'Visão geral', 5], ['recursos', 'Recursos', 6], ['armazenamento', 'Armazenamento', 4],
+  ['visao-geral', 'Visão geral', 8], ['recursos', 'Recursos', 6], ['armazenamento', 'Armazenamento', 2],
   ['rede', 'Rede', 1], ['processos', 'Processos & serviços', 0], ['eventos', 'Eventos', 0],
   ['relatorios', 'Relatórios', 0], ['ajuda', 'Ajuda', 0],
 ];
@@ -40,7 +42,7 @@ async function setup(t, extra = {}) {
   const app = createApp({
     historyFile: path.join(dir, 'history.json'), alertsFile: path.join(dir, 'alerts.json'),
     annotationsFile: path.join(dir, 'annotations.json'), collect: async () => ({ ok: false, error: 'sem coleta no e2e' }),
-    log: () => {}, ...extra,
+    log: () => {}, ...extra, viewport: undefined,
   });
   const now = Date.now();
   for (let i = 0; i < 120; i++) app.store.append(sample(now - (120 - i) * 60e3, i));
@@ -53,7 +55,7 @@ async function setup(t, extra = {}) {
     await close(server);
     return { skip: `Chromium indisponível: ${err.message.split('\n')[0]}` };
   }
-  const page = await browser.newPage({ viewport: { width: 1280, height: 900 } });
+  const page = await browser.newPage({ viewport: extra.viewport || { width: 1280, height: 900 } });
   const problems = [];
   page.on('console', (m) => { if (m.type() === 'error' || /Content Security Policy/i.test(m.text())) problems.push(m.text()); });
   page.on('pageerror', (e) => problems.push(e.message));
@@ -72,11 +74,13 @@ test('e2e: as 8 telas abrem com dados, gráficos e sem erro de JS/CSP', { skip: 
   for (const [id, title, charts] of VIEWS) {
     await s.page.goto(`${s.base}/#/${id}?p=6h`, { waitUntil: 'load' });
     await s.page.waitForFunction((txt) => document.getElementById('viewTitle')?.textContent === txt, title);
-    if (charts) await s.page.waitForFunction((n) => document.querySelectorAll('.uplot').length >= n, charts, { timeout: 5000 });
-    const count = await s.page.$$eval('.uplot', (els) => els.length);
+    // Conta só os gráficos da tela nova (trocar o hash mantém a tela anterior até a nova montar).
+    await s.page.waitForSelector(`.view-${id}`);
+    if (charts) await s.page.waitForFunction(([v, n]) => document.querySelectorAll(`.view-${v} .uplot`).length >= n, [id, charts], { timeout: 5000 });
+    const count = await s.page.$$eval(`.view-${id} .uplot`, (els) => els.length);
     assert.ok(count >= charts, `${id}: ${count} gráficos (esperado ≥ ${charts})`);
   }
-  assert.match(await s.page.locator('.view-ajuda').innerText(), /ALERT_DISK_PCT/);
+  assert.match(await s.page.locator('.view-ajuda').innerText(), /Configuração ativa[\s\S]*DISK_MOUNTS/);
   assert.deepEqual(s.problems, []);
 });
 
@@ -84,10 +88,10 @@ test('e2e: visão geral mostra a manchete e os dados da última coleta', { skip:
   const s = await setup(t);
   if (s.skip) return t.skip(s.skip);
   await s.page.goto(`${s.base}/`, { waitUntil: 'load' });
-  await s.page.waitForSelector('.headline');
-  assert.match(await s.page.locator('.headline').innerText(), /Servidor saudável/);
-  assert.match(await s.page.locator('#hostLabel').innerText(), /servidor-exemplo/);
-  assert.match(await s.page.locator('.cards').innerText(), /Disco mais cheio[\s\S]*30%/);
+  await s.page.waitForSelector('.hero');
+  assert.match(await s.page.locator('.hero').innerText(), /Servidor saudável/);
+  assert.match(await s.page.locator('#strip').innerText(), /ONLINE[\s\S]*servidor-exemplo/);
+  assert.match(await s.page.locator('#vg-card-disk').innerText(), /Disco mais cheio[\s\S]*30\s*%/);
   assert.deepEqual(s.problems, []);
 });
 
@@ -95,7 +99,7 @@ test('e2e: atalhos de teclado trocam de tela e de tema', { skip: !chromium && 's
   const s = await setup(t);
   if (s.skip) return t.skip(s.skip);
   await s.page.goto(`${s.base}/`, { waitUntil: 'load' });
-  await s.page.waitForSelector('.headline');
+  await s.page.waitForSelector('.hero');
   await s.page.keyboard.press('3');
   await s.page.waitForFunction(() => document.querySelector('.view-armazenamento'));
   assert.equal(await s.page.textContent('#viewTitle'), 'Armazenamento');
@@ -125,10 +129,59 @@ test('e2e: com DASH_TOKEN a tela pede login e só então mostra os dados', { ski
   await s.page.waitForSelector('#login:not([hidden])');
   await s.page.fill('#loginToken', 'errado');
   await s.page.click('#loginSubmit');
-  await s.page.waitForFunction(() => document.getElementById('loginError').textContent === 'Token incorreto');
+  await s.page.waitForFunction(() => /Token incorreto/.test(document.getElementById('loginError').textContent));
+  assert.equal(await s.page.getAttribute('#loginToken', 'aria-invalid'), 'true');
   await s.page.fill('#loginToken', token);
   await Promise.all([s.page.waitForNavigation(), s.page.click('#loginSubmit')]);
-  await s.page.waitForSelector('.headline');
+  await s.page.waitForSelector('.hero');
   assert.equal(await s.page.$eval('#login', (el) => el.hidden), true);
   assert.deepEqual(s.problems.filter((p) => !/401/.test(p)), [], 'só os 401 esperados antes do login');
+});
+
+test('e2e: celular (390 px) — menu abre, navega e fecha; sem rolagem horizontal', { skip: !chromium && 'sem playwright-core' }, async (t) => {
+  const s = await setup(t, { viewport: { width: 390, height: 844 } });
+  if (s.skip) return t.skip(s.skip);
+  await s.page.goto(`${s.base}/`, { waitUntil: 'load' });
+  await s.page.waitForSelector('.hero');
+  assert.equal(await s.page.isVisible('#side .nav-item'), false, 'menu começa fechado');
+  await s.page.click('#navToggle');
+  await s.page.waitForFunction(() => document.body.classList.contains('nav-open'));
+  assert.equal(await s.page.getAttribute('#navToggle', 'aria-expanded'), 'true');
+  await s.page.click('#side a[href^="#/recursos"]');
+  await s.page.waitForFunction(() => document.querySelector('.view-recursos'));
+  assert.equal(await s.page.evaluate(() => document.body.classList.contains('nav-open')), false, 'menu fecha ao navegar');
+  assert.equal(await s.page.textContent('#mobileTitle'), 'Recursos');
+  const overflow = await s.page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth);
+  assert.ok(overflow <= 0, `sem rolagem horizontal (${overflow} px)`);
+  await s.page.emulateMedia({ reducedMotion: 'reduce' });
+  const dur = await s.page.evaluate(() => parseFloat(getComputedStyle(document.getElementById('side')).transitionDuration));
+  assert.ok(dur < 0.01, `"reduzir movimento" desliga as transições (${dur}s)`);
+  assert.deepEqual(s.problems, []);
+});
+
+test('e2e: tema claro — telas abrem, gráficos recriados com as cores do tema e sem erros', { skip: !chromium && 'sem playwright-core' }, async (t) => {
+  const s = await setup(t);
+  if (s.skip) return t.skip(s.skip);
+  await s.page.addInitScript(() => localStorage.setItem('dash_theme', 'light'));
+  await s.page.goto(`${s.base}/#/recursos`, { waitUntil: 'load' });
+  await s.page.waitForFunction(() => document.querySelectorAll('.uplot').length >= 6);
+  assert.equal(await s.page.evaluate(() => document.documentElement.dataset.theme), 'light');
+  const bg = await s.page.evaluate(() => getComputedStyle(document.body).backgroundColor);
+  assert.equal(bg, 'rgb(243, 245, 248)', 'fundo claro da prancheta');
+  await s.page.keyboard.press('t');
+  await s.page.waitForFunction(() => document.documentElement.dataset.theme === 'dark' && document.querySelectorAll('.uplot').length >= 6);
+  assert.deepEqual(s.problems, []);
+});
+
+test('e2e: servidor inacessível — faixa crítica, manchete e últimos valores em cinza', { skip: !chromium && 'sem playwright-core' }, async (t) => {
+  const s = await setup(t);
+  if (s.skip) return t.skip(s.skip);
+  await s.app.runPoll();
+  await s.app.runPoll(); // 2 falhas seguidas = inacessível (ALERT_OFFLINE_AFTER)
+  await s.page.goto(`${s.base}/`, { waitUntil: 'load' });
+  await s.page.waitForSelector('.hero-crit');
+  assert.match(await s.page.locator('#strip').innerText(), /OFFLINE/);
+  assert.match(await s.page.locator('.hero').innerText(), /Servidor inacessível[\s\S]*última coleta boa/);
+  assert.equal(await s.page.evaluate(() => document.body.classList.contains('is-offline')), true);
+  assert.deepEqual(s.problems, []);
 });

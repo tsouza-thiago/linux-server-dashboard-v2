@@ -31,6 +31,8 @@ test('collect: amostra completa, hash confere com a configuração', async () =>
   assert.equal(res.sample.ts, new Date(NOW).toISOString());
   assert.equal(res.sample.collector.expectedHash, targetsHash(TARGETS));
   assert.equal(res.sample.collector.hashMismatch, false);
+  assert.equal(res.sample.collector.outputBytes, Buffer.byteLength(REAL), 'tamanho da saída do SSH');
+  assert.ok(Number.isInteger(res.sample.collector.durationMs) && res.sample.collector.durationMs >= 0, 'tempo do SSH');
 });
 
 test('collect: hash diferente (authorized_keys desatualizado) continua coletando e sinaliza (Q10)', async () => {
