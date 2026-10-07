@@ -4,6 +4,7 @@ import { api, onAuthRequired } from './core/api.js';
 import { connect } from './core/sse.js';
 import { VIEWS, PERIODS, parseHash, buildHash, viewByKey } from './core/router.js';
 import { html, mount } from './core/html.js';
+import { isOffline } from './core/analysis.js';
 import * as f from './core/format.js';
 import * as visaoGeral from './views/visao-geral.js';
 import * as recursos from './views/recursos.js';
@@ -127,7 +128,7 @@ function renderNav() {
 
 function renderStatus() {
   const { meta, live, sample } = store.get();
-  const offline = meta && meta.online === false && (meta.offlineSince || meta.failures > 0);
+  const offline = isOffline(meta);
   const text = live === 'caiu' ? 'reconectando…' : offline ? 'offline' : meta?.online ? 'online' : 'aguardando coleta';
   $('statusDot').className = `dot ${offline ? 'dot-offline' : meta?.online ? 'dot-online' : 'dot-polling'}`;
   $('statusText').textContent = text;
@@ -201,6 +202,7 @@ async function navigate() {
   const { view, period } = parseHash(location.hash);
   const changed = view !== store.get().view || period !== store.get().period;
   store.set({ view, period });
+  $('viewTitle').textContent = VIEWS.find((v) => v.id === view).title; // na hora, antes dos dados
   closeNav();
   if (USES_BUCKETS.has(view) && (changed || !store.get().buckets.length)) await loadBuckets();
   renderView();

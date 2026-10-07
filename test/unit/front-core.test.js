@@ -4,7 +4,7 @@ import { html, raw, escape, mount, isSafe } from '../../public/js/core/html.js';
 import * as fmt from '../../public/js/core/format.js';
 import { parseHash, buildHash, VIEWS, PERIODS, viewByKey } from '../../public/js/core/router.js';
 import { createStore, appendSample } from '../../public/js/core/store.js';
-import { series, xs, keysWith, diskEta, dailySummary, headline, fullestDisk, timeline } from '../../public/js/core/analysis.js';
+import { series, xs, keysWith, diskEta, dailySummary, headline, fullestDisk, timeline, isOffline } from '../../public/js/core/analysis.js';
 
 test('html: toda interpolação é escapada; raw() é a única porta para HTML', () => {
   const evil = '<img src=x onerror=alert(1)>"\'`&';
@@ -159,4 +159,12 @@ test('gráficos: rótulos do eixo de tempo em PT-BR e 24 h; anotações pelo ins
   const marks = markersInRange([{ ts: 'lixo' }, { ts: '2026-10-07T12:00:00Z', label: 'x' }, { ts: '2026-10-07T12:00:00Z', text: 'y' }], 0, 2e9);
   assert.deepEqual(marks.map((m) => m.label), ['x', 'y']);
   assert.deepEqual(markersInRange(null, 0, 1), []);
+});
+
+test('isOffline: só com falha de verdade (não logo após reiniciar o painel)', () => {
+  assert.equal(isOffline({ online: false, failures: 0, offlineSince: null }), false, 'antes da 1ª coleta');
+  assert.equal(isOffline({ online: false, failures: 2, offlineSince: null }), true);
+  assert.equal(isOffline({ online: false, failures: 0, offlineSince: '2026-10-07T12:00:00Z' }), true, 'queda aberta antes de reiniciar');
+  assert.equal(isOffline({ online: true, failures: 0 }), false);
+  assert.equal(isOffline(null), false);
 });

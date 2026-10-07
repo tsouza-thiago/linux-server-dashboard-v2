@@ -2,7 +2,7 @@
 // eventos mais recentes.
 import { html, mount } from '../core/html.js';
 import * as f from '../core/format.js';
-import { headline, fullestDisk, diskEta, timeline } from '../core/analysis.js';
+import { headline, fullestDisk, diskEta, timeline, isOffline } from '../core/analysis.js';
 import { drawCharts, badge } from './common.js';
 
 const LEVEL = { ok: 'ok', warn: 'warn', bad: 'bad', neutral: 'neutral' };
@@ -35,7 +35,7 @@ function eventLine(e) {
 export function render(ctx) {
   const { state } = ctx;
   const s = state.sample;
-  const h = headline(state.health, { online: state.meta?.online !== false || !s });
+  const h = headline(state.health, { online: !isOffline(state.meta) });
   const disk = fullestDisk(s);
   const svc = Object.values(s?.services || {});
   const svcOk = svc.filter((x) => x === 'active').length;

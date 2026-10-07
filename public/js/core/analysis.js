@@ -79,6 +79,13 @@ export function dailySummary(buckets, keys) {
   }));
 }
 
+/**
+ * Servidor inacessível de verdade: o servidor marcou offline E houve falha (queda aberta ou
+ * falhas seguidas). Logo depois de reiniciar o painel, antes da 1ª coleta, `online` também é
+ * false, mas não houve falha nenhuma — isso não é queda.
+ */
+export const isOffline = (meta) => Boolean(meta && meta.online === false && (meta.offlineSince || meta.failures > 0));
+
 /** Manchete da Visão geral a partir da saúde calculada no servidor. */
 export function headline(health, { online = true } = {}) {
   if (!online) return { level: 'bad', title: 'Servidor inacessível', reasons: ['Sem resposta às últimas coletas.'] };
