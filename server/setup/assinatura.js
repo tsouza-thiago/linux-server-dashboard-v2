@@ -55,8 +55,16 @@ export function currentVersionStatus(root, { run } = {}) {
   if (inside.status !== 0) return { ok: false, reason: inside.status === -1 ? 'sem-git' : 'sem-repositorio' };
   const tags = git(root, ['tag', '--points-at', 'HEAD'], run).stdout.split('\n').filter((t) => RELEASE_TAG.test(t));
   if (!tags.length) return { ok: false, reason: 'sem-tag' };
-  tags.sort(compareVersions);
-  return verifyTag(root, tags.at(-1), { run });
+  // Vale a versão assinada mais nova deste commit; uma tag sem assinatura no mesmo commit
+  // (por exemplo, criada pela interface do GitHub) não derruba a que é assinada.
+  tags.sort((a, b) => compareVersions(b, a));
+  let first = null;
+  for (const tag of tags) {
+    const r = verifyTag(root, tag, { run });
+    if (r.ok) return r;
+    first = first || r;
+  }
+  return first;
 }
 
 /** Tags de release assinadas, da mais nova para a mais antiga. */

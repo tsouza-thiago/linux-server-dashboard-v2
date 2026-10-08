@@ -38,6 +38,9 @@ test('assinatura: só passa a tag assinada pela chave de docs/allowed_signers', 
   assert.deepEqual(currentVersionStatus(dir), { ok: false, reason: 'sem-tag' });
   sign('v2.0.0-alpha.8');
   assert.deepEqual(currentVersionStatus(dir), { ok: true, tag: 'v2.0.0-alpha.8' });
+  git('tag', 'v2.0.0-alpha.99');
+  assert.deepEqual(currentVersionStatus(dir), { ok: true, tag: 'v2.0.0-alpha.8' }, 'tag sem assinatura no mesmo commit não derruba a assinada');
+  git('tag', '-d', 'v2.0.0-alpha.99');
   git('tag', '-a', 'v2.0.0-alpha.9', '-m', 'sem assinatura');
   assert.equal(verifyTag(dir, 'v2.0.0-alpha.9').reason, 'sem-assinatura');
   git('tag', 'v2.0.0-alpha.10');

@@ -21,7 +21,7 @@ export function ask(question, { secret = false, input = process.stdin, output = 
     if (secret && input.isTTY) {
       rl._writeToOutput = (s) => { if (s.includes(question)) output.write(s); else if (!/[\r\n]/.test(s)) output.write('•'); };
     }
-    rl.question(question, (answer) => { rl.close(); if (secret && input.isTTY) output.write('\n'); resolve(answer); });
+    rl.question(question, (answer) => { rl.close(); if (!input.isTTY || secret) output.write('\n'); resolve(answer); });
   });
 }
 

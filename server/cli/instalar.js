@@ -78,7 +78,9 @@ export function preflight({ out, root, flags, env = process.env, run = spawnSync
     return false;
   }
 
-  const [nodeText, nodeNote] = NODE_LINE[env.DASHBOARD_NODE_ORIGEM] || [`Node.js ${process.versions.node.split('.')[0]}`, ''];
+  // Depois de trocar de versão (reexec), o Node baixado agora há pouco aparece como "da pasta".
+  const origem = env.DASHBOARD_NODE_BAIXADO === '1' ? 'baixado' : env.DASHBOARD_NODE_ORIGEM;
+  const [nodeText, nodeNote] = NODE_LINE[origem] || [`Node.js ${process.versions.node.split('.')[0]}`, ''];
   out.ok(nodeText, nodeNote);
 
   const vendor = verifyVendor(root);
@@ -172,7 +174,8 @@ export async function instalar({ out, root, args, reconfigurar = false, deps = {
   const flags = parseFlags(args);
   out.title(reconfigurar ? 'Server Dashboard · reconfigurar' : 'Server Dashboard · instalação');
   const reexec = deps.reexec ?? (() => {
-    const r = spawnSync(path.join(root, 'dashboard'), [reconfigurar ? 'reconfigurar' : 'instalar', ...args], { stdio: 'inherit' });
+    const env = { ...process.env, ...(process.env.DASHBOARD_NODE_ORIGEM === 'baixado' ? { DASHBOARD_NODE_BAIXADO: '1' } : {}) };
+    const r = spawnSync(path.join(root, 'dashboard'), [reconfigurar ? 'reconfigurar' : 'instalar', ...args], { stdio: 'inherit', env });
     return r.status ?? 1;
   });
   const pre = preflight({ out, root, flags, reexec });
