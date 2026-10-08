@@ -8,6 +8,8 @@ pré-versões `2.0.0-alpha.N` (uma por fase do plano), depois `beta`, `rc` e `2.
 
 ## [Não publicado]
 
+## [2.0.0-alpha.8] — 2026-10-08
+
 Fase F7 do plano (instalação). Um comando no terminal abre um assistente de 6 passos no
 navegador (ou no terminal) que prepara o servidor com um usuário próprio e uma chave
 restrita à coleta. Instalação de ponta a ponta validada em contêineres Debian 12 e Ubuntu
