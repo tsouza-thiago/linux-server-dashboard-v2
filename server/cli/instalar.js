@@ -179,6 +179,16 @@ export async function instalar({ out, root, args, reconfigurar = false, deps = {
   if (typeof pre === 'number') return pre;
   if (!pre) return 1;
 
+  if (flags['importar-v1']) {
+    const { importarV1 } = await import('./importar-v1.js');
+    if (panelStatus({ root }).running && !flags.forcar) {
+      out.warn('a V2 já está rodando nesta pasta');
+      out.explain('', 'para importar de novo, pare a V2 (./dashboard parar) e repita.');
+      return 1;
+    }
+    return importarV1({ out, root, dir: flags['importar-v1'] });
+  }
+
   const st = panelStatus({ root });
   if (st.running) {
     if (!reconfigurar && !flags.forcar) {

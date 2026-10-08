@@ -27,5 +27,6 @@ PROMPT_DOCUMENTAR_E_PUBLICAR.md
 # Automação local do agente — não versionar
 .github/
 
-# Node.js baixado pelo ./dashboard (Q18)
+# Node.js baixado pelo ./dashboard (Q18) e cópias do dashboard atualizar
 .runtime/
+.backups/

@@ -9,6 +9,9 @@ import { createLoginCode } from '../http/entrar.js';
 import { makeOutput } from './saida.js';
 import { openBrowser, panelStatus, startPanel, stopPanel } from './servico.js';
 import { instalar } from './instalar.js';
+import { diagnosticar } from './diagnosticar.js';
+import { atualizar } from './atualizar.js';
+import { desinstalar } from './desinstalar.js';
 
 export const ROOT = path.join(path.dirname(fileURLToPath(import.meta.url)), '..', '..');
 
@@ -16,7 +19,8 @@ const HELP = `Uso: ./dashboard <comando>
 
   instalar        primeira instalação (abre o assistente no navegador)
                     --terminal       os mesmos passos no terminal (máquina sem tela)
-                    --sem-interface  sem perguntas, por opções (veja --ajuda)
+                    --sem-interface  sem perguntas, por opções (veja --sem-interface --ajuda)
+                    --importar-v1 <pasta>  traz configuração e histórico da V1 (e para a V1)
   abrir           abre o painel no navegador, já logado
   iniciar         inicia o painel (serviço de usuário ou segundo plano)
   parar           para o painel
@@ -51,6 +55,9 @@ export function panelUrl(root, port) {
 const COMMANDS = {
   instalar: (ctx) => instalar(ctx),
   reconfigurar: (ctx) => instalar({ ...ctx, reconfigurar: true }),
+  diagnosticar: (ctx) => diagnosticar(ctx),
+  atualizar: (ctx) => atualizar(ctx),
+  desinstalar: (ctx) => desinstalar(ctx),
   async ajuda({ out }) { out.line(HELP); return 0; },
   async versao({ out, root }) { out.line(`Server Dashboard ${version(root)}`); return 0; },
 
