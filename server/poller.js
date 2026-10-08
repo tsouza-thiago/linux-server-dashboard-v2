@@ -44,9 +44,12 @@ export function computeAlerts(sample, thresholds = config.ALERTS) {
   return evaluate(sample, thresholds).conditions;
 }
 
-/** Coleta com os alvos do .env; mesmos parâmetros da V1 (`runner` recebe host e comando). */
-export function collect({ host, prev, runner, targets = configTargets(), now } = {}) {
-  return collectV2({ host, prev, runner, targets, now, alerts: computeAlerts });
+/** SSH com a configuração própria do painel (data/ssh/config), quando houver. */
+export const configRunner = (host, command) => runSSH(host, command, 45000, { configFile: config.SSH_CONFIG });
+
+/** Coleta com os alvos e o acesso do .env; mesmos parâmetros da V1 (`runner` recebe host e comando). */
+export function collect({ host, prev, runner = configRunner, targets = configTargets(), now, access = config.SSH_ACESSO } = {}) {
+  return collectV2({ host, prev, runner, targets, now, access, alerts: computeAlerts });
 }
 
 const isCLI = process.argv[1] && import.meta.url.endsWith(process.argv[1].split('/').pop());

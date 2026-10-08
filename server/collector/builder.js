@@ -42,7 +42,9 @@ function buildTemplate(targets) {
   const t = normalizeTargets(targets);
   const hash = targetsHash(t);
   const parts = [
-    `LC_ALL=C; export LC_ALL; M="\${SSH_ORIGINAL_COMMAND:-${MODE_PLACEHOLDER}}"`,
+    // No comando forçado, o que o cliente pede só escolhe entre "smart" e "basico": qualquer
+    // outro texto vira "basico" e nunca é executado nem ecoado.
+    `LC_ALL=C; export LC_ALL; M="\${SSH_ORIGINAL_COMMAND:-${MODE_PLACEHOLDER}}"; case "$M" in smart) ;; *) M=basico;; esac`,
     section('VER', `echo '${COLLECTOR_VERSION} ${hash}'; echo "$M"`),
     section('HOST', 'cat /proc/sys/kernel/hostname'),
     section('OS', "uname -r; grep -E '^(PRETTY_NAME|NAME)=' /etc/os-release 2>/dev/null"),

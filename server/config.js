@@ -87,11 +87,27 @@ export function sanitizeHost(value) {
   return v;
 }
 
+/**
+ * Acesso SSH (ADR 0008). `restrito`: a chave do painel tem `command="…"` no authorized_keys
+ * e o painel envia só a palavra do modo; `direto`: o painel envia o script inteiro (V1 e
+ * quem ainda não preparou o servidor).
+ */
+export function sshAccess(value) {
+  return String(value || '').trim().toLowerCase() === 'restrito' ? 'restrito' : 'direto';
+}
+
+/** Arquivo de configuração SSH próprio (`ssh -F`), sempre dentro de data/; vazio = nenhum. */
+export function sshConfigFile(value) {
+  return String(value || '').trim() ? clampPathToData(String(value).trim(), 'ssh/config') : '';
+}
+
 /** Avisos de configuração (valores recusados), mostrados no log ao iniciar. */
 export const configWarnings = [];
 
 export const config = {
   SSH_HOST: sanitizeHost(env('SSH_HOST', 'seu-host')),
+  SSH_CONFIG: sshConfigFile(env('SSH_CONFIG', '')),
+  SSH_ACESSO: sshAccess(env('SSH_ACESSO', '')),
   POLL_INTERVAL: clampInt(env('POLL_INTERVAL', ''), 60000, 10000, 3600000),
   PORT: clampInt(env('PORT', ''), 3000, 1, 65535),
   HISTORY_LIMIT: clampInt(env('HISTORY_LIMIT', ''), 4320, 100, 100000),
