@@ -39,7 +39,7 @@ export function parseFlags(args) {
     if (!a.startsWith('--')) { flags._.push(a); continue; }
     const [k, v] = a.slice(2).split('=');
     if (v !== undefined) flags[k] = v;
-    else if (args[i + 1] && !args[i + 1].startsWith('--') && ['servidor', 'usuario', 'porta', 'pastas', 'smart', 'rede', 'servicos', 'identidade', 'importar-v1', 'disco', 'memoria', 'temperatura'].includes(k)) { flags[k] = args[i + 1]; i += 1; } else flags[k] = true;
+    else if (args[i + 1] && !args[i + 1].startsWith('--') && ['servidor', 'usuario', 'porta', 'pastas', 'smart', 'rede', 'servicos', 'identidade', 'importar-v1', 'disco', 'memoria', 'temperatura', 'modo'].includes(k)) { flags[k] = args[i + 1]; i += 1; } else flags[k] = true;
   }
   return flags;
 }
@@ -200,7 +200,7 @@ export async function instalar({ out, root, args, reconfigurar = false, deps = {
   const inst = deps.inst ?? new Instalacao({ root });
   if (flags.terminal) {
     const { runTui } = await import('../setup/tui.js');
-    return runTui({ out, inst, root });
+    return runTui({ out, inst, root, open: deps.open ?? openBrowser });
   }
   if (flags['sem-interface']) {
     const { runHeadless } = await import('../setup/sem-interface.js');
