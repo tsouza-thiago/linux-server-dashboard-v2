@@ -8,13 +8,16 @@ import { computeRates } from './rates.js';
 
 export const SSH_OPTS = ['-o', 'BatchMode=yes', '-o', 'ConnectTimeout=10'];
 export const SMART_INTERVAL_MS = 3600000;
+// Uma coleta normal tem ~3–7 KB. Acima de 1 MB a resposta não é a da coleta (servidor
+// comprometido ou quebrado): a conexão é cortada para não encher a memória desta máquina.
+export const MAX_OUTPUT_BYTES = 1024 * 1024;
 
 /**
  * Executa 1 comando no host por SSH não interativo. Nunca lança: devolve o resultado.
  * Com `configFile`, usa só aquele arquivo (`ssh -F`, data/ssh/config): o ~/.ssh/config da
  * pessoa não entra na conta e o known_hosts é o do painel.
  */
-export function runSSH(host, command, timeoutMs = 45000, { configFile = '' } = {}) {
+export function runSSH(host, command, timeoutMs = 45000, { configFile = '', maxBytes = MAX_OUTPUT_BYTES } = {}) {
   return new Promise((resolve) => {
     if (!host || String(host).startsWith('-')) {
       resolve({ stdout: '', stderr: '', code: 255, timedOut: false, error: 'host inválido' });
@@ -25,14 +28,26 @@ export function runSSH(host, command, timeoutMs = 45000, { configFile = '' } = {
     let stdout = '';
     let stderr = '';
     let timedOut = false;
+    let bytes = 0;
+    let tooBig = false;
     const timer = setTimeout(() => {
       timedOut = true;
       child.kill('SIGKILL');
     }, timeoutMs);
-    child.stdout.on('data', (d) => { stdout += d; });
-    child.stderr.on('data', (d) => { stderr += d; });
+    const take = (d) => {
+      bytes += d.length;
+      if (bytes <= maxBytes) return String(d);
+      if (!tooBig) { tooBig = true; child.kill('SIGKILL'); }
+      return '';
+    };
+    child.stdout.on('data', (d) => { stdout += take(d); });
+    child.stderr.on('data', (d) => { stderr += take(d); });
     child.on('close', (code) => {
       clearTimeout(timer);
+      if (tooBig) {
+        resolve({ stdout: '', stderr: '', code, timedOut, error: `resposta grande demais (mais de ${Math.round(maxBytes / 1024)} KB) — não parece a coleta; a conexão foi cortada` });
+        return;
+      }
       resolve({ stdout, stderr, code, timedOut });
     });
     child.on('error', (err) => {

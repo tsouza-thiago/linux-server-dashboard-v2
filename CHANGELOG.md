@@ -8,6 +8,12 @@ pré-versões `2.0.0-alpha.N` (uma por fase do plano), depois `beta`, `rc` e `2.
 
 ## [Não publicado]
 
+### Segurança
+
+- A resposta do SSH tem limite de 1 MB (`MAX_OUTPUT_BYTES`). Um servidor comprometido que
+  responde sem parar não enche mais a memória desta máquina: a conexão é cortada e a coleta
+  falha com o motivo.
+
 ## [2.0.0-alpha.8] — 2026-10-08
 
 Fase F7 do plano (instalação). Um comando no terminal abre um assistente de 6 passos no
