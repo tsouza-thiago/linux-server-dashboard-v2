@@ -8,6 +8,7 @@ import { isPlaceholderHost, loadEnvFile } from '../config.js';
 import { createLoginCode } from '../http/entrar.js';
 import { makeOutput } from './saida.js';
 import { openBrowser, panelStatus, startPanel, stopPanel } from './servico.js';
+import { instalar } from './instalar.js';
 
 export const ROOT = path.join(path.dirname(fileURLToPath(import.meta.url)), '..', '..');
 
@@ -48,6 +49,8 @@ export function panelUrl(root, port) {
 }
 
 const COMMANDS = {
+  instalar: (ctx) => instalar(ctx),
+  reconfigurar: (ctx) => instalar({ ...ctx, reconfigurar: true }),
   async ajuda({ out }) { out.line(HELP); return 0; },
   async versao({ out, root }) { out.line(`Server Dashboard ${version(root)}`); return 0; },
 

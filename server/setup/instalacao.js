@@ -265,6 +265,10 @@ export class Instalacao {
     return {
       acoes: this.plano.actions,
       comandos: this.plano.displayed,
+      hash: this.plano.hash,
+      linhaChave: this.plano.keyLine,
+      temSmart: Boolean(this.plano.sudoersLine),
+      chave: `~/.ssh/${path.basename(this.chave.file)}`,
       blocos: this.plano.manualBlocks,
       from: this.preparo.from,
       clientIp: ip,

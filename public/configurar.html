@@ -1,0 +1,35 @@
+<!DOCTYPE html>
+<html lang="pt-BR" data-theme="dark">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="color-scheme" content="dark light">
+  <title>Server Dashboard · configuração inicial</title>
+  <link rel="icon" href="icone.svg" type="image/svg+xml">
+  <link rel="preload" href="fonts/geist-variable.woff2" as="font" type="font/woff2" crossorigin>
+  <link rel="preload" href="fonts/geist-mono-variable.woff2" as="font" type="font/woff2" crossorigin>
+  <link rel="stylesheet" href="css/tokens.css">
+  <link rel="stylesheet" href="css/base.css">
+  <link rel="stylesheet" href="css/components.css">
+  <link rel="stylesheet" href="css/configurar.css">
+  <script type="module" src="js/configurar/main.js"></script>
+</head>
+<body>
+  <a class="skip-link" href="#wz-main">Pular para o conteúdo</a>
+  <div class="wz" id="wz">
+    <header class="wz-w wz-head">
+      <div class="wz-brand">
+        <span class="wz-mark"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="3 12 7 12 10 5 14 19 17 12 21 12"/></svg></span>
+        <span class="wz-brand-text"><span class="wz-brand-name">Server Dashboard</span><span class="wz-brand-sub">Configuração inicial</span></span>
+      </div>
+      <div class="wz-head-right">
+        <span class="wz-meta" id="wzMeta" aria-live="polite"></span>
+        <button class="icon-btn" id="wzTheme" type="button" aria-label="Usar tema claro"></button>
+      </div>
+    </header>
+    <div class="wz-w" id="wzSteps"></div>
+    <div class="wz-w wz-body" id="wz-main" tabindex="-1"></div>
+    <div class="visually-hidden" id="wzLive" role="status" aria-live="polite"></div>
+  </div>
+</body>
+</html>
