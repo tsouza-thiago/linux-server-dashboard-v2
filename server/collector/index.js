@@ -41,7 +41,7 @@ export function describeError({ code, error, stderr, timedOut }) {
   if (timedOut) return 'timeout — servidor não respondeu (rede/servidor fora do ar?)';
   if (error) return error;
   if (stderr && /Host key verification/i.test(stderr)) {
-    return 'chave do servidor não autorizada — rode ./install.sh para autorizar';
+    return 'identidade do servidor desconhecida ou mudou — confira e rode ./dashboard reconfigurar';
   }
   if (code === 255) return 'SSH falhou (exit 255) — host não encontrado ou chave inválida';
   if (code !== null && code !== undefined) return `SSH falhou (exit ${code})`;

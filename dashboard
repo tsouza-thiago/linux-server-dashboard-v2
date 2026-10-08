@@ -1,0 +1,23 @@
+#!/usr/bin/env bash
+# ============================================================
+# Server Dashboard — comando único (ADR 0011)
+#
+#   ./dashboard instalar        primeira instalação (abre o assistente)
+#   ./dashboard abrir           abre o painel no navegador
+#   ./dashboard iniciar | parar | status
+#   ./dashboard diagnosticar    explica o que está errado e como resolver
+#   ./dashboard ajuda           todos os comandos
+#
+# Este arquivo só garante o Node.js 24 (sem sudo) e passa a vez para a CLI em Node.
+# ============================================================
+set -euo pipefail
+ROOT="$(cd "$(dirname "$(readlink -f "${BASH_SOURCE[0]}")")" && pwd)"
+# shellcheck source=scripts/node-runtime.sh
+. "$ROOT/scripts/node-runtime.sh"
+
+if ! ensure_node "$ROOT"; then
+  echo "ERRO: sem Node.js ${NODE_MIN_MAJOR}. Rode ./dashboard diagnosticar depois de resolver o problema acima." >&2
+  exit 1
+fi
+export DASHBOARD_NODE_ORIGEM="$NODE_ORIGEM"
+exec "$NODE_BIN" "$ROOT/server/cli/index.js" "$@"

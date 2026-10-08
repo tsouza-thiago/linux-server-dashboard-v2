@@ -112,8 +112,19 @@ test('securityHeaders inclui proteções extras e frame-ancestors', () => {
   assert.ok(res.headers['permissions-policy'].includes('geolocation=()'));
   assert.ok(res.headers['content-security-policy'].includes("frame-ancestors 'none'"));
 });
-test('log do painel nasce com permissão 0600 (não depende do chmod depois de abrir)', async () => {
-  const { readFileSync } = await import('node:fs');
-  const src = readFileSync(new URL('../../server/index.js', import.meta.url), 'utf8');
-  assert.match(src, /createWriteStream\(LOG_FILE, \{[^}]*mode: 0o600/);
+test('log do painel nasce com permissão 0600 (não depende do chmod depois de abrir)', async (t) => {
+  const fs = await import('node:fs');
+  const os = await import('node:os');
+  const path = await import('node:path');
+  const { createLogFile } = await import('../../server/logfile.js');
+  const src = fs.readFileSync(new URL('../../server/index.js', import.meta.url), 'utf8');
+  assert.match(src, /createLogFile\(LOG_FILE\)/, 'o painel usa o log com permissão restrita');
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'dash-logperm-'));
+  const old = process.umask(0);
+  t.after(() => { process.umask(old); fs.rmSync(dir, { recursive: true, force: true }); });
+  const log = createLogFile(path.join(dir, 'sub', 'dashboard.log'));
+  log.write('linha');
+  log.close();
+  assert.equal(fs.statSync(path.join(dir, 'sub', 'dashboard.log')).mode & 0o777, 0o600, 'mesmo com umask 000');
+  assert.equal(fs.statSync(path.join(dir, 'sub')).mode & 0o777, 0o700);
 });

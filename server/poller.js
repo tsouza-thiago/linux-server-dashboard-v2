@@ -53,7 +53,7 @@ const isCLI = process.argv[1] && import.meta.url.endsWith(process.argv[1].split(
 if (isCLI) {
   const host = config.SSH_HOST;
   if (isPlaceholderHost(host)) {
-    console.error('ERRO: SSH_HOST não configurado. Rode ./install.sh ou edite o .env.');
+    console.error('ERRO: SSH_HOST não configurado. Rode ./dashboard instalar.');
     process.exit(1);
   }
   const res = await collect({ host, prev: null });

@@ -75,7 +75,7 @@ function runOnce(host, command, timeoutMs = 45000) {
 async function main() {
   const host = config.SSH_HOST;
   if (isPlaceholderHost(host)) {
-    console.error('ERRO: SSH_HOST não configurado no .env. Rode ./install.sh antes.');
+    console.error('ERRO: SSH_HOST não configurado no .env. Rode ./dashboard instalar antes.');
     process.exit(1);
   }
   console.log('Capturando 1 amostra (1 conexão SSH, somente leitura)…');

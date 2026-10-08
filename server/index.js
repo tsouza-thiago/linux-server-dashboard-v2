@@ -1,9 +1,9 @@
-import fs from 'node:fs';
 import path from 'node:path';
 import { createRouter, jsonBody } from './http/router.js';
 import { serveStatic } from './http/static.js';
 import { SseHub, lastEventId, sampleId, MAX_BACKFILL } from './http/sse.js';
 import { SessionStore, SESSION_COOKIE, sessionCookie, clearSessionCookie, safeEqual } from './http/session.js';
+import { consumeLoginCode } from './http/entrar.js';
 import { History, RAW_RETENTION_MS, ROLLUP_DAYS } from './storage/index.js';
 import { migrateV1 } from './storage/migrate-v1.js';
 import { AlertsStore, AnnotationsStore } from './stores.js';
@@ -14,6 +14,7 @@ import { VERSION } from './version.js';
 import { config, configWarnings, ROOT, isPlaceholderHost } from './config.js';
 import { hostCheck, csrfCheck, securityHeaders, makeRequireAuth, issueCsrfCookie, makeRateLimit, parseCookies } from './security.js';
 import { toCSV } from './csv.js';
+import { createLogFile } from './logfile.js';
 
 export function createApp(deps = {}) {
   const SSH_HOST = deps.sshHost ?? config.SSH_HOST;
@@ -201,6 +202,20 @@ export function createApp(deps = {}) {
     res.json({ ok: true });
   });
 
+  // Link de uso único de `dashboard abrir` e do fim da instalação: entra sem digitar o token.
+  app.get('/entrar', loginRateLimit, (req, res) => {
+    if (DASH_TOKEN && consumeLoginCode(DATA_DIR, req.query.codigo)) {
+      res.appendHeader('Set-Cookie', sessionCookie(sessions.create()));
+      log(`login OK pelo link de uso único (${sessions.count} sessão(ões) ativa(s))`);
+    } else if (DASH_TOKEN) {
+      log('link de entrada recusado: código inválido, usado ou vencido');
+    }
+    res.statusCode = 302;
+    res.setHeader('Location', '/');
+    res.setHeader('Cache-Control', 'no-store');
+    res.end();
+  });
+
   app.post('/api/logout', (req, res) => {
     const sid = parseCookies(req.headers.cookie)[SESSION_COOKIE];
     if (sid) sessions.revoke(sid);
@@ -373,13 +388,11 @@ export function startServer() {
   const PORT = config.PORT;
   const LOG_FILE = config.LOG_FILE;
 
-  fs.mkdirSync(path.dirname(LOG_FILE), { recursive: true, mode: 0o700 });
-  const logStream = fs.createWriteStream(LOG_FILE, { flags: 'a', mode: 0o600 });
-  try { fs.chmodSync(LOG_FILE, 0o600); } catch { /* best-effort */ }
+  const logFile = createLogFile(LOG_FILE);
   const log = (msg) => {
     const line = `[${new Date().toISOString()}] ${msg}`;
     console.log(line);
-    logStream.write(`${line}\n`);
+    logFile.write(line);
   };
   for (const w of configWarnings) log(`AVISO de configuração: ${w}`);
 
@@ -408,7 +421,7 @@ const isCLI = process.argv[1] && import.meta.url.endsWith(process.argv[1].split(
 if (isCLI) {
   if (isPlaceholderHost(config.SSH_HOST)) {
     console.warn(`AVISO: SSH_HOST está com o valor padrão "${config.SSH_HOST}".`);
-    console.warn('       Rode ./install.sh para configurar o acesso SSH ao servidor.');
+    console.warn('       Rode ./dashboard instalar para configurar o acesso ao servidor.');
   }
   startServer();
 }
