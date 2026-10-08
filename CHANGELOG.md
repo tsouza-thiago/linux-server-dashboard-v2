@@ -42,7 +42,8 @@ restrita à coleta. Instalação de ponta a ponta validada em contêineres Debia
 - **Versões assinadas** (ADR 0012): tags conferidas com `docs/allowed_signers`; num clone do
   branch principal o instalador fixa na tag assinada mais nova; `atualizar` confere a
   versão nova com a lista da versão instalada, faz backup de `data/` e volta atrás sozinho
-  se a nova não subir.
+  se a nova não subir. Chave do mantenedor: `tsouza-thiago`
+  (`SHA256:g4S28XtDHDCsoRtHVAQAl7RGh5+iB9uCR0dtHuwM2x8`).
 - `diagnosticar` explica cada problema ("O que aconteceu / Como resolver") usando a última
   amostra gravada, sem SSH extra; `desinstalar` oferece limpar o servidor.
 - **Upgrade V1 → V2**: `./dashboard instalar --importar-v1 <pasta>` para a V1, traz o `.env`
