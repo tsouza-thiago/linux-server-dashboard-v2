@@ -9,14 +9,19 @@ import { computeRates } from './rates.js';
 export const SSH_OPTS = ['-o', 'BatchMode=yes', '-o', 'ConnectTimeout=10'];
 export const SMART_INTERVAL_MS = 3600000;
 
-/** Executa 1 comando no host por SSH não interativo. Nunca lança: devolve o resultado. */
-export function runSSH(host, command, timeoutMs = 45000) {
+/**
+ * Executa 1 comando no host por SSH não interativo. Nunca lança: devolve o resultado.
+ * Com `configFile`, usa só aquele arquivo (`ssh -F`, data/ssh/config): o ~/.ssh/config da
+ * pessoa não entra na conta e o known_hosts é o do painel.
+ */
+export function runSSH(host, command, timeoutMs = 45000, { configFile = '' } = {}) {
   return new Promise((resolve) => {
     if (!host || String(host).startsWith('-')) {
       resolve({ stdout: '', stderr: '', code: 255, timedOut: false, error: 'host inválido' });
       return;
     }
-    const child = spawn('ssh', [...SSH_OPTS, host, command], { stdio: ['ignore', 'pipe', 'pipe'] });
+    const args = [...(configFile ? ['-F', configFile] : []), ...SSH_OPTS, host, command];
+    const child = spawn('ssh', args, { stdio: ['ignore', 'pipe', 'pipe'] });
     let stdout = '';
     let stderr = '';
     let timedOut = false;
@@ -41,7 +46,7 @@ export function describeError({ code, error, stderr, timedOut }) {
   if (timedOut) return 'timeout — servidor não respondeu (rede/servidor fora do ar?)';
   if (error) return error;
   if (stderr && /Host key verification/i.test(stderr)) {
-    return 'chave do servidor não autorizada — rode ./install.sh para autorizar';
+    return 'identidade do servidor desconhecida ou mudou — confira e rode ./dashboard reconfigurar';
   }
   if (code === 255) return 'SSH falhou (exit 255) — host não encontrado ou chave inválida';
   if (code !== null && code !== undefined) return `SSH falhou (exit ${code})`;
@@ -50,7 +55,7 @@ export function describeError({ code, error, stderr, timedOut }) {
 
 /** O SMART é pedido quando há discos configurados e o último teste tem mais de 1 intervalo. */
 export function smartDue(targets, prev, nowMs, intervalMs = SMART_INTERVAL_MS) {
-  if (!targets.devs.length) return false;
+  if (!(targets.smartDevs ?? targets.devs).length) return false;
   const last = prev && prev.smartAt ? Date.parse(prev.smartAt) : NaN;
   return !Number.isFinite(last) || nowMs - last >= intervalMs;
 }
@@ -64,14 +69,16 @@ export function smartDue(targets, prev, nowMs, intervalMs = SMART_INTERVAL_MS) {
  * @param {Function} [p.runner] (host, command) => resultado do SSH (injetável nos testes)
  * @param {Function} [p.alerts] amostra => lista de alertas
  * @param {number} [p.now] relógio (ms), injetável
+ * @param {'direto'|'restrito'} [p.access] restrito: o script mora no authorized_keys e o
+ *   painel envia só a palavra do modo ("basico" ou "smart")
  */
-export async function collect({ host, prev = null, targets, runner = runSSH, alerts = () => [], now = Date.now() }) {
+export async function collect({ host, prev = null, targets, runner = runSSH, alerts = () => [], now = Date.now(), access = 'direto' }) {
   const t = normalizeTargets(targets);
   const ts = new Date(now).toISOString();
   const mode = smartDue(t, prev, now) ? 'smart' : 'basico';
   const { script, hash } = buildScript(t, mode);
   const started = performance.now();
-  const { stdout, stderr, code, timedOut, error } = await runner(host, script);
+  const { stdout, stderr, code, timedOut, error } = await runner(host, access === 'restrito' ? mode : script);
   const durationMs = Math.round(performance.now() - started);
   if (code !== 0 || !stdout || !stdout.includes('===HOST===')) {
     return { ok: false, error: describeError({ code, error, stderr, timedOut }), ts };

@@ -67,7 +67,8 @@ relevantes e suas mitigações:
 ### 6. Exposição local de telemetria (permissões)
 - **Ameaça:** outro usuário local lê `.env` e `data/` (hostnames, IPs, telemetria).
 - **Mitigação:** `data/` é criada com `0700`; `.env` e os arquivos de dados são gravados
-  com `0600`. `install.sh`/`start.sh` reforçam as permissões a cada execução.
+  com `0600`, assim como `data/ssh/` (0700) e a chave do painel (0600). O
+  `./dashboard diagnosticar` aponta qualquer arquivo aberto demais e o `chmod` exato.
 
 ### 7. Escrita fora da pasta de dados
 - **Ameaça:** `HISTORY_FILE`/`LOG_FILE` apontando para fora do projeto (ex.: sobrescrever
@@ -77,13 +78,44 @@ relevantes e suas mitigações:
 
 ### 8. Verificação de host key (MITM no SSH)
 - **Ameaça:** aceitar qualquer host key (sem checagem) permite ataque do meio no SSH.
-- **Mitigação:** o `install.sh` grava o alias com `StrictHostKeyChecking accept-new`
-  (aceita só a primeira vez, depois valida). O poller usa `BatchMode=yes`. Nada de
+- **Mitigação:** na instalação, a identidade do servidor (SHA-256, em blocos) é mostrada
+  **antes** da senha, com o comando para conferir no próprio servidor; só depois do "Este
+  é o meu servidor" ela vai para o `known_hosts` próprio do painel (`data/ssh/`). Daí em
+  diante, `ssh -F data/ssh/config` com `StrictHostKeyChecking yes` e o `HostKeyAlgorithms`
+  do tipo conferido: identidade diferente = coleta parada e aviso claro. O modo
+  `--sem-interface` exige a impressão digital (`--identidade`). Nada de
   `StrictHostKeyChecking no` nem `UserKnownHostsFile /dev/null`.
+
+### 8b. Chave do painel vazada (ADR 0008)
+- **Ameaça:** alguém copia `~/.ssh/dashboard_ed25519` e tenta usar o servidor.
+- **Mitigação:** a chave pertence ao usuário `dashmon` (sem senha, sem poderes) e o
+  `authorized_keys` dela é `restrict,from="<IP deste computador>",command="<coleta>"`: sem
+  terminal, sem encaminhamentos, só a coleta e só a partir daqui. O que o cliente pede só
+  escolhe entre `basico` e `smart` (outro texto vira `basico`, nunca é executado). O
+  `sudo` do `dashmon` vale apenas para `smartctl -H /dev/X`, um por disco (no sudoers, `*`
+  também casaria espaços e outras opções), validado com `visudo -cf` antes de ativar.
+- **Verificado por:** `test/integration/ssh-restrito.test.js` (sshd de verdade).
+
+### 8c. Senha do administrador na instalação
+- **Ameaça:** a senha usada para preparar o servidor vazar em disco, log ou `ps`.
+- **Mitigação:** fica só na memória do assistente, do passo 3 ao fim do passo 5. O `ssh`
+  a pede ao `scripts/askpass.sh`, que a lê de uma variável de ambiente só daquele processo;
+  no servidor ela entra como variável do `sh` (script pelo stdin) e vai ao `sudo -S -k`
+  pelo stdin, depois de conferida sozinha (senha errada não faz o sudo ler o script).
+  Nunca vai na linha de comando. O assistente web só abre com código de uso único
+  (cookie HttpOnly + SameSite=Strict) e tem as mesmas proteções do painel.
+
+### 8d. Versão adulterada (ADR 0012)
+- **Ameaça:** instalar ou atualizar para um código que não é o publicado.
+- **Mitigação:** releases são tags assinadas (SSH) conferidas com `docs/allowed_signers`
+  (`gpg.ssh.program` fixado, nada da configuração do git da pessoa muda o resultado). No
+  `./dashboard atualizar`, a versão nova é conferida com a lista de chaves da versão **já
+  instalada** (copiada antes do checkout). uPlot, fontes e o Node baixado são conferidos
+  por SHA-256.
 
 ### 9. Acesso à API sem credencial (camada extra)
 - **Ameaça (avançada):** se por algum motivo o painel for exposto, acesso aberto.
-- **Mitigação:** o instalador gera um `DASH_TOKEN` automático (configurável no `.env`).
+- **Mitigação:** a instalação gera um `DASH_TOKEN` automático (configurável no `.env`).
   Quando definido, toda a API/SSE exige uma sessão (cookie `dash_session` HttpOnly +
   SameSite=Strict, 30 dias renovados com o uso, obtido 1x na tela de login) ou
   `Authorization: Bearer <token>` para scripts. O token **nunca** vai na URL (`?token=`
@@ -137,36 +169,25 @@ Desenhado para não tocar em nada além de leitura no servidor monitorado:
   com o mínimo exigido pelo seu ambiente.
 - Abra o painel sempre por `http://localhost:3000` ou `http://127.0.0.1:3000`.
 - Não torne o dashboard acessível fora da máquina local; para acesso remoto use VPN/túnel SSH.
-- Não use `StrictHostKeyChecking no` no `~/.ssh/config` (desativa a verificação de
-  identidade do servidor). Prefira `accept-new`.
+- Ao instalar, confira a identidade do servidor com
+  `ssh-keygen -lf /etc/ssh/ssh_host_ed25519_key.pub` no próprio servidor.
 - Se qualquer nome/uso de chave SSH tiver vazado em repositório ou histórico público,
   **rotacione a chave** imediatamente (veja abaixo).
-- O `DASH_TOKEN` já vem gerado pelo instalador. Se quiser trocá-lo, edite o `.env` e
+- O `DASH_TOKEN` já vem gerado pela instalação. Se quiser trocá-lo, edite o `.env` e
   gere um novo com `openssl rand -hex 16`.
 
 ---
 
 ## Rotação de chave SSH (recomendado se houve vazamento)
 
-Se o nome ou o uso de uma chave apareceu em histórico público de git, trate a chave
-como comprometida e rotacione:
+Se a chave do painel pode ter vazado:
 
-1. Na **máquina local**, gere um novo par de chaves:
-   ```bash
-   ssh-keygen -t ed25519 -f ~/.ssh/dashboard_ed25519 -C "usuario@maquina" -N ""
-   ```
-   (ou use um nome novo; depois ajuste o `~/.ssh/config`.)
-2. Copie a chave pública para o servidor (executado da máquina local, uma única vez):
-   ```bash
-   ssh-copy-id -i ~/.ssh/dashboard_ed25519.pub seu-host
-   ```
-   (ou acrescente a linha em `~/.ssh/authorized_keys` no servidor manualmente.)
-3. Confirme que o `~/.ssh/config` aponta para a chave nova
-   (`IdentityFile ~/.ssh/dashboard_ed25519`) com `StrictHostKeyChecking accept-new`.
-4. Teste: `ssh seu-host 'echo ok'` deve responder `ok` sem senha.
-5. **Remova a chave antiga** da máquina local e do `authorized_keys` do servidor,
-   depois descarte-a.
-6. Atualize o `SSH_HOST`/configs do projeto se o alias mudou.
+1. Apague a chave local (`~/.ssh/dashboard_ed25519` e o `.pub`, ou a
+   `dashboard_v2_ed25519`, se for ela que aparece em `data/ssh/config`).
+2. Rode `./dashboard reconfigurar`: uma chave nova é criada e o passo "Preparar o
+   servidor" troca a linha do `authorized_keys` do `dashmon` (a antiga deixa de valer).
+3. `./dashboard diagnosticar` deve terminar sem erros.
 
-> Regra do projeto: o `~/.ssh/config` usa o mesmo alias em `SSH_HOST` do `.env`.
-> O `install.sh` (`--configure`) refaz esse fluxo para você.
+Instalações vindas da V1 usam a chave da V1, com acesso completo ao servidor, até o
+primeiro `./dashboard reconfigurar`. Depois dele, remova a linha antiga da V1 do
+`authorized_keys` do usuário que ela usava no servidor.

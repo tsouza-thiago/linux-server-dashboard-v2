@@ -61,7 +61,8 @@ export function anonymize(raw, { sshHost = '' } = {}) {
 
 function runOnce(host, command, timeoutMs = 45000) {
   return new Promise((resolve) => {
-    const child = spawn('ssh', [...SSH_OPTS, host, command], { stdio: ['ignore', 'pipe', 'pipe'] });
+    const sshArgs = [...(config.SSH_CONFIG ? ['-F', config.SSH_CONFIG] : []), ...SSH_OPTS, host, command];
+    const child = spawn('ssh', sshArgs, { stdio: ['ignore', 'pipe', 'pipe'] });
     let stdout = '';
     let stderr = '';
     const timer = setTimeout(() => child.kill('SIGKILL'), timeoutMs);
@@ -75,13 +76,14 @@ function runOnce(host, command, timeoutMs = 45000) {
 async function main() {
   const host = config.SSH_HOST;
   if (isPlaceholderHost(host)) {
-    console.error('ERRO: SSH_HOST não configurado no .env. Rode ./install.sh antes.');
+    console.error('ERRO: SSH_HOST não configurado no .env. Rode ./dashboard instalar antes.');
     process.exit(1);
   }
   console.log('Capturando 1 amostra (1 conexão SSH, somente leitura)…');
   console.log('Se o painel estiver rodando, esta será uma coleta extra neste minuto.');
   const started = Date.now();
-  const { stdout, stderr, code } = await runOnce(host, buildCommand({}, 'smart'));
+  // Com a chave restrita, o script mora no authorized_keys: basta pedir o modo.
+  const { stdout, stderr, code } = await runOnce(host, config.SSH_ACESSO === 'restrito' ? 'smart' : buildCommand({}, 'smart'));
   const ms = Date.now() - started;
   if (code !== 0 || !stdout.includes('===HOST===')) {
     console.error(`ERRO: a coleta falhou (código ${code}). ${stderr.trim()}`);

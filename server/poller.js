@@ -17,6 +17,7 @@ export function configTargets() {
     netIf: config.NET_IF,
     mounts: config.DISK_MOUNTS,
     devs: config.DISK_DEVS,
+    smartDevs: config.SMART_DEVS,
     services: config.SERVICES,
   });
 }
@@ -31,6 +32,8 @@ export function buildCommand(overrides = {}, mode = 'basico') {
     netIf: overrides.netIf ?? base.netIf,
     mounts: overrides.diskMounts ?? overrides.mounts ?? base.mounts,
     devs: overrides.diskDevs ?? overrides.devs ?? base.devs,
+    // Discos trocados no override sem SMART explícito: o SMART segue os mesmos discos.
+    smartDevs: overrides.smartDevs ?? (overrides.diskDevs || overrides.devs ? undefined : base.smartDevs),
     services: overrides.services ?? base.services,
   };
   return buildScript(targets, mode).script;
@@ -44,16 +47,19 @@ export function computeAlerts(sample, thresholds = config.ALERTS) {
   return evaluate(sample, thresholds).conditions;
 }
 
-/** Coleta com os alvos do .env; mesmos parâmetros da V1 (`runner` recebe host e comando). */
-export function collect({ host, prev, runner, targets = configTargets(), now } = {}) {
-  return collectV2({ host, prev, runner, targets, now, alerts: computeAlerts });
+/** SSH com a configuração própria do painel (data/ssh/config), quando houver. */
+export const configRunner = (host, command) => runSSH(host, command, 45000, { configFile: config.SSH_CONFIG });
+
+/** Coleta com os alvos e o acesso do .env; mesmos parâmetros da V1 (`runner` recebe host e comando). */
+export function collect({ host, prev, runner = configRunner, targets = configTargets(), now, access = config.SSH_ACESSO } = {}) {
+  return collectV2({ host, prev, runner, targets, now, access, alerts: computeAlerts });
 }
 
 const isCLI = process.argv[1] && import.meta.url.endsWith(process.argv[1].split('/').pop());
 if (isCLI) {
   const host = config.SSH_HOST;
   if (isPlaceholderHost(host)) {
-    console.error('ERRO: SSH_HOST não configurado. Rode ./install.sh ou edite o .env.');
+    console.error('ERRO: SSH_HOST não configurado. Rode ./dashboard instalar.');
     process.exit(1);
   }
   const res = await collect({ host, prev: null });

@@ -5,12 +5,12 @@
 // Corrigidos na F2: B4, B7, B8, B11 (detalhes em test/unit/storage-*.test.js).
 // Corrigidos na F3: B3, B9 (detalhes em test/unit/alerts-*.test.js).
 // Corrigidos na F5: B5, B10 (detalhes em test/unit/front-core.test.js).
+// Corrigido na F7: B12 (detalhes em test/unit/cli-servico.test.js). Nenhum bug da V1 aberto.
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import { fileURLToPath } from 'node:url';
 import { parseOutput, computeAlerts } from '../../server/poller.js';
 import { AlertsStore } from '../../server/stores.js';
 import { OutageLog } from '../../server/storage/outages.js';
@@ -18,10 +18,11 @@ import { toCSV } from '../../server/csv.js';
 import { RawStore } from '../../server/storage/ndjson.js';
 import { downsample } from '../../server/storage/buckets.js';
 import { createApp } from '../../server/index.js';
+import { spawn } from 'node:child_process';
+import { stopPanel } from '../../server/cli/servico.js';
 import { dailySummary } from '../../public/js/core/analysis.js';
 import { markersInRange } from '../../public/js/charts/timeseries.js';
 
-const ROOT = path.join(path.dirname(fileURLToPath(import.meta.url)), '..', '..');
 const TS = '2026-10-07T12:00:00.000Z';
 const OPTS = { svcOrder: [], devSet: new Set() };
 const tmpDir = () => fs.mkdtempSync(path.join(os.tmpdir(), 'lsd-bugs-'));
@@ -132,10 +133,22 @@ test('B11 — encerramento grava o histórico pendente antes de sair', async () 
   assert.ok(flushed);
 });
 
-test('B12 — stop.sh só encerra o processo que o próprio painel registrou', { todo: 'B12 · corrigir na F7 (comando dashboard)' }, () => {
-  const stop = fs.readFileSync(path.join(ROOT, 'stop.sh'), 'utf8');
-  assert.doesNotMatch(stop, /lsof\s+-t\s+-i/, 'fallback por porta pode matar processo alheio');
-  assert.doesNotMatch(stop, /pgrep\s+-f/, 'fallback por nome pode matar processo alheio');
+test('B12 — parar só encerra o processo que o próprio painel registrou', async (t) => {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'dash-b12-'));
+  fs.mkdirSync(path.join(root, 'server'));
+  fs.mkdirSync(path.join(root, 'data'));
+  fs.writeFileSync(path.join(root, 'server', 'index.js'), 'setInterval(() => {}, 1000);');
+  const alheio = spawn(process.execPath, ['-e', 'setInterval(() => {}, 1000)'], { stdio: 'ignore' });
+  t.after(() => { alheio.kill('SIGKILL'); fs.rmSync(root, { recursive: true, force: true }); });
+  const noSystemd = () => ({ error: new Error('sem systemctl') });
+  // A V1 achava "o painel" pela porta (lsof) ou pelo nome (pgrep): com o PID gravado
+  // apontando para outro programa, a V2 só limpa o arquivo e não mata ninguém.
+  fs.writeFileSync(path.join(root, 'data', 'dashboard.pid'), String(alheio.pid));
+  const r = await stopPanel({ root, home: root, run: noSystemd });
+  assert.equal(r.wasRunning, false);
+  assert.equal(r.stalePid, alheio.pid);
+  assert.doesNotThrow(() => process.kill(alheio.pid, 0), 'o processo alheio continua vivo');
+  assert.equal(fs.existsSync(path.join(root, 'data', 'dashboard.pid')), false);
 });
 
 test('I5 — seção ausente vira "sem dado", nunca zero inventado', () => {

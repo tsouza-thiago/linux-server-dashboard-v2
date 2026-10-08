@@ -91,7 +91,8 @@ test('anti-injeção: tokens perigosos nunca chegam ao comando', () => {
     services: ['smbd', 'x&&reboot', '"q"'],
   };
   const t = normalizeTargets(evil);
-  assert.deepEqual(t, { netIf: '', mounts: ['/'], devs: ['sda'], services: ['smbd'] });
+  assert.deepEqual(t, { netIf: '', mounts: ['/'], devs: ['sda'], smartDevs: ['sda'], services: ['smbd'] });
+  assert.deepEqual(normalizeTargets({ devs: ['sda'], smartDevs: ['sdb;id', 'sdc'] }).smartDevs, ['sdc']);
   const { script } = buildScript(evil, 'smart');
   for (const bad of ['eth0;id', 'rm -rf', '$(id)', '`id`', "a'b", 'nc', 'reboot', '"q"']) {
     assert.ok(!script.includes(bad), `vazou: ${bad}`);
@@ -101,4 +102,14 @@ test('anti-injeção: tokens perigosos nunca chegam ao comando', () => {
 test('tamanho do comando fica pequeno (orçamento do servidor de 1 núcleo)', () => {
   const { script } = buildScript({ ...FULL, mounts: ['/', '/a', '/b', '/c'], devs: ['sda', 'sdb', 'sdc', 'sdd'], services: ['a', 'b', 'c', 'd'] }, 'smart');
   assert.ok(script.length < 4096, `${script.length} bytes`);
+});
+
+test('SMART só nos discos escolhidos; sem a lista, os mesmos de DISK_DEVS (hash da V1 mantido)', () => {
+  const base = { mounts: ['/'], devs: ['sda', 'sdb'] };
+  assert.equal(targetsHash(base), targetsHash({ ...base, smartDevs: ['sda', 'sdb'] }), 'lista igual: mesmo hash de antes');
+  assert.notEqual(targetsHash(base), targetsHash({ ...base, smartDevs: ['sda'] }));
+  const only = buildScript({ ...base, smartDevs: ['sdb'] }, 'smart').script;
+  assert.match(only, /for d in sdb; do/);
+  assert.match(only, /\$3=="sda"\|\|\$3=="sdb"/, 'I/O continua nos dois');
+  assert.ok(!buildScript({ ...base, smartDevs: [] }, 'smart').script.includes('===SMART==='), 'sem SMART, sem seção');
 });

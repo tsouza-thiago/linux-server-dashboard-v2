@@ -39,14 +39,17 @@ responde **1 comando SSH por minuto** — requisito obrigatório (hardware muito
   aplicadas pelo CSSOM em `mount()` — nunca `style="…"` no HTML
 - **Export seguro**: `server/csv.js` previne formula-injection (`=+-@` → prefixo `'`) e
   saneia o nome do arquivo
-- **Permissões**: `data/` (0700), `.env` e arquivos de dados (0600) — reforçadas em
-  `install.sh`/`start.sh` e na escrita (`writeFileSync { mode: 0o600 }`)
-- **Token por padrão + sessão por cookie** (ADR 0007): o `install.sh` gera um `DASH_TOKEN`
+- **Permissões**: `data/` e `data/ssh/` (0700), `.env`, chave e arquivos de dados (0600) —
+  gravados assim pela instalação (`server/setup/local.js`) e na escrita
+  (`writeFileSync { mode: 0o600 }`); o `dashboard diagnosticar` aponta o que estiver aberto
+- **Token por padrão + sessão por cookie** (ADR 0007): a instalação gera um `DASH_TOKEN`
   automático se vazio; com ele, `/api/*` e `/api/stream` exigem sessão (cookie
   `dash_session`, HttpOnly + SameSite=Strict, 30 dias renovados com o uso) ou
   `Authorization: Bearer <token>` (scripts). O token é trocado 1x na tela de login
   (`/api/login`, 10 tentativas/min/IP); em disco (`data/sessions.json`, 0600) fica só o
-  SHA-256 da sessão. `?token=` na URL **não** é aceito. Comparação com `crypto.timingSafeEqual`
+  SHA-256 da sessão. `?token=` na URL **não** é aceito. Comparação com `crypto.timingSafeEqual`.
+  `GET /entrar?codigo=` aceita o link de uso único de `dashboard abrir` (só o hash em
+  `data/entrar.json`, 2 min, vale uma vez)
 - **Throttle**: `/api/poll` com piso de 5s entre coletas manuais; rate limit de
   mutações da API (120/min/IP)
 - **CSRF em 2 camadas**: rejeita `Origin` ≠ Host e `Sec-Fetch-Site: cross-site`; além
@@ -60,15 +63,20 @@ responde **1 comando SSH por minuto** — requisito obrigatório (hardware muito
   caixa-preta e precisa continuar verde
 - **SSE**: no máximo 20 conexões simultâneas (503 acima); reconexão com `Last-Event-ID`
   recupera até 2000 amostras perdidas
-- **SSH seguro**: `BatchMode=yes` + `ConnectTimeout=10`; `SSH_HOST` saneado via
-  `sanitizeHost()` — apenas rejeita `-` inicial e vazio (whitelist de caracteres é
-  exclusiva do `sanitizeToken`, acima); alias do instalador usa
-  `StrictHostKeyChecking accept-new` (nunca `no`/`/dev/null`)
-- **Instalador valida no shell**: `install-lib.sh` (funções puras, sourceada pelo
-  `install.sh`) valida `user`/`host`/`alias`/`porta` antes de tocar em `~/.ssh/config`
-  e `.env` — whitelist `[A-Za-z0-9._-]`, rejeita `-` inicial, espaço, `/` e quebra de
-  linha (bloqueia injeção de diretiva); `ssh-copy-id` roda com `ConnectTimeout=10` e
-  mostra a saída real em caso de falha
+- **SSH seguro e isolado**: `BatchMode=yes` + `ConnectTimeout=10`; com `SSH_CONFIG`, o
+  painel usa só `ssh -F data/ssh/config` e o `known_hosts` próprio com
+  `StrictHostKeyChecking yes` (nunca `no`/`accept-new` depois da instalação); `SSH_HOST`
+  saneado via `sanitizeHost()`
+- **Acesso restrito** (ADR 0008, `SSH_ACESSO=restrito`): usuário `dashmon` sem senha; a
+  linha do `authorized_keys` é `restrict,from=,command="<coleta>"` (gerada e escapada em
+  `server/setup/acesso.js`, conferida contra o `opt_dequote` do OpenSSH) e o painel envia
+  só a palavra do modo (`basico`/`smart`); qualquer outro texto vira `basico`. Sudoers com
+  um `smartctl -H /dev/X` por disco, nunca curinga, validado com `visudo -cf`
+- **Instalação** (`server/setup/`): toda entrada validada em `acesso.js` antes de virar
+  arquivo ou comando; a senha do administrador só em memória (askpass por variável de
+  ambiente do `ssh`, `sudo -S -k` pelo stdin, nunca na linha de comando) e descartada no
+  fim do passo 5; o assistente web só abre com código de uso único e tem as mesmas
+  proteções do painel; versões conferidas por tag assinada (`docs/allowed_signers`)
 
 ## Desenvolvimento da V2 (obrigatório)
 
@@ -109,18 +117,15 @@ A V2 está sendo construída neste repositório a partir da `v1.0.0`, seguindo o
 ## Comandos
 
 ```bash
-./install.sh                    # assistente 1-comando: deps, .env+token, chave SSH, systemd
-./install.sh --auto             # não-interativo: deps + .env + token (sem assistente SSH)
-./install.sh --manual           # só deps + .env (SSH já configurado)
-./install.sh --configure        # só o assistente SSH (trocar servidor)
-./install.sh --test             # roda a suíte de testes
-./install.sh --install-service  # cria/ativa serviço systemd de usuário
-./install.sh --uninstall-service
-./start.sh                      # inicia em primeiro plano
-./start.sh --background         # inicia em segundo plano (PID em data/dashboard.pid)
-./start.sh --status             # mostra se está rodando em segundo plano
-./stop.sh                       # para com segurança (PID file → pgrep → lsof)
-npm start                       # equivalente ao ./start.sh
+./dashboard instalar            # assistente no navegador (--terminal: TUI; --sem-interface: opções)
+./dashboard instalar --importar-v1 <pasta>   # upgrade V1 → V2 (para a V1, traz .env e data/)
+./dashboard abrir               # abre o painel já logado (link de uso único)
+./dashboard iniciar | parar | status   # serviço de usuário ou segundo plano (PID conferido, B12)
+./dashboard diagnosticar        # explica cada problema; usa a última amostra (sem SSH extra)
+./dashboard reconfigurar        # reabre o assistente
+./dashboard atualizar           # tag assinada mais nova, backup de data/, volta atrás se falhar
+./dashboard desinstalar         # remove daqui e oferece limpar o servidor
+npm start                       # o painel em primeiro plano (node server/index.js)
 npm test                        # suíte de testes (node --test, sem deps novas)
 npm run check                   # verificação completa — obrigatória antes de cada commit
 npm run test:unit               # só testes unitários (test/unit)
@@ -135,12 +140,13 @@ node server/poller.js --once    # teste rápido do poller sem o servidor web
 ## Quickstart
 
 ```bash
-./install.sh     # config deps + .env + SSH (assistente)
-./start.sh       # lê .env, carrega histórico, primeiro poll imediato, depois a cada 60s
+./dashboard instalar   # Node 24 conferido, assistente de 6 passos, serviço de usuário
+./dashboard abrir      # painel: primeiro poll imediato, depois a cada 60 s
 ```
 
-- Logs em `data/dashboard.log` (também no console); modo `--background` usa `data/nohup.log`.
-- Sistema de serviço (roda sempre): `./install.sh --install-service`.
+- Logs em `data/dashboard.log` (gira em 5 MB; também no console); erros de inicialização
+  do modo segundo plano em `data/dashboard-erros.log`.
+- Instalação de ponta a ponta em contêineres Debian/Ubuntu: `scripts/e2e-instalacao/rodar.sh`.
 
 ## Configuração (variáveis de ambiente em `.env`)
 
@@ -341,17 +347,16 @@ linux-server-dashboard/
 ├── README.md               ← visão geral, instalação, segurança, FAQ
 ├── SECURITY.md             ← política + threat model de segurança
 ├── LICENSE                 ← MIT
-├── install.sh              ← assistente 1-comando (deps, .env+token, chave SSH, systemd, menus)
-├── install-lib.sh          ← funções puras de validação do instalador (segurança)
-├── start.sh                ← inicia o serviço (primeiro plano, --background ou --status)
-├── stop.sh                 ← para o serviço com segurança (PID file + fallbacks)
+├── dashboard               ← comando único: garante o Node 24 (scripts/node-runtime.sh) e chama server/cli/
 ├── package.json            (sem dependências; devDependency: playwright-core p/ e2e; type: module)
 ├── .env                    (config local — NUNCA commitar)
 ├── .env.example            (modelo sem valores)
 ├── .gitignore              (exclui .env, data/, node_modules/)
-├── data/                   (history/ + rollup/ + alerts.json + annotations.json + logs — runtime)
+├── data/                   (history/ + rollup/ + ssh/ + alerts.json + annotations.json + logs — runtime)
 ├── server/
 │   ├── index.js            (rotas da API, loop de poll, export CSV)
+│   ├── cli/                (subcomandos do ./dashboard: servico.js, instalar.js, diagnosticar.js, atualizar.js, desinstalar.js, importar-v1.js)
+│   ├── setup/              (instalação: acesso.js, deteccao.js, preparo.js, remoto.js, local.js, assinatura.js, instalacao.js, web.js, tui.js, sem-interface.js)
 │   ├── http/               (router.js, static.js, session.js: login por cookie, sse.js: SSE com backfill)
 │   ├── config.js           (parser único do .env, validações, sanitizeToken/sanitizeHost)
 │   ├── security.js         (Host check, CSRF c/ cookie, headers, token timing-safe, rate limit)
@@ -362,12 +367,13 @@ linux-server-dashboard/
 │   ├── alerts/             (rules.js: regras + chaves + histerese; health.js: saúde; engine.js: motor + debounce do offline)
 │   └── stores.js           (JsonStore genérico: AlertsStore c/ ciclo de vida, AnnotationsStore)
 ├── CHANGELOG.md            ← histórico de mudanças (Keep a Changelog)
-├── docs/                   (PLANO_V2.md + adr/ — plano e decisões da V2)
-├── scripts/                (check.mjs, capturar-amostra.mjs)
+├── docs/                   (PLANO_V2.md + adr/ + allowed_signers das releases assinadas)
+├── scripts/                (check.mjs, capturar-amostra.mjs, node-runtime.sh, askpass.sh, e2e-instalacao/)
 ├── test/                   (node --test: unit/, integration/ e e2e/ no Chromium)
 ├── test-support/           (helpers de teste: request HTTP e SSE)
 └── public/
     ├── index.html          (casca: navegação das 8 telas, status, período, login, avisos)
+    ├── configurar.html     (assistente de instalação; js/configurar/ e css/configurar.css)
     ├── css/                (design system V2 — D1: tokens.css escuro/claro, base, components,
     │                        views e print; contraste AA conferido em design-tokens.test.js)
     ├── fonts/              (Geist + Geist Mono 1.7.2, OFL, .woff2 — sem CDN; SHA-256 em vendor.json)
@@ -386,14 +392,12 @@ linux-server-dashboard/
 - **Servidor off (offline):** banner de alerta, dot vermelho, histórico preservado,
   retry automático no próximo intervalo. Verificar: `ping 192.0.2.10`,
   `ssh seu-host 'uptime'`
-- **Poll demorado/parado:** logs em `data/dashboard.log`; testar comando manual:
-  `ssh seu-host 'LC_ALL=C free -m'`
+- **Poll demorado/parado:** logs em `data/dashboard.log`; a faixa de status mostra o
+  tempo e o tamanho de cada coleta
 - **Nenhum dado (histórico vazio):** confira `ls -la data/history/` (arquivos `.ndjson` de hoje) e
   as permissões de escrita na pasta `data/`; veio da V1? `npm run migrar-v1 -- --verificar`
-- **Chave SSH quebrada:** `ssh seu-host 'echo ok'` deve responder `ok` sem pedir senha.
-  Corrigir com `./install.sh --configure` ou `ssh-copy-id -i ~/.ssh/dashboard_ed25519.pub seu-host`
-- **Host key não autorizada:** primeira conexão — `ssh seu-host 'echo ok'` + `yes`,
-  ou rode `./install.sh` (aceita com `accept-new`)
+- **Primeiro passo:** `./dashboard diagnosticar` (explica e diz como resolver)
+- **Chave recusada / identidade mudou / disco novo:** `./dashboard reconfigurar`
 - **403 "Host não permitido":** abra por `http://localhost:3000` ou `http://127.0.0.1:3000`
 - Servidor não expõe nada novo — firewall/serviços do servidor permanecem intocados
 

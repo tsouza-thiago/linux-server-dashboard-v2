@@ -15,58 +15,16 @@ function listJs(dir) {
 }
 
 test('scripts shell têm sintaxe válida (bash -n)', () => {
-  for (const script of ['install.sh', 'install-lib.sh', 'start.sh', 'stop.sh']) {
+  for (const script of ['dashboard', 'scripts/node-runtime.sh']) {
     const file = path.join(ROOT, script);
     assert.doesNotThrow(
       () => execFileSync('bash', ['-n', file], { stdio: 'pipe' }),
       `${script} deveria passar no bash -n`,
     );
   }
-});
-
-test('install-lib.sh valida entradas (segurança)', () => {
-  const lib = path.join(ROOT, 'install-lib.sh');
-  const run = (expr) => execFileSync(
-    'bash',
-    ['-c', `source "$1"; { ${expr}; } || true`, 'bash', lib],
-    { encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] },
-  ).trim();
-
-  const cases = [
-    // host válido
-    ['valid_host 192.0.2.10 && echo ok', 'ok'],
-    ['valid_host meu-servidor && echo ok', 'ok'],
-    ['valid_host localhost && echo ok', 'ok'],
-    // host inválido (injeção)
-    ['valid_host "-evil" && echo ok', ''],
-    ['valid_host "evil;rm -rf" && echo ok', ''],
-    ['valid_host "a b" && echo ok', ''],
-    ['valid_host "a/b" && echo ok', ''],
-    ['valid_host "" && echo ok', ''],
-    // usuário
-    ['valid_user root && echo ok', 'ok'],
-    ['valid_user "root\\nHost evil" && echo ok', ''],
-    // porta
-    ['valid_port 22 && echo ok', 'ok'],
-    ['valid_port 65535 && echo ok', 'ok'],
-    ['valid_port 0 && echo ok', ''],
-    ['valid_port 70000 && echo ok', ''],
-    ['valid_port abc && echo ok', ''],
-    ['valid_port "" && echo ok', ''],
-    // alias
-    ['valid_alias dash-192_168_100_75 && echo ok', 'ok'],
-    ['valid_alias meu-servidor && echo ok', 'ok'],
-    ['valid_alias "-x" && echo ok', ''],
-    ['valid_alias "" && echo ok', ''],
-    // placeholder
-    ['is_placeholder_host seu-host && echo ok', 'ok'],
-    ['is_placeholder_host seu_host_ou_alias_ssh && echo ok', 'ok'],
-    ['is_placeholder_host SEU-HOST && echo ok', 'ok'],
-    ['is_placeholder_host dash-192_168_100_75 && echo ok', ''],
-    ['is_placeholder_host 192.0.2.10 && echo ok', ''],
-  ];
-  for (const [expr, expected] of cases) {
-    assert.equal(run(expr), expected, `falhou: ${expr}`);
+  assert.ok(fs.statSync(path.join(ROOT, 'dashboard')).mode & 0o100, './dashboard é executável');
+  for (const old of ['install.sh', 'install-lib.sh', 'start.sh', 'stop.sh']) {
+    assert.equal(fs.existsSync(path.join(ROOT, old)), false, `${old} foi substituído pelo ./dashboard`);
   }
 });
 
@@ -92,7 +50,7 @@ test('arquivos essenciais existem (regressão de estrutura)', () => {
   const required = [
     'server/config.js', 'server/security.js', 'server/csv.js', 'server/index.js',
     'server/poller.js', 'server/storage/index.js', 'server/stores.js',
-    'install.sh', 'install-lib.sh', 'start.sh', 'stop.sh', '.env.example', 'public/index.html',
+    'dashboard', 'scripts/node-runtime.sh', 'server/cli/index.js', '.env.example', 'public/index.html',
     'public/js/main.js', 'public/js/core/html.js', 'public/js/core/router.js',
     'public/js/charts/timeseries.js', 'public/js/views/visao-geral.js', 'public/vendor/uplot/uPlot.iife.min.js',
   ];

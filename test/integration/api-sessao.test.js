@@ -133,3 +133,20 @@ test('sessão sobrevive a reiniciar o painel (sessions.json com hash, 0600)', as
   t.after(() => close(server));
   assert.equal((await request(port, { path: '/api/status', headers: { Cookie: cookie } })).status, 200);
 });
+
+test('entrar: link de uso único cria a sessão uma vez e volta para a tela inicial', async (t) => {
+  const { createLoginCode } = await import('../../server/http/entrar.js');
+  const s = await start(t);
+  const code = createLoginCode(s.dir);
+  const first = await request(s.port, { path: `/entrar?codigo=${code}` });
+  assert.equal(first.status, 302);
+  assert.equal(first.headers.location, '/');
+  assert.equal(first.headers['cache-control'], 'no-store');
+  const cookie = sessionFrom(first);
+  assert.ok(cookie, 'sessão criada pelo link');
+  assert.equal((await request(s.port, { path: '/api/status', headers: { Cookie: cookie } })).status, 200);
+  const again = await request(s.port, { path: `/entrar?codigo=${code}` });
+  assert.equal(again.status, 302);
+  assert.equal(sessionFrom(again), null, 'o mesmo link não entra de novo');
+  assert.equal(sessionFrom(await request(s.port, { path: '/entrar' })), null, 'sem código');
+});

@@ -7,7 +7,7 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const ROOT = path.join(path.dirname(fileURLToPath(import.meta.url)), '..');
-const SHELL_SCRIPTS = ['install.sh', 'install-lib.sh', 'start.sh', 'stop.sh'];
+const SHELL_SCRIPTS = ['dashboard', 'scripts/node-runtime.sh', 'scripts/askpass.sh', 'scripts/e2e-instalacao/rodar.sh'];
 
 function run(cmd, args, opts = {}) {
   return spawnSync(cmd, args, { cwd: ROOT, encoding: 'utf8', ...opts });

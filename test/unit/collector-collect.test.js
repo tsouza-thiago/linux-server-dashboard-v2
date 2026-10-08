@@ -69,7 +69,7 @@ test('collect: falhas do SSH viram mensagens claras', async () => {
 
 test('describeError converte falhas SSH em mensagens amigáveis', () => {
   assert.equal(describeError({ timedOut: true }), 'timeout — servidor não respondeu (rede/servidor fora do ar?)');
-  assert.ok(describeError({ stderr: 'Host key verification failed.' }).includes('install.sh'));
+  assert.ok(describeError({ stderr: 'Host key verification failed.' }).includes('dashboard reconfigurar'));
   assert.equal(describeError({ code: 255 }), 'SSH falhou (exit 255) — host não encontrado ou chave inválida');
   assert.equal(describeError({ code: 1 }), 'SSH falhou (exit 1)');
   assert.equal(describeError({ error: 'spawn ssh ENOENT' }), 'spawn ssh ENOENT');

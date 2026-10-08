@@ -8,6 +8,66 @@ pré-versões `2.0.0-alpha.N` (uma por fase do plano), depois `beta`, `rc` e `2.
 
 ## [Não publicado]
 
+## [2.0.0-alpha.8] — 2026-10-08
+
+Fase F7 do plano (instalação). Um comando no terminal abre um assistente de 6 passos no
+navegador (ou no terminal) que prepara o servidor com um usuário próprio e uma chave
+restrita à coleta. Instalação de ponta a ponta validada em contêineres Debian 12 e Ubuntu
+24.04 limpos (sem Node), e upgrade da V1 com o `data/` gerado pela própria V1.
+
+### Adicionado
+
+- **`./dashboard`** (ADR 0011), comando único que substitui `install.sh`, `start.sh` e
+  `stop.sh`: `instalar`, `abrir`, `iniciar`, `parar`, `status`, `diagnosticar`,
+  `reconfigurar`, `atualizar`, `desinstalar`, `versao`. Sem Node 24 no sistema, baixa o
+  Node 24.21.0 oficial para `.runtime/` com a soma SHA-256 fixada (Q18), sem sudo.
+- **Assistente no navegador** (D10), fiel às pranchetas: boas-vindas, servidor (alcance da
+  porta), conectar (identidade do servidor em blocos antes da senha), o que monitorar
+  (detecção automática de pastas, discos, rede e serviços, SMART por disco, limiares e
+  custo estimado), preparar o servidor (assistido com os comandos exatos ou à mão com
+  Copiar/Testar) e pronto (primeira leitura, preferências e token de reserva mostrado uma
+  vez). Servidor temporário em 127.0.0.1 com código de uso único e as proteções do painel.
+- **TUI reserva** (`--terminal`) com os mesmos passos e **`--sem-interface`** para
+  automatizar (exige `--identidade` e lê a senha só do stdin).
+- **Acesso restrito** (ADR 0008): usuário `dashmon` sem senha; `authorized_keys` com
+  `restrict,from=,command=` (escape conferido contra o OpenSSH); sudoers com um
+  `smartctl -H` por disco, sem curinga, validado com `visudo -cf`. `SSH_ACESSO=restrito`
+  faz o painel enviar só a palavra do modo.
+- **SSH isolado**: `SSH_CONFIG=data/ssh/config` (`ssh -F`) com `known_hosts` próprio e
+  `StrictHostKeyChecking yes`; o `~/.ssh/config` da pessoa não é tocado.
+- `SMART_DEVS`: discos com teste de saúde separados dos discos de I/O (`DISK_DEVS`).
+- Serviço systemd **de usuário** com hardening (refeito sem ele se o sistema não deixar),
+  atalho "Server Dashboard" no menu e link de entrada de uso único (`/entrar`) para abrir o
+  painel já logado.
+- **Versões assinadas** (ADR 0012): tags conferidas com `docs/allowed_signers`; num clone do
+  branch principal o instalador fixa na tag assinada mais nova; `atualizar` confere a
+  versão nova com a lista da versão instalada, faz backup de `data/` e volta atrás sozinho
+  se a nova não subir. Chave do mantenedor: `tsouza-thiago`
+  (`SHA256:g4S28XtDHDCsoRtHVAQAl7RGh5+iB9uCR0dtHuwM2x8`).
+- `diagnosticar` explica cada problema ("O que aconteceu / Como resolver") usando a última
+  amostra gravada, sem SSH extra; `desinstalar` oferece limpar o servidor.
+- **Upgrade V1 → V2**: `./dashboard instalar --importar-v1 <pasta>` para a V1, traz o `.env`
+  saneado e os dados (histórico convertido com backup, alertas, anotações) e liga a V2; a
+  pasta da V1 fica intacta.
+- Log do painel com rotação (5 MB → `dashboard.log.1`).
+- `scripts/e2e-instalacao/rodar.sh`: instalação de ponta a ponta em contêineres.
+
+### Corrigido
+
+- **B12**: `parar` só encerra o PID que o painel registrou, conferido em `/proc`; sem
+  procurar pela porta ou pelo nome. Nenhum bug da V1 continua aberto.
+
+### Alterado
+
+- `engines.node` agora é `>=24` (ADR 0002).
+- No comando forçado, o pedido do cliente só escolhe entre `smart` e `basico`; qualquer
+  outro texto vira `basico` e nunca é ecoado.
+
+### Removido
+
+- `install.sh`, `install-lib.sh`, `start.sh` e `stop.sh` (a validação das entradas foi
+  portada para `server/setup/acesso.js`, com os mesmos casos de teste).
+
 ## [2.0.0-alpha.7] — 2026-10-07
 
 Fase F6 do plano (design). O design system aprovado no canvas (Aurora + Cockpit, escuro
