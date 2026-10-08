@@ -253,6 +253,7 @@ export function createApp(deps = {}) {
     res.json({
       version: VERSION,
       sshHost: SSH_HOST,
+      sshAccess: deps.sshAccess ?? config.SSH_ACESSO,
       pollIntervalMs: POLL_INTERVAL,
       targets: deps.targets ?? configTargets(),
       thresholds,

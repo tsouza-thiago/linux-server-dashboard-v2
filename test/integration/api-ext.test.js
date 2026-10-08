@@ -111,3 +111,11 @@ test('API: outage prolongado gera apenas UM alerta ativo (chave estável)', asyn
   await okPoll.runPoll();
   assert.equal(okPoll.alertsStore.active.length, 0, 'recuperação auto-resolve o alerta offline');
 });
+test('API: /api/config mostra o modo de acesso e os discos com SMART, nunca o token', async (t) => {
+  const s = await withServer(t, () => setupApp({ token: 'token-secreto-de-teste-123' }));
+  const r = await request(s.port, { method: 'GET', path: '/api/config', headers: { Authorization: 'Bearer token-secreto-de-teste-123' } });
+  assert.equal(r.status, 200);
+  assert.ok(['restrito', 'direto'].includes(r.json.sshAccess));
+  assert.ok(Array.isArray(r.json.targets.smartDevs));
+  assert.doesNotMatch(r.text, /token-secreto-de-teste-123/);
+});

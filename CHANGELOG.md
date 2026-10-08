@@ -8,6 +8,16 @@ pré-versões `2.0.0-alpha.N` (uma por fase do plano), depois `beta`, `rc` e `2.
 
 ## [Não publicado]
 
+### Adicionado
+
+- Ajuda do painel: modo de acesso (`SSH_ACESSO`) e discos com SMART (`SMART_DEVS`) na
+  configuração ativa; `/api/config` passa a informar o modo de acesso.
+
+### Alterado
+
+- Ajuda do painel: a linha do sudoers usa os discos de `SMART_DEVS`; "para mudar, rode
+  `./dashboard reconfigurar`" no lugar de editar o `.env`.
+
 ### Segurança
 
 - A resposta do SSH tem limite de 1 MB (`MAX_OUTPUT_BYTES`). Um servidor comprometido que
