@@ -13,9 +13,9 @@ o painel que mostra em tempo real o que está acontecendo com o seu servidor Lin
 
 1. [O que é este programa?](#1-o-que-é-este-programa)
 2. [Antes de começar (pré-requisitos)](#2-antes-de-começar-pré-requisitos)
-3. [Instalação (assistente automático)](#3-instalação-assistente-automático)
-4. [Iniciar o serviço](#4-iniciar-o-serviço)
-5. [Parar o serviço](#5-parar-o-serviço)
+3. [Instalação (assistente no navegador)](#3-instalação-assistente-no-navegador)
+4. [Abrir, iniciar e parar](#4-abrir-iniciar-e-parar)
+5. [Atualizar, reconfigurar e desinstalar](#5-atualizar-reconfigurar-e-desinstalar)
 6. [Como usar o dashboard](#6-como-usar-o-dashboard)
 7. [Entendendo os números (glossário para leigos)](#7-entendendo-os-números-glossário-para-leigos)
 8. [Alertas: o que significam e o que fazer](#8-alertas-o-que-significam-e-o-que-fazer)
@@ -57,221 +57,100 @@ de uso de CPU, RAM, temperatura, discos e alertas ativos:
 
 ## 2. Antes de começar (pré-requisitos)
 
-Só são necessários 3 itens, e normalmente já estão prontos neste computador:
+Só são necessários 3 itens:
 
-1. **Node.js versão 18 ou mais nova** — é o "motor" do programa.
-2. **O servidor ligado e na rede** (ex.: `ping 192.0.2.10`).
-3. **O endereço do servidor** no formato `usuario@IP` (ex.: `root@192.0.2.10`).
-
-> Não se preocupe com chave SSH: o instalador cria e configura tudo sozinho na seção 3.
-
-### Como verificar (copie e cole no terminal)
-
-```bash
-node --version
-```
-
-Deve aparecer algo como `v18.x` ou `v20.x`, `v22.x`, etc. Se aparecer "command not found",
-instale o Node.js antes de continuar:
-
-- Baixe em https://nodejs.org (instalador do sistema), **ou**
-- Use o gerenciador nvm: https://github.com/nvm-sh/nvm
-
-Depois rode o `./install.sh` de novo.
-
----
-
-## 3. Instalação (assistente automático)
-
-A instalação é uma única vez. Depois disso, é só iniciar/parar quando quiser.
-
-### Passo 1 — Entrar na pasta do projeto
-
-```bash
-cd ~/projeto/linux-server-dashboard
-```
-
-> Dica: este é o "endereço" do programa. Toda vez que precisar iniciar ou parar,
-> comece por este comando.
-
-### Passo 2 — Rodar o instalador (faz TUDO)
-
-```bash
-./install.sh
-```
-
-O instalador vai:
-
-1. Conferir o Node.js e baixar as dependências (barra de progresso por alguns segundos);
-2. Criar o arquivo de configuração `.env` e **gerar um token de acesso** (`DASH_TOKEN`)
-   para proteger o painel;
-3. **Testar a conexão SSH** com o servidor;
-4. Se ainda não estiver configurada, abre o **assistente SSH** (interativo). Ele pergunta
-   primeiro se você já tem um **alias SSH** configurado:
-
+1. **O `git`** neste computador (é o único momento em que algo pede a sua senha aqui):
+   ```bash
+   sudo apt install git     # Debian, Ubuntu, Mint
+   sudo dnf install git     # Fedora
    ```
-   Já tem um alias SSH configurado em ~/.ssh/config? [s/N]
-   ```
+2. **O servidor ligado e na mesma rede**.
+3. **Um usuário do servidor que possa usar `sudo`**, e a senha dele (usada uma vez).
 
-   - Se você já usa um alias (ex.: `meu-servidor` do `~/.ssh/config`), digite `s` e o nome
-     do alias — pronto, ele usa o que já existe.
-   - Caso contrário, aperte Enter e digite o servidor:
-
-     ```
-     Endereço do servidor (ex.: root@192.0.2.10, ou só o IP/host):
-     ```
-
-     Você pode digitar `root@192.0.2.10` **ou** só `192.0.2.10` (aí ele pergunta
-     o usuário, padrão `root`). Depois informa a **porta SSH** (padrão 22).
-
-   Ele mostra o **plano** (servidor, chave e alias que serão criados) e pede confirmação.
-   Confirmando, gera a chave de acesso, **pede a senha do servidor uma única vez** (só
-   para copiar a chave — a senha **não** fica salva em lugar nenhum) e cria o apelido.
-
-   > Entrada inválida não quebra a instalação: ele pede de novo (Ctrl+C cancela).
-
-5. No final, mostra o resumo (com o seu token de acesso) e um **menu de próximos passos**:
-   iniciar em segundo plano, instalar como serviço (roda sempre), ver o tutorial ou sair.
-
-> **Se der erro na cópia da chave**, anote o comando que ele mostrar e rode a seção 9
-> ("Chave SSH quebrada").
-
-### Passo 3 — Teste rápido (opcional, mas recomendado)
-
-Para confirmar que o programa consegue falar com o servidor **sem abrir o navegador**:
-
-```bash
-node server/poller.js --once
-```
-
-Vai imprimir um bloco de informações do servidor (host, kernel, memória, discos...).
-Se aparecer um JSON com `"ok": true`, está tudo pronto.
+> Não precisa instalar o Node.js nem configurar chave SSH: o `./dashboard` baixa o Node 24
+> oficial para dentro da pasta (conferido) e o assistente cria uma chave só para o painel.
 
 ---
 
-## 4. Iniciar o serviço
+## 3. Instalação (assistente no navegador)
 
-### Forma fácil (recomendada)
-
-```bash
-cd ~/projeto/linux-server-dashboard
-./start.sh
-```
-
-### Em segundo plano (libera o terminal)
+A instalação é uma única vez. Abra um terminal, copie e cole:
 
 ```bash
-./start.sh --background
+git clone https://github.com/tsouza-thiago/linux-server-dashboard-v2.git && cd linux-server-dashboard-v2 && ./dashboard instalar
 ```
 
-O painel continua rodando mesmo depois de fechar o terminal. Para parar, use o `./stop.sh`.
+O terminal mostra uma lista de verificações (versão assinada, Node.js, pasta `data/`,
+porta) e **abre o assistente no navegador** sozinho. Se o navegador não abrir, copie o
+endereço e o **código de uso único** que aparecem no terminal. Deixe o terminal aberto até
+o fim do assistente.
 
-### Saber se está rodando em segundo plano
+### Os 6 passos
 
-```bash
-./start.sh --status
-```
+1. **Boas-vindas** — o que será feito e o que nunca é feito. Clique em **Começar**.
+2. **Servidor** — o endereço (ex.: `192.0.2.10`; no servidor, `hostname -I` mostra) e o
+   seu usuário dele. O assistente confere se o servidor responde.
+3. **Conectar** — aparece a **identidade do servidor** em blocos de letras. Se quiser
+   conferir, rode no servidor `ssh-keygen -lf /etc/ssh/ssh_host_ed25519_key.pub`: as letras
+   devem ser iguais. Marque "Este é o meu servidor", digite a senha e clique em
+   **Conectar** (1 conexão só de leitura; nada muda no servidor ainda). Já tem chave SSH
+   para o servidor? Deixe a senha em branco.
+4. **O que monitorar** — discos, pastas, rede e serviços que o assistente encontrou, já
+   marcados como recomendado, e os limites de aviso. O resumo ao lado mostra o custo
+   estimado no servidor (menos de 1 segundo por minuto).
+5. **Preparar o servidor** — confira os comandos exatos e clique em **Confirmar e
+   preparar** (*assistido*), ou escolha **Prefiro fazer à mão** e cole os blocos no
+   servidor, clicando em **Testar** depois de cada um. Isso cria o usuário `dashmon`, sem
+   senha, com uma chave que só roda a coleta, e libera o teste de saúde dos discos.
+6. **Pronto** — a primeira leitura real do servidor. Escolha "iniciar com o computador",
+   o atalho no menu e os avisos do navegador, e clique em **Abrir o painel**: o assistente
+   se desliga e o painel abre já logado.
 
-Mostra o PID e a porta, ou avisa que não está rodando.
-
-### Rodar sempre (inicia sozinho no login)
-
-```bash
-./install.sh --install-service
-```
-
-Para o serviço continuar ativo mesmo sem abrir sessão gráfica:
-
-```bash
-loginctl enable-linger $USER
-```
-
-Gerir o serviço:
-
-```bash
-systemctl --user status  linux-server-dashboard
-systemctl --user restart linux-server-dashboard
-```
-
-### O que deve acontecer
-
-1. O terminal mostra uma mensagem parecida com:
-   `dashboard em http://127.0.0.1:3000 — host: seu-host, intervalo: 60000ms`
-2. A primeira coleta acontece imediatamente (deve aparecer `poll OK` em ~1 segundo).
-3. Depois, uma nova coleta a cada 60 segundos.
-
-### Abrindo o painel no navegador
-
-Abra seu navegador (Firefox, Chrome...) e digite na barra de endereço:
-
-```
-http://localhost:3000
-```
-
-Pronto, o painel está aberto. **Deixe o terminal aberto** (no modo normal) — enquanto ele
-estiver rodando, o painel funciona. Fechar a janela do navegador **não** para o serviço;
-fechar o terminal sim (no modo `--background` ou systemd, nem isso é problema).
-
-> Na **primeira vez**, o painel mostra uma tela de login pedindo o seu **token de acesso**
-> (o que o instalador mostrou no final). Depois disso o navegador fica conectado por 30
-> dias. Para sair, use **Ajuda → Sessão → Sair deste navegador**.
-
-> O painel só é acessível neste computador (127.0.0.1). Ninguém mais na rede
-> consegue abrir — isso é proposital e seguro.
-
-### Como saber se está rodando
-
-Com o serviço ativo, abra outro terminal e execute:
-
-```bash
-curl http://127.0.0.1:3000/api/status
-```
-
-Deve devolver um texto começando com `{"meta":{...` contendo `"online":true`.
+> **Máquina sem tela?** `./dashboard instalar --terminal` faz os mesmos 6 passos no
+> terminal (setas, espaço e Enter).
 
 ---
 
-## 5. Parar o serviço
+## 4. Abrir, iniciar e parar
 
-### Forma fácil (recomendada)
-
-```bash
-cd ~/projeto/linux-server-dashboard
-./stop.sh
-```
-
-O script encontra o processo, encerra com gentileza (SIGTERM) e confirma:
-
-```
-Parando Linux Server Dashboard (PID 12345)...
-Serviço parado. O histórico foi preservado (data/history/).
-```
-
-### Se você iniciou no terminal (Ctrl+C)
-
-No terminal onde o `./start.sh` está rodando, pressione `Ctrl+C`.
-
-### Se instalou como serviço systemd
+Depois de instalado, o painel liga sozinho com o computador e aparece no menu de
+aplicativos como **Server Dashboard**. Pelo terminal, na pasta do projeto:
 
 ```bash
-systemctl --user stop linux-server-dashboard
+./dashboard abrir      # abre o painel no navegador, já logado
+./dashboard status     # está rodando?
+./dashboard parar      # para (o servidor não é afetado; o histórico fica salvo)
+./dashboard iniciar    # liga de novo
 ```
 
-### Manualmente (se nenhum dos acima funcionar)
+O painel só existe **neste computador** (`http://127.0.0.1:3000`): ninguém mais na rede
+consegue abrir, de propósito. Em outro navegador, ele pede o **token de reserva** (o
+assistente mostra uma vez; ele também fica no `.env`).
+
+### Algo parece errado?
 
 ```bash
-# Descobrir o PID do processo
-pgrep -f "node server/index.js"
-
-# Encerrar (troque 12345 pelo número que apareceu)
-kill 12345
+./dashboard diagnosticar
 ```
 
-> **O que acontece com os dados ao parar?** Nada se perde. O histórico fica salvo
-> em `data/history/` (72 h detalhadas) e `data/rollup/` (90 dias resumidos). Na próxima vez que iniciar, os gráficos continuam de onde
-> pararam. Enquanto parado, apenas não há novas coletas.
+Ele confere tudo (painel, permissões, servidor, chave, teste de saúde dos discos, última
+coleta) e explica cada problema com "O que aconteceu" e "Como resolver".
 
-> **O servidor é afetado?** Não. Parar o painel não altera nada no servidor.
+---
+
+## 5. Atualizar, reconfigurar e desinstalar
+
+```bash
+./dashboard atualizar      # versão assinada mais nova; faz backup e volta atrás se falhar
+./dashboard reconfigurar   # trocar servidor, discos, pastas ou serviços (reabre o assistente)
+./dashboard desinstalar    # remove daqui e oferece limpar o servidor
+```
+
+**Vindo da V1?** Clone a V2 numa pasta nova e rode
+`./dashboard instalar --importar-v1 ~/linux-server-dashboard`: a V1 é parada, as
+configurações e o histórico vêm junto e a pasta da V1 fica intacta (para voltar, se
+precisar). Depois, `./dashboard reconfigurar` troca o acesso completo da V1 pela chave
+restrita à coleta.
 
 ---
 
@@ -371,69 +250,46 @@ Dicas por tela:
 
 ## 9. Solução de problemas
 
+Comece sempre por `./dashboard diagnosticar`: ele aponta o problema e diz como resolver.
+
 ### O painel não abre no navegador
 
-- Confirme que o serviço está rodando (o terminal está com `./start.sh` ativo?).
-- Confira a porta: se você mudou `PORT` no `.env`, use a nova porta na URL.
-- Teste com `curl http://127.0.0.1:3000/api/status` (seção 4).
-- Se aparecer **"Host não permitido (403)"**: abra por `http://localhost:3000`
+- `./dashboard status` mostra se está rodando; `./dashboard abrir` liga e abre já logado.
+- Se aparecer **"Host não permitido (403)"**: abra por `http://127.0.0.1:3000`
   (outros endereços são bloqueados de propósito).
 
 ### "Servidor inacessível" (indicador offline, banner de alerta)
 
-1. O servidor está ligado? `ping -c 3 192.0.2.10`
-2. O SSH responde? `ssh seu-host 'uptime'`
-3. Se voltou, o painel se recupera sozinho no próximo minuto (ou clique em **Coletar agora**).
+1. O servidor está ligado e na mesma rede?
+2. Quando ele voltar, o painel se recupera sozinho no próximo minuto (ou clique em
+   **Coletar agora**).
 
-### Chave SSH quebrada / pedindo senha
+### "A identidade do servidor mudou"
 
-```bash
-ssh seu-host 'echo ok'
-```
+- Reinstalou o servidor? Rode `./dashboard reconfigurar` e confira a identidade nova.
+- Não reinstalou? **Pare**: pode ser outro aparelho usando o endereço do seu servidor.
 
-- Se pedir senha: a chave não está sendo usada. O jeito mais simples é refazer o assistente:
-  ```bash
-  ./install.sh --configure
-  ```
-- Se der "Permission denied": a chave pública não está no servidor. Reautorize:
-  ```bash
-  ssh-copy-id -i ~/.ssh/dashboard_ed25519.pub seu-host
-  ```
-- Se pedir "yes/no" sobre a chave do servidor: é a primeira conexão. Digite `yes`
-  (o instalador também aceita automaticamente com segurança).
+### Adicionei um disco (ou pasta, ou serviço)
+
+- Rode `./dashboard reconfigurar` e marque o que mudou no passo "O que monitorar". O passo
+  "Preparar o servidor" atualiza a chave e a regra do teste de saúde.
 
 ### Gráficos vazios ("sem amostras")
 
-- O histórico ficou vazio? Confira `ls -la data/history/` (deve haver um arquivo `.ndjson` de hoje com tamanho > 0).
+- Na primeira execução, aguarde 1-2 minutos: CPU e rede aparecem a partir da 2ª coleta.
 - O período escolhido pode ser maior que o histórico disponível: selecione `1h`.
-- Na primeira execução, aguarde 1-2 minutos para acumular amostras.
 
 ### A porta 3000 já está em uso
 
-```bash
-# Descobrir quem está usando
-lsof -i :3000
-
-# Opções: matar o processo antigo (kill <PID>) ou mudar a porta no .env (PORT=3001)
-```
+- Outro programa usa a porta: mude `PORT=3001` no `.env` e rode `./dashboard iniciar`.
 
 ### Onde ver o que aconteceu (logs)
 
 ```bash
-tail -f data/dashboard.log    # modo normal / systemd
-tail -f data/nohup.log        # modo --background
+tail -f data/dashboard.log
 ```
 
 Cada coleta registra uma linha: `poll OK (123ms) — amostras: 45` ou `poll FALHOU: ...`.
-
-### Testar a coleta isolada (sem o painel)
-
-```bash
-node server/poller.js --once
-```
-
-Se isso funcionar e o painel não, o problema é do painel. Se isso falhar,
-o problema é SSH/rede — os logs dirão o motivo.
 
 ---
 

@@ -191,178 +191,133 @@ O painel tem **8 telas**, navegáveis pela coluna da esquerda ou pelas teclas `1
 
 ## Pré-requisitos
 
-1. **Node.js 18 ou mais novo** — o "motor" do programa.
+1. **Linux nesta máquina** (Debian, Ubuntu, Mint ou Fedora; ADR 0013).
+2. **git** — o único momento em que algo pede senha neste computador:
    ```bash
-   node --version   # deve mostrar v18.x ou superior
+   sudo apt install git     # Debian/Ubuntu/Mint
+   sudo dnf install git     # Fedora
    ```
-2. **Acesso SSH ao servidor por chave** — o instalador cria e configura isso para você.
-3. **Servidor ligado e na rede** — o painel coleta dele, afinal.
+3. **Servidor ligado e na rede**, com o `sshd` ativo, e um usuário dele que possa usar
+   `sudo` (só para preparar o acesso, uma vez).
 
-> Não sabe configurar a chave SSH? Não precisa: o `./install.sh` faz tudo (gera a chave,
-> copia para o servidor, cria o alias). O serviço `sshd` precisa estar ativo no servidor —
-> nada além disso.
+Não precisa instalar o Node.js: se o do sistema faltar ou for anterior ao 24, o
+`./dashboard` baixa o Node 24 oficial para dentro da pasta (`.runtime/`) e confere a soma
+SHA-256 antes de usar. Nada de `npm install`: uPlot e fontes já vêm no pacote, conferidos.
 
 ---
 
-## Instalação (fácil)
+## Instalação (1 comando)
 
 > Quer um passo a passo com calma? O [Tutorial passo a passo](TUTORIAL.md)
 > cobre pré-requisitos, instalação e como iniciar, do zero.
 
 ```bash
-git clone https://github.com/seu-usuario/linux-server-dashboard.git
-cd linux-server-dashboard
-./install.sh
+git clone https://github.com/tsouza-thiago/linux-server-dashboard-v2.git && cd linux-server-dashboard-v2 && ./dashboard instalar
 ```
 
-O `./install.sh` é um **assistente 1-comando** que:
+O `./dashboard instalar` confere a **assinatura da versão** (fixa na versão assinada mais
+nova, ADR 0012), o Node 24, os arquivos do pacote e a porta, e abre o **assistente no
+navegador** (`http://127.0.0.1:3000/configurar`, com código de uso único). São 6 passos:
 
-1. Confere o Node.js (18+) e instala as dependências;
-2. Cria o `.env` (se ainda não existir) com permissões restritas e **gera um `DASH_TOKEN`
-   automático** para proteger a API (você pode trocá-lo depois);
-3. **Testa a conexão SSH**;
-4. Se não estiver configurada, abre o **assistente SSH interativo** — aceita um **alias
-   já existente** no `~/.ssh/config` ou um `usuario@IP`/`IP` novo (com porta SSH opcional),
-   mostra o plano antes de aplicar e gera/copia a chave Ed25519
-   (`~/.ssh/dashboard_ed25519`) pedindo a **senha uma única vez**;
-5. Restringe permissões de `data/` e `.env` (segurança);
-6. Mostra o resumo com o token de acesso e um **menu de próximos passos** (iniciar em
-   segundo plano, instalar como serviço systemd, ver o tutorial ou sair).
+1. **Boas-vindas** — o que será feito e o que nunca é feito (nada é instalado no servidor,
+   nada de sudo nesta máquina, a senha não é guardada).
+2. **Servidor** — endereço e o seu usuário administrador (com teste de alcance).
+3. **Conectar** — você confere a **identidade do servidor** antes de digitar a senha; 1
+   conexão só de leitura descobre discos, pastas, rede, serviços e o sudo.
+4. **O que monitorar** — tudo já vem marcado como recomendado; ajuste pastas, SMART por
+   disco, rede, serviços e limiares.
+5. **Preparar o servidor** — *assistido* (mostra os comandos exatos e executa depois do seu
+   "Confirmar") ou *à mão* (blocos com Copiar e Testar). Cria o usuário `dashmon`, sem senha,
+   com uma chave que **só roda a coleta** e só a partir deste computador, e libera o `sudo`
+   apenas para `smartctl -H` nos discos escolhidos (ADR 0008).
+6. **Pronto** — primeira leitura real, "iniciar com o computador", atalho no menu e o painel
+   aberto já logado.
 
-> Entrada inválida não quebra a instalação: o assistente pede de novo (Ctrl+C cancela).
-> Toda entrada (usuário, host, alias, porta) é validada no shell antes de tocar no
-> `~/.ssh/config` e no `.env` — veja `install-lib.sh`.
+Máquina sem tela ou acessada por SSH? `./dashboard instalar --terminal` faz os mesmos
+passos no terminal. Para automatizar: `./dashboard instalar --sem-interface --ajuda`.
 
-Opções do instalador:
+Vindo da V1? Veja [Atualizar da V1](#atualizar-da-v1).
+
+---
+
+## Comandos
 
 | Comando | O que faz |
 |---------|-----------|
-| `./install.sh` | Assistente completo (recomendado) |
-| `./install.sh --auto` | Não-interativo: dependências + `.env` + token (sem assistente SSH) |
-| `./install.sh --manual` | Só dependências + `.env` (você já tem SSH configurado) |
-| `./install.sh --configure` | Só o assistente SSH (trocar de servidor) |
-| `./install.sh --test` | Roda a suíte de testes e sai |
-| `./install.sh --install-service` | Cria o serviço systemd (roda sempre) |
-| `./install.sh --uninstall-service` | Remove o serviço systemd |
+| `./dashboard instalar` | primeira instalação (assistente no navegador) |
+| `./dashboard abrir` | abre o painel no navegador, já logado (link de uso único) |
+| `./dashboard iniciar` / `parar` / `status` | controle do painel (serviço de usuário ou segundo plano) |
+| `./dashboard diagnosticar` | testa tudo e explica cada problema em português simples |
+| `./dashboard reconfigurar` | reabre o assistente (trocar servidor, discos, serviços) |
+| `./dashboard atualizar` | baixa a versão assinada mais nova, com backup de `data/` e volta atrás se falhar |
+| `./dashboard desinstalar` | remove serviço, atalho e arquivos locais e oferece limpar o servidor |
 
-**Teste rápido** (coleta única, sem abrir o navegador):
+Depois de instalado, o painel aparece no menu de aplicativos como **Server Dashboard** e
+inicia com o computador (serviço systemd **de usuário**, com isolamento: só grava em
+`data/`). Nenhum terminal precisa ficar aberto.
 
-```bash
-node server/poller.js --once
-```
-
-Deve imprimir um JSON com `"ok": true` e os dados do servidor. Se aparecer isso,
-a comunicação está funcionando.
+> **Nada se perde ao parar.** O histórico fica em `data/history/` e `data/rollup/`.
+> Parar o painel **não afeta o servidor**.
 
 ---
 
 ## Configuração
 
-As variáveis ficam no arquivo `.env` (o instalador já cria e preenche o `SSH_HOST`):
+O assistente preenche o `.env` (0600). Para mudar servidor, discos ou serviços, use
+`./dashboard reconfigurar`: ele também atualiza a linha da chave restrita no servidor.
 
 | Variável | Padrão | Descrição |
 |----------|--------|-----------|
-| `SSH_HOST` | `seu-host` | Host/alias SSH do servidor (criado pelo instalador) |
+| `SSH_HOST` | `servidor` | Nome do servidor no `data/ssh/config` (ou um alias do `~/.ssh/config`, como na V1) |
+| `SSH_CONFIG` | `data/ssh/config` | Configuração SSH própria do painel (`ssh -F`); vazio = usa o `~/.ssh/config` |
+| `SSH_ACESSO` | `restrito` | `restrito` = a chave só roda a coleta; `direto` = o painel envia o comando (V1) |
 | `POLL_INTERVAL` | `60000` | Intervalo entre coletas em ms. **Mínimo 10000** (protege o servidor) |
-| `PORT` | `3000` | Porta do dashboard no seu computador |
+| `PORT` | `3000` | Porta do painel neste computador (só em 127.0.0.1) |
 | `HISTORY_LIMIT` | `4320` | Amostras retidas (4320 = 3 dias a 1/min) |
 | `HISTORY_FILE` | `data/history.json` | Histórico da V1 a migrar (1 vez, com backup; sempre dentro de `data/`) |
-| `LOG_FILE` | `data/dashboard.log` | Arquivo de log (sempre dentro de `data/`) |
-| `NET_IF` | *(vazio)* | Interface de rede a monitorar (vazio = seção Rede omitida) |
-| `DISK_MOUNTS` | `/` | Mount points monitorados, separados por espaço |
-| `DISK_DEVS` | *(vazio)* | Dispositivos de bloco p/ IO/SMART (vazio = omitido) |
-| `SERVICES` | *(vazio)* | Serviços systemd monitorados, separados por espaço |
-| `DASH_TOKEN` | *(gerado no install)* | **Token** de acesso à API/SSE (veja [Segurança](#segurança)); o instalador gera um automático se vazio |
+| `LOG_FILE` | `data/dashboard.log` | Log (sempre dentro de `data/`; gira em 5 MB) |
+| `NET_IF` | *(vazio)* | Interface de rede (vazio = tela Rede oculta) |
+| `DISK_MOUNTS` | `/` | Pastas (pontos de montagem) acompanhadas, separadas por espaço |
+| `DISK_DEVS` | *(vazio)* | Discos para leitura/gravação (I/O) |
+| `SMART_DEVS` | *(= DISK_DEVS)* | Discos com teste de saúde SMART (1x por hora); vazio = nenhum |
+| `SERVICES` | *(vazio)* | Serviços systemd acompanhados |
+| `DASH_TOKEN` | *(gerado)* | Token de acesso (o navegador pede 1x; `./dashboard abrir` entra sem ele) |
+| `ALERT_*` | 90 / 90 / 60 / 5 / 2 | Limiares de disco %, RAM %, temperatura °C, histerese e quedas seguidas |
 
 > **Segurança automática do `.env`:** valores que não são "palavras seguras"
-> (letras, números, `_ . : / -`) são **ignorados** pelo programa. Assim, nada escrito
-> no `.env` vira comando no servidor. Tokens que começam com `-` também são ignorados
-> — inclusive o `SSH_HOST`, que passa por sanitização própria antes do SSH.
+> (letras, números, `_ . : / -`) são **ignorados**. Nada escrito no `.env` vira comando
+> no servidor; tokens que começam com `-` também são ignorados.
 
 ---
 
-## Como usar
-
-### Iniciar
+## Abrir o painel
 
 ```bash
-./start.sh
+./dashboard abrir
 ```
 
-Ou em segundo plano (libera o terminal):
-
-```bash
-./start.sh --background
-```
-
-Confira se está rodando em segundo plano (e em qual porta):
-
-```bash
-./start.sh --status
-```
-
-Ou, se você instalou o serviço systemd (`./install.sh --install-service`), o painel
-já está rodando — para gerir:
-
-```bash
-systemctl --user status  linux-server-dashboard
-systemctl --user restart linux-server-dashboard
-```
-
-### Abrir o painel
-
-No navegador (Firefox, Chrome...), acesse:
-
-```
-http://localhost:3000
-```
-
-> O painel só é acessível **neste computador** (`127.0.0.1`). Ninguém mais na rede
-> consegue abrir — isso é proposital.
+Ou pelo atalho **Server Dashboard** no menu. O painel só existe **neste computador**
+(`127.0.0.1`): ninguém mais na rede consegue abrir — isso é proposital.
 
 > Entender cada tela e cada número? O [Tutorial passo a passo](TUTORIAL.md)
 > tem um glossário para leigos e a seção "Como usar o dashboard".
 
-### Verificar se está rodando
-
-```bash
-curl http://127.0.0.1:3000/api/status
-```
-
-Deve devolver um JSON com `"online":true`.
-
-### Parar
-
-```bash
-./stop.sh        # forma fácil (encontra e encerra o processo)
-# ou Ctrl+C no terminal do ./start.sh
-```
-
-> **Nada se perde ao parar.** O histórico fica salvo em `data/history/` e `data/rollup/` e os
-> gráficos continuam de onde pararam. Parar o painel **não afeta o servidor**.
-
 ---
 
-## Rodar sempre em segundo plano (systemd)
+## Atualizar da V1
 
-Para o painel iniciar sozinho no login (e ficar sempre de pé):
-
-```bash
-./install.sh --install-service
-```
-
-O serviço roda como **usuário** (sem `sudo`). Para ele continuar ativo mesmo sem
-login gráfico:
+A V1 e a V2 **nunca rodam juntas** (seriam 2 conexões por minuto ao servidor). Com a V2
+clonada numa pasta nova:
 
 ```bash
-loginctl enable-linger $USER
+./dashboard instalar --importar-v1 ~/linux-server-dashboard
 ```
 
-Remover:
-
-```bash
-./install.sh --uninstall-service
-```
+Isso para a V1 (e tira o serviço dela do início automático), traz o `.env` e os dados
+(histórico convertido com backup, alertas e anotações) e liga a V2 usando o mesmo acesso
+SSH da V1. A pasta da V1 **não é alterada**: para voltar, `./dashboard parar` e, na pasta da
+V1, `./start.sh --background` (o script de lá). Depois, `./dashboard reconfigurar` troca o acesso completo
+da V1 pela chave restrita à coleta.
 
 ---
 
@@ -433,9 +388,16 @@ Este projeto foi desenhado com **segurança by design**. Os principais pontos:
 **No servidor monitorado**
 - **Sem senhas.** A autenticação é por **chave SSH** (Ed25519). O `.env` não guarda
   senha nenhuma, e o `.env.example` só traz placeholders.
-- **Somente leitura.** O servidor executa apenas comandos de leitura (`cat`, `df`,
-  `free`, `ps`, `smartctl`...). Nada é instalado, alterado ou executado de forma
-  persistente no servidor.
+- **Somente leitura.** O servidor executa apenas comandos de leitura (`cat` em `/proc` e
+  `/sys`, `df`, `ps`, `systemctl is-active`, `smartctl -H`). Nada é instalado no servidor.
+- **Chave restrita (ADR 0008).** O painel entra com um usuário próprio (`dashmon`, sem
+  senha) cuja chave tem `restrict,from="<este computador>",command="<coleta>"` no
+  `authorized_keys`: mesmo vazada, ela só roda a coleta, só a partir daqui, sem terminal
+  nem encaminhamentos. O `sudo` dele vale só para `smartctl -H` em cada disco escolhido
+  (sem curinga), validado com `visudo -c` antes de ativar. Tudo é exibido antes, feito
+  depois do seu "Confirmar" e desfeito pelo `./dashboard desinstalar`.
+- **Senha do servidor usada uma vez.** Na instalação, a senha do administrador fica só na
+  memória do assistente (nunca em disco, log ou linha de comando) e é descartada no fim.
 - **1 comando por minuto.** Contato mínimo, previsível e barato.
 - **Sem agentes.** Não há daemon, serviço ou script rodando no servidor — não há
   superfície de ataque nova por lá.
@@ -474,16 +436,22 @@ Este projeto foi desenhado com **segurança by design**. Os principais pontos:
 - **Permissões restritas.** `data/` é `700` e os arquivos de dados/`.env` são `600`.
 - **Segredos fora do git.** `.env` e `data/` estão no `.gitignore`; o repositório
   público contém apenas código e modelos sem valores.
-- **SSH não-interativo.** `BatchMode=yes` + `ConnectTimeout=10` — falha rápido se o
-  servidor estiver fora, sem travar nem pedir interação. O instalador grava o alias
-  com `StrictHostKeyChecking accept-new` (verificação de host key segura).
+- **SSH isolado.** O painel usa só a própria configuração (`ssh -F data/ssh/config`) e o
+  próprio `known_hosts`, com `StrictHostKeyChecking yes`: a identidade do servidor é a que
+  você conferiu na instalação; se mudar, a coleta para e avisa. `BatchMode=yes` +
+  `ConnectTimeout=10`. O seu `~/.ssh/config` não é tocado.
+- **Versões assinadas (ADR 0012).** O instalador e o `./dashboard atualizar` só aceitam tags
+  assinadas pela chave listada em `docs/allowed_signers`; a atualização confere a versão
+  nova com a lista da versão já instalada. uPlot e fontes são conferidos por SHA-256 e o
+  Node baixado também.
 - **Token por padrão (`DASH_TOKEN`).** O instalador gera um token automático — a API/SSE
   passa a exigir login; o navegador pede o token uma única vez e o troca por um cookie
   de sessão (HttpOnly, 30 dias). O token nunca vai na URL.
 
-> Se você fosse auditar: o único contato com o servidor é o comando SSH construído em
-> `server/poller.js` (`buildCommand()`), com valores já filtrados por
-> `server/config.js` (`sanitizeToken()`). É só leitura, é só 1 por minuto, e é isso.
+> Se você fosse auditar: o único contato com o servidor é o comando de coleta montado em
+> `server/collector/builder.js`, com valores já filtrados por `server/config.js`
+> (`sanitizeToken()`), e é ele que fica gravado na linha restrita do `authorized_keys`.
+> É só leitura, é só 1 por minuto, e é isso.
 
 ---
 
@@ -516,16 +484,17 @@ linux-server-dashboard/
 ├── README.md               ← este arquivo
 ├── SECURITY.md             ← política e threat model de segurança
 ├── LICENSE                 ← MIT
-├── install.sh              ← assistente 1-comando (deps, .env+token, SSH, systemd, menus)
-├── install-lib.sh          ← validação pura das entradas do instalador (segurança)
-├── start.sh                ← inicia o serviço (primeiro plano, --background ou --status)
-├── stop.sh                 ← para o serviço com segurança (PID file)
+├── dashboard               ← comando único: garante o Node 24 e chama a CLI (server/cli/)
 ├── package.json            (sem dependências; playwright-core só para testes e2e)
 ├── .env.example            (modelo de configuração, sem valores reais)
 ├── .gitignore              (exclui .env, data/, node_modules/)
-├── data/                   (runtime: history/, rollup/, alerts.json, annotations.json, log)
+├── data/                   (runtime: history/, rollup/, ssh/, alerts.json, annotations.json, log)
+├── docs/                   (plano da V2, ADRs e allowed_signers das releases assinadas)
+├── scripts/                (check, captura de amostra, Node do ./dashboard, askpass, e2e da instalação)
 ├── server/
 │   ├── index.js            (rotas da API, loop de poll, export CSV)
+│   ├── cli/                (subcomandos do ./dashboard: instalar, abrir, diagnosticar, atualizar…)
+│   ├── setup/              (instalação: detecção, preparo do servidor, assistente web e TUI)
 │   ├── http/               (servidor próprio: rotas, estáticos, sessão, SSE)
 │   ├── config.js           (parser único do .env, validações, sanitização)
 │   ├── security.js         (Host check, CSRF c/ cookie, headers, token timing-safe, rate limit)
@@ -537,6 +506,7 @@ linux-server-dashboard/
 ├── test-support/           (helpers de teste: VM p/ frontend, request HTTP)
 └── public/
     ├── index.html          (casca das 8 telas, login e avisos)
+    ├── configurar.html     (assistente de instalação, 6 passos)
     ├── css/                (design system V2: tokens, base, componentes, telas, impressão)
     ├── fonts/              (Geist e Geist Mono, OFL — sem CDN)
     ├── vendor/uplot/       (uPlot versionado com SHA-256)
@@ -547,40 +517,34 @@ linux-server-dashboard/
 
 ## Solução de problemas
 
+Primeiro passo, sempre: `./dashboard diagnosticar`. Ele confere painel, permissões,
+acesso ao servidor, chave restrita, SMART e última coleta, e diz o que fazer.
+
 ### O painel não abre no navegador
-- O serviço está rodando? (o terminal está com `./start.sh` ativo?)
-- Mudou a porta? Use a nova porta na URL (`PORT` no `.env`).
-- Teste: `curl http://127.0.0.1:3000/api/status`
-- "Host não permitido (403)"? Abra por `http://localhost:3000` ou `http://127.0.0.1:3000`
-  — outros endereços são bloqueados de propósito.
+- `./dashboard status` mostra se está rodando; `./dashboard abrir` liga e abre já logado.
+- "Host não permitido (403)"? Abra por `http://127.0.0.1:3000` (ou `localhost`) — outros
+  endereços são bloqueados de propósito.
 
 ### "Servidor inacessível" (indicador offline)
-1. `ping -c 3 seu-host`
-2. `ssh seu-host 'uptime'`
-3. Se voltou, o painel se recupera sozinho no próximo minuto (ou clique em **Coletar agora**).
+1. O servidor está ligado e na mesma rede?
+2. `./dashboard diagnosticar` testa a conexão e explica o motivo.
+3. Quando voltar, o painel se recupera sozinho no próximo minuto (ou clique em **Coletar agora**).
 
-### "Chave do servidor não autorizada" no primeiro uso
-- O `install.sh` resolve: ele aceita a chave do servidor na primeira conexão.
-- Manualmente: `ssh seu-host 'echo ok'` e confirme com `yes` na pergunta de host key.
+### "A identidade do servidor mudou"
+- Se você reinstalou o servidor, rode `./dashboard reconfigurar` e confira a identidade nova.
+- Se não reinstalou, **pare**: pode ser outro aparelho no mesmo endereço.
 
-### Chave SSH pedindo senha
-- A chave não está sendo usada. Confira `ls -la ~/.ssh/` e o seu `~/.ssh/config`.
-- "Permission denied" = a chave pública não está autorizada no servidor. Reautorize:
-  ```bash
-  ssh-copy-id -i ~/.ssh/dashboard_ed25519.pub seu-host
-  ```
-  ou rode `./install.sh --configure`.
+### "SMART sem permissão" ou "linha da chave desatualizada"
+- Um disco novo, outra pasta ou outro serviço mudou depois da instalação:
+  `./dashboard reconfigurar` atualiza a linha da chave e a regra do sudo no servidor.
 
 ### Porta 3000 já em uso
-```bash
-lsof -i :3000                 # descobrir quem está usando
-# opções: kill <PID> ou mudar PORT no .env
-```
+- Outro programa usa a porta: mude `PORT` no `.env` (ex.: `PORT=3001`).
 
 ### Ver os logs
 ```bash
-tail -f data/dashboard.log    # primeiro plano / systemd
-tail -f data/nohup.log        # modo --background
+tail -f data/dashboard.log                  # o painel
+journalctl --user -u server-dashboard       # o serviço de usuário
 ```
 
 ---
@@ -594,13 +558,12 @@ com métricas do sistema — nenhum arquivo é modificado.
 irrelevante, até num servidor de 1 núcleo. Todo o trabalho pesado (parse, gráficos,
 histórico) roda na sua máquina.
 
-**Preciso de senha?** Não. O acesso é por chave SSH. O `./install.sh` cria e copia a
-chave para você (ele pede a senha do servidor uma única vez, só para copiar a chave).
+**Preciso de senha?** Só uma vez, na instalação, para preparar o servidor (nunca é
+guardada). Depois o painel usa uma chave própria, restrita ao comando de coleta.
 
 **Funciona em qualquer servidor Linux?** Sim, desde que tenha `sshd` ativo e os
-comandos padrão (`df`, `free`, `ps`, `systemctl`, `smartctl`*). O comando de coleta é
-montado em `server/poller.js` — ajuste discos, interface de rede e serviços conforme
-o seu ambiente.
+comandos padrão (`df`, `ps`, `systemctl`; `smartctl` e `sudo` só para o teste de saúde
+dos discos). O assistente descobre discos, rede e serviços sozinho.
 
 **E se o servidor ficar off?** O painel mostra o alerta de inacessível, preserva o
 histórico e continua tentando a cada minuto — recupera sozinho quando volta.
