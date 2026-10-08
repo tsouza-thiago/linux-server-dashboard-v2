@@ -1,7 +1,7 @@
-# Tutorial — Linux Server Dashboard
+# Tutorial — Server Dashboard
 
-Guia completo, passo a passo, para instalar, iniciar, parar e usar o **Linux Server Dashboard** —
-o painel que mostra em tempo real o que está acontecendo com o seu servidor Linux
+Guia completo, passo a passo, para instalar, iniciar, parar e usar o **Server Dashboard**:
+o painel que mostra em tempo real o que acontece no seu servidor Linux
 (ex.: um Debian modesto na sua rede local).
 
 > **Para leigos:** se você nunca abriu um terminal, siga as seções **1**, **2** e **3**
@@ -26,7 +26,7 @@ o painel que mostra em tempo real o que está acontecendo com o seu servidor Lin
 
 ## 1. O que é este programa?
 
-O **Linux Server Dashboard** é um "painel de controle" que fica no seu computador e mostra,
+O **Server Dashboard** é um "painel de controle" que fica no seu computador e mostra,
 a cada 60 segundos, como está o seu servidor:
 
 - uso de **CPU** (carga) e **memória RAM**;
@@ -39,13 +39,14 @@ a cada 60 segundos, como está o seu servidor:
 - os **processos** que mais consomem memória;
 - **alertas** quando algo está errado (disco quase cheio, temperatura alta, servidor fora do ar).
 
-Como ele faz isso? Uma vez por minuto ele conecta no servidor por SSH, lê as informações
-e mostra em gráficos. **O servidor não recebe nada** — só leitura, sem instalar nada nele.
+Como ele faz isso? Uma vez por minuto, ele conecta no servidor por SSH, lê as informações
+e mostra em gráficos. **Nada é instalado no servidor**, e a conexão só lê.
 
-### Por que o "índice de saúde"?
+### O que é a "saúde 0–100"?
 
-No canto inferior esquerdo há um círculo com uma nota de 0 a 100. Ele é calculado a partir
-de uso de CPU, RAM, temperatura, discos e alertas ativos:
+Na tela **Visão geral**, um anel mostra uma nota de 0 a 100. Ela começa em 100 e perde
+pontos a cada problema: carga alta, RAM, temperatura, disco cheio, SMART com falha ou
+serviço parado. O motivo aparece ao lado da nota.
 
 | Nota | Cor | Significado |
 |------|-----|-------------|
@@ -186,8 +187,6 @@ Dicas por tela:
 
 ### Interações comuns a todas as telas
 
-**Interações em todas as telas:**
-
 - **Período**: botões `1h` · `6h` · `24h` · `72h` · `7d` · `30d` · `90d` no topo (fica na URL).
 - **Gráficos**: arrastar = aproximar um trecho · roda do mouse = zoom · duplo clique = voltar.
   O cursor fica sincronizado entre os gráficos da tela.
@@ -210,25 +209,25 @@ Dicas por tela:
 
 | Termo | O que significa | Valor saudável |
 |-------|-----------------|----------------|
-| **Load (1/5/15)** | Carga do processador na média de 1, 5 e 15 min. Neste servidor (1 núcleo), 1,0 = 100% de uso | abaixo de 1,0 |
+| **Load (1/5/15)** | Carga do processador na média de 1, 5 e 15 min. Com 1 núcleo, 1,0 = 100% de uso; com 4 núcleos, 4,0 = 100% | abaixo do número de núcleos |
 | **RAM usada** | Memória em uso agora | abaixo de 90% |
 | **Swap usada** | Memória "emprestada" do disco. Se estiver subindo, falta RAM | 0 (zero) |
 | **Temperatura** | Calor do processador em °C | abaixo de 60 °C |
 | **Mbps** | Velocidade de download/upload (megabits por segundo) | — |
 | **MB/s** | Velocidade de leitura/escrita dos discos | — |
-| **SMART** | Autodiagnóstico de saúde do disco | `PASSED` |
+| **SMART** | Autodiagnóstico de saúde do disco. `SEM_PERMISSAO` = falta a regra do `sudo` (rode `./dashboard reconfigurar`) | `PASSED` |
 | **Uptime** | Tempo ligado desde o último boot | — |
 | **ETA** | Previsão de quando um disco vai encher (pela tendência de crescimento) | quanto mais longe, melhor |
 | **Outage** | Período em que o servidor ficou inacessível | nenhum |
 
 ### Sinais de alerta que você deve conhecer
 
-- **Load acima de 1,0** — o processador está saturado (muito trabalho para 1 núcleo).
+- **Load acima do número de núcleos** — o processador está saturado.
 - **RAM ≥ 90%** — quase sem memória; o sistema começa a usar swap e fica lento.
 - **Swap subindo** — falta memória; considere fechar serviços pesados.
 - **Temperatura ≥ 60 °C** — cuidado com o calor; verifique ventilação/poeira.
 - **Disco ≥ 90%** — risco de encher; libere espaço (principalmente em `/`).
-- **SMART ≠ PASSED** — disco pode estar morrendo; faça backup urgente.
+- **SMART com FAILED** — o disco avisou que pode falhar; faça backup urgente.
 - **Serviço monitorado parado** — algo que deveria estar no ar caiu.
 
 ---
@@ -239,9 +238,9 @@ Dicas por tela:
 |--------|-------|-------------|
 | `Disco X com NN% usado` | warning | Liberar espaço: apagar arquivos temporários, mover dados grandes para outros discos. Atenção em `/` (sistema). |
 | `RAM usada em NN%` | warning | Verificar processos pesados na tela **Processos**. Fechar aplicações, ou reduzir carga. |
-| `Temperatura CPU NN°C` | warning | Verificar ventilação do gabinete, poeira nos coolers, posição do computador. |
-| `SMART /dev/sdX: ...` | critical | **Backup imediato** dos dados do disco. Pode ser falha física. |
-| `Serviço X ...` | critical | Reiniciar o serviço no servidor (ex.: `ssh seu-host 'sudo systemctl restart smbd'`). |
+| `Temperatura CPU NN.N°C` | warning | Verificar ventilação do gabinete, poeira nos coolers, posição do computador. |
+| `SMART /dev/sdX: FAILED` | critical | **Backup imediato** dos dados do disco. Pode ser falha física. |
+| `Serviço X <estado>` | critical | Reiniciar o serviço no servidor com o **seu** usuário (a chave do painel só faz a coleta). Ex.: `ssh usuario@192.0.2.10 'sudo systemctl restart smbd'`. |
 | `Servidor inacessível: ...` | critical | Servidor desligado ou fora da rede. Verificar energia, cabo de rede: `ping 192.0.2.10`. O painel continua tentando a cada minuto e se recupera sozinho. |
 
 **Regra de ouro:** warning = preste atenção, critical = aja.
@@ -269,6 +268,12 @@ Comece sempre por `./dashboard diagnosticar`: ele aponta o problema e diz como r
 - Reinstalou o servidor? Rode `./dashboard reconfigurar` e confira a identidade nova.
 - Não reinstalou? **Pare**: pode ser outro aparelho usando o endereço do seu servidor.
 
+### "SMART sem permissão" ou "comando de coleta desatualizado"
+
+- A regra do `sudo` ou a linha da chave no servidor não batem com a configuração (por
+  exemplo, depois de mudar o `.env` à mão). Rode `./dashboard reconfigurar`: o passo
+  "Preparar o servidor" atualiza as duas.
+
 ### Adicionei um disco (ou pasta, ou serviço)
 
 - Rode `./dashboard reconfigurar` e marque o que mudou no passo "O que monitorar". O passo
@@ -286,17 +291,18 @@ Comece sempre por `./dashboard diagnosticar`: ele aponta o problema e diz como r
 ### Onde ver o que aconteceu (logs)
 
 ```bash
-tail -f data/dashboard.log
+tail -f data/dashboard.log                  # o painel
+journalctl --user -u server-dashboard       # o serviço que inicia com o computador
 ```
 
-Cada coleta registra uma linha: `poll OK (123ms) — amostras: 45` ou `poll FALHOU: ...`.
+Cada coleta registra uma linha: `poll OK (123ms) — amostras: 45` ou `poll FALHOU (2x seguidas): <motivo>`.
 
 ---
 
 ## 10. Dicas e boas práticas
 
-1. **Nunca instale nada no servidor** — o monitoramento é 100% leitura. O servidor
-   tem hardware muito limitado (1 núcleo, pouca RAM); qualquer instalação pode travá-lo.
+1. **Nunca instale nada no servidor para o painel** — o monitoramento é 100% leitura.
+   Num servidor modesto (1 núcleo, pouca RAM), qualquer peso a mais aparece.
 2. **Respeite o intervalo de 60s** — não mude `POLL_INTERVAL` para valores muito baixos
    (o programa já bloqueia abaixo de 10 segundos). O servidor responde 1 comando por minuto, por projeto.
 3. **Discos SMR** — evite cópias massivas e aleatórias de arquivos no
@@ -316,5 +322,5 @@ Cada coleta registra uma linha: `poll OK (123ms) — amostras: 45` ou `poll FALH
 
 ---
 
-*Linux Server Dashboard — monitoramento somente leitura via SSH, 1 coleta/min,
+*Server Dashboard — monitoramento somente leitura via SSH, 1 coleta/min,
 dashboard local em 127.0.0.1:3000. O servidor não instala nada.*
