@@ -8,6 +8,44 @@ pré-versões `2.0.0-alpha.N` (uma por fase do plano), depois `beta`, `rc` e `2.
 
 ## [Não publicado]
 
+## [2.0.0-beta.1] — 2026-10-08
+
+Fase F8 do plano (documentação). A V2 passa a `beta`: instalação validada no computador e
+no servidor reais do mantenedor, e a documentação é conferida contra o código por teste.
+
+### Adicionado
+
+- `test/unit/docs.test.js`: a documentação bate com o código. Confere links e âncoras,
+  arquivos citados, subcomandos e opções do `./dashboard`, scripts do npm, variáveis do
+  `.env` (nomes, padrões e faixas, testados nos limites), rotas da API, versões de uPlot,
+  Geist e Node, o exemplo do comando de coleta (igual ao do builder), o nome do serviço e
+  do sudoers, os IPs de exemplo (só RFC 5737) e o teste que confere cada ameaça do SECURITY.
+- Ajuda do painel: modo de acesso (`SSH_ACESSO`) e discos com SMART (`SMART_DEVS`) na
+  configuração ativa; `/api/config` passa a informar o modo de acesso.
+
+### Alterado
+
+- **README enxuto** (585 → ~170 linhas): o que é, garantias, telas, instalação, comandos,
+  V1, problemas e perguntas frequentes. Detalhes técnicos saem do README.
+- **AGENTS.md é a referência técnica única**: regras, configuração (com padrão e faixa de
+  cada variável), comando de coleta e linhas do servidor, formato da amostra, persistência
+  (todos os arquivos de `data/` e de fora dela), API (inclui `/entrar` e o assistente) e
+  alertas.
+- **SECURITY.md**: modelo de ameaças com escopo (o que fica de fora) e 16 ameaças, cada uma
+  com o teste que a confere. Novas: sudo do SMART, assistente de instalação, resposta
+  maliciosa do servidor. Caminhos de teste corrigidos.
+- **TUTORIAL.md**: saúde 0–100 explicada como é (anel da Visão geral), carga relativa ao
+  número de núcleos, alerta SMART só com `FAILED`, "SMART sem permissão" e logs do serviço.
+- Ajuda do painel: a linha do sudoers usa os discos de `SMART_DEVS`; "para mudar, rode
+  `./dashboard reconfigurar`" no lugar de editar o `.env`.
+- `.env.example` traz `SMART_DEVS` (comentada: vazia desligaria o SMART).
+
+### Segurança
+
+- A resposta do SSH tem limite de 1 MB (`MAX_OUTPUT_BYTES`). Um servidor comprometido que
+  responde sem parar não enche mais a memória desta máquina: a conexão é cortada e a coleta
+  falha com o motivo.
+
 ## [2.0.0-alpha.8] — 2026-10-08
 
 Fase F7 do plano (instalação). Um comando no terminal abre um assistente de 6 passos no
@@ -338,7 +376,10 @@ Documentados no plano da V2 (seção 2.2, B1–B12), entre eles: alerta SMART fa
 rede zerada com contadores grandes, alerta duplicado a cada coleta e reescrita completa do
 histórico a cada minuto.
 
-[Não publicado]: https://github.com/tsouza-thiago/linux-server-dashboard-v2/compare/v2.0.0-alpha.6...HEAD
+[Não publicado]: https://github.com/tsouza-thiago/linux-server-dashboard-v2/compare/v2.0.0-beta.1...HEAD
+[2.0.0-beta.1]: https://github.com/tsouza-thiago/linux-server-dashboard-v2/compare/v2.0.0-alpha.8...v2.0.0-beta.1
+[2.0.0-alpha.8]: https://github.com/tsouza-thiago/linux-server-dashboard-v2/compare/v2.0.0-alpha.7...v2.0.0-alpha.8
+[2.0.0-alpha.7]: https://github.com/tsouza-thiago/linux-server-dashboard-v2/compare/v2.0.0-alpha.6...v2.0.0-alpha.7
 [2.0.0-alpha.6]: https://github.com/tsouza-thiago/linux-server-dashboard-v2/compare/v2.0.0-alpha.5...v2.0.0-alpha.6
 [2.0.0-alpha.5]: https://github.com/tsouza-thiago/linux-server-dashboard-v2/compare/v2.0.0-alpha.4...v2.0.0-alpha.5
 [2.0.0-alpha.4]: https://github.com/tsouza-thiago/linux-server-dashboard-v2/compare/v2.0.0-alpha.3...v2.0.0-alpha.4

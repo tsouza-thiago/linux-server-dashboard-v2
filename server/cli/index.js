@@ -113,6 +113,9 @@ const COMMANDS = {
   },
 };
 
+/** Nomes dos subcomandos (a documentação é conferida contra esta lista). */
+export const COMMAND_NAMES = Object.freeze(Object.keys(COMMANDS));
+
 export async function main(argv = process.argv.slice(2), { out = makeOutput(), root = ROOT } = {}) {
   const [name = 'ajuda', ...args] = argv;
   const alias = { '--help': 'ajuda', '-h': 'ajuda', help: 'ajuda', '--version': 'versao', versão: 'versao' };

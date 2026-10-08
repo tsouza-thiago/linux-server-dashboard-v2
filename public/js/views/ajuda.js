@@ -16,7 +16,7 @@ function whatToDo(t) {
     ${panelHead('O que fazer em cada alerta')}
     ${row('warn', 'warn', `Disco acima de ${f.pct(t.diskPct)}`, 'Libere espaço ou mova arquivos. Veja em Armazenamento quando ele enche no ritmo atual.')}
     ${row('warn', 'warn', `Memória acima de ${f.pct(t.ramPct)} · temperatura acima de ${f.celsius(t.tempC)}`, 'Veja quem consome em Processos. Para calor: ventilação, poeira e pasta térmica.')}
-    ${row('crit', 'crit', 'SMART diferente de PASSED', html`<b>Faça backup agora.</b> O disco avisou que pode falhar.`)}
+    ${row('crit', 'crit', 'SMART com FAILED', html`<b>Faça backup agora.</b> O disco avisou que pode falhar.`)}
     ${row('crit', 'outage', 'Servidor inacessível · serviço parado', 'Confira se o servidor está ligado e na rede. O painel tenta de novo a cada coleta e se recupera sozinho.')}`;
 }
 
@@ -48,10 +48,12 @@ function config(state) {
   const r = c.retention;
   return html`<table class="table kv-table"><tbody>
     ${row('Servidor', c.sshHost, 'SSH_HOST')}
+    ${row('Acesso', c.sshAccess === 'restrito' ? 'chave restrita à coleta' : 'acesso completo (como na V1)', 'SSH_ACESSO')}
     ${row('Coleta', `a cada ${f.duration(c.pollIntervalMs / 1000)}`, 'POLL_INTERVAL')}
     ${row('Rede', c.targets?.netIf || '—', 'NET_IF')}
     ${row('Pontos de montagem', list(c.targets?.mounts), 'DISK_MOUNTS')}
-    ${row('Discos', list(c.targets?.devs), 'DISK_DEVS')}
+    ${row('Discos (leitura e gravação)', list(c.targets?.devs), 'DISK_DEVS')}
+    ${row('Discos com SMART', list(c.targets?.smartDevs), 'SMART_DEVS')}
     ${row('Serviços', list(c.targets?.services), 'SERVICES')}
     ${row('Limiares', `disco ${f.pct(t.diskPct)} · RAM ${f.pct(t.ramPct)} · temp ${f.celsius(t.tempC)}`)}
     ${row('Histerese e queda', `${t.hysteresis} · inacessível após ${t.offlineAfter} falha${t.offlineAfter > 1 ? 's' : ''}`)}
@@ -63,7 +65,7 @@ function config(state) {
 function access(state) {
   const c = state.config;
   const s = state.sample;
-  const devs = c?.targets?.devs || [];
+  const devs = c?.targets?.smartDevs || [];
   const smart = s?.smart || [];
   const ok = (text) => html`<span class="status-ink ink-ok">${icon('check', 14, 3)}${text}</span>`;
   const warn = (text) => html`<span class="status-ink ink-warn">${icon('warn', 14, 2.5)}${text}</span>`;
@@ -79,10 +81,10 @@ function access(state) {
       <div class="kv"><span class="ink-2">Comando de coleta no servidor</span>${!s ? html`<span class="ink-3">aguardando coleta</span>` : hm ? warn('desatualizado') : ok('em dia')}</div>
       ${allowed.length ? html`<div class="kv"><span class="ink-2">SMART via sudo · ${allowed.join(', ')}</span>${ok('liberado')}</div>` : ''}
       ${denied.length ? html`<div class="kv"><span class="ink-2">SMART via sudo · ${denied.join(', ')}</span>${warn('falta a linha')}</div>` : ''}
-      ${!devs.length ? html`<div class="kv"><span class="ink-2">SMART</span><span class="ink-3">nenhum disco em DISK_DEVS</span></div>` : ''}
+      ${!devs.length ? html`<div class="kv"><span class="ink-2">SMART</span><span class="ink-3">nenhum disco em SMART_DEVS</span></div>` : ''}
     </div>
     ${line ? html`<div class="field">
-      <span class="note">Cole no servidor com <span class="mono">sudo visudo -f /etc/sudoers.d/dashboard</span> (troque <span class="mono">dashmon</span> pelo usuário SSH, se for outro):</span>
+      <span class="note">O <span class="mono">./dashboard reconfigurar</span> grava esta linha sozinho. À mão: cole no servidor com <span class="mono">sudo visudo -f /etc/sudoers.d/dashboard</span> (troque <span class="mono">dashmon</span> pelo usuário SSH, se for outro, e o caminho pelo de <span class="mono">command -v smartctl</span>):</span>
       <pre class="code" id="aj-sudo">${line}</pre>
       <button class="btn btn-soft btn-sm align-start" type="button" id="aj-copy">${icon('copy', 14)} Copiar linha</button>
     </div>` : ''}
@@ -107,7 +109,7 @@ export function render(ctx) {
     </div>
     <div class="grid-2">
       <section class="panel flush" aria-label="Configuração ativa">
-        <div class="panel-head"><div><h2>Configuração ativa</h2><span class="hint">somente leitura · para mudar, edite o <span class="mono">.env</span> e reinicie o painel</span></div></div>
+        <div class="panel-head"><div><h2>Configuração ativa</h2><span class="hint">somente leitura · para mudar, rode <span class="mono">./dashboard reconfigurar</span></span></div></div>
         <div id="aj-config"></div>
       </section>
       <section class="panel" aria-label="Acesso ao servidor e versão" id="aj-access"></section>

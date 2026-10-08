@@ -10,6 +10,7 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { buildScript, normalizeTargets } from '../../server/collector/builder.js';
 import { parseOutput } from '../../server/collector/parser.js';
+import { collect, runSSH, MAX_OUTPUT_BYTES } from '../../server/collector/index.js';
 
 const ROOT = path.join(path.dirname(fileURLToPath(import.meta.url)), '..', '..');
 const linux = process.platform === 'linux' && fs.existsSync('/proc/stat');
@@ -63,4 +64,29 @@ test('ponta a ponta: `node server/poller.js --once` com ssh falso executando o c
   assert.equal(res.sample.collector.hashMismatch, false);
   assert.equal(res.sample.net.iface, 'lo');
   assert.equal(fs.readFileSync(log, 'utf8').trim().split('\n').length, 1, 'exatamente 1 conexão SSH');
+});
+
+test('servidor que responde sem parar: a conexão é cortada em 1 MB e a coleta falha com motivo claro', { skip: !linux && 'requer Linux' }, async () => {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'lsd-gigante-'));
+  const bin = path.join(dir, 'bin');
+  fs.mkdirSync(bin);
+  // "Servidor" comprometido: devolve uma saída sem fim (antes, ela crescia na memória até o timeout).
+  fs.writeFileSync(path.join(bin, 'ssh'), '#!/bin/sh\necho ===HOST===\nexec yes 0123456789abcdef\n', { mode: 0o755 });
+  const oldPath = process.env.PATH;
+  process.env.PATH = `${bin}:${oldPath}`;
+  try {
+    const started = Date.now();
+    const r = await runSSH('servidor', 'x', 20000);
+    assert.equal(r.stdout, '');
+    assert.match(r.error, /grande demais/);
+    assert.equal(r.timedOut, false, 'cortou pelo tamanho, não pelo timeout');
+    assert.ok(Date.now() - started < 10000);
+    const c = await collect({ host: 'servidor', targets: { mounts: ['/'] }, runner: (h, cmd) => runSSH(h, cmd, 20000) });
+    assert.equal(c.ok, false);
+    assert.match(c.error, /grande demais/);
+    assert.ok(MAX_OUTPUT_BYTES >= 100 * 1024, 'o limite fica muito acima de uma coleta real (~3–7 KB)');
+  } finally {
+    process.env.PATH = oldPath;
+    fs.rmSync(dir, { recursive: true, force: true });
+  }
 });

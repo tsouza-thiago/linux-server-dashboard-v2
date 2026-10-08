@@ -4,8 +4,10 @@
 > F1 concluída (`2.0.0-alpha.2`, validada no servidor real em 901 ms) · F2 concluída
 > (`2.0.0-alpha.3`, migração validada com o `data/` real da V1) · F3 concluída (`2.0.0-alpha.4`) ·
 > F4 concluída (`2.0.0-alpha.5`) · F5 concluída (`2.0.0-alpha.6`) · F6 concluída (`2.0.0-alpha.7`,
-> revisão visual aprovada em 08/10/2026) · F7 entregue (`2.0.0-alpha.8`, e2e em contêineres
-> Debian 12 e Ubuntu 24.04 limpos: 27/27) · próxima: **F8** ·
+> revisão visual aprovada em 08/10/2026) · F7 concluída (`2.0.0-alpha.8`, e2e em contêineres
+> Debian 12 e Ubuntu 24.04 limpos: 27/27; validada no computador e no servidor real em
+> 08/10/2026) · F8 entregue (`2.0.0-beta.1`, docs conferidas por `test/unit/docs.test.js`) ·
+> próxima: **F9** ·
 > base: `v1.0.0` (= `tsouza-thiago/linux-server-dashboard` @ `11a3286`, 196 testes verdes)
 >
 > Referência visual: canvas "Dashboard V2 — direções de design" (privado, do mantenedor).
@@ -260,7 +262,7 @@ commit** (testes + cobertura + `npm audit` + `bash -n`), e nenhum commit vermelh
 | Código | SemVer. `v1.0.0` = estado atual importado. Depois `v2.0.0-alpha.N` (1 por fase) → `beta.N` → `rc.N` → `v2.0.0`, cada uma com **GitHub Release** e notas do CHANGELOG |
 | Commits | Conventional Commits em PT-BR (`feat(collector):`, `fix(alerts):`, `test:`, `docs:`, `refactor:`, `style:`, `perf:`, `chore:`, `security:`), 1 mudança lógica por commit, sempre verde |
 | Mudanças | `CHANGELOG.md` (Keep a Changelog), atualizado no mesmo commit |
-| Decisões | `docs/PLANO_V2.md` (este documento) + `docs/adr/NNNN-*.md`. ADRs iniciais: 0001 repo novo com histórico · 0002 Node 24 · 0003 HTTP sem Express · 0004 uPlot · 0005 NDJSON 72h/90d · 0006 motor de alertas · 0007 sessão por cookie · 0008 SSH restrito + sudo smartctl · 0009 design limpo e arejado · 0010 ES modules sem build |
+| Decisões | `docs/PLANO_V2.md` (este documento) + `docs/adr/NNNN-*.md`. ADRs iniciais: 0001 repo novo com histórico · 0002 Node 24 · 0003 HTTP sem Express · 0004 uPlot · 0005 NDJSON 72h/90d · 0006 motor de alertas · 0007 sessão por cookie · 0008 SSH restrito + sudo smartctl · 0009 design Aurora + Cockpit, escuro primeiro · 0010 ES modules sem build · 0011 instalação (assistente + TUI) · 0012 git clone + tag assinada · 0013 só Linux na máquina local |
 | Versão em runtime | fonte única `package.json` → `/api/status`, Ajuda e log de boot |
 | Dados | `schemaVersion` na amostra; `data/meta.json` + migrações numeradas e idempotentes com backup do v1 |
 | Comando de coleta | `COLLECTOR_VERSION` + hash da config, gravados na amostra |
@@ -292,8 +294,8 @@ commit** (testes + cobertura + `npm audit` + `bash -n`), e nenhum commit vermelh
 | **F4 — HTTP** ✅ | `node:http`, sessão por cookie, SSE com backfill, segurança portada | testes de segurança V1 + novos verdes; `npm audit` limpo |
 | **F5 — Fundação do front** ✅ | ES modules, store, router, `html` com escape, uPlot | e2e abre todas as views |
 | **F6 — Design** ✅ | implementar em CSS/JS o design system **já aprovado no canvas** (tokens, componentes, estados, AA nos 2 temas, teclado, mobile, `prefers-reduced-motion`) + 8 telas | screenshots do Chromium comparados com as pranchetas aprovadas + **sua revisão visual** |
-| **F7 — Instalação** ✅ entregue | comando `dashboard`, assistente no navegador + TUI reserva, detecção automática, configuração do servidor assistida/manual, SSH isolado, tag assinada, atalho e systemd de usuário, atualizar/desinstalar, upgrade V1→V2 | instalação de ponta a ponta numa VM Debian e numa Ubuntu limpas (sem git? sem Node?) + upgrade testado numa cópia de `data/` da V1 — **feito em contêineres** (`scripts/e2e-instalacao/rodar.sh`, 27/27): Debian 12 e Ubuntu 24.04 sem Node (git instalado pelo comando do README), servidores Debian e Ubuntu com sudo por senha; upgrade com o `data/` gerado pela própria V1 (`v1.0.0`) rodando contra o servidor. Falta a 1ª instalação no servidor real do mantenedor |
-| **F8 — Docs** | README enxuto, TUTORIAL, AGENTS e SECURITY (threat model com SSH restrito e sudo) → `beta` | docs batem com o código |
+| **F7 — Instalação** ✅ | comando `dashboard`, assistente no navegador + TUI reserva, detecção automática, configuração do servidor assistida/manual, SSH isolado, tag assinada, atalho e systemd de usuário, atualizar/desinstalar, upgrade V1→V2 | instalação de ponta a ponta numa VM Debian e numa Ubuntu limpas (sem git? sem Node?) + upgrade testado numa cópia de `data/` da V1 — **feito em contêineres** (`scripts/e2e-instalacao/rodar.sh`, 27/27): Debian 12 e Ubuntu 24.04 sem Node (git instalado pelo comando do README), servidores Debian e Ubuntu com sudo por senha; upgrade com o `data/` gerado pela própria V1 (`v1.0.0`) rodando contra o servidor. Validada pelo mantenedor em 08/10/2026: `--importar-v1` + `reconfigurar` no computador e no servidor reais, serviço systemd de usuário ativo depois de reiniciar, `diagnosticar` sem avisos |
+| **F8 — Docs** ✅ entregue | README enxuto, TUTORIAL, AGENTS e SECURITY (threat model com SSH restrito e sudo) → `beta` | docs batem com o código — conferido por `test/unit/docs.test.js` (links, arquivos, comandos e opções, scripts, variáveis com padrões e faixas, rotas, versões, exemplo da coleta, IPs, teste de cada ameaça) |
 | **F9 — Release** | soak de 72 h → `rc` → `v2.0.0` | dentro do orçamento (tempo do comando no servidor, saída, RAM/CPU local) |
 
 ---
