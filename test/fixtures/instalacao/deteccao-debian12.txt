@@ -1,0 +1,58 @@
+===WHO===
+maria
+1000
+===CLIENT===
+192.0.2.50
+===OS===
+PRETTY_NAME="Debian GNU/Linux 12 (bookworm)"
+servidor-casa
+===SUDO===
+senha
+===SMARTCTL===
+/usr/sbin/smartctl
+===SUDOBIN===
+/usr/bin/sudo
+/usr/sbin/visudo
+===DASHMON===
+===LSBLK===
+NAME="sda" KNAME="sda" PKNAME="" TYPE="disk" SIZE="100030242816" ROTA="0" TRAN="sata" MODEL="SSD\x20120GB" MOUNTPOINT=""
+NAME="sda1" KNAME="sda1" PKNAME="sda" TYPE="part" SIZE="536870912" ROTA="0" TRAN="" MODEL="" MOUNTPOINT="/boot/efi"
+NAME="sda2" KNAME="sda2" PKNAME="sda" TYPE="part" SIZE="99492741120" ROTA="0" TRAN="" MODEL="" MOUNTPOINT="/"
+NAME="sdb" KNAME="sdb" PKNAME="" TYPE="disk" SIZE="4000787030016" ROTA="1" TRAN="sata" MODEL="HDD\x204TB" MOUNTPOINT=""
+NAME="sdb1" KNAME="sdb1" PKNAME="sdb" TYPE="part" SIZE="4000785104896" ROTA="1" TRAN="" MODEL="" MOUNTPOINT="/mnt/dados"
+NAME="sdc" KNAME="sdc" PKNAME="" TYPE="disk" SIZE="4000787030016" ROTA="1" TRAN="usb" MODEL="HDD\x20Externo" MOUNTPOINT=""
+NAME="sdc1" KNAME="sdc1" PKNAME="sdc" TYPE="part" SIZE="4000785104896" ROTA="1" TRAN="" MODEL="" MOUNTPOINT=""
+NAME="backup-vol" KNAME="dm-0" PKNAME="sdc1" TYPE="crypt" SIZE="4000768327680" ROTA="1" TRAN="" MODEL="" MOUNTPOINT="/mnt/backup"
+NAME="loop0" KNAME="loop0" PKNAME="" TYPE="loop" SIZE="66326528" ROTA="0" TRAN="" MODEL="" MOUNTPOINT="/snap/core22/1"
+NAME="zram0" KNAME="zram0" PKNAME="" TYPE="disk" SIZE="1073741824" ROTA="0" TRAN="" MODEL="" MOUNTPOINT="[SWAP]"
+===DF===
+Filesystem       Type         1B-blocks          Used         Avail Mounted on
+/dev/sda2        ext4       97850339328   40118636544   52713779200 /
+/dev/sda1        vfat         535805952      10713088     525092864 /boot/efi
+/dev/sdb1        ext4     3936301383680 2519232884736 1217176854528 /mnt/dados
+/dev/mapper/backup-vol ext4 3936285171712 865982734336 2870348980224 /mnt/backup
+overlay          overlay    97850339328   40118636544   52713779200 /var/lib/docker/overlay2/abc/merged
+/dev/sda2        ext4       97850339328   40118636544   52713779200 /etc/hosts
+===NET===
+docker0 down cabo
+enp3s0 up cabo
+lo unknown cabo
+veth1a2b up cabo
+wlp2s0 down wifi
+===ROTA===
+enp3s0
+===SERVICES===
+containerd.service
+cron.service
+dbus.service
+docker.service
+getty@tty1.service
+jellyfin.service
+nmbd.service
+smbd.service
+ssh.service
+systemd-journald.service
+systemd-logind.service
+unattended-upgrades.service
+user@1000.service
+===FIM===

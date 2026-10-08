@@ -92,10 +92,12 @@ const quotePath = (p) => {
  * do servidor conferida no known_hosts próprio (StrictHostKeyChecking yes): se mudar, a
  * coleta falha com aviso claro em vez de aceitar em silêncio.
  */
-export function sshConfigText({ host, port = 22, user = PANEL_USER, keyFile, knownHosts }) {
+/** `hostKeyType`: valor do HostKeyAlgorithms (ver remoto.hostKeyAlgorithms). */
+export function sshConfigText({ host, port = 22, user = PANEL_USER, keyFile, knownHosts, hostKeyType = '' }) {
   if (!validHost(host)) throw new Error('endereço do servidor inválido');
   if (!validPort(port)) throw new Error('porta inválida');
   if (!validUser(user)) throw new Error('usuário inválido');
+  if (hostKeyType && !/^[a-z0-9@.,-]+$/.test(hostKeyType)) throw new Error('tipo de chave do servidor inválido');
   return [
     '# Server Dashboard: configuração SSH própria do painel (ssh -F). O ~/.ssh/config não é usado.',
     `Host ${SSH_ALIAS}`,
@@ -107,6 +109,8 @@ export function sshConfigText({ host, port = 22, user = PANEL_USER, keyFile, kno
     `  UserKnownHostsFile ${quotePath(knownHosts)}`,
     '  GlobalKnownHostsFile /dev/null',
     '  StrictHostKeyChecking yes',
+    // Só o tipo de chave que a pessoa conferiu no passo 3.
+    ...(hostKeyType ? [`  HostKeyAlgorithms ${hostKeyType}`] : []),
     '  UpdateHostKeys no',
     '  BatchMode yes',
     '  ConnectTimeout 10',

@@ -17,6 +17,7 @@ export function configTargets() {
     netIf: config.NET_IF,
     mounts: config.DISK_MOUNTS,
     devs: config.DISK_DEVS,
+    smartDevs: config.SMART_DEVS,
     services: config.SERVICES,
   });
 }
@@ -31,6 +32,8 @@ export function buildCommand(overrides = {}, mode = 'basico') {
     netIf: overrides.netIf ?? base.netIf,
     mounts: overrides.diskMounts ?? overrides.mounts ?? base.mounts,
     devs: overrides.diskDevs ?? overrides.devs ?? base.devs,
+    // Discos trocados no override sem SMART explícito: o SMART segue os mesmos discos.
+    smartDevs: overrides.smartDevs ?? (overrides.diskDevs || overrides.devs ? undefined : base.smartDevs),
     services: overrides.services ?? base.services,
   };
   return buildScript(targets, mode).script;

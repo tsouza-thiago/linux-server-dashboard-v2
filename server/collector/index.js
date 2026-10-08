@@ -55,7 +55,7 @@ export function describeError({ code, error, stderr, timedOut }) {
 
 /** O SMART é pedido quando há discos configurados e o último teste tem mais de 1 intervalo. */
 export function smartDue(targets, prev, nowMs, intervalMs = SMART_INTERVAL_MS) {
-  if (!targets.devs.length) return false;
+  if (!(targets.smartDevs ?? targets.devs).length) return false;
   const last = prev && prev.smartAt ? Date.parse(prev.smartAt) : NaN;
   return !Number.isFinite(last) || nowMs - last >= intervalMs;
 }

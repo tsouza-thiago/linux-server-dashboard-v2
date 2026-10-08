@@ -79,6 +79,8 @@ export function clampPathToData(value, fallbackBasename) {
 const sanitizedMounts = sanitizeToken(env('DISK_MOUNTS', '/'));
 const sanitizedDevs = sanitizeToken(env('DISK_DEVS', ''));
 const sanitizedServices = sanitizeToken(env('SERVICES', ''));
+// SMART_DEVS ausente = SMART em todos os DISK_DEVS (V1); presente e vazio = nenhum.
+const rawSmartDevs = process.env.SMART_DEVS ?? fileEnv.SMART_DEVS;
 const sanitizedNetIf = sanitizeToken(env('NET_IF', ''));
 
 export function sanitizeHost(value) {
@@ -116,6 +118,7 @@ export const config = {
   NET_IF: sanitizedNetIf[0] || '',
   DISK_MOUNTS: sanitizedMounts.length ? sanitizedMounts : ['/'],
   DISK_DEVS: sanitizedDevs,
+  SMART_DEVS: rawSmartDevs === undefined ? null : sanitizeToken(rawSmartDevs),
   SERVICES: sanitizedServices,
   DASH_TOKEN: env('DASH_TOKEN', '').trim(),
   ALERTS: alertThresholds(undefined, configWarnings),
