@@ -1,4 +1,4 @@
-// Os 6 passos da instalação (seção 11 do plano), em um só lugar: o assistente no navegador
+// Os 6 passos da instalação (ADR 0011), em um só lugar: o assistente no navegador
 // (web.js) e a TUI (tui.js) só desenham e chamam estes métodos, então os textos, a ordem e
 // as checagens são os mesmos nos dois.
 //
@@ -22,9 +22,15 @@ import { currentVersionStatus, describeVersion } from './assinatura.js';
 import { createLoginCode } from '../http/entrar.js';
 import { hasSystemdUser, panelPort, startPanel, unitPath } from '../cli/servico.js';
 
+/** Nomes dos 6 passos, na ordem em que a tela os mostra. */
 export const STEPS = ['Boas-vindas', 'Servidor', 'Conectar', 'O que monitorar', 'Preparar servidor', 'Pronto'];
+/** Limiares que a instalação pergunta: [mínimo, máximo, padrão] (as faixas do .env). */
 export const THRESHOLD_LIMITS = { diskPct: [50, 99, 90], ramPct: [50, 99, 90], tempC: [30, 110, 60] };
 
+/**
+ * Erro esperado de um passo (dado inválido, servidor recusou): a mensagem vai para a tela,
+ * com o status HTTP e o campo do formulário a destacar.
+ */
 export class InstallError extends Error {
   constructor(message, { status = 400, field } = {}) {
     super(message);
@@ -33,6 +39,7 @@ export class InstallError extends Error {
   }
 }
 
+// Interrompe o passo com uma mensagem para a tela.
 const fail = (msg, opts) => { throw new InstallError(msg, opts); };
 
 /** Endereço e porta atuais do data/ssh/config (para o reconfigurar já vir preenchido). */
@@ -47,6 +54,7 @@ export function currentServer(root) {
   }
 }
 
+/** O estado de uma instalação em andamento (um objeto por assistente aberto). */
 export class Instalacao {
   constructor({ root, home = os.homedir(), deps = {} } = {}) {
     this.root = root;
@@ -59,6 +67,7 @@ export class Instalacao {
     this.reset();
   }
 
+  /** Volta ao começo: esquece servidor, identidade, detecção, escolhas, plano e senha. */
   reset() {
     this.servidor = null;
     this.identidades = [];
@@ -74,15 +83,18 @@ export class Instalacao {
     this.#senha = '';
   }
 
+  // Campo privado: nada fora desta classe lê a senha (nem a tela, nem o log).
   #senha = '';
 
   /** Descarta a senha do administrador (fim do passo 5, cancelamento ou tempo esgotado). */
   esquecerSenha() { this.#senha = ''; }
 
+  /** Há uma senha guardada? (a tela usa para saber se precisa pedir de novo) */
   get temSenha() { return Boolean(this.#senha); }
 
   // ---- Passo 1: verificações deste computador --------------------------------------------
 
+  /** Checagens do passo 1: versão assinada, Node, SSH, systemd, porta e se é reconfiguração. */
   verificarComputador() {
     const has = (cmd) => {
       const r = this.deps.spawnSync(cmd, ['-V'], { stdio: 'ignore' });
@@ -104,6 +116,10 @@ export class Instalacao {
 
   // ---- Passo 2: servidor -----------------------------------------------------------------
 
+  /**
+   * Passo 2: valida o endereço, o usuário e a porta, e confere se a porta do SSH responde.
+   * Trocar de servidor apaga a identidade, a detecção e a senha do servidor anterior.
+   */
   async definirServidor({ host, user, port = 22 } = {}) {
     host = String(host ?? '').trim();
     user = String(user ?? '').trim();
@@ -129,6 +145,7 @@ export class Instalacao {
 
   // ---- Passo 3: conectar -----------------------------------------------------------------
 
+  /** Passo 3: lê a identidade do servidor (ssh-keyscan) e a mostra em blocos para comparar. */
   async lerIdentidade() {
     if (!this.servidor) fail('Informe o servidor primeiro.');
     const keys = await this.deps.scanHostKeys(this.servidor.host, this.servidor.port);
@@ -138,6 +155,7 @@ export class Instalacao {
     return { type: k.type, fingerprint: k.fingerprint, blocos: fingerprintBlocks(k.fingerprint), conhecida: this.#identidadeConhecida(k) };
   }
 
+  /** Essa identidade já está no known_hosts do painel? (reconfigurar o mesmo servidor) */
   #identidadeConhecida(k) {
     try {
       return fs.readFileSync(path.join(this.root, 'data', 'ssh', 'known_hosts'), 'utf8').includes(`${k.type} ${k.key}`);
@@ -178,6 +196,7 @@ export class Instalacao {
     return this.resumoDeteccao();
   }
 
+  /** O que o passo 4 mostra: o retrato do servidor, as escolhas atuais e o custo estimado. */
   resumoDeteccao() {
     const d = this.deteccao;
     if (!d) fail('Conecte ao servidor primeiro.');
@@ -206,6 +225,7 @@ export class Instalacao {
     };
   }
 
+  /** Alvos da coleta a partir das escolhas (os discos de I/O são os das pastas escolhidas). */
   #alvos(e) {
     const mounts = e.mounts;
     const io = [...new Set(this.deteccao.mounts.filter((m) => mounts.includes(m.target)).map((m) => m.disk).filter(Boolean))];
@@ -214,6 +234,10 @@ export class Instalacao {
 
   // ---- Passo 4: o que monitorar ----------------------------------------------------------
 
+  /**
+   * Passo 4: valida as escolhas contra o que a detecção encontrou (nada que o servidor não
+   * tenha mostrado entra no script) e os limiares contra as faixas.
+   */
   definirEscolhas({ mounts, smart = [], netIf = '', services = [], limiares = {} } = {}) {
     const d = this.deteccao;
     if (!d) fail('Conecte ao servidor primeiro.');
@@ -323,6 +347,7 @@ export class Instalacao {
     return { ok: true, sample: s, resumo: this.resumoTeste(s) };
   }
 
+  /** Resumo da coleta de teste para o passo 6 (memória, disco mais cheio, serviços…). */
   resumoTeste(s = this.teste) {
     if (!s) return null;
     const ramPct = s.ram && s.ram.total ? Math.round((s.ram.used / s.ram.total) * 100) : null;

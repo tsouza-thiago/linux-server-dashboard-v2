@@ -11,6 +11,7 @@ export const shQuote = (s) => `'${String(s).replace(/'/g, "'\\''")}'`;
  * e é usada uma vez para conferir se o sudo aceita (`sudo -S -k`, que sempre pergunta).
  */
 export function detectionScript({ password = '' } = {}) {
+  // A senha vai entre aspas simples (shQuote); quebra de linha não tem como ir com segurança.
   if (/[\r\n\0]/.test(password)) throw new Error('senha com quebra de linha não é suportada');
   return [
     password ? `P=${shQuote(password)}` : "P=''",
@@ -24,6 +25,7 @@ export function detectionScript({ password = '' } = {}) {
     'elif sudo -n true 2>/dev/null; then echo nopasswd',
     "elif [ -n \"$P\" ] && printf '%s\\n' \"$P\" | sudo -S -k -p '' true 2>/dev/null; then echo senha",
     'else echo nao; fi',
+    // A variável da senha é apagada logo depois do uso.
     'P=',
     "echo '===SMARTCTL==='; for p in /usr/sbin/smartctl /usr/bin/smartctl /sbin/smartctl /usr/local/sbin/smartctl; do [ -x \"$p\" ] && { echo \"$p\"; break; }; done; true",
     "echo '===SUDOBIN==='; command -v sudo 2>/dev/null; for p in /usr/sbin/visudo /usr/bin/visudo /sbin/visudo; do [ -x \"$p\" ] && { echo \"$p\"; break; }; done; true",
@@ -38,6 +40,7 @@ export function detectionScript({ password = '' } = {}) {
   ].join('\n');
 }
 
+/** Separa a saída da detecção nas seções ===NOME=== (cada uma com as suas linhas). */
 function sections(text) {
   const out = {};
   let cur = null;
@@ -58,7 +61,9 @@ export function parsePairs(line) {
   return out;
 }
 
+// Interfaces que não são a rede do servidor (loopback, contêineres, VPNs, túneis): ficam de fora.
 const NET_SKIP = /^(lo|docker\d*|veth|br-|virbr|vnet|tun|tap|wg|zt|tailscale|cni|flannel|kube|ifb|sit|ip6tnl|ip6gre|gre|gretap|erspan|dummy|teql|ip_vti|ip6_vti|nlmon)/;
+// Serviços do próprio sistema que não fazem sentido acompanhar: ficam de fora da lista.
 const SERVICE_SKIP = /^(systemd-|dbus|getty@|serial-getty@|user@|user-runtime-dir@|polkit|accounts-daemon|udisks2|upower|rtkit|packagekit|unattended-upgrades|ModemManager|NetworkManager|wpa_supplicant|networkd-dispatcher|multipathd|irqbalance|rsyslog|snapd|thermald|fwupd|chrony|chronyd|ntp|ntpd|avahi-daemon|cups|cups-browsed|colord|switcheroo|power-profiles|bluetooth|gdm|lightdm|sddm|atd|haveged|lvm2|mdmonitor|smartd|smartmontools|open-vm-tools|qemu-guest-agent|apport|kerneloops|whoopsie|containerd)\b/;
 
 /** Serviços que vêm marcados por padrão (o que um servidor de casa costuma servir). */
@@ -72,8 +77,10 @@ const RECOMMENDED = [
   [/^(docker|podman)$/, 'contêineres'],
   [/^(home-assistant|homeassistant|pihole-FTL|adguardhome|unbound|mosquitto|zigbee2mqtt)/, 'casa'],
 ];
+// Serviços conhecidos que aparecem com rótulo, mas desmarcados.
 const LABELS = [[/^(cron|crond)$/, 'tarefas agendadas'], [/^(ssh|sshd)$/, 'acesso remoto']];
 
+/** Se o serviço vem marcado e qual rótulo ele ganha na tela. */
 function serviceInfo(name) {
   for (const [re, label] of RECOMMENDED) if (re.test(name)) return { recommended: true, label };
   for (const [re, label] of LABELS) if (re.test(name)) return { recommended: false, label };
@@ -99,6 +106,7 @@ export function parseDetection(text) {
 
   const blocks = (s.LSBLK || []).map(parsePairs).filter((b) => b.NAME);
   const byKname = new Map(blocks.map((b) => [b.KNAME || b.NAME, b]));
+  // Disco de uma partição/volume: sobe pela árvore do lsblk (PKNAME) até achar o disco.
   const diskOf = (b) => {
     let cur = b;
     for (let i = 0; cur && i < 8; i += 1) {
@@ -143,11 +151,13 @@ export function parseDetection(text) {
     });
   }
 
+  // Rede: a interface da rota padrão primeiro, depois as ligadas, depois por nome.
   const defaults = new Set((s.ROTA || []).map((l) => l.trim()).filter(Boolean));
   const nets = (s.NET || []).map((l) => l.trim().split(/\s+/)).filter((p) => p[0] && !NET_SKIP.test(p[0]))
     .map(([name, state = '', kind = 'cabo']) => ({ name, up: state === 'up', wifi: kind === 'wifi', default: defaults.has(name) }));
   nets.sort((a, b) => Number(b.default) - Number(a.default) || Number(b.up) - Number(a.up) || a.name.localeCompare(b.name));
 
+  // Serviços em execução: só nomes seguros e sem instância (@), sem os do sistema.
   const services = [...new Set((s.SERVICES || []).map((l) => l.trim().replace(/\.service$/, '')).filter((n) => /^[A-Za-z0-9@._-]+$/.test(n) && !n.includes('@')))]
     .filter((n) => !SERVICE_SKIP.test(n))
     .map((name) => ({ name, ...serviceInfo(name) }))

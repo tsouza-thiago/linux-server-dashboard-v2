@@ -1,9 +1,10 @@
-// `./dashboard instalar --sem-interface` (D10): os mesmos passos sem perguntas, por
+// `./dashboard instalar --sem-interface` (ADR 0011): os mesmos passos sem perguntas, por
 // opções, para quem automatiza. A identidade do servidor precisa ser informada
 // (--identidade SHA256:…) — nada de aceitar a primeira que aparecer — e a senha, quando
 // houver, vem pelo stdin (--senha-stdin), nunca pela linha de comando.
 import { THRESHOLD_LIMITS } from './instalacao.js';
 
+/** Texto de `--sem-interface --ajuda` (as opções são conferidas pelo docs.test.js). */
 export const HEADLESS_HELP = `Uso: ./dashboard instalar --sem-interface --servidor <ip> --usuario <nome> --identidade <SHA256:…> [opções]
 
   --porta <n>             porta SSH (padrão 22)
@@ -21,8 +22,10 @@ export const HEADLESS_HELP = `Uso: ./dashboard instalar --sem-interface --servid
   --sem-atalho            não cria o atalho no menu
 `;
 
+// Lista de uma opção: ausente = undefined (usa a recomendação); a palavra `none` = vazia.
 const list = (v, none) => (v === undefined ? undefined : String(v).trim() === none ? [] : String(v).split(/[\s,]+/).filter(Boolean));
 
+/** 1ª linha do stdin (a senha), sem guardar o resto. */
 async function readLine(stream) {
   let data = '';
   for await (const chunk of stream) {
@@ -32,6 +35,10 @@ async function readLine(stream) {
   return data.split('\n')[0].replace(/\r$/, '');
 }
 
+/**
+ * Instalação sem perguntas. Códigos de saída: 0 pronto, 2 erro de uso ou do servidor,
+ * 3 modo manual (os blocos foram mostrados; rode de novo com --ja-preparado).
+ */
 export async function runHeadless({ out, inst, flags, stdin = process.stdin }) {
   const fail = (msg, how) => { out.fail(msg); if (how) out.explain('', how); return 2; };
   if (flags.ajuda || flags.help) { out.line(HEADLESS_HELP); return 0; }

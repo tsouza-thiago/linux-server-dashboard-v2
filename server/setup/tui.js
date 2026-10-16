@@ -1,10 +1,11 @@
-// TUI reserva (D10, prancheta "TUI reserva"): os mesmos 6 passos do assistente no
+// TUI reserva (ADR 0011): os mesmos 6 passos do assistente no
 // terminal, para máquinas sem tela ou acessadas por SSH. Feita em Node, sem dependências:
 // setas, espaço, Tab e Enter; funciona sem cores (NO_COLOR ou terminal simples).
 // Usa os mesmos métodos do assistente no navegador (instalacao.js).
 import readline from 'node:readline';
 import { STEPS } from './instalacao.js';
 
+// Tamanho em base 1000 com vírgula ("1,8 TB"), como os fabricantes de disco anunciam.
 const fmtBytes = (b) => {
   if (!Number.isFinite(b) || b <= 0) return '—';
   const u = ['B', 'KB', 'MB', 'GB', 'TB'];
@@ -15,6 +16,7 @@ const fmtBytes = (b) => {
 };
 const pad = (s, n) => String(s).padEnd(n);
 
+// Ctrl+C ou Esc no 1º passo: interrompe a TUI de forma limpa.
 class Cancelled extends Error {}
 
 /** Terminal: lê teclas (keypress) e redesenha a tela inteira a cada mudança. */
@@ -23,6 +25,7 @@ export class Screen {
     this.input = input;
     this.output = output;
     this.color = color;
+    // Teclas que chegaram antes de alguém pedir (fila) e quem está esperando a próxima.
     this.queue = [];
     this.waiting = null;
     this.onKey = (str, key = {}) => {
@@ -34,6 +37,7 @@ export class Screen {
     this.step = 1;
   }
 
+  // Cores ANSI (sem cor, o texto puro) e vídeo reverso para o cursor dos campos.
   paint(code, text) { return this.color ? `\x1b[${code}m${text}\x1b[0m` : String(text); }
   ok(t) { return this.paint('32', t); }
   warn(t) { return this.paint('33', t); }
@@ -43,6 +47,7 @@ export class Screen {
   bold(t) { return this.paint('1', t); }
   inverse(t) { return this.color ? `\x1b[7m${t}\x1b[0m` : t; }
 
+  /** A próxima tecla (Ctrl+C rejeita com Cancelled). */
   key() {
     if (this.cancelled) return Promise.reject(new Cancelled());
     if (this.queue.length) {
@@ -55,6 +60,7 @@ export class Screen {
     });
   }
 
+  /** Cabeçalho com os 6 passos: ✓ feitos, ● atual, ○ por vir. */
   header() {
     const marks = STEPS.map((name, i) => {
       const n = i + 1;
@@ -66,12 +72,14 @@ export class Screen {
     return [this.accent(`╭─ Server Dashboard · configuração inicial ${line.slice(0, 28)}╮`), `  ${marks}`, this.accent(`╰${line}╯`), ''];
   }
 
+  /** Limpa a tela e desenha cabeçalho, corpo e a linha de teclas. */
   draw(body, hints = '') {
     const out = [...this.header(), ...body];
     if (hints) out.push('', this.dim('─'.repeat(72)), ` ${hints}`);
     this.output.write(`\x1b[2J\x1b[H${out.join('\n')}\n`);
   }
 
+  /** Para de ouvir as teclas. */
   close() { this.input.off('keypress', this.onKey); }
 
   /** Campo de texto (Enter confirma, Esc volta). `mask` esconde o que é digitado. */
@@ -89,6 +97,7 @@ export class Screen {
       if (k.name === 'return' || k.name === 'enter') return v;
       if (k.name === 'escape') return null;
       if (k.name === 'backspace') { v = v.slice(0, -1); continue; }
+      // Só caracteres visíveis entram no campo (nada de sequência de controle).
       if (k.sequence && k.sequence.length === 1 && k.sequence >= ' ' && !k.ctrl) v += k.sequence;
     }
   }
@@ -136,6 +145,7 @@ export class Screen {
       keys.push(`${this.accent('Tab')} próximo grupo`, `${this.accent('Enter')} continuar`, `${this.accent('Esc')} voltar`);
       this.draw(body, keys.join('   '));
       const k = await this.key();
+      // Move o cursor para a próxima linha habilitada (dá a volta no fim).
       const move = (d) => {
         for (let j = 1; j <= rows.length; j += 1) {
           const n = (cur + d * j + rows.length) % rows.length;
@@ -165,6 +175,7 @@ export class Screen {
 
 // ---------------- Os 6 passos ----------------
 
+/** Passo 1: o que será feito e o que nunca é feito, e as checagens deste computador. */
 async function step1(sc, inst) {
   sc.step = 1;
   const c = inst.verificarComputador();
@@ -187,6 +198,7 @@ async function step1(sc, inst) {
   if (r === null) throw new Cancelled();
 }
 
+/** Passo 2: endereço, usuário e porta; repete enquanto o servidor não responder. */
 async function step2(sc, inst, form) {
   sc.step = 2;
   let error = '';
@@ -212,6 +224,7 @@ async function step2(sc, inst, form) {
   }
 }
 
+/** Passo 3: a identidade do servidor ANTES da senha; depois, a conexão de leitura. */
 async function step3(sc, inst, form) {
   sc.step = 3;
   sc.busy(`Conectar a ${form.host}`, 'lendo a identidade do servidor…');
@@ -252,6 +265,7 @@ async function step3(sc, inst, form) {
   }
 }
 
+/** Passo 4: pastas (com SMART por disco), rede, serviços e limiares, num formulário só. */
 async function step4(sc, inst) {
   sc.step = 4;
   const d = inst.resumoDeteccao();
@@ -319,8 +333,10 @@ async function step4(sc, inst) {
   }
 }
 
+// Na lista de comandos, o script dentro de command="…" (longo) aparece resumido.
 const shortKey = (text, hash) => text.replace(/command="(?:[^"\\]|\\.)*"/, `command="…coleta v2 · ${hash.slice(0, 6)}…"`);
 
+/** Passo 5: assistido (1 conexão, depois do Confirmar) ou à mão (bloco por bloco, com teste). */
 async function step5(sc, inst, form) {
   sc.step = 5;
   let from = true;
@@ -386,6 +402,7 @@ async function step5(sc, inst, form) {
   }
 }
 
+/** Passo 6: resultado da 1ª coleta, preferências (início automático, atalho) e o token. */
 async function step6(sc, inst) {
   sc.step = 6;
   const r = inst.resumoTeste() || {};
@@ -420,6 +437,7 @@ export async function runTui({ out, inst, input = process.stdin, output = proces
     out.explain('a entrada não é um terminal (veio de um pipe ou script).', 'para automatizar, use ./dashboard instalar --sem-interface (veja ./dashboard ajuda).');
     return 2;
   }
+  // Terminal em modo "cru": cada tecla chega na hora, sem esperar Enter.
   if (input === process.stdin) {
     readline.emitKeypressEvents(input);
     input.setRawMode(true);
@@ -429,6 +447,7 @@ export async function runTui({ out, inst, input = process.stdin, output = proces
   const form = { host: inst.servidor?.host || inst.verificarComputador().servidorAtual?.host || '', user: '', port: String(inst.verificarComputador().servidorAtual?.port || 22) };
   let result = null;
   try {
+    // Cada passo devolve 'next', 'back' ou, no 6º, o resultado final.
     let step = 1;
     while (step <= 6) {
       if (step === 1) { await step1(sc, inst); step = 2; continue; }
