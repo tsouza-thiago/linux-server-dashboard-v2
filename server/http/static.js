@@ -2,6 +2,7 @@
 // arquivo oculto, pasta ou caminho que escape da raiz (path traversal).
 import fs from 'node:fs';
 import path from 'node:path';
+import zlib from 'node:zlib';
 
 export const MIME = {
   '.html': 'text/html; charset=utf-8',
@@ -16,16 +17,44 @@ export const MIME = {
   '.txt': 'text/plain; charset=utf-8',
 };
 
+// Texto (HTML, CSS, JS, JSON, SVG) vai em gzip quando o navegador aceita: a página inicial
+// cabe no orçamento de 300 KB (Q17). As fontes .woff2 e as imagens já vêm comprimidas. Os
+// arquivos são do próprio pacote, sem segredo nem dado do usuário (nada de BREACH).
+const COMPRESSIBLE = /^(text\/|application\/json|image\/svg\+xml)/;
+const MIN_GZIP_BYTES = 1024;
+const gzipCache = new Map();
+
+function gzipped(file, stat) {
+  const key = `${file}:${stat.size}:${stat.mtimeMs}`;
+  let buf = gzipCache.get(key);
+  if (!buf) {
+    buf = zlib.gzipSync(fs.readFileSync(file), { level: 9 });
+    for (const k of gzipCache.keys()) if (k.startsWith(`${file}:`)) gzipCache.delete(k);
+    gzipCache.set(key, buf);
+  }
+  return buf;
+}
+
 /** Envia um arquivo conhecido (tipo pela extensão, que precisa estar na lista). */
-export function sendFile(res, file, { cacheControl = 'no-cache' } = {}) {
+export function sendFile(res, file, { cacheControl = 'no-cache', req = null } = {}) {
   const type = MIME[path.extname(file).toLowerCase()];
   let stat;
   try { stat = fs.statSync(file); } catch { stat = null; }
   if (!type || !stat || !stat.isFile()) return res.status(404).json({ error: 'não encontrado' });
   res.statusCode = 200;
   res.setHeader('Content-Type', type);
-  res.setHeader('Content-Length', stat.size);
   res.setHeader('Cache-Control', cacheControl);
+  if (COMPRESSIBLE.test(type)) res.setHeader('Vary', 'Accept-Encoding');
+  const acceptsGzip = /\bgzip\b/i.test(String(req?.headers?.['accept-encoding'] || ''));
+  if (acceptsGzip && COMPRESSIBLE.test(type) && stat.size >= MIN_GZIP_BYTES) {
+    let body;
+    try { body = gzipped(file, stat); } catch { return res.status(404).json({ error: 'não encontrado' }); }
+    res.setHeader('Content-Encoding', 'gzip');
+    res.setHeader('Content-Length', body.length);
+    res.end(req.method === 'HEAD' ? undefined : body);
+    return res;
+  }
+  res.setHeader('Content-Length', stat.size);
   fs.createReadStream(file).on('error', () => res.destroy()).pipe(res);
   return res;
 }
@@ -55,6 +84,6 @@ export function serveStatic(root, { maxAge = 3600 } = {}) {
     try { stat = fs.statSync(file); } catch { return next(); }
     if (!stat.isFile()) return next();
     const cacheControl = file.endsWith('.html') ? 'no-cache' : `public, max-age=${maxAge}`;
-    return sendFile(res, file, { cacheControl });
+    return sendFile(res, file, { cacheControl, req });
   };
 }

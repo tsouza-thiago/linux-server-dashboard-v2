@@ -16,6 +16,10 @@ pré-versões `2.0.0-alpha.N` (uma por fase do plano), depois `beta`, `rc` e `2.
   blocos de 1 MB, não inteiros. Medido pelo soak acelerado: o histórico de 72 h cai de 33,6
   para 15,7 MB de heap, e a RAM do painel reiniciado com 72 h, de 127,8 para 102,6 MB. O
   NDJSON continua com a amostra inteira; `/api/history` traz `topProcs` só na mais recente.
+- **Página inicial em 279 KB (orçamento Q17: até 300 KB):** os arquivos de texto do pacote
+  (HTML, CSS, JS, JSON, SVG) vão em gzip quando o navegador aceita (antes, 441 KB sem
+  compressão). Fontes `.woff2` e imagens já vêm comprimidas. Só arquivos estáticos, sem
+  segredo nem dado do usuário. Um teste e2e mede o total transferido.
 
 ## [2.0.0-beta.2] — 2026-10-16
 
