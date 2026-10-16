@@ -50,7 +50,7 @@ async function setup(t, extra = {}) {
   const { server, port } = await listen(app.app);
   let browser;
   try {
-    browser = await chromium.launch();
+    browser = await chromium.launch({ executablePath: process.env.CHROMIUM || undefined });
   } catch (err) {
     await close(server);
     return { skip: `Chromium indisponível: ${err.message.split('\n')[0]}` };

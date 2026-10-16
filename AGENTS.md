@@ -158,7 +158,7 @@ npm test                        # suíte de testes (node --test)
 npm run check                   # verificação completa, obrigatória antes de cada commit
 npm run test:unit               # só testes unitários (test/unit)
 npm run test:integration        # só integração (HTTP, shell, ssh falso, sshd real)
-npm run test:e2e                # ponta a ponta no Chromium (playwright-core; pula sem navegador)
+npm run test:e2e                # ponta a ponta no Chromium (playwright-core; pula sem navegador; CHROMIUM=<caminho> escolhe outro)
 npm run capturar-amostra        # 1 coleta real → data/amostra-{bruta,anonima}.txt (fixtures)
 npm run migrar-v1 -- --verificar  # resume o data/history.json da V1 sem gravar nada
 npm run migrar-v1               # migra a V1 agora (o painel também migra sozinho ao iniciar)

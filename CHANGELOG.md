@@ -9,6 +9,13 @@ diante: `PATCH` corrige, `MINOR` acrescenta sem quebrar e `MAJOR` quebra.
 
 ## [Não publicado]
 
+### Alterado
+
+- Testes: a CLI (`main` e `instalar`) aceita a pasta pessoal injetada (`home`). Os testes de
+  `status` e de "painel já rodando" usam uma pasta temporária e não enxergam mais o painel
+  instalado na máquina de quem roda a suíte.
+- Testes e2e: `CHROMIUM=<caminho>` escolhe o navegador, como já fazia o e2e da instalação.
+
 ## [2.0.0] — 2026-10-16
 
 Primeira versão estável da V2: a reformulação completa do painel, feita em 9 fases a partir

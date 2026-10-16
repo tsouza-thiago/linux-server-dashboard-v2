@@ -2,6 +2,7 @@
 // CLI do comando `dashboard` (ADR 0011). O ./dashboard (bash) garante o Node 24 e chama
 // este arquivo; aqui ficam os subcomandos, todos em português e sem sudo.
 import fs from 'node:fs';
+import os from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { isPlaceholderHost, loadEnvFile } from '../config.js';
@@ -63,8 +64,8 @@ const COMMANDS = {
   async ajuda({ out }) { out.line(HELP); return 0; },
   async versao({ out, root }) { out.line(`Server Dashboard ${version(root)}`); return 0; },
 
-  async status({ out, root }) {
-    const st = panelStatus({ root });
+  async status({ out, root, home }) {
+    const st = panelStatus({ root, home });
     if (!isConfigured(root)) out.warn('ainda não instalado', 'rode ./dashboard instalar');
     if (st.running) {
       const how = st.mode === 'servico'
@@ -77,31 +78,31 @@ const COMMANDS = {
     return 3;
   },
 
-  async iniciar({ out, root }) {
+  async iniciar({ out, root, home }) {
     if (!isConfigured(root)) {
       out.fail('ainda não instalado', 'rode ./dashboard instalar');
       return 1;
     }
-    const r = await startPanel({ root });
+    const r = await startPanel({ root, home });
     if (!r.ok) { out.fail(r.error); return 1; }
     out.ok(r.already ? 'o painel já estava rodando' : 'painel iniciado', `http://127.0.0.1:${r.port}`);
     return 0;
   },
 
-  async parar({ out, root }) {
-    const r = await stopPanel({ root });
+  async parar({ out, root, home }) {
+    const r = await stopPanel({ root, home });
     if (!r.ok) { out.fail('não consegui parar o serviço', 'veja: systemctl --user status server-dashboard'); return 1; }
     if (!r.wasRunning) out.ok('o painel não estava rodando');
     else out.ok(r.forced ? 'painel parado (forçado após 5 s)' : 'painel parado', 'o histórico fica salvo em data/');
     return 0;
   },
 
-  async abrir({ out, root }) {
+  async abrir({ out, root, home }) {
     if (!isConfigured(root)) {
       out.fail('ainda não instalado', 'rode ./dashboard instalar');
       return 1;
     }
-    const r = await startPanel({ root });
+    const r = await startPanel({ root, home });
     if (!r.ok) { out.fail(r.error); return 1; }
     const { url, oneTime } = panelUrl(root, r.port);
     if (openBrowser(url)) {
@@ -118,7 +119,12 @@ const COMMANDS = {
 /** Nomes dos subcomandos (a documentação é conferida contra esta lista). */
 export const COMMAND_NAMES = Object.freeze(Object.keys(COMMANDS));
 
-export async function main(argv = process.argv.slice(2), { out = makeOutput(), root = ROOT } = {}) {
+/**
+ * Ponto de entrada da CLI. `home` é a pasta pessoal onde ficam o serviço systemd e o atalho
+ * (padrão: a do usuário); os testes passam uma pasta temporária para não enxergar o painel
+ * instalado na máquina de quem roda a suíte.
+ */
+export async function main(argv = process.argv.slice(2), { out = makeOutput(), root = ROOT, home = os.homedir() } = {}) {
   const [name = 'ajuda', ...args] = argv;
   const alias = { '--help': 'ajuda', '-h': 'ajuda', help: 'ajuda', '--version': 'versao', versão: 'versao' };
   const cmd = COMMANDS[alias[name] ?? name];
@@ -127,7 +133,7 @@ export async function main(argv = process.argv.slice(2), { out = makeOutput(), r
     out.line(HELP);
     return 2;
   }
-  return cmd({ out, root, args });
+  return cmd({ out, root, home, args });
 }
 
 const isCLI = process.argv[1] && fileURLToPath(import.meta.url) === path.resolve(process.argv[1]);

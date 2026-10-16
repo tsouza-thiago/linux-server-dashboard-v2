@@ -186,7 +186,7 @@ export async function runWizard({ out, root, inst, port, open = openBrowser, idl
   return 0;
 }
 
-export async function instalar({ out, root, args, reconfigurar = false, deps = {} }) {
+export async function instalar({ out, root, args, home, reconfigurar = false, deps = {} }) {
   const flags = parseFlags(args);
   out.title(reconfigurar ? 'Server Dashboard · reconfigurar' : 'Server Dashboard · instalação');
   const reexec = deps.reexec ?? (() => {
@@ -200,7 +200,7 @@ export async function instalar({ out, root, args, reconfigurar = false, deps = {
 
   if (flags['importar-v1']) {
     const { importarV1 } = await import('./importar-v1.js');
-    if (panelStatus({ root }).running && !flags.forcar) {
+    if (panelStatus({ root, home }).running && !flags.forcar) {
       out.warn('a V2 já está rodando nesta pasta');
       out.explain('', 'para importar de novo, pare a V2 (./dashboard parar) e repita.');
       return 1;
@@ -208,14 +208,14 @@ export async function instalar({ out, root, args, reconfigurar = false, deps = {
     return importarV1({ out, root, dir: flags['importar-v1'] });
   }
 
-  const st = panelStatus({ root });
+  const st = panelStatus({ root, home });
   if (st.running) {
     if (!reconfigurar && !flags.forcar) {
       out.warn('o painel já está instalado e rodando');
       out.explain('', 'para trocar servidor, discos ou serviços, rode ./dashboard reconfigurar.');
       return 1;
     }
-    await stopPanel({ root });
+    await stopPanel({ root, home });
     out.ok('painel parado durante a reconfiguração', 'volta sozinho no fim');
   }
   const port = panelPort(root);

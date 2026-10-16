@@ -179,7 +179,7 @@ test('log: gira em dashboard.log.1 ao passar do limite', async (t) => {
 
 test('cli: ajuda, versão, comando desconhecido e "ainda não instalado"', async (t) => {
   const root = fakeRoot(t);
-  const run = async (...argv) => { const o = memOut(); const code = await main(argv, { out: makeOut(o), root }); return { code, text: o.text() }; };
+  const run = async (...argv) => { const o = memOut(); const code = await main(argv, { out: makeOut(o), root, home: root }); return { code, text: o.text() }; };
   const { makeOutput } = await import('../../server/cli/saida.js');
   const makeOut = (o) => makeOutput({ stream: o.stream, env: {} });
   assert.match((await run()).text, /Uso: \.\/dashboard <comando>/);

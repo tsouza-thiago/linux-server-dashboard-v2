@@ -130,7 +130,7 @@ test('instalar: painel já rodando → sugere reconfigurar; porta ocupada → ex
   await new Promise((r) => blocker.once('listening', r));
   t.after(() => blocker.close());
   const o = memOut();
-  const code = await instalar({ out: o.out, root, args: ['--sem-assinatura'], deps: { inst: fake.inst } });
+  const code = await instalar({ out: o.out, root, home: root, args: ['--sem-assinatura'], deps: { inst: fake.inst } });
   assert.equal(code, 1);
   assert.match(o.text(), new RegExp(`a porta ${port} está em uso por outro programa`));
 });
