@@ -95,6 +95,26 @@ test('e2e: visão geral mostra a manchete e os dados da última coleta', { skip:
   assert.deepEqual(s.problems, []);
 });
 
+// Orçamento do plano (Q17): a página inicial transfere até 300 KB (HTML, CSS, JS, fontes,
+// uPlot e os dados das primeiras chamadas da API; o SSE fica de fora, ele não termina).
+test('e2e: a página inicial transfere até 300 KB (orçamento Q17)', { skip: !chromium && 'sem playwright-core' }, async (t) => {
+  const s = await setup(t);
+  if (s.skip) return t.skip(s.skip);
+  const sizes = [];
+  s.page.on('requestfinished', (req) => sizes.push(req.sizes().then((z) => ({ url: req.url(), bytes: z.responseBodySize + z.responseHeadersSize }))));
+  await s.page.goto(`${s.base}/`, { waitUntil: 'load' });
+  await s.page.waitForSelector('.hero');
+  await s.page.waitForFunction(() => document.querySelectorAll('.view-visao-geral .uplot').length >= 8);
+  await s.page.waitForTimeout(500); // pedidos que a tela faz depois de desenhar
+  const all = await Promise.all(sizes);
+  const total = all.reduce((a, r) => a + r.bytes, 0);
+  const top = all.sort((a, b) => b.bytes - a.bytes).slice(0, 5).map((r) => `${r.url.replace(s.base, '')} ${Math.round(r.bytes / 1024)} KB`);
+  t.diagnostic(`página inicial: ${Math.round(total / 1024)} KB em ${all.length} pedidos · maiores: ${top.join(' · ')}`);
+  assert.ok(all.length > 5, 'pedidos medidos');
+  assert.ok(total <= 300 * 1024, `página inicial com ${Math.round(total / 1024)} KB (limite 300 KB)`);
+  assert.deepEqual(s.problems, []);
+});
+
 test('e2e: atalhos de teclado trocam de tela e de tema', { skip: !chromium && 'sem playwright-core' }, async (t) => {
   const s = await setup(t);
   if (s.skip) return t.skip(s.skip);

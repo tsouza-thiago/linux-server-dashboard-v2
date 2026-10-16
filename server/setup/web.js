@@ -61,7 +61,7 @@ export function createWizardApp({ inst, code, onFinish = () => {}, onActivity = 
     res.setHeader('Location', '/configurar');
     res.end();
   });
-  app.get('/configurar', (req, res) => sendFile(res, path.join(PUBLIC, 'configurar.html')));
+  app.get('/configurar', (req, res) => sendFile(res, path.join(PUBLIC, 'configurar.html'), { req }));
 
   const loginLimit = makeRateLimit({ windowMs: 60000, max: 10 });
   app.post('/api/configurar/entrar', loginLimit, (req, res) => {

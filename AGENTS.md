@@ -71,7 +71,8 @@ O teste `test/unit/docs.test.js` confere esta documentação contra o código.
   cortada).
 - **Erros sem vazamento**: o error handler central devolve JSON sem stack trace.
 - **HTTP próprio** (ADR 0003): `node:http` + `server/http/` (roteador, estáticos só de
-  `public/` com lista de tipos, sem arquivo oculto, pasta ou traversal). Backend sem
+  `public/` com lista de tipos, sem arquivo oculto, pasta ou traversal; HTML, CSS, JS, JSON
+  e SVG em gzip quando o navegador aceita, só arquivos do pacote). Backend sem
   dependência de runtime. `test/integration/http-seguranca.test.js` é a caracterização
   caixa-preta e precisa continuar verde.
 - **SSH isolado**: `BatchMode=yes` + `ConnectTimeout=10`. Com `SSH_CONFIG`, o painel usa só
@@ -108,8 +109,15 @@ O teste `test/unit/docs.test.js` confere esta documentação contra o código.
 - **CHANGELOG.md** atualizado no mesmo commit da mudança (Keep a Changelog).
 - **Bugs conhecidos** ficam em `test/unit/bugs-v1.test.js` como `todo`; o commit que corrige
   remove o `todo` (o teste vira regressão).
-- **Versões:** SemVer, uma pré-versão por fase, com tag assinada e release
-  (procedimento na ADR 0012).
+- **Versões:** SemVer a partir da `v2.0.0`: `PATCH` corrige, `MINOR` acrescenta sem quebrar,
+  `MAJOR` quebra (configuração, formato de `data/` ou acesso ao servidor). Pré-versões
+  (`-rc.N`) são opcionais e só chegam a quem já está numa pré-versão ou usa `--pre`
+  (`./dashboard instalar --pre`, `./dashboard atualizar --pre`): uma instalação nova a
+  partir do `main` fica na estável assinada mais nova, mesmo que o último commit tenha uma
+  tag `-rc`. Toda versão é uma tag assinada + GitHub Release
+  (procedimento na ADR 0012; a release escolhe a tag já existente).
+- **Orçamento de desempenho:** veja [Orçamento de desempenho](#orçamento-de-desempenho).
+  Mudou coleta, histórico ou frontend? Rode `npm run soak` e `npm run test:e2e`.
 - **Node.js 24** é a versão mínima (ADR 0002).
 - **Exemplos** usam só IPs de documentação (`192.0.2.x`, RFC 5737) e nomes genéricos.
 
@@ -154,6 +162,7 @@ npm run test:e2e                # ponta a ponta no Chromium (playwright-core; pu
 npm run capturar-amostra        # 1 coleta real → data/amostra-{bruta,anonima}.txt (fixtures)
 npm run migrar-v1 -- --verificar  # resume o data/history.json da V1 sem gravar nada
 npm run migrar-v1               # migra a V1 agora (o painel também migra sozinho ao iniciar)
+npm run soak                    # soak acelerado: 83 h de coletas simuladas; confere RAM e vazamento
 scripts/e2e-instalacao/rodar.sh # instalação de ponta a ponta em contêineres Debian/Ubuntu
 ```
 
@@ -302,7 +311,7 @@ Tudo fica no disco local. Nada é gravado no servidor.
 
 | Caminho | O que guarda |
 |---|---|
-| `data/history/AAAA-MM-DD.ndjson` | Amostras brutas, 1 linha por coleta, só acréscimo (fila assíncrona), 1 arquivo por dia (UTC). Retenção de 72 h; linha cortada por queda é ignorada. ~3,7 KB por coleta (~16 MB em 72 h) |
+| `data/history/AAAA-MM-DD.ndjson` | Amostras brutas, 1 linha por coleta, só acréscimo (fila assíncrona), 1 arquivo por dia (UTC). Retenção de 72 h; linha cortada por queda é ignorada. ~3,7 KB por coleta (~16 MB em 72 h). Em memória, só a amostra mais recente guarda `topProcs` (as antigas ficam compactas, `compactSample`); o arquivo guarda tudo e é lido em blocos de 1 MB ao reiniciar |
 | `data/rollup/AAAA-MM-DD.ndjson` | Agregados de 5 min `{ t, n, m: { métrica: [mín, máx, média] } }` por 90 dias. Fechar de novo não duplica; o boot fecha os pendentes. ~1,2 KB a cada 5 min (~29 MB em 90 dias) |
 | `data/alerts.json` | Alertas com ciclo de vida `new` → `ack` → `resolved` (até 500) |
 | `data/annotations.json` | Anotações (texto, rótulo, instante) |
@@ -340,7 +349,7 @@ segurança, rate limit das mutações e error handler sem stack trace. Com `DASH
 | `/api/logout` | POST | Encerra a sessão deste navegador |
 | `/api/logout-all` | POST | Encerra todas as sessões (exige estar logado) |
 | `/api/status` | GET | Última amostra + meta (online, lastPollAt, nextPollAt, offlineSince) + saúde + alertas ativos |
-| `/api/history` | GET | `?limit=N&from=&to=` → amostras (reduzidas a até 720, com o pior caso de cada grupo). `&formato=baldes` → `{from, to, step, buckets}` com mín/máx/média, até 90 dias |
+| `/api/history` | GET | `?limit=N&from=&to=` → amostras (reduzidas a até 720, com o pior caso de cada grupo; `topProcs` só na mais recente). `&formato=baldes` → `{from, to, step, buckets}` com mín/máx/média, até 90 dias |
 | `/api/config` | GET | Configuração ativa para a Ajuda: versões, alvos, modo de acesso, limiares (sem segredos) |
 | `/api/outages` | GET | `?days=1..90` (padrão 30) → `{days, outages, uptime}` |
 | `/api/alerts` | GET | `?status=&level=&limit=` → `{active, all}` |
@@ -379,6 +388,22 @@ Motor em `server/alerts/` (ADR 0006).
 - **Saúde 0–100** (`server/alerts/health.js`): começa em 100 e perde pontos por problema,
   com os mesmos limiares. 80–100 saudável, 50–79 atenção, 0–49 crítico. A tela só mostra o
   que vem em `/api/status` (`health`).
+
+## Orçamento de desempenho
+
+Definido no plano (Q17); o limite de RAM foi revisto em 16/10/2026, depois de medido.
+
+| Medida | Limite | Medido | Como se confere |
+|---|---|---|---|
+| Tempo do comando no servidor | ≤ 1,5 s | 1,26–1,31 s (servidor real, 1 núcleo) | faixa de status e `./dashboard diagnosticar` |
+| Tamanho da resposta | ≤ 16 KB | 2,9 KB (servidor real) | idem; acima de 1 MB a conexão é cortada |
+| Página inicial | ≤ 300 KB transferidos | 279 KB (com gzip) | `test/e2e/telas.test.js` |
+| RAM do Node com 72 h em memória | ≤ 110 MB | 102,6–105,3 MB (painel reiniciado com 72 h) | `npm run soak` |
+| Memória depois que a janela de 72 h enche | sem crescer (≤ +4 MB) | +1,1 a +1,8 MB em 11 h a mais | `npm run soak` |
+
+O Node 24 vazio usa ~44 MB e o painel sem histórico, ~62 MB: o resto é o histórico de
+72 h (~3,6 KB por amostra em memória). Para voltar a 80 MB, o próximo passo é guardar em
+memória só os números que os gráficos usam (2.1).
 
 ## Estrutura
 

@@ -6,7 +6,7 @@ Uma vez por minuto, o painel conecta no servidor por SSH, lê dezenas de métric
 tudo em gráficos. Ele roda no **seu computador**: o servidor só responde 1 comando de
 leitura por minuto. Funciona até em hardware muito limitado (1 núcleo, pouca RAM).
 
-> **Versão 2 (beta).** Mudanças: [CHANGELOG.md](CHANGELOG.md). Plano e decisões:
+> **Versão 2.0.** Mudanças: [CHANGELOG.md](CHANGELOG.md). Plano e decisões:
 > [docs/PLANO_V2.md](docs/PLANO_V2.md) e [docs/adr/](docs/adr/README.md). A V1 continua na
 > tag [`v1.0.0`](https://github.com/tsouza-thiago/linux-server-dashboard-v2/releases/tag/v1.0.0).
 

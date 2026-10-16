@@ -7,7 +7,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import {
-  verifyTag, currentVersionStatus, signedReleaseTags, compareVersions, describeVersion,
+  verifyTag, currentVersionStatus, signedReleaseTags, compareVersions, describeVersion, installTag,
 } from '../../server/setup/assinatura.js';
 
 const hasTools = !spawnSync('git', ['--version']).error && !spawnSync('ssh-keygen', ['-?']).error;
@@ -51,6 +51,11 @@ test('assinatura: só passa a tag assinada pela chave de docs/allowed_signers', 
   assert.equal(verifyTag(dir, 'v1.0.0').reason, 'tag-invalida', 'fora do padrão v2.x');
   assert.deepEqual(signedReleaseTags(dir), ['v2.0.0', 'v2.0.0-alpha.8']);
   assert.deepEqual(signedReleaseTags(dir, { includePre: false }), ['v2.0.0']);
+  sign('v2.0.1-rc.1');
+  assert.equal(installTag(signedReleaseTags(dir)), 'v2.0.0', 'instalação nova fica na estável, não na rc mais nova');
+  assert.equal(installTag(signedReleaseTags(dir), { pre: true }), 'v2.0.1-rc.1', '--pre escolhe a mais nova de todas');
+  assert.equal(installTag(['v2.0.0-beta.2', 'v2.0.0-beta.1']), 'v2.0.0-beta.2', 'sem estável, a pré-versão mais nova');
+  assert.equal(installTag([]), null);
   const empty = path.join(dir, 'vazio');
   fs.writeFileSync(empty, '# nada\n');
   assert.equal(verifyTag(dir, 'v2.0.0', { signersFile: empty }).reason, 'sem-chaves');
@@ -64,4 +69,41 @@ test('versões: ordem SemVer com alpha < beta < rc < final; frases para a tela',
   assert.equal(describeVersion({ ok: true, tag: 'v2.0.0' }), 'versão v2.0.0 — assinatura conferida');
   assert.match(describeVersion({ ok: false, reason: 'invalida', tag: 'v2.0.0' }), /não confere/);
   assert.match(describeVersion({ ok: false, reason: 'sem-tag' }), /não está numa versão publicada/);
+});
+
+test('instalação nova: clone do main fica na estável assinada, não na rc mais nova; --pre e tag escolhida à mão são respeitados', { skip: !hasTools }, async (t) => {
+  const { preflight } = await import('../../server/cli/instalar.js');
+  const { makeOutput } = await import('../../server/cli/saida.js');
+  const { dir, git, sign } = repo(t);
+  const run = (cmd, args, opts) => spawnSync(cmd, args, { ...opts, env: { ...process.env, GIT_CONFIG_GLOBAL: '/dev/null', GIT_CONFIG_SYSTEM: '/dev/null' } });
+  const check = (flags = {}) => {
+    let text = '';
+    const out = makeOutput({ stream: { write: (s) => { text += s; }, isTTY: false }, env: { NO_COLOR: '1' } });
+    const r = preflight({ out, root: dir, flags, run, reexec: () => 'reexecutou' });
+    return { r, text };
+  };
+  sign('v2.0.0');
+  const stable = git('rev-parse', 'HEAD');
+  git('commit', '-q', '--allow-empty', '-m', 'merge da rc');
+  sign('v2.0.1-rc.1');
+  // No branch main, com a rc no último commit: troca para a estável.
+  let c = check();
+  assert.equal(c.r, 'reexecutou');
+  assert.match(c.text, /usando a versão estável assinada mais nova: v2\.0\.0/);
+  assert.equal(git('rev-parse', 'HEAD'), stable);
+  // Tag escolhida à mão (HEAD solto na rc): continua nela.
+  git('checkout', '-q', '--detach', 'v2.0.1-rc.1');
+  c = check();
+  assert.notEqual(c.r, 'reexecutou');
+  assert.match(c.text, /versão v2\.0\.1-rc\.1 — assinatura conferida/);
+  // --pre no branch: fica na rc.
+  git('checkout', '-q', '-B', 'main', 'v2.0.1-rc.1');
+  c = check({ pre: true });
+  assert.notEqual(c.r, 'reexecutou');
+  assert.match(c.text, /versão v2\.0\.1-rc\.1 — assinatura conferida/);
+  // Último commit sem tag: também vai para a estável.
+  git('commit', '-q', '--allow-empty', '-m', 'trabalho em andamento');
+  c = check();
+  assert.equal(c.r, 'reexecutou');
+  assert.match(c.text, /usando a versão assinada mais nova: v2\.0\.0/);
 });

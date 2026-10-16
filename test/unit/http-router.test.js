@@ -140,3 +140,38 @@ test('sendFile: arquivo inexistente ou de tipo fora da lista vira 404', async (t
   assert.equal((await request(port, { path: '/exe' })).status, 404);
   assert.equal((await request(port, { path: '/nada' })).status, 404);
 });
+
+test('estáticos: texto vai em gzip só quando o navegador aceita; fonte e arquivo pequeno vão como estão', async (t) => {
+  const zlib = await import('node:zlib');
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'lsd-gzip-'));
+  const big = `/* ${'painel '.repeat(400)} */\nexport const x = 1;\n`;
+  fs.writeFileSync(path.join(root, 'app.js'), big);
+  fs.writeFileSync(path.join(root, 'mini.css'), 'a{color:red}');
+  fs.writeFileSync(path.join(root, 'f.woff2'), Buffer.alloc(4096, 7));
+  const port = await serve(t, (app) => app.use(serveStatic(root)));
+  const get = (p, headers = {}) => new Promise((resolve, reject) => {
+    http.get({ host: '127.0.0.1', port, path: p, headers }, (res) => {
+      const chunks = [];
+      res.on('data', (c) => chunks.push(c));
+      res.on('end', () => resolve({ headers: res.headers, body: Buffer.concat(chunks) }));
+    }).on('error', reject);
+  });
+  const gz = await get('/app.js', { 'Accept-Encoding': 'gzip, deflate, br' });
+  assert.equal(gz.headers['content-encoding'], 'gzip');
+  assert.equal(gz.headers.vary, 'Accept-Encoding');
+  assert.equal(Number(gz.headers['content-length']), gz.body.length);
+  assert.ok(gz.body.length < big.length / 5, `comprimido: ${gz.body.length} de ${big.length} bytes`);
+  assert.equal(zlib.gunzipSync(gz.body).toString(), big);
+  const again = await get('/app.js', { 'Accept-Encoding': 'gzip' });
+  assert.deepEqual(again.body, gz.body, 'do cache, igual');
+  const plain = await get('/app.js');
+  assert.equal(plain.headers['content-encoding'], undefined, 'sem Accept-Encoding vai sem gzip');
+  assert.equal(plain.body.toString(), big);
+  assert.equal((await get('/mini.css', { 'Accept-Encoding': 'gzip' })).headers['content-encoding'], undefined, 'pequeno demais');
+  const font = await get('/f.woff2', { 'Accept-Encoding': 'gzip' });
+  assert.equal(font.headers['content-encoding'], undefined, 'woff2 já é comprimido');
+  assert.equal(font.body.length, 4096);
+  // Arquivo trocado (nova versão): o cache não serve o conteúdo antigo.
+  fs.writeFileSync(path.join(root, 'app.js'), `${big}// v2\n`);
+  assert.match(zlib.gunzipSync((await get('/app.js', { 'Accept-Encoding': 'gzip' })).body).toString(), /\/\/ v2/);
+});
