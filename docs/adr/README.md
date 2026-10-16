@@ -19,3 +19,4 @@ Uma ADR aceita não é editada; se a decisão mudar, uma nova ADR a substitui.
 | [0012](0012-distribuicao-por-git-clone-com-tag-assinada.md) | Distribuição por `git clone` com tag assinada | Aceita |
 | [0013](0013-somente-linux-na-maquina-local.md) | Somente Linux na máquina local | Aceita |
 | [0014](0014-verificacao-de-seguranca-continua.md) | Verificação de segurança contínua (local e no GitHub) | Aceita |
+| [0015](0015-entregas-incrementais-e-consolidacao-em-versoes-minor.md) | Entregas incrementais e consolidação em versões MINOR | Aceita |
