@@ -1,4 +1,4 @@
-// Manutenção pelo comando `dashboard` (F7): diagnosticar, atualizar (tags assinadas de
+// Manutenção pelo comando `dashboard`: diagnosticar, atualizar (tags assinadas de
 // verdade num repositório temporário, com volta atrás), upgrade V1→V2 e desinstalar.
 import test from 'node:test';
 import assert from 'node:assert/strict';

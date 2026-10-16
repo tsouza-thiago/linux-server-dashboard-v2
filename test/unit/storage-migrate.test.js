@@ -1,3 +1,4 @@
+// Migração do histórico da V1: sem arquivo, arquivo ilegível, --verificar e backup.
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';

@@ -1,4 +1,4 @@
-// TUI reserva e modo sem interface (F7): os mesmos passos do assistente, dirigidos por
+// TUI reserva e modo sem interface: os mesmos passos do assistente, dirigidos por
 // teclas num terminal falso e por opções, com servidor/ssh/systemd falsos.
 import test from 'node:test';
 import assert from 'node:assert/strict';

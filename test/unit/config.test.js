@@ -1,3 +1,4 @@
+// Configuração: sanitizeToken, host de exemplo, faixas e caminhos presos em data/.
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {

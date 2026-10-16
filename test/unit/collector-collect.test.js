@@ -1,3 +1,4 @@
+// Coleta: 1 chamada SSH por coleta (I1), hash dos alvos e erros traduzidos.
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
@@ -35,7 +36,7 @@ test('collect: amostra completa, hash confere com a configuração', async () =>
   assert.ok(Number.isInteger(res.sample.collector.durationMs) && res.sample.collector.durationMs >= 0, 'tempo do SSH');
 });
 
-test('collect: hash diferente (authorized_keys desatualizado) continua coletando e sinaliza (Q10)', async () => {
+test('collect: hash diferente (authorized_keys desatualizado) continua coletando e sinaliza', async () => {
   const res = await collectV2({ host: 'h', targets: { ...TARGETS, services: ['smbd', 'nmbd'] }, now: NOW, runner: ok(REAL) });
   assert.equal(res.ok, true);
   assert.equal(res.sample.collector.hashMismatch, true);

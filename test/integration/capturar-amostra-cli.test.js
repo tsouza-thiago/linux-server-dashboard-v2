@@ -1,3 +1,4 @@
+// `npm run capturar-amostra` com ssh falso: 1 conexão só, grava bruta + anônima, falha limpa.
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { spawnSync } from 'node:child_process';

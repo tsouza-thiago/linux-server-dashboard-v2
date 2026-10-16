@@ -1,3 +1,4 @@
+// Bibliotecas e fontes de public/vendor e public/fonts conferidas pelo SHA-256 do manifesto.
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import crypto from 'node:crypto';

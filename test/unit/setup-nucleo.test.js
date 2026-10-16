@@ -1,4 +1,4 @@
-// Núcleo da instalação (F7): detecção, plano de preparo do servidor, conexões e arquivos
+// Núcleo da instalação: detecção, plano de preparo do servidor, conexões e arquivos
 // locais — sem rede e sem tocar no sistema (servidor, systemd e ssh são falsos aqui; o
 // caminho real foi exercitado contra um Debian 12 em contêiner, ver test/e2e/).
 import test from 'node:test';

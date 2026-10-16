@@ -1,3 +1,4 @@
+// Login e sessão pela API: token → cookie, força bruta limitada, CSRF e encerrar sessões.
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';

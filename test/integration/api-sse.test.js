@@ -1,3 +1,4 @@
+// Tempo real (SSE): id por amostra, recuperação com Last-Event-ID e limite de conexões.
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';

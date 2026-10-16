@@ -1,3 +1,4 @@
+// Leitura do .env: aspas, comentários, arquivo ausente e precedência do process.env.
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { mkdtempSync, writeFileSync, rmSync } from 'node:fs';

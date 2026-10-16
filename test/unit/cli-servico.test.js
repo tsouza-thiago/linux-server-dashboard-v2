@@ -1,4 +1,4 @@
-// Comando `dashboard` (F7): controle do painel sem systemd (segundo plano com PID
+// Comando `dashboard`: controle do painel sem systemd (segundo plano com PID
 // conferido), status, link de uso único e rotação do log.
 import test from 'node:test';
 import assert from 'node:assert/strict';

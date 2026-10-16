@@ -1,3 +1,4 @@
+// Núcleo do frontend no Node: template html com escape, formatos PT-BR, análise e estado.
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { html, raw, escape, mount } from '../../public/js/core/html.js';

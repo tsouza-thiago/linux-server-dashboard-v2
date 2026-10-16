@@ -1,3 +1,4 @@
+// Limiar inválido no .env vira aviso no log do painel, sem ecoar o valor.
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { spawn } from 'node:child_process';

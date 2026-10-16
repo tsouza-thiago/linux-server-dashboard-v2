@@ -24,7 +24,7 @@ async function throughStep4(inst) {
   return inst.conectar({ senha: 'certa', confirmo: true });
 }
 
-test('instalação: 6 passos com os nomes das pranchetas', () => {
+test('instalação: 6 passos com os nomes mostrados na tela', () => {
   assert.deepEqual(STEPS, ['Boas-vindas', 'Servidor', 'Conectar', 'O que monitorar', 'Preparar servidor', 'Pronto']);
 });
 

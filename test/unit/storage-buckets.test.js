@@ -1,3 +1,4 @@
+// Baldes de agregação: métricas da amostra, mín/máx/média e buracos sem balde.
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { flatten, aggregate, mergeBuckets, downsample, worstOf, roundValue } from '../../server/storage/buckets.js';

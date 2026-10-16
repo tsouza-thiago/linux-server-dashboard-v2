@@ -1,3 +1,4 @@
+// Taxas entre coletas (CPU, rede, disco): null na 1ª coleta, no reboot e com contador que voltou.
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { computeRates, computeCpu, computeNet, computeIo } from '../../server/collector/rates.js';

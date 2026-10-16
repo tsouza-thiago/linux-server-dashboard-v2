@@ -1,4 +1,4 @@
-// Assistente de instalação no Chromium (critério da F7): os 6 passos das pranchetas, nos
+// Assistente de instalação no Chromium : os 6 passos, nos
 // modos assistido e manual, nos 2 temas e no celular, sem erro de JavaScript nem violação
 // de CSP. Servidor, ssh e systemd são falsos (test-support/instalacao-fake.js); o caminho
 // real é testado contra contêineres Debian/Ubuntu (scripts/e2e-instalacao/rodar.sh).

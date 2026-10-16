@@ -1,4 +1,4 @@
-// A documentação bate com o código (critério de saída da F8). Cada fato que a documentação
+// A documentação bate com o código. Cada fato que a documentação
 // afirma e que dá para conferir sozinho é conferido aqui: links, arquivos citados, comandos e
 // opções do ./dashboard, scripts do npm, variáveis do .env (nomes, padrões e faixas), rotas
 // da API, versões das bibliotecas, o exemplo do comando de coleta e os IPs de exemplo.

@@ -1,4 +1,4 @@
-// Cálculos e utilitários das telas redesenhadas na F6 (sem DOM, rodam no Node).
+// Cálculos e utilitários das telas (sem DOM, rodam no Node).
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {

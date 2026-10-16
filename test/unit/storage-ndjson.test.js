@@ -1,3 +1,4 @@
+// Histórico bruto em NDJSON: 1 linha por amostra (B7), virada do dia e janela de 72 h.
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
@@ -132,7 +133,7 @@ test('readNdjson e writeFileAtomicSync', () => {
   assert.throws(() => readNdjson(dir), /EISDIR/);
 });
 
-test('RAM (Q17): só a amostra mais recente guarda os processos, em memória e depois de reiniciar; o disco guarda tudo', async () => {
+test('RAM (orçamento de desempenho): só a amostra mais recente guarda os processos, em memória e depois de reiniciar; o disco guarda tudo', async () => {
   const dir = tmp();
   const procs = { topProcs: [{ user: 'root', pid: 1, cpu: 0, mem: 1, rssKB: 10, cmd: '/sbin/init' }] };
   const store = new RawStore({ dir, log: silent });

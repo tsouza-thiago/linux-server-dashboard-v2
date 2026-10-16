@@ -1,3 +1,4 @@
+// Host check em detalhe: IPv6, porta e espaços no cabeçalho Host.
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {

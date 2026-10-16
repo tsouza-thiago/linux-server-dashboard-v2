@@ -1,3 +1,4 @@
+// Alertas e anotações guardados: ciclo de vida, reconcile e persistência.
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { mkdtempSync, rmSync } from 'node:fs';

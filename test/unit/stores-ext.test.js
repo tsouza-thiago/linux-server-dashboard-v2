@@ -1,3 +1,4 @@
+// JsonStore: padrões, arquivo ausente ou inválido e gravação.
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { mkdtempSync, writeFileSync, rmSync, existsSync, readFileSync } from 'node:fs';

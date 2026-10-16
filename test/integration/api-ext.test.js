@@ -1,3 +1,4 @@
+// Proteções da API: cookie CSRF, rate limit das mutações e erros em JSON sem stack trace.
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { mkdtempSync, rmSync } from 'node:fs';

@@ -1,3 +1,4 @@
+// Ciclo de vida dos alertas guardados: reconcile por chave, reconhecido e resolvido.
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
