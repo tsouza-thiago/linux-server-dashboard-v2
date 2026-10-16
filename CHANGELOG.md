@@ -29,6 +29,10 @@ diante: `PATCH` corrige, `MINOR` acrescenta sem quebrar e `MAJOR` quebra.
   - CI no GitHub (ADR 0014, `.github/workflows/seguranca.yml`): a cada push no `main` e a
     cada PR, `npm run check`, e2e obrigatório (`E2E_OBRIGATORIO=1`: sem navegador, falha) e
     `npm run seguranca`. Actions presas por SHA, só leitura, sem segredos.
+  - SECURITY: mapa do OWASP Top 10:2025 (cada categoria com as ameaças e os testes,
+    conferido pelo `docs.test.js`), seção "Verificação contínua" e 4 ameaças novas no
+    modelo: prototype pollution (17), ReDoS (18), cadeia de suprimentos e CI (19) e OSINT
+    no repositório público (20).
   - Linha de base da `v2.0.0` analisada em `docs/seguranca/2026-10-16-linha-de-base.md`
     (achados, decisões e OSINT do repositório público); exceções aceitas, com motivo e
     teste, em `docs/seguranca/excecoes.json`.
@@ -44,6 +48,14 @@ diante: `PATCH` corrige, `MINOR` acrescenta sem quebrar e `MAJOR` quebra.
 - `.gitignore`: `.seguranca/` (relatórios brutos) e `.claude/` (configuração local).
 - `scripts/node-runtime.sh`: diretiva do ShellCheck explica por que `NODE_BIN` e
   `NODE_ORIGEM` parecem sem uso (quem as lê é o `./dashboard`).
+
+### Corrigido
+
+- SECURITY: o erro da API devolve só `{ "error" }` (não existe `errorCode`); trocar o
+  `DASH_TOKEN` **não** encerra as sessões já abertas (agora explica como encerrá-las) e a
+  instalação usa 32 bytes aleatórios; o isolamento do systemd vale "quando o systemd
+  permite"; o `from=` da chave é o padrão, não garantia (pode ser desligado). Os limites
+  numéricos ficam só no AGENTS, como manda a regra da referência única.
 
 ### Segurança
 
