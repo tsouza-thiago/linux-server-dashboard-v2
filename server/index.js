@@ -309,7 +309,9 @@ export function createApp(deps = {}) {
   app.post('/api/annotations', (req, res) => {
     const { ts, text, label } = req.body || {};
     if (!text || !String(text).trim()) return res.status(400).json({ error: 'texto obrigatório' });
-    const validTs = !ts || !Number.isNaN(Date.parse(ts)) ? ts : undefined;
+    // Instante em ISO canônico; o que não é data (ou não é texto) vira "agora" no store.
+    const quando = typeof ts === 'string' ? Date.parse(ts) : NaN;
+    const validTs = Number.isNaN(quando) ? undefined : new Date(quando).toISOString();
     const annotation = annotationsStore.add({ ts: validTs, text, label });
     broadcast('annotations', { annotations: annotationsStore.data.slice(-500).reverse() });
     res.json({ ok: true, annotation });

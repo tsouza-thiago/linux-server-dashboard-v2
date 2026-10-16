@@ -33,13 +33,21 @@ const CABECALHOS = {
   'referrer-policy': /^no-referrer$/,
   'cross-origin-opener-policy': /^same-origin$/,
   'cross-origin-resource-policy': /^same-origin$/,
+  'cross-origin-embedder-policy': /^require-corp$/,
   'permissions-policy': /camera=\(\)/,
 };
 
-/** Confere os cabeçalhos de segurança e que o corpo não vaza detalhe interno. */
-function confereResposta(r, onde) {
+/**
+ * Confere os cabeçalhos de segurança e que o corpo não vaza detalhe interno. Respostas da
+ * API, do link de entrada e do assistente nunca vão para o cache do navegador (OWASP ASVS
+ * V8: sessão, telemetria e o token do fim da instalação não ficam gravados em disco).
+ */
+function confereResposta(r, onde, caminho = '') {
   for (const [nome, re] of Object.entries(CABECALHOS)) {
     assert.match(String(r.headers[nome] ?? ''), re, `${onde}: cabeçalho ${nome}`);
+  }
+  if (/^\/(?:api|entrar)(?:\/|$|\?)/.test(caminho) && !/text\/event-stream/.test(String(r.headers['content-type']))) {
+    assert.match(String(r.headers['cache-control'] ?? ''), /\bno-store\b/, `${onde}: Cache-Control no-store`);
   }
   assert.doesNotMatch(r.text, /\n\s+at\s|node:internal|\/home\/|[A-Za-z]:\\|Express|x-powered-by/i, `${onde}: corpo vaza detalhe interno`);
   assert.equal(r.headers['x-powered-by'], undefined, `${onde}: x-powered-by`);
@@ -88,7 +96,7 @@ test('matriz (painel): Host de outro nome recebe 403 em toda rota, com os cabeç
     for (const host of ['evil.example', 'localhost.evil.example', '127.0.0.1.nip.io', '192.0.2.10', '[::2]']) {
       const r = await request(port, { method: metodo, path: caminhoConcreto(caminho), headers: { Host: host, ...ct }, body });
       assert.equal(r.status, 403, `${metodo} ${caminho} com Host ${host}`);
-      confereResposta(r, `${metodo} ${caminho} Host ${host}`);
+      confereResposta(r, `${metodo} ${caminho} Host ${host}`, caminho);
     }
   }
 });
@@ -102,7 +110,7 @@ test('matriz (painel): sem sessão nem Bearer, só as rotas públicas respondem;
     // As públicas podem responder 401 por conta própria (login com token errado); as
     // privadas precisam responder 401 de qualquer jeito.
     if (!PUBLICAS.has(chave)) assert.equal(r.status, 401, `${chave} sem login`);
-    confereResposta(r, chave);
+    confereResposta(r, chave, caminho);
   }
 });
 
@@ -142,7 +150,7 @@ test('matriz (painel): mutação de outra origem, cross-site ou sem cookie CSRF 
     for (const h of casos) {
       const r = await request(port, { ...base, headers: { 'Content-Type': 'application/json', ...auth, ...h } });
       assert.equal(r.status, 403, `${metodo} ${caminho} com ${JSON.stringify(h)}`);
-      confereResposta(r, `${metodo} ${caminho} CSRF`);
+      confereResposta(r, `${metodo} ${caminho} CSRF`, caminho);
     }
   }
 });
@@ -157,7 +165,7 @@ test('matriz (painel): autenticado, nenhuma rota responde 5xx nem vaza detalhe i
       headers: { Cookie: csrf, Origin: 'http://localhost', Authorization: `Bearer ${TOKEN}`, ...ct },
     });
     assert.ok(r.status < 500, `${metodo} ${caminho}: ${r.status}`);
-    confereResposta(r, `${metodo} ${caminho} autenticado`);
+    confereResposta(r, `${metodo} ${caminho} autenticado`, caminho);
   }
 });
 
@@ -168,7 +176,7 @@ test('matriz (painel): método ou caminho que não existe é 404 limpo, nunca 50
     for (const metodo of ['PUT', 'PATCH']) {
       const r = await request(port, { method: metodo, path: caminhoConcreto(caminho), headers: auth, body: {} });
       assert.ok([401, 404].includes(r.status), `${metodo} ${caminho}: ${r.status}`);
-      confereResposta(r, `${metodo} ${caminho}`);
+      confereResposta(r, `${metodo} ${caminho}`, caminho);
     }
   }
   for (const p of ['/api/nada', '/api/../../etc/passwd', '/.env', '/data/sessions.json', '/server/index.js', '/.git/config']) {
@@ -185,11 +193,11 @@ test('matriz (assistente): Host estranho é 403, sem o código é 401 e outra or
     const p = caminhoConcreto(caminho);
     const host = await request(port, { method: metodo, path: p, headers: { Host: 'evil.example', ...ct }, body });
     assert.equal(host.status, 403, `${metodo} ${caminho} Host`);
-    confereResposta(host, `assistente ${metodo} ${caminho} Host`);
+    confereResposta(host, `assistente ${metodo} ${caminho} Host`, caminho);
     if (caminho.startsWith('/api/configurar/') && caminho !== '/api/configurar/entrar') {
       const semCodigo = await request(port, { method: metodo, path: p, headers: { Cookie: csrf, Origin: 'http://localhost', ...ct }, body });
       assert.equal(semCodigo.status, 401, `${metodo} ${caminho} sem o código`);
-      confereResposta(semCodigo, `assistente ${metodo} ${caminho}`);
+      confereResposta(semCodigo, `assistente ${metodo} ${caminho}`, caminho);
     }
     if (MUTACOES.includes(metodo)) {
       const cross = await request(port, { method: metodo, path: p, headers: { Cookie: csrf, Origin: 'http://evil.example', ...ct }, body });

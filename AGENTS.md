@@ -48,7 +48,9 @@ O teste `test/unit/docs.test.js` confere esta documentação contra o código.
   ou com `Sec-Fetch-Site: cross-site` recebem 403. Mutações com `Origin` também precisam
   do cookie `dash_csrf` (SameSite=Lax, HttpOnly), emitido nos GETs.
 - **Cabeçalhos** em todas as respostas, inclusive 401/403/404: CSP sem `'unsafe-inline'`
-  e sem `'unsafe-eval'`, `nosniff`, `X-Frame-Options: DENY`, `Referrer-Policy: no-referrer`.
+  e sem `'unsafe-eval'`, `nosniff`, `X-Frame-Options: DENY`, `Referrer-Policy: no-referrer`,
+  `Cross-Origin-Opener/Resource/Embedder-Policy` e `Permissions-Policy`. API, `/entrar` e o
+  assistente respondem com `Cache-Control: no-store`.
 - **Anti-XSS** (ADR 0010): a tela monta HTML só pelo template `html` de
   `public/js/core/html.js`, que escapa toda interpolação. HTML cru só por `raw()`
   explícito. Medidas vindas dos dados (largura de barra, cor) vão em `data-w`/`data-bg`/…

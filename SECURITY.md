@@ -146,9 +146,11 @@ Inclua: o passo a passo para reproduzir, o impacto estimado e a versão afetada
   `Authorization: Bearer <token>`. O token nunca vai na URL e o JavaScript não o guarda.
   Em disco fica só o SHA-256 da sessão. O login aceita 10 tentativas por minuto por IP.
   O link do `./dashboard abrir` (`/entrar`) vale 1 vez, por 2 minutos. A comparação usa
-  `crypto.timingSafeEqual`. A Ajuda tem "Sair" e "Encerrar todas as sessões".
-- **Verificado por:** `test/integration/api-sessao.test.js` e
-  `test/unit/http-session.test.js`.
+  `crypto.timingSafeEqual`. A Ajuda tem "Sair" e "Encerrar todas as sessões". As
+  respostas da API e do assistente vão com `Cache-Control: no-store` e não ficam no cache
+  de disco do navegador.
+- **Verificado por:** `test/integration/api-sessao.test.js`,
+  `test/unit/http-session.test.js` e `test/seguranca/superficie-ataque.test.js`.
 
 ### 12. Leitura de arquivos locais por outro usuário
 - **Ameaça:** outro usuário desta máquina lê `.env`, a chave do painel ou `data/`

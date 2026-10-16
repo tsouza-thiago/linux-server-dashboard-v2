@@ -85,6 +85,12 @@ export function securityHeaders(req, res, next) {
   res.setHeader('X-DNS-Prefetch-Control', 'off');
   res.setHeader('Cross-Origin-Opener-Policy', 'same-origin');
   res.setHeader('Cross-Origin-Resource-Policy', 'same-origin');
+  // Com o COOP acima, isola a página de outras origens; o painel só carrega recursos dele.
+  res.setHeader('Cross-Origin-Embedder-Policy', 'require-corp');
+  // API, link de entrada e assistente nunca vão para o cache do navegador (OWASP ASVS V8):
+  // sessão, telemetria e o token do fim da instalação não ficam gravados em disco. Rotas
+  // como o SSE e o export trocam por um valor próprio, também sem cache.
+  if (/^\/(?:api|entrar)(?:\/|$)/.test(req.path || '')) res.setHeader('Cache-Control', 'no-store');
   res.setHeader('Permissions-Policy', 'camera=(), microphone=(), geolocation=(), payment=(), usb=()');
   res.setHeader('Content-Security-Policy', [
     "default-src 'self'",

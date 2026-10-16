@@ -37,6 +37,8 @@ const MUTACOES = [
   { nome: 'token aceito na URL (?token=)', arquivo: 'server/security.js', de: "    const bearer = auth.startsWith('Bearer ') ? auth.slice(7) : '';", para: "    const bearer = auth.startsWith('Bearer ') ? auth.slice(7) : String(req.query?.token || '');" },
   { nome: 'CSP com unsafe-inline', arquivo: 'server/security.js', de: `"script-src 'self'",`, para: `"script-src 'self' 'unsafe-inline'",` },
   { nome: 'sem X-Content-Type-Options', arquivo: 'server/security.js', de: "  res.setHeader('X-Content-Type-Options', 'nosniff');\n", para: '' },
+  { nome: 'sem Cross-Origin-Embedder-Policy', arquivo: 'server/security.js', de: "  res.setHeader('Cross-Origin-Embedder-Policy', 'require-corp');\n", para: '' },
+  { nome: 'API indo para o cache do navegador', arquivo: 'server/security.js', de: "res.setHeader('Cache-Control', 'no-store');", para: "res.setHeader('Cache-Control', 'public, max-age=3600');" },
   { nome: 'comparação de segredo sem tempo constante', arquivo: 'server/http/session.js', de: 'return crypto.timingSafeEqual(ab, bb);', para: 'return ab.toString() === bb.toString();' },
   { nome: 'cookie de sessão sem HttpOnly', arquivo: 'server/http/session.js', de: 'Path=/; HttpOnly; SameSite=Strict`;', para: 'Path=/; SameSite=Strict`;' },
   { nome: 'JSON do corpo sem filtro de __proto__', arquivo: 'server/http/router.js', de: "JSON.parse(text, (k, v) => (k === '__proto__' || k === 'constructor' || k === 'prototype' ? undefined : v))", para: 'JSON.parse(text)' },

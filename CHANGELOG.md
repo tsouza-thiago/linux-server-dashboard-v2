@@ -48,6 +48,13 @@ diante: `PATCH` corrige, `MINOR` acrescenta sem quebrar e `MAJOR` quebra.
   LibreOffice pulam esses caracteres e leriam o resto como fórmula), e CR no meio põe a
   célula entre aspas. Antes, só `= + - @` eram protegidos. O `host` e o `kernel` do
   relatório vêm do servidor monitorado (orientação do OWASP "CSV Injection").
+- Toda resposta ganha `Cross-Origin-Embedder-Policy: require-corp`, que completa o
+  isolamento entre origens junto com o COOP e o CORP que já existiam (OWASP ZAP 90004).
+- API, `/entrar` e assistente respondem com `Cache-Control: no-store`. Sessão, telemetria
+  e o token mostrado no fim da instalação não ficam no cache de disco do navegador
+  (OWASP ASVS V8).
+- Anotação: o instante (`ts`) é gravado em ISO canônico. Antes, o texto recebido era gravado
+  como veio, se fosse uma data válida.
 
 ## [2.0.0] — 2026-10-16
 

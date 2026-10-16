@@ -147,6 +147,24 @@ test('A05/CWE-79: o template html escapa todo payload, em texto e em atributo', 
   }
 });
 
+test('A08: o instante da anotação é gravado em ISO canônico (nunca o texto recebido)', async (t) => {
+  const { port, auth } = await painel(t);
+  const casos = [
+    ['2026-10-16T12:00:00Z', '2026-10-16T12:00:00.000Z'],
+    ['2026-10-16T09:00:00-03:00', '2026-10-16T12:00:00.000Z'],
+    ['Fri, 16 Oct 2026 12:00:00 GMT', '2026-10-16T12:00:00.000Z'],
+  ];
+  for (const [enviado, gravado] of casos) {
+    const r = await request(port, { method: 'POST', path: '/api/annotations', headers: auth, body: { ts: enviado, text: 'x' } });
+    assert.equal(r.json.annotation.ts, gravado, enviado);
+  }
+  // Texto que não é data vira o instante atual (como antes).
+  for (const lixo of ['John Doe AND 1=1 --', '<script>', '9'.repeat(30), { a: 1 }]) {
+    const r = await request(port, { method: 'POST', path: '/api/annotations', headers: auth, body: { ts: lixo, text: 'y' } });
+    assert.match(r.json.annotation.ts, /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z$/, JSON.stringify(lixo));
+  }
+});
+
 test('A05/CWE-79: anotação com payload volta da API como texto JSON (sem virar HTML)', async (t) => {
   const { port, auth } = await painel(t);
   for (const p of XSS) {
