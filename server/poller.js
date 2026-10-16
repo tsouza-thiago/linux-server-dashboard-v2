@@ -1,15 +1,9 @@
 // Fachada da coleta usada pelo servidor (server/index.js) e pelo CLI `--once`.
 // A implementação V2 vive em ./collector/ (builder, parser, rates).
 import { config, isPlaceholderHost } from './config.js';
-import {
-  collect as collectV2, describeError, runSSH, smartDue, SSH_OPTS, SMART_INTERVAL_MS,
-} from './collector/index.js';
+import { collect as collectV2, runSSH } from './collector/index.js';
 import { buildScript, normalizeTargets } from './collector/builder.js';
-import { parseOutput } from './collector/parser.js';
-import { computeRates } from './collector/rates.js';
 import { evaluate } from './alerts/rules.js';
-
-export { describeError, runSSH, smartDue, SSH_OPTS, SMART_INTERVAL_MS, parseOutput, computeRates };
 
 /** Alvos da coleta vindos do .env (já saneados pelo config.js). */
 export function configTargets() {

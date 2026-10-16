@@ -57,6 +57,14 @@ diante: `PATCH` corrige, `MINOR` acrescenta sem quebrar e `MAJOR` quebra.
 
 ### Removido
 
+- Código sem uso no servidor (cada item com uso zero conferido no código, nos testes e nos
+  scripts): `LOG_FILE` e o parâmetro `manual` dentro do `createApp`; `req.badUrl` e
+  `req.sessionId` (gravados, nunca lidos); `'::1'` sem colchetes na lista de Host (o
+  `parseHost` nunca devolve essa forma; `[::1]` continua valendo); `log`, `concluida` e
+  `deps.stopPanel` da `Instalacao`; o campo `heredoc` dos blocos de preparo; parâmetros
+  que ninguém passava (`out` no passo 6 da TUI, `root` no `runTui`); as reexportações do
+  `poller.js` e do `atualizar.js` que ninguém importava; a segunda definição do `ROOT` na
+  CLI (usa a do `config.js`); o ramo `win32` do `check.mjs` (só Linux, ADR 0013).
 - `docs/PLANO_V2.md`: o plano da V2 está concluído e fica como registro histórico na tag
   `v2.0.0`. O que ainda vale passou para o AGENTS: as invariantes I1–I10 (citadas no
   código), os navegadores suportados e a origem do orçamento de desempenho. As decisões

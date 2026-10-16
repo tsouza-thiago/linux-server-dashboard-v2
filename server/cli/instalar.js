@@ -229,7 +229,7 @@ export async function instalar({ out, root, args, home, reconfigurar = false, de
   const inst = deps.inst ?? new Instalacao({ root });
   if (flags.terminal) {
     const { runTui } = await import('../setup/tui.js');
-    return runTui({ out, inst, root, open: deps.open ?? openBrowser });
+    return runTui({ out, inst, open: deps.open ?? openBrowser });
   }
   if (flags['sem-interface']) {
     const { runHeadless } = await import('../setup/sem-interface.js');

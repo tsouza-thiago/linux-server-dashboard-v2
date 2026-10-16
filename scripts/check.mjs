@@ -71,8 +71,7 @@ const steps = [
   {
     name: 'dependências de runtime (npm audit)',
     fn() {
-      const npm = process.platform === 'win32' ? 'npm.cmd' : 'npm';
-      const r = run(npm, ['audit', '--omit=dev', '--audit-level=moderate']);
+      const r = run('npm', ['audit', '--omit=dev', '--audit-level=moderate']);
       const line = `${r.stdout}`.trim().split('\n').pop();
       return { ok: r.status === 0, detail: line };
     },

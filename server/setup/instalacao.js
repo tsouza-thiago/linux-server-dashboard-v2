@@ -20,7 +20,7 @@ import {
 } from './local.js';
 import { currentVersionStatus, describeVersion } from './assinatura.js';
 import { createLoginCode } from '../http/entrar.js';
-import { hasSystemdUser, panelPort, startPanel, stopPanel, unitPath } from '../cli/servico.js';
+import { hasSystemdUser, panelPort, startPanel, unitPath } from '../cli/servico.js';
 
 export const STEPS = ['Boas-vindas', 'Servidor', 'Conectar', 'O que monitorar', 'Preparar servidor', 'Pronto'];
 export const THRESHOLD_LIMITS = { diskPct: [50, 99, 90], ramPct: [50, 99, 90], tempC: [30, 110, 60] };
@@ -48,13 +48,12 @@ export function currentServer(root) {
 }
 
 export class Instalacao {
-  constructor({ root, home = os.homedir(), deps = {}, log = () => {} } = {}) {
+  constructor({ root, home = os.homedir(), deps = {} } = {}) {
     this.root = root;
     this.home = home;
-    this.log = log;
     this.deps = {
       probePort, scanHostKeys, runAdmin, collect: collectV2, runSSH, ensureKey, installService, installShortcut,
-      startPanel, stopPanel, hasSystemdUser, versionStatus: () => currentVersionStatus(root), spawnSync,
+      startPanel, hasSystemdUser, versionStatus: () => currentVersionStatus(root), spawnSync,
       ...deps,
     };
     this.reset();
@@ -72,7 +71,6 @@ export class Instalacao {
     this.preparo = { feitos: [], concluido: false, modo: 'assistido', from: true, testes: {} };
     this.teste = null;
     this.tokenMostrado = false;
-    this.concluida = false;
     this.#senha = '';
   }
 
@@ -426,7 +424,6 @@ export class Instalacao {
     this.esquecerSenha();
     if (atalho) this.deps.installShortcut({ root: this.root, home: this.home });
     else removeShortcut({ home: this.home });
-    this.concluida = true;
     return { iniciarComComputador: Boolean(iniciarComComputador), atalho: Boolean(atalho) };
   }
 

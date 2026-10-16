@@ -5,7 +5,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { isPlaceholderHost, loadEnvFile } from '../config.js';
+import { ROOT, isPlaceholderHost, loadEnvFile } from '../config.js';
 import { createLoginCode } from '../http/entrar.js';
 import { makeOutput } from './saida.js';
 import { openBrowser, panelStatus, startPanel, stopPanel } from './servico.js';
@@ -14,7 +14,6 @@ import { diagnosticar } from './diagnosticar.js';
 import { atualizar } from './atualizar.js';
 import { desinstalar } from './desinstalar.js';
 
-export const ROOT = path.join(path.dirname(fileURLToPath(import.meta.url)), '..', '..');
 
 const HELP = `Uso: ./dashboard <comando>
 

@@ -47,7 +47,6 @@ function decorate(req, res) {
     url = new URL(req.url, 'http://localhost');
   } catch {
     url = new URL('/', 'http://localhost');
-    req.badUrl = true;
   }
   req.path = url.pathname;
   req.query = parseQuery(url.searchParams);

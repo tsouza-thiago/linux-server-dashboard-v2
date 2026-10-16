@@ -1,7 +1,7 @@
 import crypto from 'node:crypto';
 import { SESSION_COOKIE, safeEqual } from './http/session.js';
 
-const ALLOWED_HOSTS = new Set(['localhost', '127.0.0.1', '::1', '[::1]']);
+const ALLOWED_HOSTS = new Set(['localhost', '127.0.0.1', '[::1]']);
 const CSRF_COOKIE = 'dash_csrf';
 
 export function parseHost(hostHeader) {
@@ -139,10 +139,7 @@ export function makeRequireAuth(token, sessions = null) {
   return function requireAuth(req, res, next) {
     if (!token) return next();
     const sid = parseCookies(req.headers?.cookie)[SESSION_COOKIE];
-    if (sessions && sid && sessions.touch(sid)) {
-      req.sessionId = sid;
-      return next();
-    }
+    if (sessions && sid && sessions.touch(sid)) return next();
     const auth = req.headers.authorization || '';
     const bearer = auth.startsWith('Bearer ') ? auth.slice(7) : '';
     if (bearer && safeEqual(bearer, token)) return next();

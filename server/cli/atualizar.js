@@ -6,7 +6,7 @@ import { spawnSync } from 'node:child_process';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import { SIGNERS, compareVersions, signedReleaseTags, currentVersionStatus } from '../setup/assinatura.js';
+import { SIGNERS, compareVersions, signedReleaseTags } from '../setup/assinatura.js';
 import { installService } from '../setup/local.js';
 import { panelPort, panelStatus, startPanel, stopPanel, unitPath, waitForPort, systemctlUser, UNIT_NAME } from './servico.js';
 import { parseFlags } from './instalar.js';
@@ -135,5 +135,3 @@ export async function atualizar({ out, root, args = [], home = os.homedir(), dep
   out.explain(`a versão ${target} não ligou o painel nesta máquina.`, 'nada foi perdido. Rode ./dashboard diagnosticar e, se quiser, avise no GitHub do projeto.');
   return 1;
 }
-
-export { currentVersionStatus };

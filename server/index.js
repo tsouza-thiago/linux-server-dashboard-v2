@@ -20,7 +20,6 @@ export function createApp(deps = {}) {
   const SSH_HOST = deps.sshHost ?? config.SSH_HOST;
   const POLL_INTERVAL = deps.pollInterval ?? config.POLL_INTERVAL;
   const HISTORY_FILE = deps.historyFile ?? config.HISTORY_FILE;
-  const LOG_FILE = deps.logFile ?? config.LOG_FILE;
   const DASH_TOKEN = deps.dashToken ?? config.DASH_TOKEN;
   const collectFn = deps.collect ?? collect;
   const log = deps.log || ((msg) => {
@@ -79,7 +78,7 @@ export function createApp(deps = {}) {
     broadcast('alerts', { alerts: alertsStore.active, all: alertsStore.list({ limit: 50 }) });
   }
 
-  async function runPoll({ manual = false } = {}) {
+  async function runPoll() {
     if (state.polling) return;
     state.polling = true;
     const started = Date.now();
@@ -363,7 +362,7 @@ export function createApp(deps = {}) {
       return res.status(429).json({ error: 'aguarde alguns segundos entre coletas manuais' });
     }
     state.lastManualPollAt = Date.now();
-    runPoll({ manual: true });
+    runPoll();
     res.json({ ok: true });
   });
 

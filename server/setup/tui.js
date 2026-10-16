@@ -386,7 +386,7 @@ async function step5(sc, inst, form) {
   }
 }
 
-async function step6(sc, inst, out) {
+async function step6(sc, inst) {
   sc.step = 6;
   const r = inst.resumoTeste() || {};
   const systemd = inst.verificarComputador().systemd;
@@ -432,7 +432,7 @@ export async function runTui({ out, inst, input = process.stdin, output = proces
     let step = 1;
     while (step <= 6) {
       if (step === 1) { await step1(sc, inst); step = 2; continue; }
-      const fn = { 2: () => step2(sc, inst, form), 3: () => step3(sc, inst, form), 4: () => step4(sc, inst), 5: () => step5(sc, inst, form), 6: () => step6(sc, inst, out) }[step];
+      const fn = { 2: () => step2(sc, inst, form), 3: () => step3(sc, inst, form), 4: () => step4(sc, inst), 5: () => step5(sc, inst, form), 6: () => step6(sc, inst) }[step];
       const r = await fn();
       if (r === 'back') step = Math.max(1, step - 1);
       else if (r === 'next') step += 1;

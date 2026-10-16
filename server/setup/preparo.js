@@ -52,7 +52,6 @@ export function preparationPlan({ adminUser, publicKey, targets, smartDevs = [],
         keyLine,
         KEY_EOF,
       ],
-      heredoc: true,
     },
     rule
       ? {
@@ -66,7 +65,6 @@ export function preparationPlan({ adminUser, publicKey, targets, smartDevs = [],
           SUDOERS_EOF,
           `visudo -cf ${SUDOERS}.novo && mv ${SUDOERS}.novo ${SUDOERS}`,
         ],
-        heredoc: true,
       }
       : {
         id: 'sudoers',
