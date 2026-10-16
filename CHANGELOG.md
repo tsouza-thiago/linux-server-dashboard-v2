@@ -20,6 +20,10 @@ pré-versões `2.0.0-alpha.N` (uma por fase do plano), depois `beta`, `rc` e `2.
   Antes, `byte % 25` deixava 6 das 25 letras 10% mais prováveis (alerta do CodeQL
   `js/biased-cryptographic-random`). Impacto prático desprezível: o código já tinha limite
   de 20 tentativas e 30 minutos e só abre em `127.0.0.1`.
+- Escape do `command="…"` do `authorized_keys` analisado contra o alerta do CodeQL
+  `js/incomplete-sanitization`: falso positivo. O OpenSSH só trata `\"` como especial;
+  escapar também a `\` dobraria as barras do script de coleta. O código explica o motivo e
+  o teste de ida e volta agora mostra que o escape "completo" quebraria a coleta.
 
 ## [2.0.0-beta.1] — 2026-10-08
 

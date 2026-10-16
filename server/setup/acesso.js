@@ -53,6 +53,11 @@ export function validPublicKey(v) {
  * Escapa o comando para `command="…"`: no authorized_keys só `\"` é especial (o OpenSSH
  * troca `\"` por `"` e copia o resto). Comando com quebra de linha ou terminado em `\`
  * não pode ser representado com segurança.
+ *
+ * A `\` fica como está DE PROPÓSITO (o CodeQL js/incomplete-sanitization aponta isso, mas
+ * é falso positivo): o opt_dequote não desfaz `\\`, então dobrar a barra mudaria o script
+ * de coleta (`\t`, `\n` do awk e do tr). O caso `\` antes de `"` sai como `\\"` e volta
+ * certo; o teste de ida e volta em test/integration/ssh-restrito.test.js confere.
  */
 export function quoteCommandOption(command) {
   if (/[\r\n\0]/.test(command)) throw new Error('comando com quebra de linha não cabe no authorized_keys');

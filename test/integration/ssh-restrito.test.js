@@ -42,6 +42,11 @@ test('authorized_keys: o OpenSSH lê de volta exatamente o comando de coleta', (
   }
   assert.throws(() => quoteCommandOption('a\nb'), /quebra de linha/);
   assert.throws(() => quoteCommandOption('termina\\'), /terminado em/);
+  // Escapar também a `\` (o que o CodeQL js/incomplete-sanitization sugere) quebraria a
+  // coleta: o OpenSSH não desfaz `\\` e o script chegaria com as barras dobradas.
+  assert.ok(script.includes('\\'), 'o script tem barras invertidas');
+  const escapingBackslash = (c) => `"${c.replace(/\\/g, '\\\\').replace(/"/g, '\\"')}"`;
+  assert.notEqual(opensshDequote(escapingBackslash(script)).value, script);
 
   const { line, hash } = authorizedKeysLine({ publicKey: PUB, targets: FULL, from: '192.0.2.50' });
   assert.match(line, /^restrict,from="192\.0\.2\.50",command="/);
