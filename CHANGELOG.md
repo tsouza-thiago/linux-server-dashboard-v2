@@ -9,6 +9,13 @@ diante: `PATCH` corrige, `MINOR` acrescenta sem quebrar e `MAJOR` quebra.
 
 ## [Não publicado]
 
+### Alterado
+
+- Política de versões escrita no repositório (ADR 0015 e AGENTS, "Desenvolvimento"): um
+  PR pequeno por mudança lógica; correção sai como PATCH e funcionalidade como pré-versão
+  da próxima MINOR (`-rc.N`), que a MINOR estável consolida. Merge com merge commit, sem
+  squash nem reescrita do histórico. Só documentação: nada muda no painel.
+
 ### Segurança
 
 - Alerta 8 do CodeQL (`js/file-access-to-http`, em `test-support/request.js`) analisado e

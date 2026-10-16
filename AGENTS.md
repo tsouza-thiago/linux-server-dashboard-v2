@@ -152,10 +152,16 @@ O teste `test/unit/docs.test.js` confere esta documentação contra o código.
   todos corrigidos na V2, são regressões em `test/unit/bugs-v1.test.js`.
 - **Versões:** SemVer a partir da `v2.0.0`: `PATCH` corrige, `MINOR` acrescenta sem quebrar,
   `MAJOR` quebra (configuração, formato de `data/` ou acesso ao servidor). Pré-versões
-  (`-rc.N`) são opcionais e só chegam a quem já está numa pré-versão ou usa `--pre`
+  (`-rc.N`) só chegam a quem já está numa pré-versão ou usa `--pre`
   (`./dashboard instalar --pre`, `./dashboard atualizar --pre`): uma instalação nova a
   partir do `main` fica na estável assinada mais nova, mesmo que o último commit tenha uma
   tag `-rc`. Toda versão é uma tag assinada + GitHub Release (abaixo).
+- **Entregas pequenas** (ADR 0015): um PR por mudança lógica. Correção sai como `PATCH`
+  (2.0.2, 2.0.3…); funcionalidade, como pré-versão da próxima `MINOR` (2.1.0-rc.1…), e a
+  `MINOR` estável consolida as pré-versões. As `PATCH` da fila saem antes da 1ª pré-versão;
+  correção urgente durante as pré-versões sai de um ramo `manutencao/X.Y` criado da última
+  tag e volta ao `main` por merge. Merge com merge commit, sem squash nem reescrita do
+  `main`. Documentação sem código não gera versão: sai nas notas da próxima.
 - **Orçamento de desempenho:** veja [Orçamento de desempenho](#orçamento-de-desempenho).
   Mudou coleta, histórico ou frontend? Rode `npm run soak` e `npm run test:e2e`.
 - **Node.js 24** é a versão mínima (ADR 0002).
