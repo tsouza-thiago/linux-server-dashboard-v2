@@ -8,6 +8,12 @@ pré-versões `2.0.0-alpha.N` (uma por fase do plano), depois `beta`, `rc` e `2.
 
 ## [Não publicado]
 
+### Adicionado
+
+- `CLAUDE.md`: orientação para o Claude Code. Importa o AGENTS.md (a referência técnica
+  única) e só acrescenta como rodar um teste isolado, a estrutura dos testes e o que o
+  `test/unit/docs.test.js` confere.
+
 ## [2.0.0-beta.1] — 2026-10-08
 
 Fase F8 do plano (documentação). A V2 passa a `beta`: instalação validada no computador e
