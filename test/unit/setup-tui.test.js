@@ -68,6 +68,25 @@ test('TUI: os 6 passos no terminal até o painel ligado, sem cores', async (t) =
   assert.equal(fake.services[0].enable, true);
 });
 
+test('TUI: desmarcar "Iniciar com o computador" vale (o serviço não é habilitado)', async (t) => {
+  const fake = makeInstalacao();
+  t.after(fake.cleanup);
+  const term = terminal();
+  const o = memOut();
+  const running = runTui({ out: o.out, inst: fake.inst, input: term.input, output: term.output });
+  term.keys(
+    'Enter', '192.0.2.10', 'Enter', 'maria', 'Enter', 'Enter', 's', 'certa', 'Enter',
+    'Enter', 'Enter', 'Enter', 'Enter',
+    'space', 'Enter', // 6: desmarca a 1ª caixa (iniciar com o computador) e conclui
+  );
+  assert.equal(await running, 0, o.text());
+  assert.match(term.screens.join(''), /\[ \] Iniciar com o computador/);
+  // Sem a unidade instalada e sem "iniciar com o computador", o painel sobe em segundo
+  // plano: nenhum serviço é instalado (antes, a TUI ignorava a escolha e habilitava).
+  assert.deepEqual(fake.services, []);
+  assert.match(o.text(), /painel rodando em segundo plano/);
+});
+
 test('TUI: Esc volta um passo, erro aparece na tela e Ctrl+C cancela sem gravar', async (t) => {
   const fake = makeInstalacao();
   t.after(fake.cleanup);

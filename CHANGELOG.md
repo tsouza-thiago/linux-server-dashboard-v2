@@ -105,6 +105,9 @@ diante: `PATCH` corrige, `MINOR` acrescenta sem quebrar e `MAJOR` quebra.
 
 ### Corrigido
 
+- Instalação pelo terminal (TUI): desmarcar "Iniciar com o computador" no passo 6 não
+  valia; o serviço era instalado e habilitado do mesmo jeito. Agora a TUI repassa a
+  escolha, como o assistente no navegador.
 - Documentação conferida contra o código:
   - AGENTS: o `.env` guarda o `DASH_TOKEN`, não senhas; o `diagnosticar` reaproveita a
     última amostra e só coleta se ela estiver velha; o link de entrada vale 2 min

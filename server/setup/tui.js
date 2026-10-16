@@ -426,8 +426,10 @@ async function step6(sc, inst) {
   });
   if (res === null) return 'back';
   sc.close();
-  inst.concluir({ iniciarComComputador: prefs.boot, atalho: prefs.shortcut });
-  return { prefs, token: prefs.token };
+  // `concluir` devolve as preferências no formato que `ligarPainel` lê
+  // ({ iniciarComComputador, atalho }), igual ao assistente web.
+  const escolhas = inst.concluir({ iniciarComComputador: prefs.boot, atalho: prefs.shortcut });
+  return { prefs: escolhas, token: prefs.token };
 }
 
 /** Roda os 6 passos no terminal. Devolve o código de saída. */
