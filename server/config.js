@@ -103,11 +103,12 @@ export function alertThresholds(get = (k) => env(k, ''), warnings = []) {
 
 /**
  * Caminho de arquivo de dados SEMPRE dentro de data/ (CWE-22): um `HISTORY_FILE=../../etc/x`
- * ou um caminho absoluto fora de data/ vira `data/<fallbackBasename>`.
+ * ou um caminho absoluto fora de data/ vira `data/<fallbackBasename>`. `root` é a pasta do
+ * projeto (a do painel; a CLI passa a pasta que está examinando).
  */
-export function clampPathToData(value, fallbackBasename) {
-  const p = path.resolve(ROOT, value || '');
-  const dataDir = path.join(ROOT, 'data');
+export function clampPathToData(value, fallbackBasename, root = ROOT) {
+  const p = path.resolve(root, value || '');
+  const dataDir = path.join(root, 'data');
   if (p === dataDir || p.startsWith(dataDir + path.sep)) return p;
   return path.join(dataDir, fallbackBasename);
 }
@@ -142,8 +143,8 @@ export function sshAccess(value) {
 }
 
 /** Arquivo de configuração SSH próprio (`ssh -F`), sempre dentro de data/; vazio = nenhum. */
-export function sshConfigFile(value) {
-  return String(value || '').trim() ? clampPathToData(String(value).trim(), 'ssh/config') : '';
+export function sshConfigFile(value, root = ROOT) {
+  return String(value || '').trim() ? clampPathToData(String(value).trim(), 'ssh/config', root) : '';
 }
 
 /** Avisos de configuração (valores recusados), mostrados no log ao iniciar. */

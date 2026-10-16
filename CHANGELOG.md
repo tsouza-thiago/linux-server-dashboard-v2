@@ -114,6 +114,9 @@ diante: `PATCH` corrige, `MINOR` acrescenta sem quebrar e `MAJOR` quebra.
 - Relatórios: o "tempo fora" do cartão Disponibilidade somava a duração inteira de uma
   queda que começou antes do período escolhido. Agora conta só a parte de dentro do
   período, como a porcentagem ao lado já fazia.
+- `./dashboard diagnosticar` lê `SSH_ACESSO` e `SSH_CONFIG` com as mesmas regras do painel.
+  Antes, `SSH_ACESSO=Restrito` (com maiúscula) era tratado como acesso direto, e a coleta
+  de teste usava sempre `data/ssh/config`, ignorando o `SSH_CONFIG` do `.env`.
 - Documentação conferida contra o código:
   - AGENTS: o `.env` guarda o `DASH_TOKEN`, não senhas; o `diagnosticar` reaproveita a
     última amostra e só coleta se ela estiver velha; o link de entrada vale 2 min

@@ -5,7 +5,7 @@
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import { clampInt, loadEnvFile, isPlaceholderHost, sanitizeToken } from '../config.js';
+import { clampInt, loadEnvFile, isPlaceholderHost, sanitizeToken, sshAccess, sshConfigFile } from '../config.js';
 import { listDays, readNdjson } from '../storage/ndjson.js';
 import { collect, runSSH } from '../collector/index.js';
 import { normalizeTargets } from '../collector/builder.js';
@@ -51,6 +51,16 @@ export function keyFileFromConfig(root) {
   } catch {
     return null;
   }
+}
+
+/**
+ * Modo de acesso e arquivo `ssh -F` do .env desta pasta, com as MESMAS regras do painel
+ * (server/config.js): "Restrito" ou " restrito " valem como restrito; SSH_CONFIG vazio = sem
+ * `-F` (usa o ~/.ssh/config); caminho fora de data/ volta para data/ssh/config. Assim a
+ * coleta de teste conecta exatamente como o painel conectaria.
+ */
+export function sshSettings(env, root) {
+  return { access: sshAccess(env.SSH_ACESSO), configFile: sshConfigFile(env.SSH_CONFIG, root) };
 }
 
 /** Alvos do .env desta pasta (os mesmos que o painel usa). */
@@ -112,8 +122,9 @@ export async function diagnosticar({ out, root, home = os.homedir(), deps = {} }
     out.explain('outros usuários desta máquina poderiam ler a configuração ou a chave.', `rode: ${perms.map((p) => `chmod ${p.want} "${p.file}"`).join('; ')}`);
   }
 
-  // Acesso restrito = SSH_ACESSO=restrito com o data/ssh/config da instalação.
-  const restricted = env.SSH_ACESSO === 'restrito' && fs.existsSync(path.join(root, 'data', 'ssh', 'config'));
+  // Modo de acesso e configuração SSH lidos como o painel lê (sshSettings).
+  const ssh = sshSettings(env, root);
+  const restricted = ssh.access === 'restrito';
   if (!restricted) {
     warn('acesso direto ao servidor (como na V1)');
     out.explain('a chave usada pelo painel pode rodar qualquer comando no servidor.', 'rode dashboard reconfigurar para trocar por um usuário próprio com chave restrita à coleta.');
@@ -130,10 +141,9 @@ export async function diagnosticar({ out, root, home = os.homedir(), deps = {} }
   // Sem amostra recente, faz 1 coleta de teste, com o mesmo acesso do painel.
   if (!sample || now - Date.parse(sample.ts) > 3 * interval) {
     live = true;
-    const configFile = restricted ? path.join(root, 'data', 'ssh', 'config') : '';
     const res = await (deps.collect ?? collect)({
-      host: env.SSH_HOST, targets: envTargets(env), access: restricted ? 'restrito' : 'direto',
-      runner: deps.runner ?? ((h, c) => runSSH(h, c, 30000, { configFile })), now,
+      host: env.SSH_HOST, targets: envTargets(env), access: ssh.access,
+      runner: deps.runner ?? ((h, c) => runSSH(h, c, 30000, { configFile: ssh.configFile })), now,
     });
     if (!res.ok) {
       fail('o servidor não respondeu à coleta de teste', res.error);

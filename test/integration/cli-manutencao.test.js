@@ -7,7 +7,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { makeOutput } from '../../server/cli/saida.js';
-import { diagnosticar, latestSample, permissionProblems, explainFailure } from '../../server/cli/diagnosticar.js';
+import { diagnosticar, latestSample, permissionProblems, explainFailure, sshSettings } from '../../server/cli/diagnosticar.js';
 import { atualizar, afterUpdate, backupData, restoreData } from '../../server/cli/atualizar.js';
 import { importarV1, detectV1, v1Settings, v1Pid, stopV1 } from '../../server/cli/importar-v1.js';
 import { desinstalar } from '../../server/cli/desinstalar.js';
@@ -95,6 +95,27 @@ test('diagnosticar: permissões abertas, linha desatualizada, disco reprovado e 
   assert.match(text, /✗ o disco \/dev\/sda reprovou no teste de saúde/);
   assert.match(text, /▲ o smartctl não está instalado no servidor/);
   assert.match(text, /coleta de teste há 18 s · 1,20 s/);
+});
+
+test('diagnosticar: lê SSH_ACESSO e SSH_CONFIG com as mesmas regras do painel', async (t) => {
+  const { root, home } = installedRoot(t);
+  const data = path.join(root, 'data');
+  // As regras de server/config.js: modo sem diferença de caixa/espaço; caminho preso em data/.
+  assert.deepEqual(sshSettings({ SSH_ACESSO: ' Restrito ', SSH_CONFIG: 'data/ssh/config' }, root),
+    { access: 'restrito', configFile: path.join(data, 'ssh', 'config') });
+  assert.deepEqual(sshSettings({ SSH_ACESSO: 'restrito', SSH_CONFIG: '' }, root), { access: 'restrito', configFile: '' },
+    'sem SSH_CONFIG o painel usa o ~/.ssh/config, e o diagnóstico também');
+  assert.deepEqual(sshSettings({ SSH_CONFIG: '../../etc/ssh/ssh_config' }, root),
+    { access: 'direto', configFile: path.join(data, 'ssh', 'config') }, 'fora de data/ volta ao padrão');
+  assert.deepEqual(sshSettings({ SSH_ACESSO: 'qualquer', SSH_CONFIG: 'data/ssh/outro' }, root),
+    { access: 'direto', configFile: path.join(data, 'ssh', 'outro') });
+  // Ponta a ponta: "Restrito" com maiúscula vale como restrito, como no painel.
+  fs.writeFileSync(path.join(root, '.env'), 'SSH_HOST=servidor\nSSH_ACESSO=Restrito\nSSH_CONFIG=data/ssh/config\nDISK_MOUNTS=/\n', { mode: 0o600 });
+  const o = memOut();
+  let access = null;
+  await diagnosticar({ out: o.out, root, home, deps: { panelStatus: () => ({ running: false }), collect: async (p) => { access = p.access; return { ok: false, error: 'x' }; } } });
+  assert.equal(access, 'restrito');
+  assert.doesNotMatch(o.text(), /acesso direto ao servidor/);
 });
 
 test('diagnosticar: não instalado, coleta falhando e acesso direto da V1', async (t) => {
