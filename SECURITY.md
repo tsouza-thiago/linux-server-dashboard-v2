@@ -52,7 +52,8 @@ Inclua: o passo a passo para reproduzir, o impacto estimado e a versão afetada
   servidor.
 - **Mitigação:** a chave pertence ao usuário `dashmon` (sem senha e sem poderes). A linha
   dela no `authorized_keys` é `restrict,from="<IP deste computador>",command="<coleta>"`:
-  sem terminal, sem encaminhamentos, só a coleta e só a partir desta máquina. O texto que o
+  sem terminal, sem encaminhamentos e só a coleta. Por padrão, só a partir desta máquina
+  (o `from=` pode ser desligado no assistente ou com `--sem-origem`). O texto que o
   cliente envia só escolhe entre `basico` e `smart`; qualquer outro texto vira `basico` e
   nunca é executado nem ecoado. O escape da linha segue o `opt_dequote` do OpenSSH.
 - **Verificado por:** `test/integration/ssh-restrito.test.js` (sshd de verdade).
@@ -95,9 +96,11 @@ Inclua: o passo a passo para reproduzir, o impacto estimado e a versão afetada
   ler dados ou mandar comandos ao servidor.
 - **Mitigação:** o assistente escuta só em `127.0.0.1`, tem as mesmas proteções do painel
   (Host check, CSRF, cabeçalhos) e só abre com o **código de uso único** mostrado no
-  terminal (30 min, 20 tentativas). O código tem 6 caracteres de um alfabeto de 25,
-  sorteados sem viés (`crypto.randomInt`), e vira um cookie HttpOnly + SameSite=Strict.
-- **Verificado por:** `test/integration/assistente-http.test.js`.
+  terminal, com prazo e número de tentativas limitados (valores no AGENTS, "Regras de
+  segurança"). O código tem 6 caracteres de um alfabeto de 25, sorteados sem viés
+  (`crypto.randomInt`), e vira um cookie HttpOnly + SameSite=Strict.
+- **Verificado por:** `test/integration/assistente-http.test.js` e
+  `test/seguranca/superficie-ataque.test.js`.
 
 ### 7. Versão adulterada (ADR 0012)
 - **Ameaça:** instalar ou atualizar para um código diferente do publicado.
@@ -116,8 +119,9 @@ Inclua: o passo a passo para reproduzir, o impacto estimado e a versão afetada
 - **Mitigação:** toda requisição passa pela validação do cabeçalho `Host`. Só
   `localhost`, `127.0.0.1` e `[::1]` (com qualquer porta) passam; o resto recebe 403
   (`hostCheck` em `server/security.js`).
-- **Verificado por:** `test/unit/security.test.js` e
-  `test/integration/http-seguranca.test.js`.
+- **Verificado por:** `test/unit/security.test.js`,
+  `test/integration/http-seguranca.test.js` e `test/seguranca/superficie-ataque.test.js`
+  (toda rota, com 5 nomes de Host hostis).
 
 ### 9. CSRF (requisições de outra origem)
 - **Ameaça:** um site dispara POSTs (coletar agora, reconhecer alertas, criar anotações)
@@ -128,7 +132,8 @@ Inclua: o passo a passo para reproduzir, o impacto estimado e a versão afetada
   2. Mutações com `Origin` também precisam do cookie `dash_csrf` (SameSite=Lax, HttpOnly),
      emitido nos GETs. Um site de outra origem não consegue forjar esse cookie.
 - **Verificado por:** `test/unit/security-ext.test.js`,
-  `test/integration/http-seguranca.test.js` e `test/integration/api-ext.test.js`.
+  `test/integration/http-seguranca.test.js`, `test/integration/api-ext.test.js` e
+  `test/seguranca/superficie-ataque.test.js` (toda mutação de toda rota).
 
 ### 10. XSS (conteúdo mostrado na tela)
 - **Ameaça:** dados do servidor (pontos de montagem, serviços, comandos de processo,
@@ -136,30 +141,36 @@ Inclua: o passo a passo para reproduzir, o impacto estimado e a versão afetada
 - **Mitigação:** a tela só monta HTML pelo template `html` (`public/js/core/html.js`), que
   escapa toda interpolação. HTML cru só por `raw()` explícito. A CSP não permite script nem
   estilo inline nem `eval`.
-- **Verificado por:** `test/unit/front-core.test.js` e `test/e2e/telas.test.js` (uma
-  anotação com `<img onerror=…>` aparece como texto).
+- **Verificado por:** `test/unit/front-core.test.js`, `test/e2e/telas.test.js` (uma
+  anotação com `<img onerror=…>` aparece como texto), `test/seguranca/payloads-owasp.test.js`
+  (13 payloads de XSS) e `test/seguranca/invariantes-estaticas.test.js` (nada de
+  `innerHTML` fora do template, nem `style="…"`).
 
 ### 11. Acesso ao painel sem credencial
 - **Ameaça:** outro usuário desta máquina (ou um programa local) lê a API do painel.
 - **Mitigação:** a instalação gera um `DASH_TOKEN`. Com ele, a API e o SSE exigem sessão
-  (cookie `dash_session`, HttpOnly + SameSite=Strict, 30 dias renovados com o uso) ou
+  (cookie `dash_session`, HttpOnly + SameSite=Strict, com prazo renovado com o uso) ou
   `Authorization: Bearer <token>`. O token nunca vai na URL e o JavaScript não o guarda.
-  Em disco fica só o SHA-256 da sessão. O login aceita 10 tentativas por minuto por IP.
-  O link do `./dashboard abrir` (`/entrar`) vale 1 vez, por 2 minutos. A comparação usa
-  `crypto.timingSafeEqual`. A Ajuda tem "Sair" e "Encerrar todas as sessões".
-- **Verificado por:** `test/integration/api-sessao.test.js` e
-  `test/unit/http-session.test.js`.
+  Em disco fica só o SHA-256 da sessão. O login tem limite de tentativas por minuto, e o
+  link do `./dashboard abrir` (`/entrar`) vale uma vez só, por pouco tempo (valores no
+  AGENTS, "Regras de segurança"). A comparação usa `crypto.timingSafeEqual`. A Ajuda tem "Sair" e "Encerrar todas as sessões". As
+  respostas da API e do assistente vão com `Cache-Control: no-store` e não ficam no cache
+  de disco do navegador.
+- **Verificado por:** `test/integration/api-sessao.test.js`,
+  `test/unit/http-session.test.js` e `test/seguranca/superficie-ataque.test.js`.
 
 ### 12. Leitura de arquivos locais por outro usuário
 - **Ameaça:** outro usuário desta máquina lê `.env`, a chave do painel ou `data/`
   (hostnames, IPs, telemetria), ou o painel grava fora de `data/`.
 - **Mitigação:** `data/` e `data/ssh/` com 0700; `.env`, chave e arquivos de dados com
   0600, mesmo com `umask` aberta. `HISTORY_FILE`, `LOG_FILE` e `SSH_CONFIG` são forçados
-  para dentro de `data/` (`clampPathToData`). O serviço de usuário roda com isolamento do
-  systemd (`NoNewPrivileges`, `ProtectSystem=strict`, só grava em `data/`). O
+  para dentro de `data/` (`clampPathToData`). Quando o systemd da máquina permite, o
+  serviço de usuário roda isolado (`NoNewPrivileges`, `ProtectSystem=strict`, só grava em
+  `data/`); se não permitir, a instalação avisa e segue sem o isolamento. O
   `./dashboard diagnosticar` aponta arquivo aberto demais e o `chmod` exato.
 - **Verificado por:** `test/unit/security-fixes.test.js`, `test/unit/config.test.js`,
-  `test/unit/setup-nucleo.test.js` e `test/integration/cli-manutencao.test.js`.
+  `test/unit/setup-nucleo.test.js`, `test/integration/cli-manutencao.test.js` e
+  `test/seguranca/invariantes-estaticas.test.js` (toda escrita do painel com 0600).
 
 ### 13. Resposta maliciosa do servidor
 - **Ameaça:** um servidor comprometido devolve uma saída montada para quebrar o parser,
@@ -167,40 +178,123 @@ Inclua: o passo a passo para reproduzir, o impacto estimado e a versão afetada
 - **Mitigação:** a saída é só lida, nunca executada. O parser tolera qualquer texto
   (campo ausente vira `null`) e a tela escapa tudo (ameaça 10). A resposta do SSH tem limite
   de 1 MB: acima disso, a conexão é cortada e a coleta falha com o motivo.
-- **Verificado por:** `test/unit/collector-fuzz.test.js` e
-  `test/integration/collector-local.test.js`.
+- **Verificado por:** `test/unit/collector-fuzz.test.js`,
+  `test/integration/collector-local.test.js` e `test/seguranca/payloads-owasp.test.js`
+  (1 MB de saída hostil lido em tempo limitado).
 
 ### 14. Abuso dos endpoints
 - **Ameaça:** excesso de "coletar agora" sobrecarrega o servidor, ou requisições grandes
   sobrecarregam esta máquina.
-- **Mitigação:** `/api/poll` fica bloqueado durante uma coleta e tem piso de 5 s entre
-  coletas manuais. O corpo JSON tem até 50 KB (413 acima, também sem `Content-Length`).
-  As mutações têm limite de 120 por minuto por IP (`makeRateLimit`). O SSE aceita até 20
-  conexões.
+- **Mitigação:** `/api/poll` fica bloqueado durante uma coleta e tem um intervalo mínimo
+  entre coletas manuais. O corpo JSON tem tamanho máximo (413 acima, também sem
+  `Content-Length`), as mutações têm limite por minuto por IP (`makeRateLimit`) e o SSE tem
+  número máximo de conexões. Os valores ficam no AGENTS ("Regras de segurança").
 - **Verificado por:** `test/integration/api-ext.test.js`,
-  `test/integration/http-seguranca.test.js` e `test/integration/api-sse.test.js`.
+  `test/integration/http-seguranca.test.js`, `test/integration/api-sse.test.js` e
+  `test/seguranca/payloads-owasp.test.js`.
 
 ### 15. Formula injection no export (CSV)
-- **Ameaça:** células que começam com `=`, `+`, `-` ou `@` viram fórmula no Excel.
-- **Mitigação:** `server/csv.js` põe `'` antes desses valores (`csvEscape`). O nome do
-  arquivo exportado também é saneado.
-- **Verificado por:** `test/unit/csv.test.js` e `test/unit/csv-ext.test.js`.
+- **Ameaça:** células que começam com `=`, `+`, `-`, `@`, TAB ou CR viram fórmula no Excel
+  e no LibreOffice. O `host` e o `kernel` vêm do servidor monitorado (ameaça 13).
+- **Mitigação:** `server/csv.js` põe `'` antes desses valores e coloca entre aspas a célula
+  com vírgula, aspas ou quebra de linha (`csvEscape`). O nome do arquivo exportado também
+  é saneado.
+- **Verificado por:** `test/unit/csv.test.js`, `test/unit/csv-ext.test.js` e
+  `test/seguranca/payloads-owasp.test.js`.
 
 ### 16. Detalhes internos em mensagens de erro
 - **Ameaça:** um erro com stack trace revela caminhos e versões do ambiente.
-- **Mitigação:** o error handler central devolve JSON **sem stack trace** (só `error`,
-  `errorCode` e `status`). Erro interno vira `500` genérico.
-- **Verificado por:** `test/integration/api-ext.test.js`.
+- **Mitigação:** o error handler central devolve só `{ "error": "<mensagem curta>" }`,
+  **sem stack trace**, caminho ou nome de biblioteca. Erro interno vira `500` genérico.
+- **Verificado por:** `test/integration/api-ext.test.js` e
+  `test/seguranca/superficie-ataque.test.js` (toda resposta de toda rota, inclusive os
+  erros).
+
+### 17. Prototype pollution pelo JSON ou pela query
+- **Ameaça:** um corpo `{"__proto__": {…}}` ou uma query `?__proto__[x]=1` altera o
+  protótipo de todos os objetos do processo e muda o comportamento do painel.
+- **Mitigação:** o leitor do corpo JSON (`server/http/router.js`) descarta as chaves
+  `__proto__`, `constructor` e `prototype`; a query é lida num objeto sem protótipo
+  (`Object.create(null)`) e também recusa esses três nomes.
+- **Verificado por:** `test/seguranca/payloads-owasp.test.js` e
+  `test/seguranca/invariantes-estaticas.test.js`.
+
+### 18. Negação de serviço por regex ou entrada patológica (ReDoS)
+- **Ameaça:** um texto montado para causar backtracking em uma regex (Host, Origin,
+  cookies, código do assistente, validadores da instalação, saída do servidor) trava o
+  painel.
+- **Mitigação:** as regex que tocam entrada externa são ancoradas e lineares; `new RegExp`
+  só com texto fixo ou escapado; corpo JSON com tamanho máximo; JSON profundo ou quebrado
+  vira 4xx.
+- **Verificado por:** `test/seguranca/payloads-owasp.test.js` (100 mil caracteres hostis
+  contra cada regex, com teto de tempo) e `test/seguranca/invariantes-estaticas.test.js`.
+
+### 19. Cadeia de suprimentos e CI (OWASP A03:2025)
+- **Ameaça:** uma dependência, uma ferramenta, uma action do CI ou o próprio Node baixado
+  trocados por versões maliciosas; ou o script de coleta alterado sem querer, quebrando o
+  `authorized_keys` de quem já usa.
+- **Mitigação:** zero dependências de runtime; o lockfile só aceita o registro oficial com
+  integridade sha512; o Node é conferido pela soma SHA-256 **antes** de extrair; versões
+  assinadas (ameaça 7); ferramentas de segurança em imagens presas por digest; actions do
+  CI presas por SHA, só leitura e sem segredos (ADR 0014); hash dourado do script de
+  coleta.
+- **Verificado por:** `test/seguranca/cadeia-suprimentos.test.js`, `test/unit/vendor.test.js`
+  e `test/integration/assinatura.test.js`.
+
+### 20. Vazamento pelo repositório público (OSINT)
+- **Ameaça:** um segredo, um IP da rede de quem desenvolve, um e-mail pessoal ou dados do
+  servidor real publicados por engano e colhidos por robôs que varrem o GitHub.
+- **Mitigação:** `.env`, `data/` e chaves no `.gitignore`; fixtures só pela captura anônima
+  (`npm run capturar-amostra`); exemplos só com IPs de documentação; commits e tags com o
+  e-mail *noreply* do GitHub. O Gitleaks varre os arquivos **e todo o histórico** a cada PR.
+- **Verificado por:** `test/seguranca/segredos-osint.test.js` (tudo que vai para o
+  repositório, antes do commit) e `scripts/seguranca.mjs` (Gitleaks). Análise do que o
+  histórico já expõe: [linha de base](docs/seguranca/2026-10-16-linha-de-base.md#osint-o-que-o-repositório-público-revela).
 
 ---
 
-## Análise estática (CodeQL)
+## OWASP Top 10:2025
 
-O repositório usa o code scanning do GitHub (CodeQL, configuração padrão) a cada push.
-Cada alerta é corrigido ou descartado como falso positivo com a análise escrita em
-`docs/seguranca/`. Primeira análise: [2 alertas de 16/10/2026](docs/seguranca/2026-10-16-codeql.md)
-(viés no sorteio do código do assistente, corrigido; escape do `authorized_keys`, falso
-positivo).
+Onde cada categoria do [OWASP Top 10:2025](https://top10.owasp.org/2025) é tratada no
+painel. `test/unit/docs.test.js` confere que cada linha aponta um teste.
+
+| Categoria | Ameaças acima | Verificado por |
+|---|---|---|
+| A01 Broken Access Control | 6, 8, 9, 11, 12 | `test/seguranca/superficie-ataque.test.js`, `test/seguranca/payloads-owasp.test.js` (path traversal) |
+| A02 Security Misconfiguration | 12, 16 e cabeçalhos (CSP, COOP/COEP/CORP, no-store) | `test/seguranca/superficie-ataque.test.js`, `test/seguranca/invariantes-estaticas.test.js` |
+| A03 Software Supply Chain Failures | 7, 19 | `test/seguranca/cadeia-suprimentos.test.js`, `test/unit/vendor.test.js` |
+| A04 Cryptographic Failures | 4, 5, 11, 20 | `test/seguranca/invariantes-estaticas.test.js`, `test/seguranca/segredos-osint.test.js`, `test/unit/http-session.test.js` |
+| A05 Injection | 1, 3, 10, 13, 15 | `test/seguranca/payloads-owasp.test.js`, `test/unit/config.test.js`, `test/unit/setup-nucleo.test.js` |
+| A06 Insecure Design | 2, 3 (acesso mínimo, servidor só leitura) | `test/integration/ssh-restrito.test.js`, `test/unit/collector-builder.test.js` |
+| A07 Authentication Failures | 6, 11 | `test/integration/api-sessao.test.js`, `test/seguranca/superficie-ataque.test.js` |
+| A08 Software or Data Integrity Failures | 7, 17, 19 | `test/integration/assinatura.test.js`, `test/seguranca/payloads-owasp.test.js`, `test/seguranca/cadeia-suprimentos.test.js` |
+| A09 Security Logging and Alerting Failures | log sem segredo; alertas de queda e de serviço | `test/seguranca/invariantes-estaticas.test.js`, `test/unit/alerts-engine.test.js` |
+| A10 Mishandling of Exceptional Conditions | 13, 14, 16, 18 | `test/seguranca/payloads-owasp.test.js`, `test/unit/collector-fuzz.test.js`, `test/integration/api-ext.test.js` |
+
+---
+
+## Verificação contínua
+
+A verificação é redundante de propósito: cada camada pega o que a outra pode deixar passar.
+Os detalhes estão no AGENTS ("Verificação em camadas") e na ADR 0014.
+
+1. **`npm run check`**, antes de todo commit. Inclui os testes de `test/seguranca/`:
+   regras estáticas, matriz de ataque, payloads do OWASP, OSINT e cadeia de suprimentos.
+2. **`npm run seguranca`**: Semgrep (regras OWASP), Gitleaks, ShellCheck, OSV-Scanner,
+   OWASP ZAP e a **mutação dos guardas**, que quebra cada proteção de propósito e exige que
+   um teste acuse.
+3. **CI no GitHub** a cada push no `main` e a cada PR, com as duas etapas acima e o e2e.
+4. **CodeQL** do GitHub (suíte *extended*). Cada alerta é corrigido ou descartado como
+   falso positivo, com a análise em `docs/seguranca/`.
+
+Análises publicadas:
+- [Alertas do CodeQL de 16/10/2026](docs/seguranca/2026-10-16-codeql.md): viés no sorteio
+  do código do assistente, corrigido; escape do `authorized_keys`, falso positivo.
+- [Alertas do CodeQL *extended*](docs/seguranca/2026-10-16-codeql-extended.md): nome de
+  parâmetro da query (endurecido) e conferir-e-depois-ler em testes (corrigido).
+- [Linha de base da 2.0.1](docs/seguranca/2026-10-16-linha-de-base.md): resultado de todas
+  as ferramentas na `v2.0.0`, correções feitas e o que o repositório público revela.
+- Achados aceitos depois de análise: `docs/seguranca/excecoes.json`.
 
 ---
 
@@ -227,8 +321,10 @@ positivo).
   `ssh-keygen -lf /etc/ssh/ssh_host_ed25519_key.pub`.
 - Abra o painel por `./dashboard abrir`, `http://127.0.0.1:3000` ou
   `http://localhost:3000`.
-- Para trocar o `DASH_TOKEN`: gere um novo com `openssl rand -hex 16`, troque no `.env` e
-  rode `./dashboard parar` e `./dashboard iniciar`.
+- Para trocar o `DASH_TOKEN`: gere um novo com `openssl rand -base64 32` (a instalação usa
+  32 bytes aleatórios), troque no `.env` e rode `./dashboard parar` e `./dashboard iniciar`.
+  As sessões já abertas **continuam valendo** (elas não dependem do token): depois, use
+  "Encerrar todas as sessões" na Ajuda, ou apague `data/sessions.json` com o painel parado.
 
 ---
 

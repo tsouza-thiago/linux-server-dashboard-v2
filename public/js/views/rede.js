@@ -1,4 +1,4 @@
-// 4. Rede (prancheta "V2 · Rede"): vazão agora com o pico do período, volume do dia, erros
+// 4. Rede: vazão agora com o pico do período, volume do dia, erros
 // e descartes, tráfego no período, volume por dia (7 dias) e os maiores picos.
 import { html, mount } from '../core/html.js';
 import * as f from '../core/format.js';
@@ -7,12 +7,16 @@ import { peakOf, dailyTraffic, topPeaks } from '../core/analysis.js';
 const dayOf = f.localDay;
 import { $, pill, big, chartBox, legend, drawCharts, panelHead } from './common.js';
 
+/** Subtítulo da tela, com a interface acompanhada. */
 export const sub = (state) => (state.sample?.net ? `Interface ${state.sample.net.iface} · tráfego, totais e erros` : 'Tráfego, totais e erros da interface de rede');
 
+// Dias da semana para os rótulos dos gráficos de barras.
 const WEEKDAY = ['dom', 'seg', 'ter', 'qua', 'qui', 'sex', 'sáb'];
 const WEEKDAY_LONG = ['domingo', 'segunda', 'terça', 'quarta', 'quinta', 'sexta', 'sábado'];
+// GB com 1 casa abaixo de 10 GB.
 const gb = (bytes) => f.num(bytes / 1024 ** 3, bytes < 10 * 1024 ** 3 ? 1 : 0);
 
+/** Cartões: download, upload, volume do dia e erros/descartes. */
 function cards(ctx) {
   const { state } = ctx;
   const n = state.sample?.net;
@@ -47,6 +51,7 @@ function cards(ctx) {
     </article>`;
 }
 
+/** Volume por dia nos últimos 7 dias (barras). */
 function weekBars(ctx) {
   if (!ctx.local.week) return html`<p class="empty">Carregando os últimos 7 dias…</p>`;
   const days = dailyTraffic(ctx.local.week, ctx.state.meta?.pollIntervalMs);
@@ -71,6 +76,7 @@ function weekBars(ctx) {
     <span class="note">${top.rx + top.tx > 0 ? `maior dia: ${top.label === 'hoje' ? 'hoje' : top.long} · ${gb(top.rx + top.tx)} GB (↓ ${gb(top.rx)} · ↑ ${gb(top.tx)})` : 'sem tráfego registrado nos últimos 7 dias'}</span>`;
 }
 
+/** Os maiores picos de tráfego do período. */
 function peaksTable(state) {
   const peaks = topPeaks(state.buckets || [], ['rxMbps', 'txMbps'], { n: 3, stepMs: state.bucketsStep || 60e3 });
   if (!peaks.length) return html`<p class="empty">Sem tráfego no período.</p>`;
@@ -81,6 +87,7 @@ function peaksTable(state) {
   </table></div>`;
 }
 
+/** Monta a tela inteira. */
 export function render(ctx) {
   mount(ctx.el, html`
     <section class="grid-cards" aria-label="Agora" id="rd-cards"></section>
@@ -106,6 +113,7 @@ export function render(ctx) {
   update(ctx);
 }
 
+/** Atualiza só o que muda com os dados novos. */
 export function update(ctx) {
   mount($('#rd-cards', ctx.el), cards(ctx));
   mount($('#rd-week', ctx.el), weekBars(ctx));

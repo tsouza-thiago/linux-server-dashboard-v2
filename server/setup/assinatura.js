@@ -5,9 +5,13 @@ import { spawnSync } from 'node:child_process';
 import fs from 'node:fs';
 import path from 'node:path';
 
+/** Lista de chaves que podem assinar versões, dentro da pasta `root`. */
 export const SIGNERS = (root) => path.join(root, 'docs', 'allowed_signers');
-export const RELEASE_TAG = /^v2\.\d+\.\d+(-(alpha|beta|rc)\.\d+)?$/;
+// Nomes de versão aceitos: v2.X.Y e as pré-versões. Uma V3 (MAJOR) exige mudar este padrão
+// numa versão 2.x antes, para quem está na V2 conseguir atualizar.
+const RELEASE_TAG = /^v2\.\d+\.\d+(-(alpha|beta|rc)\.\d+)?$/;
 
+/** Roda o git na pasta (argumentos em lista); sem git instalado, status -1. */
 function git(root, args, run = spawnSync) {
   const r = run('git', ['-C', root, ...args], { encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] });
   if (r.error) return { status: -1, stdout: '', stderr: r.error.code === 'ENOENT' ? 'git não encontrado' : r.error.message };

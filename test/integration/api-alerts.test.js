@@ -1,3 +1,5 @@
+// Alertas pela API: motor com chave estável e histerese, saúde em /api/status e quedas
+// em /api/outages (1 falha isolada não conta).
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';

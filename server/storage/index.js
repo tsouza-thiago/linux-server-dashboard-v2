@@ -5,13 +5,18 @@ import { RawStore, HOUR_MS } from './ndjson.js';
 import { RollupStore, ROLLUP_STEP_MS } from './rollup.js';
 import { aggregate, mergeBuckets } from './buckets.js';
 
+/** Janela das amostras brutas (1 por minuto): 72 h. */
 export const RAW_RETENTION_MS = 72 * HOUR_MS;
+/** Janela dos agregados de 5 min: 90 dias. */
 export const ROLLUP_DAYS = 90;
-export const MAX_BUCKETS = 2000;
+// Teto de baldes numa resposta (o gráfico não tem largura para mais) e o menor passo (1 min).
+const MAX_BUCKETS = 2000;
 const MIN_MS = 60000;
 
+// Arredonda `v` para cima, para um múltiplo de `unit`.
 const ceilTo = (v, unit) => Math.ceil(v / unit) * unit;
 
+/** Histórico completo do painel: brutas recentes + agregados antigos, numa interface só. */
 export class History {
   /**
    * @param {object} opts
@@ -26,6 +31,7 @@ export class History {
     if (latest) this.rollup.close(this.raw.samples, Date.parse(latest.ts));
   }
 
+  // Atalhos para o bruto (o servidor e os testes usam a mesma forma da V1).
   get limit() { return this.raw.limit; }
   get length() { return this.raw.length; }
   get samples() { return this.raw.samples; }
@@ -37,6 +43,7 @@ export class History {
     this.raw.append(sample);
   }
 
+  /** Espera as gravações pendentes dos dois (encerramento do painel, B11). */
   async flush() {
     await Promise.all([this.raw.flush(), this.rollup.flush()]);
   }
@@ -60,6 +67,7 @@ export class History {
    * @returns {{from: string, to: string, step: number, buckets: object[]}}
    */
   buckets({ fromMs, toMs, maxPoints = 720 }) {
+    // Passo: o intervalo dividido pelos pontos pedidos, em minutos inteiros.
     const points = Math.min(Math.max(maxPoints, 1), MAX_BUCKETS);
     const raw = this.raw.samples;
     const rawStart = raw.length ? Date.parse(raw[0].ts) : Infinity;

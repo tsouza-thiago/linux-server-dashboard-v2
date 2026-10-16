@@ -1,4 +1,4 @@
-// Comando `dashboard` (F7): controle do painel sem systemd (segundo plano com PID
+// Comando `dashboard`: controle do painel sem systemd (segundo plano com PID
 // conferido), status, link de uso único e rotação do log.
 import test from 'node:test';
 import assert from 'node:assert/strict';
@@ -13,6 +13,8 @@ import {
 import { createLoginCode, consumeLoginCode } from '../../server/http/entrar.js';
 import { rotateIfNeeded, createLogFile } from '../../server/logfile.js';
 import { main, isConfigured, panelUrl } from '../../server/cli/index.js';
+import { lerComModo } from '../../test-support/arquivos.js';
+import { esperarAte } from '../../test-support/esperar.js';
 
 const noSystemd = () => ({ error: new Error('sem systemctl') });
 
@@ -46,7 +48,8 @@ test('servico: reconhece só o processo que roda o server/index.js desta pasta',
   const ours = spawn(process.execPath, [path.join(root, 'server', 'index.js')], { stdio: 'ignore' });
   const other = spawn(process.execPath, ['-e', 'setInterval(() => {}, 1000)'], { stdio: 'ignore' });
   t.after(() => { ours.kill('SIGKILL'); other.kill('SIGKILL'); });
-  await new Promise((r) => setTimeout(r, 100));
+  // Espera o nosso processo aparecer no /proc com a linha de comando (não um tempo fixo).
+  await esperarAte(() => isOurProcess(ours.pid, root));
   assert.equal(isOurProcess(ours.pid, root), true);
   assert.equal(isOurProcess(other.pid, root), false);
   assert.equal(isOurProcess(1, root), false, 'nunca o PID 1');
@@ -66,10 +69,12 @@ test('servico: reconhece só o processo que roda o server/index.js desta pasta',
 });
 
 test('servico: processo que ignora o SIGTERM é forçado depois do prazo', async (t) => {
-  const root = fakeRoot(t, { script: "process.on('SIGTERM', () => {}); setInterval(() => {}, 1000);" });
-  const ours = spawn(process.execPath, [path.join(root, 'server', 'index.js')], { stdio: 'ignore' });
+  // O filho avisa "pronto" DEPOIS de instalar o tratador do SIGTERM. Uma espera fixa
+  // (150 ms) falhava com a máquina carregada: o SIGTERM chegava antes do tratador.
+  const root = fakeRoot(t, { script: "process.on('SIGTERM', () => {}); process.stdout.write('pronto\\n'); setInterval(() => {}, 1000);" });
+  const ours = spawn(process.execPath, [path.join(root, 'server', 'index.js')], { stdio: ['ignore', 'pipe', 'ignore'] });
   t.after(() => ours.kill('SIGKILL'));
-  await new Promise((r) => setTimeout(r, 150));
+  await new Promise((r) => ours.stdout.once('data', r));
   fs.writeFileSync(path.join(root, 'data', 'dashboard.pid'), String(ours.pid));
   const r = await stopPanel({ root, home: root, run: noSystemd, graceMs: 300 });
   assert.equal(r.forced, true);
@@ -149,8 +154,9 @@ test('entrar: código de uso único vale uma vez, no prazo, e em disco fica só 
   t.after(() => fs.rmSync(dir, { recursive: true, force: true }));
   const code = createLoginCode(dir, { now: 1000 });
   const file = path.join(dir, 'entrar.json');
-  assert.equal(fs.statSync(file).mode & 0o777, 0o600);
-  assert.ok(!fs.readFileSync(file, 'utf8').includes(code), 'o código não fica gravado');
+  const gravado = lerComModo(file);
+  assert.equal(gravado.modo, 0o600);
+  assert.ok(!gravado.texto.includes(code), 'o código não fica gravado');
   assert.equal(consumeLoginCode(dir, 'x'.repeat(32), { now: 1000 }), false);
   assert.equal(consumeLoginCode(dir, code, { now: 1000 + 121e3 }), false, 'vencido');
   const code2 = createLoginCode(dir, { now: 1000 });
@@ -158,7 +164,7 @@ test('entrar: código de uso único vale uma vez, no prazo, e em disco fica só 
   assert.equal(consumeLoginCode(dir, code2, { now: 2000 }), false, 'segunda vez não');
   assert.equal(consumeLoginCode(dir, undefined), false);
   for (let i = 0; i < 7; i += 1) createLoginCode(dir, { now: 3000 });
-  assert.equal(JSON.parse(fs.readFileSync(file, 'utf8')).length, 5, 'guarda no máximo 5 pendentes');
+  assert.equal(JSON.parse(lerComModo(file).texto).length, 5, 'guarda no máximo 5 pendentes');
 });
 
 test('log: gira em dashboard.log.1 ao passar do limite', async (t) => {
@@ -179,7 +185,7 @@ test('log: gira em dashboard.log.1 ao passar do limite', async (t) => {
 
 test('cli: ajuda, versão, comando desconhecido e "ainda não instalado"', async (t) => {
   const root = fakeRoot(t);
-  const run = async (...argv) => { const o = memOut(); const code = await main(argv, { out: makeOut(o), root }); return { code, text: o.text() }; };
+  const run = async (...argv) => { const o = memOut(); const code = await main(argv, { out: makeOut(o), root, home: root }); return { code, text: o.text() }; };
   const { makeOutput } = await import('../../server/cli/saida.js');
   const makeOut = (o) => makeOutput({ stream: o.stream, env: {} });
   assert.match((await run()).text, /Uso: \.\/dashboard <comando>/);

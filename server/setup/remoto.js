@@ -13,8 +13,10 @@ import { fileURLToPath } from 'node:url';
 import { validHost, validPort, validUser } from './acesso.js';
 
 const ROOT = path.join(path.dirname(fileURLToPath(import.meta.url)), '..', '..');
+/** Ajudante que entrega a senha ao ssh (lê a variável de ambiente só deste processo). */
 export const ASKPASS = path.join(ROOT, 'scripts', 'askpass.sh');
-export const HOST_KEY_ORDER = ['ssh-ed25519', 'ecdsa-sha2-nistp256', 'ecdsa-sha2-nistp384', 'ecdsa-sha2-nistp521', 'rsa-sha2-512', 'ssh-rsa'];
+// Ordem de preferência dos tipos de chave do servidor (a 1ª que ele tiver é a mostrada).
+const HOST_KEY_ORDER = ['ssh-ed25519', 'ecdsa-sha2-nistp256', 'ecdsa-sha2-nistp384', 'ecdsa-sha2-nistp521', 'rsa-sha2-512', 'ssh-rsa'];
 
 /** O endereço responde na porta do SSH? (passo 2: "encontrado na rede · respondeu em 3 ms") */
 export function probePort(host, port = 22, { timeoutMs = 5000 } = {}) {
@@ -47,6 +49,10 @@ export function fingerprint(keyB64) {
 /** Impressão digital em blocos de 4 letras, para comparar com calma (passo 3). */
 export const fingerprintBlocks = (fp) => fp.replace(/^SHA256:/, '').match(/.{1,4}/g) || [];
 
+/**
+ * Roda um programa (argumentos em lista, sem shell) com `input` no stdin e teto de tempo;
+ * nunca lança: devolve código, saídas e o motivo da falha.
+ */
 function runProcess(cmd, args, { input = '', env = process.env, timeoutMs = 60000, spawnFn = spawn } = {}) {
   return new Promise((resolve) => {
     const child = spawnFn(cmd, args, { env, stdio: ['pipe', 'pipe', 'pipe'] });
@@ -76,6 +82,7 @@ export async function scanHostKeys(host, port = 22, opts = {}) {
     const parts = line.trim().split(/\s+/);
     if (parts.length < 3 || parts[0].startsWith('#')) continue;
     const [, type, key] = parts;
+    // Só chave em base64 de verdade (a saída do keyscan vem da rede: nada cru passa).
     if (!/^[A-Za-z0-9+/]+={0,2}$/.test(key)) continue;
     keys.push({ type, key, fingerprint: fingerprint(key) });
   }
@@ -109,6 +116,8 @@ export function runAdmin({ host, port = 22, user, password = '', knownHosts, hos
       : ['-o', 'BatchMode=yes']),
     '-T', '--', host, '/bin/sh -s',
   ];
+  // Ambiente limpo: nenhum askpass de fora; a senha só entra por esta variável, só neste
+  // processo do ssh (nunca na linha de comando, que outros usuários veem no `ps`).
   const env = { ...process.env };
   delete env.SSH_ASKPASS;
   delete env.DASHBOARD_SENHA_SSH;

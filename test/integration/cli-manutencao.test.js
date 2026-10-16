@@ -1,4 +1,4 @@
-// Manutenção pelo comando `dashboard` (F7): diagnosticar, atualizar (tags assinadas de
+// Manutenção pelo comando `dashboard`: diagnosticar, atualizar (tags assinadas de
 // verdade num repositório temporário, com volta atrás), upgrade V1→V2 e desinstalar.
 import test from 'node:test';
 import assert from 'node:assert/strict';
@@ -7,11 +7,12 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { makeOutput } from '../../server/cli/saida.js';
-import { diagnosticar, latestSample, permissionProblems, explainFailure } from '../../server/cli/diagnosticar.js';
+import { diagnosticar, latestSample, permissionProblems, explainFailure, sshSettings } from '../../server/cli/diagnosticar.js';
 import { atualizar, afterUpdate, backupData, restoreData } from '../../server/cli/atualizar.js';
 import { importarV1, detectV1, v1Settings, v1Pid, stopV1 } from '../../server/cli/importar-v1.js';
 import { desinstalar } from '../../server/cli/desinstalar.js';
 import { loadEnvFile } from '../../server/config.js';
+import { esperarAte } from '../../test-support/esperar.js';
 
 function memOut() {
   const chunks = [];
@@ -94,6 +95,27 @@ test('diagnosticar: permissões abertas, linha desatualizada, disco reprovado e 
   assert.match(text, /✗ o disco \/dev\/sda reprovou no teste de saúde/);
   assert.match(text, /▲ o smartctl não está instalado no servidor/);
   assert.match(text, /coleta de teste há 18 s · 1,20 s/);
+});
+
+test('diagnosticar: lê SSH_ACESSO e SSH_CONFIG com as mesmas regras do painel', async (t) => {
+  const { root, home } = installedRoot(t);
+  const data = path.join(root, 'data');
+  // As regras de server/config.js: modo sem diferença de caixa/espaço; caminho preso em data/.
+  assert.deepEqual(sshSettings({ SSH_ACESSO: ' Restrito ', SSH_CONFIG: 'data/ssh/config' }, root),
+    { access: 'restrito', configFile: path.join(data, 'ssh', 'config') });
+  assert.deepEqual(sshSettings({ SSH_ACESSO: 'restrito', SSH_CONFIG: '' }, root), { access: 'restrito', configFile: '' },
+    'sem SSH_CONFIG o painel usa o ~/.ssh/config, e o diagnóstico também');
+  assert.deepEqual(sshSettings({ SSH_CONFIG: '../../etc/ssh/ssh_config' }, root),
+    { access: 'direto', configFile: path.join(data, 'ssh', 'config') }, 'fora de data/ volta ao padrão');
+  assert.deepEqual(sshSettings({ SSH_ACESSO: 'qualquer', SSH_CONFIG: 'data/ssh/outro' }, root),
+    { access: 'direto', configFile: path.join(data, 'ssh', 'outro') });
+  // Ponta a ponta: "Restrito" com maiúscula vale como restrito, como no painel.
+  fs.writeFileSync(path.join(root, '.env'), 'SSH_HOST=servidor\nSSH_ACESSO=Restrito\nSSH_CONFIG=data/ssh/config\nDISK_MOUNTS=/\n', { mode: 0o600 });
+  const o = memOut();
+  let access = null;
+  await diagnosticar({ out: o.out, root, home, deps: { panelStatus: () => ({ running: false }), collect: async (p) => { access = p.access; return { ok: false, error: 'x' }; } } });
+  assert.equal(access, 'restrito');
+  assert.doesNotMatch(o.text(), /acesso direto ao servidor/);
 });
 
 test('diagnosticar: não instalado, coleta falhando e acesso direto da V1', async (t) => {
@@ -270,9 +292,15 @@ test('V1 → V2: para a V1, traz configuração e dados saneados e liga a V2; a 
   assert.match(o.text(), /✓ V1 parada \(o serviço dela não inicia mais com o computador\)/);
   assert.match(o.text(), /▲ a V2 ainda usa o acesso completo da V1/);
   assert.match(o.text(), /systemctl --user enable --now linux-server-dashboard\.service/);
+  assert.match(o.text(), /Para voltar à V1: \.\/dashboard parar e,/, 'V2 em segundo plano: parar basta');
   const again = memOut();
   await importarV1({ out: again.out, root, dir: v1, home, deps: { stopV1: async () => [], hasSystemdUser: () => false, startPanel: async () => ({ ok: true }), waitForPort: async () => true } });
   assert.match(again.text(), /nenhum dado novo para copiar/, 'não sobrescreve o que a V2 já tem');
+  // V2 como serviço: "parar" não basta (ela voltaria com o computador e as duas fariam 2
+  // conexões por minuto ao servidor); o recado manda desligar o serviço.
+  const svc = memOut();
+  await importarV1({ out: svc.out, root, dir: v1, home, deps: { stopV1: async () => [], hasSystemdUser: () => true, installService: async () => ({ ok: true }), installShortcut: () => {}, waitForPort: async () => true } });
+  assert.match(svc.text(), /Para voltar à V1: systemctl --user disable --now server-dashboard\.service e,/);
 
   assert.deepEqual(detectV1(root), { ok: false, reason: 'nao-e-v1' });
   const notV1 = memOut();
@@ -285,8 +313,9 @@ test('V1 → V2: para só o processo da V1 daquela pasta e o serviço dela', asy
   const v1 = v1Folder(t);
   const proc = spawn(process.execPath, [path.join(v1, 'server', 'index.js')], { stdio: 'ignore' });
   t.after(() => proc.kill('SIGKILL'));
-  await new Promise((r) => setTimeout(r, 150));
   fs.writeFileSync(path.join(v1, 'data', 'dashboard.pid'), String(proc.pid));
+  // Espera o processo da V1 aparecer no /proc com a linha de comando (não um tempo fixo).
+  await esperarAte(() => v1Pid(v1) === proc.pid);
   assert.equal(v1Pid(v1), proc.pid);
   const calls = [];
   const run = (cmd, args) => {

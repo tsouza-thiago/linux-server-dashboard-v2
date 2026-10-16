@@ -1,3 +1,4 @@
+// `npm run migrar-v1`: --verificar não grava, migração com backup e arquivo corrompido intacto.
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { spawnSync } from 'node:child_process';

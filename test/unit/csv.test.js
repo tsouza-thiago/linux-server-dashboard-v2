@@ -1,3 +1,4 @@
+// Export CSV: proteção contra formula injection e escape de valores maliciosos.
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { toCSV, csvEscape } from '../../server/csv.js';

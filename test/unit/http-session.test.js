@@ -1,3 +1,4 @@
+// Sessões: criação, renovação, expiração, só o hash em disco (0600) e revogação.
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';

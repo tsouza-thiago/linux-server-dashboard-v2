@@ -1,3 +1,4 @@
+// Motor de alertas: debounce do offline, quedas e alertas que ficam como estão sem medida.
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';

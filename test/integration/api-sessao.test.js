@@ -1,3 +1,4 @@
+// Login e sessão pela API: token → cookie, força bruta limitada, CSRF e encerrar sessões.
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
@@ -5,6 +6,7 @@ import os from 'node:os';
 import path from 'node:path';
 import { createApp } from '../../server/index.js';
 import { listen, close, request, readSSE } from '../../test-support/request.js';
+import { lerComModo } from '../../test-support/arquivos.js';
 
 const TOKEN = 't'.repeat(43);
 
@@ -123,8 +125,9 @@ test('sessão sobrevive a reiniciar o painel (sessions.json com hash, 0600)', as
   const cookie = sessionFrom(await s.post('/api/login', { token: TOKEN }));
   await s.shutdown();
   const file = path.join(s.dir, 'sessions.json');
-  assert.equal(fs.statSync(file).mode & 0o777, 0o600);
-  assert.ok(!fs.readFileSync(file, 'utf8').includes(cookie.split('=')[1]));
+  const sessoes = lerComModo(file);
+  assert.equal(sessoes.modo, 0o600);
+  assert.ok(!sessoes.texto.includes(cookie.split('=')[1]));
   const again = createApp({
     historyFile: path.join(s.dir, 'history.json'), alertsFile: path.join(s.dir, 'alerts.json'),
     annotationsFile: path.join(s.dir, 'annotations.json'), dashToken: TOKEN, log: () => {},

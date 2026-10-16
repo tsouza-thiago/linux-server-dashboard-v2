@@ -1,4 +1,5 @@
-// Preparar o servidor (passo 5, D11): os mesmos comandos servem aos dois modos.
+// Preparar o servidor (passo 5 da instalação, ADR 0011): os mesmos comandos servem aos dois
+// modos.
 // - assistido: rodam como root numa única chamada de sudo (`sudo -S -k`, a senha vai uma
 //   vez pelo stdin e nunca para a linha de comando), depois do "Confirmar";
 // - manual: viram blocos para colar no servidor, com `sudo` na frente de cada linha.
@@ -7,11 +8,14 @@
 import { authorizedKeysLine, sudoersLine, PANEL_USER } from './acesso.js';
 import { shQuote } from './deteccao.js';
 
-const SUDOERS = '/etc/sudoers.d/dashboard';
+/** Arquivo da regra de sudo do painel no servidor (o docs.test confere contra a documentação). */
+export const SUDOERS = '/etc/sudoers.d/dashboard';
+// Marcadores dos heredocs: a chave, a regra e o script inteiro entram pelo stdin, sem eco.
 const KEY_EOF = 'FIM_DA_CHAVE';
 const SUDOERS_EOF = 'FIM_DA_REGRA';
 const SCRIPT_EOF = 'FIM_DO_PREPARO';
 
+// "sda, sdb e sdc" para os textos da tela.
 const DEVS_TEXT = (devs) => (devs.length > 1 ? `${devs.slice(0, -1).join(', ')} e ${devs.at(-1)}` : devs[0]);
 
 /**
@@ -52,7 +56,6 @@ export function preparationPlan({ adminUser, publicKey, targets, smartDevs = [],
         keyLine,
         KEY_EOF,
       ],
-      heredoc: true,
     },
     rule
       ? {
@@ -66,7 +69,6 @@ export function preparationPlan({ adminUser, publicKey, targets, smartDevs = [],
           SUDOERS_EOF,
           `visudo -cf ${SUDOERS}.novo && mv ${SUDOERS}.novo ${SUDOERS}`,
         ],
-        heredoc: true,
       }
       : {
         id: 'sudoers',
@@ -99,6 +101,7 @@ export function preparationPlan({ adminUser, publicKey, targets, smartDevs = [],
     '',
   ].join('\n');
 
+  // O que a tela mostra: as ações em ordem (modo assistido) e os blocos para colar (manual).
   const isRoot = adminUser === 'root';
   const actions = [
     { id: 'sudo', titulo: isRoot ? 'Entrar como administrador' : 'Confirmar que você pode usar sudo', detalhe: isRoot ? `você entra como root: nada de sudo` : `pede a senha de ${adminUser} uma vez` },
@@ -131,6 +134,7 @@ export function preparationPlan({ adminUser, publicKey, targets, smartDevs = [],
  * @param {'root'|'nopasswd'|'senha'} sudo como o administrador vira root (detecção)
  */
 export function assistedScript(rootScript, { sudo, password = '' }) {
+  // O marcador do heredoc não pode aparecer dentro do script (fecharia o heredoc antes).
   if (rootScript.includes(`\n${SCRIPT_EOF}\n`)) throw new Error('script de preparo inválido');
   const doc = `cat <<'${SCRIPT_EOF}'\n${rootScript}${SCRIPT_EOF}`;
   if (sudo === 'root') return `/bin/sh -s <<'${SCRIPT_EOF}'\n${rootScript}${SCRIPT_EOF}\n`;

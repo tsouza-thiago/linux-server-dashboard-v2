@@ -1,25 +1,30 @@
-// 7. Relatórios (prancheta "V2 · Relatórios"): resumo do período (7, 30, 90 dias ou datas
+// 7. Relatórios: resumo do período (7, 30, 90 dias ou datas
 // escolhidas), tabela por dia no fuso local (B5) e exportação em CSV, JSON ou PDF.
 import { html, mount } from '../core/html.js';
 import * as f from '../core/format.js';
 import {
-  dailySummary, dailyTraffic, uptimeIn, meanOf, peakOf, timeline, levelOf, fullestDisk,
+  dailySummary, dailyTraffic, outagesIn, uptimeIn, meanOf, peakOf, timeline, levelOf, fullestDisk,
 } from '../core/analysis.js';
 import { $, icon, panelHead, onClick } from './common.js';
 
+// Métricas resumidas por dia e os períodos oferecidos.
 const DAY = 86400e3;
 const KEYS = ['cpu', 'ramPct', 'tempC', 'rxMbps', 'txMbps'];
 const RANGES = { 7: '7 dias', 30: '30 dias', 90: '90 dias' };
 const view = { days: 7, from: null, to: null };
 const WEEKDAY = ['dom', 'seg', 'ter', 'qua', 'qui', 'sex', 'sáb'];
 
+// Fuso horário do navegador (os dias do relatório seguem ele, B5).
 const tz = () => { try { return Intl.DateTimeFormat().resolvedOptions().timeZone || 'local'; } catch { return 'local'; } };
+/** Subtítulo da tela. */
 export const sub = () => `Resumo por dia no seu fuso horário (${tz()}) e exportação dos dados`;
 
+/** Escolha do período (7, 30, 90 dias ou datas). */
 export const actions = () => html`<div class="segmented is-text" role="group" aria-label="Período do relatório">
   ${Object.entries(RANGES).map(([d, t]) => html`<button type="button" data-days="${d}" aria-pressed="${!view.from && view.days === Number(d)}">${t}</button>`)}
   <button type="button" data-days="custom" aria-pressed="${Boolean(view.from)}">Personalizado</button></div>`;
 
+/** Clique na escolha do período. */
 export function onAction(ctx, e) {
   const b = e.target.closest('[data-days]');
   if (!b) return;
@@ -35,6 +40,7 @@ export function onAction(ctx, e) {
   load(ctx);
 }
 
+/** Intervalo escolhido em ms. */
 function range() {
   if (view.from && view.to) {
     const from = new Date(`${view.from}T00:00:00`).getTime();
@@ -45,15 +51,17 @@ function range() {
   return { from: to - view.days * DAY, to };
 }
 
+// GB com 1 casa abaixo de 10 GB.
 const gb = (b) => `${f.num(b / 1024 ** 3, b < 10 * 1024 ** 3 ? 1 : 0)}`;
 
+/** Cartões de resumo do período (disponibilidade, médias, picos). */
 function cards(ctx) {
   const b = ctx.local.buckets;
   if (!b) return html`${[1, 2, 3, 4, 5].map(() => html`<div class="skel soft card-skel"></div>`)}`;
   const { from, to } = range();
-  const outs = (ctx.state.outages?.outages || []).filter((o) => Date.parse(o.from) <= to && (!o.to || Date.parse(o.to) >= from));
+  const outs = outagesIn(ctx.state.outages?.outages, from, to);
   const since = ctx.state.outages?.uptime?.from ? Date.parse(ctx.state.outages.uptime.from) : -Infinity;
-  const up = uptimeIn(outs, from, to, { sinceMs: since });
+  const up = uptimeIn(ctx.state.outages?.outages, from, to, { sinceMs: since });
   const cpuPeak = peakOf(b, 'cpu');
   const ramPeak = peakOf(b, 'ramPct');
   const disk = fullestDisk(ctx.state.sample);
@@ -64,13 +72,14 @@ function cards(ctx) {
   const when = (p) => (p ? `${WEEKDAY[new Date(p.t).getDay()]} ${f.time(p.t)}` : '');
   const card = (label, value, note) => html`<article class="card"><span class="card-label">${label}</span><span class="big md">${value}</span><span class="note">${note}</span></article>`;
   return html`
-    ${card('Disponibilidade', up === null ? '—' : `${f.num(up, 2)}%`, outs.length ? `${outs.length} queda${outs.length > 1 ? 's' : ''} · ${f.duration(outs.reduce((s, o) => s + o.durationSec, 0))} fora` : 'nenhuma queda')}
+    ${card('Disponibilidade', f.pct(up, 2), outs.count ? `${outs.count} queda${outs.count > 1 ? 's' : ''} · ${f.duration(outs.offlineSec)} fora` : 'nenhuma queda')}
     ${card('CPU média', f.pct(meanOf(b, 'cpu')), cpuPeak ? `pico ${f.pct(cpuPeak.value)} · ${when(cpuPeak)}` : 'sem dados')}
     ${card('Memória média', f.pct(meanOf(b, 'ramPct')), ramPeak ? `pico ${f.pct(ramPeak.value)}` : 'sem dados')}
     ${card(disk ? disk.mount : 'Disco', grew === null ? '—' : `${grew >= 0 ? '+' : '−'}${f.bytes(Math.abs(grew))}`, pk.length > 1 ? `${f.pct(pk[0])} → ${f.pct(pk[pk.length - 1])} no período` : 'sem dados no período')}
     ${card('Rede', `${gb(traffic.rx + traffic.tx)} GB`, `↓ ${gb(traffic.rx)} · ↑ ${gb(traffic.tx)}`)}`;
 }
 
+/** Tabela por dia (fuso local) com médias, picos e eventos. */
 function table(ctx) {
   const b = ctx.local.buckets;
   if (!b) return html`<p class="empty">Carregando resumo…</p>`;
@@ -106,6 +115,7 @@ function table(ctx) {
   })}</tbody></table></div>`;
 }
 
+/** Exportar CSV/JSON e imprimir. */
 function exportPanel(ctx) {
   const { from, to } = range();
   const link = (format) => ctx.api.exportUrl({ format, from: new Date(from).toISOString(), to: new Date(to).toISOString() });
@@ -117,6 +127,7 @@ function exportPanel(ctx) {
   </div>`;
 }
 
+/** Formulário de datas do período personalizado. */
 function customForm() {
   return html`<form class="custom-range" id="rl-custom">
     <div class="field"><label for="rl-from">De</label><input class="input" type="date" id="rl-from" value="${view.from}" min="${f.localDay(Date.now() - 89 * DAY)}" max="${f.localDay(Date.now())}" required></div>
@@ -126,6 +137,7 @@ function customForm() {
   </form>`;
 }
 
+/** Busca os baldes de 1 h do período (uma vez por período escolhido). */
 function load(ctx) {
   const { from, to } = range();
   ctx.local.buckets = null;
@@ -138,6 +150,7 @@ function load(ctx) {
   mount(document.getElementById('viewActions'), actions()); // botão do período marcado
 }
 
+/** Monta a tela inteira. */
 export function render(ctx) {
   ctx.local.custom = Boolean(view.from);
   mount(ctx.el, html`
@@ -164,6 +177,7 @@ export function render(ctx) {
   load(ctx);
 }
 
+/** Atualiza só o que muda com os dados novos. */
 export function update(ctx) {
   // O formulário de datas só é refeito ao abrir/fechar (as coletas ao vivo não apagam o que se digita).
   if (Boolean($('#rl-custom', ctx.el)) !== ctx.local.custom) mount($('#rl-custom-box', ctx.el), ctx.local.custom ? customForm() : '');

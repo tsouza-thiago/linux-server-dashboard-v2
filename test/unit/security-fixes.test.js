@@ -1,3 +1,4 @@
+// Correções de segurança: sanitizeHost, script de coleta saneado e cookie CSRF.
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {

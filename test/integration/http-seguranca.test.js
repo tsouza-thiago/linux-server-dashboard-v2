@@ -1,4 +1,4 @@
-// Caracterização da segurança pela rede (F4, invariante I9): o que um navegador ou um
+// Caracterização da segurança pela rede (invariante I9): o que um navegador ou um
 // atacante vê, sem depender de como o servidor HTTP é implementado. Escrita e verde ANTES
 // da troca do Express por node:http; precisa continuar verde depois.
 import test from 'node:test';

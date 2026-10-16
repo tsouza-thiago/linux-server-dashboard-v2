@@ -1,14 +1,17 @@
-// 2. Recursos (prancheta "V2 · Recursos"): processador por tipo (empilhado), carga, memória,
+// 2. Recursos: processador por tipo (empilhado), carga, memória,
 // temperatura com o limite e pressão do sistema (PSI) em faixas sincronizadas.
 import { html, mount } from '../core/html.js';
 import * as f from '../core/format.js';
 import { keysWith, meanOf, peakOf, trendOf } from '../core/analysis.js';
-import { $, pill, chip, big, n0, meter, chartBox, legend, drawCharts, drawStrips, strips, panelHead } from './common.js';
+import { $, pill, big, n0, meter, chartBox, legend, drawCharts, drawStrips, strips, panelHead } from './common.js';
 
+/** Subtítulo da tela. */
 export const sub = () => 'Processador, memória, pressão do sistema e temperatura';
 
+// Limiares atuais (do status ao vivo ou da configuração).
 const thr = (state) => state.meta?.thresholds || state.config?.thresholds || {};
 
+/** Cartões do momento: CPU, carga, memória, swap e temperatura. */
 function nowCards(state) {
   const s = state.sample;
   const t = thr(state);
@@ -45,6 +48,7 @@ function nowCards(state) {
     </article>`;
 }
 
+/** Gráfico da CPU: empilhado (usuário, sistema, espera) ou só o total no histórico antigo. */
 function cpuSpec(state) {
   const b = state.buckets || [];
   const split = keysWith(b, 'cpuUser').length > 0;
@@ -52,11 +56,12 @@ function cpuSpec(state) {
     ? { id: 'rc-cpu', height: 240, stack: true, format: (v) => f.pct(v, v < 10 ? 1 : 0), axisFormat: (v) => f.pct(v), series: [
       { label: 'usuário', key: 'cpuUser', color: 's1', glow: false }, { label: 'sistema', key: 'cpuSystem', color: 's4', glow: false },
       { label: 'espera de disco', key: 'cpuIowait', color: 's3' }] }
-    // Histórico de antes da F6 não separa usuário/sistema: total e espera de disco.
+    // Amostras antigas (V1 e as primeiras da V2) não separam usuário/sistema: total e espera.
     : { id: 'rc-cpu', height: 240, format: (v) => f.pct(v), series: [
       { label: 'total', key: 'cpu', color: 's1', fill: 0.15 }, { label: 'espera de disco', key: 'cpuIowait', color: 's3' }] };
 }
 
+/** Média, pico e tendência da memória no período. */
 function ramStats(state) {
   const b = state.buckets || [];
   const peak = peakOf(b, 'ramPct');
@@ -69,18 +74,21 @@ function ramStats(state) {
     ${mini('swap', f.mb(state.sample?.ram?.swapUsed))}`;
 }
 
+/** Selos de todos os sensores de temperatura, com o escolhido em destaque. */
 function sensors(s) {
   const list = s?.temps || [];
   if (!list.length) return '';
   return html`${list.map((x) => html`<span class="chip mono${x.type === s.tempSensor ? ' is-current' : ''}">${x.type} ${f.celsius(x.c)}${x.type === s.tempSensor ? html` <span class="ink-accent">· usado</span>` : ''}</span>`)}`;
 }
 
+// Faixas da pressão do sistema (PSI): CPU, memória e disco.
 const PSI_ROWS = [
   { id: 'rc-psi-cpu', label: 'CPU', key: 'psi:cpu', color: 's1' },
   { id: 'rc-psi-mem', label: 'Memória', key: 'psi:memory', color: 's2' },
   { id: 'rc-psi-io', label: 'Disco', key: 'psi:io', color: 's3' },
 ].map((r) => ({ ...r, format: (v) => f.pct(v, v < 1 ? 2 : 1), range: (u, min, max) => [0, Math.max(5, (max ?? 0) * 1.2)], fill: 0.12 }));
 
+/** Selo da PSI (ou "indisponível" em kernel sem PSI). */
 function psiPill(s) {
   const p = s?.psi;
   if (!p) return pill('neutral', 'sem PSI neste kernel', { iconOnly: null });
@@ -88,6 +96,7 @@ function psiPill(s) {
   return worst >= 10 ? pill('warn', 'engasgando', { lg: true }) : pill('ok', 'sem engasgos', { lg: true });
 }
 
+/** Monta a tela inteira. */
 export function render(ctx) {
   const t = thr(ctx.state);
   mount(ctx.el, html`
@@ -116,6 +125,7 @@ export function render(ctx) {
   update(ctx);
 }
 
+/** Atualiza só o que muda com os dados novos. */
 export function update(ctx) {
   const { state } = ctx;
   const t = thr(state);

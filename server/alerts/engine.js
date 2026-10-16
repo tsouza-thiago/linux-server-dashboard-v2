@@ -4,6 +4,7 @@
 import { evaluate, OFFLINE_KEY } from './rules.js';
 import { healthScore } from './health.js';
 
+/** Estado dos alertas e das quedas entre uma coleta e outra (um por painel). */
 export class AlertEngine {
   /**
    * @param {object} opts
@@ -16,6 +17,7 @@ export class AlertEngine {
     this.outages = outages;
     this.t = thresholds;
     this.now = now;
+    // Falhas seguidas e o instante/motivo da 1ª delas (a queda começa nela).
     this.failures = 0;
     this.firstFailureAt = null;
     this.firstError = null;
@@ -40,6 +42,8 @@ export class AlertEngine {
       this.outages.end(Number.isFinite(at) ? at : this.now());
       this.offline = false;
     }
+    // As chaves abertas entram na avaliação para a histerese; as que esta amostra não
+    // consegue avaliar (`unknown`) ficam abertas como estão.
     const active = new Set(this.alerts.active.map((a) => a.key).filter(Boolean));
     const { conditions, unknown } = evaluate(sample, this.t, active);
     this.alerts.reconcile(conditions, { keep: unknown });
@@ -65,6 +69,7 @@ export class AlertEngine {
     return { offline: this.offline, failures: this.failures };
   }
 
+  /** Saúde 0–100 da amostra, com os mesmos limiares (offline = 0). */
   health(sample) {
     return healthScore(sample, this.t, { offline: this.offline });
   }

@@ -1,5 +1,5 @@
 # shellcheck shell=bash
-# Node.js do painel (ADR 0002, Q18): usa o Node 24+ do sistema ou, se faltar ou for antigo,
+# Node.js do painel (ADR 0002): usa o Node 24+ do sistema ou, se faltar ou for antigo,
 # baixa o Node 24 oficial para dentro da pasta (.runtime/node), sem sudo, e confere a soma
 # SHA-256 fixada abaixo antes de extrair. Lido pelo ./dashboard (não executa nada sozinho).
 
@@ -79,7 +79,10 @@ install_node_runtime() {
 }
 
 # Escolhe o Node: o da pasta (se já foi baixado), senão o do sistema (24+), senão baixa.
-# Define NODE_BIN e NODE_ORIGEM (pasta | sistema | baixado).
+# Define NODE_BIN (caminho do node) e NODE_ORIGEM (pasta | sistema | baixado). Quem lê as
+# duas é o ./dashboard, que carrega este arquivo com ".": por isso o ShellCheck, olhando só
+# este arquivo, as acha "sem uso" (SC2034).
+# shellcheck disable=SC2034
 ensure_node() {
   local root="$1" sys
   if [ -x "$root/.runtime/node/bin/node" ] && [ "$(node_major "$root/.runtime/node/bin/node")" -ge "$NODE_MIN_MAJOR" ]; then

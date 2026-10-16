@@ -1,15 +1,19 @@
 // Chamadas à API local. A sessão vai no cookie (ADR 0007): nada de token no JavaScript.
 // Qualquer 401 avisa quem se inscreveu em `onAuthRequired` (a tela mostra o login).
+import { ALERTS_LIMIT } from './analysis.js';
+
 let authHandler = () => {};
 export const onAuthRequired = (fn) => { authHandler = fn; };
 
-export class ApiError extends Error {
+// Erro de API com o status HTTP (a tela decide o que fazer com 401, 409, 429…).
+class ApiError extends Error {
   constructor(status, message) {
     super(message);
     this.status = status;
   }
 }
 
+/** Um pedido à API: corpo em JSON, cookie de sessão da mesma origem, erro como ApiError. */
 async function request(path, { method = 'GET', body } = {}) {
   const opts = { method, credentials: 'same-origin', headers: {} };
   if (body !== undefined) {
@@ -24,6 +28,7 @@ async function request(path, { method = 'GET', body } = {}) {
   return data;
 }
 
+// Query string só com os valores presentes (`?a=1&b=2`, ou vazio).
 const qs = (params) => {
   const p = new URLSearchParams();
   for (const [k, v] of Object.entries(params)) if (v !== undefined && v !== null && v !== '') p.set(k, v);
@@ -31,6 +36,7 @@ const qs = (params) => {
   return s ? `?${s}` : '';
 };
 
+/** Uma função por rota da API. */
 export const api = {
   session: () => request('/api/session'),
   login: (token, { remember = true } = {}) => request('/api/login', { method: 'POST', body: { token, remember } }),
@@ -38,8 +44,7 @@ export const api = {
   status: () => request('/api/status'),
   config: () => request('/api/config'),
   buckets: ({ from, to, limit = 600 }) => request(`/api/history${qs({ formato: 'baldes', from, to, limit })}`),
-  samples: ({ from, to, limit = 720 }) => request(`/api/history${qs({ from, to, limit })}`),
-  alerts: (limit = 200) => request(`/api/alerts${qs({ limit })}`),
+  alerts: (limit = ALERTS_LIMIT) => request(`/api/alerts${qs({ limit })}`),
   ack: (id) => request(`/api/alerts/${encodeURIComponent(id)}/ack`, { method: 'POST', body: {} }),
   resolve: (id) => request(`/api/alerts/${encodeURIComponent(id)}/resolve`, { method: 'POST', body: {} }),
   annotations: () => request('/api/annotations'),

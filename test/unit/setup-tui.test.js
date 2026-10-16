@@ -1,4 +1,4 @@
-// TUI reserva e modo sem interface (F7): os mesmos passos do assistente, dirigidos por
+// TUI reserva e modo sem interface: os mesmos passos do assistente, dirigidos por
 // teclas num terminal falso e por opções, com servidor/ssh/systemd falsos.
 import test from 'node:test';
 import assert from 'node:assert/strict';
@@ -8,6 +8,10 @@ import { runTui, Screen } from '../../server/setup/tui.js';
 import { runHeadless, HEADLESS_HELP } from '../../server/setup/sem-interface.js';
 import { makeOutput } from '../../server/cli/saida.js';
 import { makeInstalacao } from '../../test-support/instalacao-fake.js';
+import { esperarAte } from '../../test-support/esperar.js';
+import { loadEnvFile } from '../../server/config.js';
+import fs from 'node:fs';
+import path from 'node:path';
 
 function memOut() {
   const chunks = [];
@@ -67,6 +71,25 @@ test('TUI: os 6 passos no terminal até o painel ligado, sem cores', async (t) =
   assert.equal(fake.services[0].enable, true);
 });
 
+test('TUI: desmarcar "Iniciar com o computador" vale (o serviço não é habilitado)', async (t) => {
+  const fake = makeInstalacao();
+  t.after(fake.cleanup);
+  const term = terminal();
+  const o = memOut();
+  const running = runTui({ out: o.out, inst: fake.inst, input: term.input, output: term.output });
+  term.keys(
+    'Enter', '192.0.2.10', 'Enter', 'maria', 'Enter', 'Enter', 's', 'certa', 'Enter',
+    'Enter', 'Enter', 'Enter', 'Enter',
+    'space', 'Enter', // 6: desmarca a 1ª caixa (iniciar com o computador) e conclui
+  );
+  assert.equal(await running, 0, o.text());
+  assert.match(term.screens.join(''), /\[ \] Iniciar com o computador/);
+  // Sem a unidade instalada e sem "iniciar com o computador", o painel sobe em segundo
+  // plano: nenhum serviço é instalado (antes, a TUI ignorava a escolha e habilitava).
+  assert.deepEqual(fake.services, []);
+  assert.match(o.text(), /painel rodando em segundo plano/);
+});
+
 test('TUI: Esc volta um passo, erro aparece na tela e Ctrl+C cancela sem gravar', async (t) => {
   const fake = makeInstalacao();
   t.after(fake.cleanup);
@@ -74,10 +97,10 @@ test('TUI: Esc volta um passo, erro aparece na tela e Ctrl+C cancela sem gravar'
   const o = memOut();
   const running = runTui({ out: o.out, inst: fake.inst, input: term.input, output: term.output });
   term.keys('Enter', '192.0.2.99', 'Enter', 'maria', 'Enter', 'Enter');
-  await new Promise((r) => setTimeout(r, 50));
+  await esperarAte(() => /✗ Ninguém respondeu nesse endereço/.test(term.last()));
   assert.match(term.last(), /✗ Ninguém respondeu nesse endereço/);
   term.keys('Esc');
-  await new Promise((r) => setTimeout(r, 20));
+  await esperarAte(() => /Vamos ligar o painel ao seu servidor/.test(term.last()));
   assert.match(term.last(), /Vamos ligar o painel ao seu servidor/);
   term.keys('CtrlC');
   assert.equal(await running, 1);
@@ -93,11 +116,11 @@ test('TUI: modo manual testa bloco por bloco; sem terminal interativo, explica',
   term.keys('Enter', '192.0.2.10', 'Enter', 'maria', 'Enter', 'Enter', 's', 'certa', 'Enter', 'Enter', 'Enter');
   // passo 5: desce até "Prefiro fazer à mão", marca e confirma
   term.keys('down', 'space', 'Enter');
-  await new Promise((r) => setTimeout(r, 80));
+  await esperarAte(() => /Preparar o servidor à mão · Criar o usuário dashmon/.test(term.last()));
   assert.match(term.last(), /Preparar o servidor à mão · Criar o usuário dashmon/);
   assert.match(term.last(), /sudo id dashmon/);
   term.keys('Enter');
-  await new Promise((r) => setTimeout(r, 30));
+  await esperarAte(() => /▲ O usuário dashmon ainda não existe/.test(term.last()));
   assert.match(term.last(), /▲ O usuário dashmon ainda não existe/);
   fake.srv.dashmon = true;
   term.keys('Enter', 'Enter', 'Enter', 'Enter', 'Enter');
@@ -153,6 +176,21 @@ test('sem interface: exige identidade conferida, lê a senha do stdin e conclui'
   assert.match(c.text(), /SMART sda · rede — · serviços smbd/);
   assert.match(c.text(), /✓ servidor preparado \(usuário dashmon · chave restrita · sudo só para smartctl -H\)/);
   assert.match(c.text(), /link de entrada \(uso único, 2 min\): http:\/\/127\.0\.0\.1:3999\/entrar\?codigo=/);
+});
+
+test('sem interface: sem --disco/--memoria/--temperatura, mantém os limiares do .env', async (t) => {
+  const fake = makeInstalacao();
+  t.after(fake.cleanup);
+  fs.writeFileSync(path.join(fake.root, '.env'), 'ALERT_RAM_PCT=80\nALERT_TEMP_C=70\n', { mode: 0o600 });
+  const o = memOut();
+  const code = await runHeadless({
+    out: o.out, inst: fake.inst, stdin: Readable.from(['certa\n']),
+    flags: { servidor: '192.0.2.10', usuario: 'maria', identidade: 'SHA256:8oOm2IqGGSLMQ94IC6SBJJ/EIGqCSF6BhAsYUkBWlXw', 'senha-stdin': true, disco: '85', 'sem-atalho': true },
+  });
+  assert.equal(code, 0, o.text());
+  const env = loadEnvFile(path.join(fake.root, '.env'));
+  // --disco vence; memória e temperatura ficam como estavam (antes voltavam a 90 e 60).
+  assert.deepEqual([env.ALERT_DISK_PCT, env.ALERT_RAM_PCT, env.ALERT_TEMP_C], ['85', '80', '70']);
 });
 
 test('sem interface: modo manual mostra os blocos; --ja-preparado testa e conclui', async (t) => {

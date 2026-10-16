@@ -1,7 +1,6 @@
 /* Componentes compartilhados: estrutura (navegação, faixa de status, cabeçalho), controles,
    cartões, selos, medidores, tabelas, avisos, esqueletos, gráficos e login.
-   Referência: pranchetas "Componente · Navegação", "Componente · Faixa de status",
-   "V2 · Design system", "V2 · Estados" e "V2 · Login". */
+   Só usa os tokens de tokens.css (nada de cor solta), para os dois temas valerem. */
 
 /* ---------------- Estrutura ---------------- */
 .app {
@@ -161,7 +160,7 @@ body.login-open { overflow: hidden; }
 .icon-btn:hover { color: var(--text); background: var(--surface-2); }
 
 .field { display: flex; flex-direction: column; gap: 6px; }
-.field label, .label { font-size: 13px; color: var(--text-2); }
+.field label { font-size: 13px; color: var(--text-2); }
 .input {
   min-height: var(--touch); padding: 0 14px; border-radius: 10px;
   border: 1px solid var(--input-line); background: var(--bg); color: var(--text); font-size: 14px;

@@ -1,3 +1,4 @@
+// Tempo real (SSE): id por amostra, recuperação com Last-Event-ID e limite de conexões.
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
@@ -35,7 +36,10 @@ const events = (data) => data.split('\n\n').filter((b) => b.includes('event: '))
 test('SSE: cada amostra ao vivo sai com id = instante dela', async (t) => {
   const s = await start(t);
   const live = readSSE(s.port, { until: 4, timeoutMs: 3000 });
-  await new Promise((r) => setTimeout(r, 50));
+  // Só coleta depois que a conexão SSE está registrada no hub. Uma espera fixa (50 ms)
+  // perdia a amostra com a máquina carregada (ex.: suíte com cobertura).
+  for (let i = 0; i < 200 && s.sse.size < 1; i++) await new Promise((r) => setTimeout(r, 10));
+  assert.equal(s.sse.size, 1, 'a conexão SSE entrou no hub');
   s.queue.push({ ok: true, sample: { ts: at(0), host: 'srv', disks: [] } });
   await s.runPoll();
   const r = await live;
@@ -66,8 +70,10 @@ test('SSE: sem Last-Event-ID (1ª conexão) ou com valor inválido não há back
 
 test('SSE: limite de conexões simultâneas responde 503', async (t) => {
   const s = await start(t, { sseMaxClients: 1 });
-  const first = readSSE(s.port, { until: 99, timeoutMs: 400 });
-  await new Promise((r) => setTimeout(r, 80));
+  const first = readSSE(s.port, { until: 99, timeoutMs: 1500 });
+  // A 1ª conexão precisa estar no hub antes da 2ª (espera fixa falhava com a máquina carregada).
+  for (let i = 0; i < 100 && s.sse.size < 1; i++) await new Promise((r) => setTimeout(r, 10));
+  assert.equal(s.sse.size, 1, 'a 1ª conexão SSE entrou no hub');
   const second = await request(s.port, { path: '/api/stream' });
   assert.equal(second.status, 503);
   assert.match(second.json.error, /conexões demais/);

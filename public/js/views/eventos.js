@@ -1,16 +1,19 @@
-// 6. Eventos (prancheta "V2 · Eventos"): disponibilidade de 90 dias, filtros por tipo e
+// 6. Eventos: disponibilidade de 90 dias, filtros por tipo e
 // situação, anotar agora e a linha do tempo única (alertas, quedas e anotações) agrupada por
 // dia, com reconhecer, remover, "ver no gráfico" e paginação dos antigos.
 import { html, mount } from '../core/html.js';
 import * as f from '../core/format.js';
 import { timeline, dayStatuses, levelOf, viewOfKey, offlineMsIn } from '../core/analysis.js';
-import { $, icon, iconBox, panelHead, onClick } from './common.js';
+import { $, icon, iconBox, onClick } from './common.js';
 
+/** Subtítulo da tela. */
 export const sub = () => 'Alertas, quedas e anotações numa linha do tempo única';
 
+// Filtros e página da lista (ficam enquanto a tela está aberta).
 const view = { kind: 'todos', status: 'qualquer', page: 1 };
 const PAGE = 40;
 
+/** Botões no topo: notificações do navegador e nova anotação. */
 export const actions = () => {
   const perm = typeof Notification === 'undefined' ? 'unsupported' : Notification.permission;
   return html`
@@ -19,6 +22,7 @@ export const actions = () => {
     <button class="btn btn-primary" type="button" data-act="note">${icon('plus', 16, 2.5)} Nova anotação</button>`;
 };
 
+/** Clique num botão do topo. */
 export function onAction(ctx, e) {
   const b = e.target.closest('[data-act]');
   if (!b) return;
@@ -26,9 +30,11 @@ export function onAction(ctx, e) {
   else focusNew(ctx);
 }
 
+// Aberto = alerta novo/reconhecido ou queda em andamento; novo = ainda não reconhecido.
 const isOpen = (e) => (e.kind === 'alerta' && (e.status === 'new' || e.status === 'ack')) || (e.kind === 'queda' && e.ongoing);
 const isNew = (e) => (e.kind === 'alerta' || e.kind === 'queda') && e.status === 'new';
 
+/** O item passa nos filtros de tipo e situação? */
 function matches(e) {
   if (view.kind !== 'todos' && e.kind !== view.kind) return false;
   if (view.status === 'novos') return isNew(e);
@@ -36,6 +42,7 @@ function matches(e) {
   return true;
 }
 
+/** Faixa de disponibilidade de 90 dias (um quadradinho por dia). */
 function uptime(state) {
   const o = state.outages;
   const u = o?.uptime;
@@ -50,7 +57,7 @@ function uptime(state) {
     <div class="panel-head">
       <div class="uptime-head">
         <h2>Disponibilidade · 90 dias</h2>
-        <span class="big md">${u?.uptimePct === null || u?.uptimePct === undefined ? '—' : `${f.num(u.uptimePct, 2)}%`}</span>
+        <span class="big md">${f.pct(u?.uptimePct, 2)}</span>
         <span class="note">${outs.length} queda${outs.length === 1 ? '' : 's'} · ${svcDown} serviço${svcDown === 1 ? '' : 's'} parado${svcDown === 1 ? '' : 's'} · ${f.duration(offMs / 1000)} fora no total</span>
       </div>
       <div class="legend small">
@@ -66,6 +73,7 @@ function uptime(state) {
     ${since ? '' : html`<span class="note">O monitoramento ainda não tem histórico.</span>`}`;
 }
 
+/** Botões de filtro, com a contagem de cada tipo. */
 function filters(all) {
   const count = (k) => all.filter((e) => k === 'todos' || e.kind === k).length;
   const seg = (name, label, opts, value) => html`<div class="segmented is-text" role="group" aria-label="${label}">${opts.map(([v, t, n]) => html`
@@ -78,6 +86,7 @@ function filters(all) {
     <span class="note filters-note">${openNow ? `${openNow} ativo${openNow > 1 ? 's' : ''} agora` : 'Nenhum alerta ativo agora'}${unack ? ` · ${unack} não reconhecido${unack > 1 ? 's' : ''}` : ''}</span>`;
 }
 
+/** Rótulo do dia na lista ("hoje", "ontem" ou a data). */
 function dayLabel(ts) {
   const d = new Date(ts);
   const day = f.localDay(ts);
@@ -87,6 +96,7 @@ function dayLabel(ts) {
   return day === today ? `Hoje · ${dm}` : day === yesterday ? `Ontem · ${dm}` : dm;
 }
 
+/** Um item da linha do tempo (alerta, queda ou anotação) com as ações dele. */
 function item(e) {
   if (e.kind === 'alerta') {
     const lvl = levelOf(e);
@@ -122,6 +132,7 @@ function item(e) {
   </li>`;
 }
 
+/** A lista agrupada por dia, paginada de 40 em 40. */
 function list(all) {
   const filtered = all.filter(matches);
   const shown = filtered.slice(0, view.page * PAGE);
@@ -136,8 +147,10 @@ function list(all) {
     ${filtered.length > shown.length ? html`<div class="ev-more"><button class="btn btn-quiet" type="button" id="ev-more">Carregar eventos mais antigos (${filtered.length - shown.length})</button></div>` : ''}`;
 }
 
+// Alertas, anotações e quedas juntos, do mais recente ao mais antigo.
 const allEvents = (state) => timeline({ alerts: state.alerts?.all, annotations: state.annotations, outages: state.outages?.outages });
 
+/** Monta a tela inteira. */
 export function render(ctx) {
   mount(ctx.el, html`
     <section class="panel" aria-label="Disponibilidade nos últimos 90 dias" id="ev-uptime"></section>
@@ -171,6 +184,7 @@ export function render(ctx) {
   update(ctx);
 }
 
+/** Atualiza só o que muda com os dados novos. */
 export function update(ctx) {
   const all = allEvents(ctx.state);
   mount($('#ev-uptime', ctx.el), uptime(ctx.state));
@@ -178,4 +192,5 @@ export function update(ctx) {
   mount($('#ev-list', ctx.el), list(all));
 }
 
+/** Leva o cursor ao campo de nova anotação (tecla N). */
 export const focusNew = (ctx) => $('#ev-text', ctx.el)?.focus();

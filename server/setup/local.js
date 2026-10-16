@@ -10,9 +10,11 @@ import { loadEnvFile } from '../config.js';
 import { KEY_COMMENT, knownHostsName, sshConfigText, validHost, validPort } from './acesso.js';
 import { UNIT_NAME, unitPath, systemctlUser, hasSystemdUser } from '../cli/servico.js';
 
-export const DESKTOP_FILE = 'server-dashboard.desktop';
-export const desktopPath = (home = os.homedir()) => path.join(home, '.local', 'share', 'applications', DESKTOP_FILE);
+// Atalho do menu de aplicativos (~/.local/share/applications/).
+const DESKTOP_FILE = 'server-dashboard.desktop';
+const desktopPath = (home = os.homedir()) => path.join(home, '.local', 'share', 'applications', DESKTOP_FILE);
 
+// Grava via arquivo temporário + rename (atômico), com o modo pedido (padrão 0600).
 const writeAtomic = (file, text, mode = 0o600) => {
   const tmp = `${file}.tmp-${process.pid}`;
   fs.writeFileSync(tmp, text, { mode });
@@ -31,6 +33,7 @@ export function ensureDataDirs(root) {
   return { data, ssh };
 }
 
+/** Chave pública de um arquivo .pub: { publicKey: "tipo base64", comment }, ou null. */
 function readPub(file) {
   try {
     const [type, b64, ...comment] = fs.readFileSync(file, 'utf8').trim().split(/\s+/);
@@ -94,6 +97,8 @@ export function updateEnv(root, updates) {
   else if (fs.existsSync(path.join(root, '.env.example'))) text = fs.readFileSync(path.join(root, '.env.example'), 'utf8');
   const lines = text.split('\n');
   if (lines.at(-1) === '') lines.pop();
+  // Nome só com A–Z e _, e valor sem quebra de linha, aspas nem # (não dá para injetar
+  // outra variável nem um comentário no .env).
   for (const [key, raw] of Object.entries(updates)) {
     if (!/^[A-Z_]+$/.test(key)) throw new Error(`variável inválida: ${key}`);
     const value = String(raw ?? '');
@@ -126,7 +131,7 @@ export function serviceNode(root, current = process.execPath) {
   return fs.existsSync(local) ? local : current;
 }
 
-/** Unidade systemd de usuário. Com hardening (D12), o painel só grava em data/. */
+/** Unidade systemd de usuário. Com hardening (isolamento do systemd), o painel só grava em data/. */
 export function unitText({ root, nodeBin, hardening = true }) {
   if (/[\r\n]/.test(root) || /[\r\n]/.test(nodeBin)) throw new Error('caminho inválido');
   return [
@@ -178,6 +183,7 @@ export async function installService({ root, home = os.homedir(), nodeBin = serv
     fs.rmSync(file, { force: true });
     return { ok: false, error: 'sem systemd de usuário nesta sessão' };
   }
+  // 1ª tentativa com o isolamento; se o serviço não ficar ativo, a 2ª sem ele.
   for (const hardening of [true, false]) {
     apply(hardening);
     if (enable) systemctlUser(['enable', UNIT_NAME], { run });
@@ -201,6 +207,7 @@ export async function installService({ root, home = os.homedir(), nodeBin = serv
   return { ok: false, error: 'o serviço não ficou ativo (veja: journalctl --user -u server-dashboard)', file };
 }
 
+/** Desliga e apaga o serviço de usuário (desinstalar); devolve se ele existia. */
 export function removeService({ home = os.homedir(), run } = {}) {
   const file = unitPath(home);
   if (!fs.existsSync(file)) return false;
@@ -213,6 +220,7 @@ export function removeService({ home = os.homedir(), run } = {}) {
 // Desktop Entry: argumentos com espaço vão entre aspas; dentro delas, \ " ` $ levam \.
 const desktopArg = (s) => `"${String(s).replace(/[\\"`$]/g, (c) => `\\${c}`).replace(/%/g, '%%')}"`;
 
+/** Texto do atalho do menu: abre o painel pelo `./dashboard abrir`. */
 export function desktopEntryText({ root }) {
   if (/[\r\n]/.test(root)) throw new Error('caminho inválido');
   return [
@@ -238,6 +246,7 @@ export function installShortcut({ root, home = os.homedir() } = {}) {
   return file;
 }
 
+/** Apaga o atalho do menu; devolve se ele existia. */
 export function removeShortcut({ home = os.homedir() } = {}) {
   const file = desktopPath(home);
   if (!fs.existsSync(file)) return false;

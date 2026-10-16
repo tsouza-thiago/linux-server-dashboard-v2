@@ -1,7 +1,7 @@
-// Assistente de instalação no Chromium (critério da F7): os 6 passos das pranchetas, nos
+// Assistente de instalação no Chromium : os 6 passos, nos
 // modos assistido e manual, nos 2 temas e no celular, sem erro de JavaScript nem violação
 // de CSP. Servidor, ssh e systemd são falsos (test-support/instalacao-fake.js); o caminho
-// real é testado contra contêineres Debian/Ubuntu (ver docs/PLANO_V2.md, F7).
+// real é testado contra contêineres Debian/Ubuntu (scripts/e2e-instalacao/rodar.sh).
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { createWizardApp } from '../../server/setup/web.js';
@@ -10,6 +10,9 @@ import { makeInstalacao } from '../../test-support/instalacao-fake.js';
 
 let chromium = null;
 try { ({ chromium } = await import('playwright-core')); } catch { /* sem playwright-core */ }
+// No CI (E2E_OBRIGATORIO=1) o e2e não pode pular calado: sem navegador, a suíte falha.
+const OBRIGATORIO = process.env.E2E_OBRIGATORIO === '1';
+if (OBRIGATORIO && !chromium) throw new Error('E2E_OBRIGATORIO=1, mas o playwright-core não está instalado');
 
 async function setup(t, { viewport, theme, server } = {}) {
   if (!chromium) return { skip: 'playwright-core não instalado' };
@@ -19,10 +22,11 @@ async function setup(t, { viewport, theme, server } = {}) {
   const { server: http, port } = await listen(app);
   let browser;
   try {
-    browser = await chromium.launch();
+    browser = await chromium.launch({ executablePath: process.env.CHROMIUM || undefined });
   } catch (err) {
     await close(http);
     fake.cleanup();
+    if (OBRIGATORIO) throw err;
     return { skip: `Chromium indisponível: ${err.message.split('\n')[0]}` };
   }
   const page = await browser.newPage({ viewport: viewport || { width: 1280, height: 900 } });

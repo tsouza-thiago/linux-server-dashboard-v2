@@ -1,3 +1,4 @@
+// Regras de alerta: chaves estáveis (B3), limiares padrão e histerese.
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { evaluate, rulesFor, ramPct, OFFLINE_KEY } from '../../server/alerts/rules.js';

@@ -1,3 +1,4 @@
+// Histórico pela API: migração da V1 na 1ª subida e /api/history (amostras e baldes).
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';

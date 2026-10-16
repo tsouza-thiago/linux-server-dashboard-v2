@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # ============================================================
-# Instalação de ponta a ponta (critério de saída da F7), em contêineres:
+# Instalação de ponta a ponta (o teste mais completo da instalação), em contêineres:
 #   A · Debian 12 limpo  → servidor Debian 12: --sem-interface, diagnosticar,
 #       atualizar (tag assinada; a sem assinatura é ignorada) e desinstalar
 #   B · Ubuntu 24.04 limpo → servidor Ubuntu 24.04: assistente no navegador

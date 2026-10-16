@@ -1,4 +1,4 @@
-// Design system V2 (D1): os tokens de public/css/tokens.css garantem contraste AA nos dois
+// Design system V2 (ADR 0009): os tokens de public/css/tokens.css garantem contraste AA nos dois
 // temas — todo texto ≥ 4,5:1 sobre as superfícies onde aparece, selos de status sobre o seu
 // próprio fundo e as cores das séries ≥ 3:1 (elemento gráfico) sobre o cartão.
 import test from 'node:test';
@@ -78,6 +78,6 @@ for (const theme of ['dark', 'light']) {
 test('tokens: as séries seguem a ordem fixa aprovada (CPU, RAM, disco, temperatura)', () => {
   assert.deepEqual(['s1', 's2', 's3', 's4'].map((k) => tokens('dark')[k]), ['#0E9CB0', '#8064F0', '#D84B8A', '#3F86E8']);
   assert.deepEqual(['s1', 's2', 's3', 's4'].map((k) => tokens('light')[k]), ['#0B8FA3', '#6D4FE0', '#D23F7E', '#2F6FD6']);
-  assert.equal(tokens('dark').bg, '#07090E', 'escuro é o padrão (D1)');
+  assert.equal(tokens('dark').bg, '#07090E', 'escuro é o padrão (ADR 0009)');
   assert.equal(tokens('light').glow, '0', 'sem brilho no tema claro');
 });

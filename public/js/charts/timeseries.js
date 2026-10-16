@@ -1,11 +1,13 @@
-// Gráficos de série temporal com uPlot (ADR 0004) no visual da V2 (D1): linhas de 2 px com
+// Gráficos de série temporal com uPlot (ADR 0004) no visual da V2 (ADR 0009): linhas de 2 px com
 // halo no escuro, preenchimento em degradê, limites tracejados, marcas de anotação e dica
 // flutuante com todos os valores do instante. Eixo de tempo REAL (B10), buracos visíveis,
 // cursor sincronizado entre os gráficos da tela, arrastar/roda = zoom, duplo clique = volta.
 // Cores vêm dos tokens CSS (--s1..--s4), lidas na criação: trocar o tema recria os gráficos.
+// Gráficos com a mesma chave movem o cursor juntos; cores usadas se o CSS ainda não carregou.
 const SYNC_KEY = 'painel';
 const DEFAULT_COLORS = { s1: '#0E9CB0', s2: '#8064F0', s3: '#D84B8A', s4: '#3F86E8' };
 
+// Valor de um token CSS do tema atual (ou o padrão, fora do navegador).
 const cssVar = (name, fallback) => {
   try {
     return getComputedStyle(document.documentElement).getPropertyValue(name).trim() || fallback;
@@ -14,7 +16,8 @@ const cssVar = (name, fallback) => {
   }
 };
 
-export function themeColors() {
+/** Cores do tema atual para o canvas do uPlot (que não lê CSS sozinho). */
+function themeColors() {
   return {
     s1: cssVar('--s1', DEFAULT_COLORS.s1),
     s2: cssVar('--s2', DEFAULT_COLORS.s2),
@@ -22,9 +25,7 @@ export function themeColors() {
     s4: cssVar('--s4', DEFAULT_COLORS.s4),
     text: cssVar('--text-3', '#8390A4'),
     grid: cssVar('--grid', 'rgba(148,163,184,0.08)'),
-    border: cssVar('--border', 'rgba(148,163,184,0.12)'),
     surface: cssVar('--surface', '#0F141D'),
-    accent: cssVar('--accent', '#3EE0D0'),
     warn: cssVar('--warn', '#F5B83D'),
     crit: cssVar('--crit', '#F0525C'),
     glow: cssVar('--glow', '1') !== '0',
@@ -48,7 +49,7 @@ export function timeTicks(splits, spanSec) {
 }
 
 /** Horário completo da dica: "07/10 15:02". */
-export const tipTime = (sec) => new Date(sec * 1000).toLocaleString('pt-BR', {
+const tipTime = (sec) => new Date(sec * 1000).toLocaleString('pt-BR', {
   day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit', hour12: false,
 });
 
@@ -246,8 +247,9 @@ export function timeChart(el, o) {
   if (!UPlot || !el) return null;
   const {
     series, format = String, height = 220, range, axes = true, interactive = true, tooltip = true,
-    thresholds, annotations, bands, onCursor, onZoom, padRight = 0,
+    thresholds, annotations, bands, onCursor, onZoom,
   } = o;
+  // Cores, formatos e plugins conforme o tipo do gráfico (completo, faixa ou mini).
   const c = themeColors();
   const fmt = (v) => (v === null || v === undefined ? '—' : format(v));
   const axisFmt = (v) => (v === null || v === undefined ? '' : (o.axisFormat || format)(v));
@@ -263,7 +265,7 @@ export function timeChart(el, o) {
     width: Math.max(el.clientWidth, 120),
     height,
     pxAlign: false,
-    padding: axes ? [8, 8 + padRight, 0, 0] : [4, 0, 4, 0],
+    padding: axes ? [8, 8, 0, 0] : [4, 0, 4, 0],
     cursor: interactive
       ? { sync: { key: o.syncKey || SYNC_KEY }, drag: { x: true, y: false }, points: { size: 8, width: 2, fill: c.surface }, y: false }
       : { show: false },
@@ -314,6 +316,7 @@ export function timeChart(el, o) {
   const chart = new UPlot(opts, [[], ...series.map(() => [])], el);
   chart.over?.addEventListener('dblclick', () => { zoomed = false; });
   if (onCursor) chart.over?.addEventListener('mouseleave', () => onCursor(null, chart));
+  // Acompanha a largura do contêiner (menu aberto/fechado, rotação do celular).
   let ro = null;
   if (typeof ResizeObserver === 'function') {
     ro = new ResizeObserver(() => chart.setSize({ width: Math.max(el.clientWidth, 120), height }));

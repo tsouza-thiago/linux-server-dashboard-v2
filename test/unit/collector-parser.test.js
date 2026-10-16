@@ -1,3 +1,4 @@
+// Parser da amostra v2 contra saídas reais anonimizadas (golden) e casos-limite.
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';

@@ -2,21 +2,29 @@
 // dos discos. Sem anterior, com reinício do servidor no meio (contadores zerados) ou com
 // contador que andou para trás, a taxa fica null ("sem dado"), nunca 0 inventado.
 
+// Arredonda, preservando null ("sem dado").
 const round = (v, digits = 2) => (v === null ? null : Number(v.toFixed(digits)));
 
+/** Segundos entre a amostra anterior e a atual (null se não der para saber). */
 function elapsedSec(sample, prev) {
   if (!prev || !prev.ts) return null;
   const sec = (Date.parse(sample.ts) - Date.parse(prev.ts)) / 1000;
   return Number.isFinite(sec) && sec > 0 ? sec : null;
 }
 
+/** O servidor reiniciou entre as duas amostras? (o uptime diminuiu) */
 function rebooted(sample, prev) {
   return sample.uptimeSec !== null && prev.uptimeSec !== null && prev.uptimeSec !== undefined
     && sample.uptimeSec < prev.uptimeSec;
 }
 
+// Quanto o contador andou; contador que voltou ou ausente vira null (nunca negativo).
 const delta = (cur, old) => (cur === null || old === null || old === undefined || cur < old ? null : cur - old);
 
+/**
+ * CPU em % entre duas leituras do /proc/stat: total, usuário, sistema, espera de disco e
+ * steal. O "uso" (pct) não conta o tempo ocioso nem a espera de disco.
+ */
 export function computeCpu(sample, prev) {
   const cur = sample.cpuTicks;
   const old = prev && prev.cpuTicks;
@@ -35,6 +43,7 @@ export function computeCpu(sample, prev) {
   };
 }
 
+/** Download e upload em Mbps (preenche `sample.net`); troca de interface não vira taxa. */
 export function computeNet(sample, prev) {
   const sec = elapsedSec(sample, prev);
   if (!sample.net || !prev || !prev.net || !sec || rebooted(sample, prev)) return;
@@ -45,6 +54,10 @@ export function computeNet(sample, prev) {
   sample.net.txMbps = tx === null ? null : round(tx * 8 / sec / 1e6);
 }
 
+/**
+ * Por disco: leitura e gravação em MB/s (setores de 512 bytes), % do tempo ocupado e
+ * latência média por operação em ms (preenche cada item de `sample.io`).
+ */
 export function computeIo(sample, prev) {
   const sec = elapsedSec(sample, prev);
   if (!sec || !prev || !Array.isArray(prev.io) || rebooted(sample, prev)) return;

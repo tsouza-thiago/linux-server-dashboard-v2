@@ -7,11 +7,19 @@
 // - direto: o painel envia o script inteiro, com o modo ("basico" ou "smart") embutido;
 // - comando forçado: o script fica no authorized_keys e o painel envia só a palavra do
 //   modo, que chega ao script como $SSH_ORIGINAL_COMMAND e é usada apenas num `case`.
+//
+// ATENÇÃO: o TEXTO gerado aqui é gravado no authorized_keys de cada servidor preparado.
+// Mudar uma letra dele (mesmo um espaço) faz a coleta falhar em toda instalação restrita
+// até um `./dashboard reconfigurar`. test/seguranca/cadeia-suprimentos.test.js guarda o
+// hash do script da v2.0.0 e falha se ele mudar. Comentários AQUI, fora das strings, podem.
 import crypto from 'node:crypto';
 import { sanitizeToken } from '../config.js';
 
+/** Versão do formato da saída; o parser compara com a que espera. */
 export const COLLECTOR_VERSION = 2;
-export const MODES = ['basico', 'smart'];
+// basico = tudo menos o SMART; smart = com o teste de saúde dos discos (1 vez por hora).
+const MODES = ['basico', 'smart'];
+// Marca trocada pelo modo no script direto (no forçado, o modo vem do cliente).
 const MODE_PLACEHOLDER = '__MODO__';
 
 /**
@@ -19,6 +27,7 @@ const MODE_PLACEHOLDER = '__MODO__';
  * `smartDevs` (discos com teste SMART) é opcional: sem ele, vale a lista de `devs` (V1).
  */
 export function normalizeTargets({ netIf = '', mounts = ['/'], devs = [], services = [], smartDevs } = {}) {
+  // `one`: um único item (a interface de rede); `many`: lista sem repetição.
   const one = (v) => sanitizeToken(String(v || ''))[0] || '';
   const many = (list) => [...new Set(sanitizeToken((Array.isArray(list) ? list : [list]).join(' ')))];
   const cleanMounts = many(mounts);
@@ -41,10 +50,16 @@ export function targetsHash(targets) {
   return crypto.createHash('sha256').update(canonical).digest('hex').slice(0, 12);
 }
 
+/** Uma seção do script: o marcador `===NOME===` seguido dos comandos dela. */
 function section(name, body) {
   return `echo '===${name}==='; ${body}`;
 }
 
+/**
+ * O script inteiro (com a marca do modo) e o hash dos alvos. Cada seção lê uma fonte do
+ * kernel ou um comando de leitura; as seções opcionais (rede, I/O, SMART, serviços) só
+ * entram quando há alvo configurado.
+ */
 function buildTemplate(targets) {
   const t = normalizeTargets(targets);
   const hash = targetsHash(t);
@@ -52,6 +67,8 @@ function buildTemplate(targets) {
     // No comando forçado, o que o cliente pede só escolhe entre "smart" e "basico": qualquer
     // outro texto vira "basico" e nunca é executado nem ecoado.
     `LC_ALL=C; export LC_ALL; M="\${SSH_ORIGINAL_COMMAND:-${MODE_PLACEHOLDER}}"; case "$M" in smart) ;; *) M=basico;; esac`,
+    // Versão do coletor + hash dos alvos (o painel detecta authorized_keys desatualizado)
+    // + o modo que valeu.
     section('VER', `echo '${COLLECTOR_VERSION} ${hash}'; echo "$M"`),
     section('HOST', 'cat /proc/sys/kernel/hostname'),
     section('OS', "uname -r; grep -E '^(PRETTY_NAME|NAME)=' /etc/os-release 2>/dev/null"),
@@ -60,15 +77,19 @@ function buildTemplate(targets) {
     section('LOAD', 'cat /proc/loadavg'),
     section('STAT', 'head -1 /proc/stat'),
     section('MEM', "grep -E '^(MemTotal|MemFree|MemAvailable|Buffers|Cached|SReclaimable|SwapTotal|SwapFree|Dirty|Writeback):' /proc/meminfo"),
+    // Uma única chamada do df para todas as pastas, em bytes (-B1).
     section('DF', `df -B1 --output=source,target,size,used,avail,pcent,ipcent ${t.mounts.join(' ')} 2>/dev/null`),
   ];
+  // Rede: só a linha da interface escolhida, comparando o nome exato (B2: eth0 ≠ veth0).
   if (t.netIf) {
     parts.push(section('NET', `awk -F: -v i='${t.netIf}' '{n=$1; gsub(/[ \\t]/,"",n)} n==i' /proc/net/dev`));
   }
+  // I/O: só as linhas dos discos escolhidos no /proc/diskstats.
   if (t.devs.length) {
     const cond = t.devs.map((d) => `$3=="${d}"`).join('||');
     parts.push(section('IO', `awk '${cond}' /proc/diskstats`));
   }
+  // Pressão do sistema (PSI) e todos os sensores de temperatura (o parser escolhe o da CPU).
   parts.push(
     section('PSI', 'for f in cpu memory io; do printf \'%s \' "$f"; grep -h . /proc/pressure/$f 2>/dev/null | tr \'\\n\' \' \'; echo; done'),
     section('TEMP', 'for z in /sys/class/thermal/thermal_zone*; do [ -r "$z/temp" ] && printf \'%s %s\\n\' "$(cat "$z/type" 2>/dev/null)" "$(cat "$z/temp" 2>/dev/null)"; done 2>/dev/null; true'),
@@ -86,9 +107,11 @@ function buildTemplate(targets) {
     ].join(' ');
     parts.push(section('SMART', `case "$M" in smart) ${loop};; *) echo pulado;; esac`));
   }
+  // Serviços: `systemctl is-active` só lê o estado.
   if (t.services.length) {
     parts.push(section('SERVICES', `for s in ${t.services.join(' ')}; do printf '%s %s\\n' "$s" "$(systemctl is-active "$s" 2>/dev/null)"; done`));
   }
+  // Os 8 processos que mais usam memória, e o marcador de saída completa.
   parts.push(
     section('PS', 'ps -eo user:32,pid,pcpu,pmem,rss,etimes,args --sort=-rss 2>/dev/null | head -9'),
     "echo '===FIM==='",

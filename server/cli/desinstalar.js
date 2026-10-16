@@ -1,15 +1,15 @@
-// `dashboard desinstalar` (seção 11): remove o serviço, o atalho e os arquivos locais e
+// `dashboard desinstalar`: remove o serviço, o atalho e os arquivos locais e
 // oferece limpar o servidor (usuário dashmon, chave e regra de sudo) — com os comandos
 // exibidos antes e a senha usada uma vez, como no assistente.
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import readline from 'node:readline';
-import { removalScript, assistedScript, completedSteps } from '../setup/preparo.js';
+import { removalScript, assistedScript, completedSteps, SUDOERS } from '../setup/preparo.js';
 import { runAdmin, describeAdminError } from '../setup/remoto.js';
 import { removeService, removeShortcut } from '../setup/local.js';
 import { currentServer } from '../setup/instalacao.js';
-import { validUser } from '../setup/acesso.js';
+import { validUser, PANEL_USER } from '../setup/acesso.js';
 import { stopPanel } from './servico.js';
 import { keyFileFromConfig } from './diagnosticar.js';
 import { parseFlags } from './instalar.js';
@@ -18,6 +18,7 @@ import { parseFlags } from './instalar.js';
 export function ask(question, { secret = false, input = process.stdin, output = process.stdout } = {}) {
   return new Promise((resolve) => {
     const rl = readline.createInterface({ input, output, terminal: Boolean(input.isTTY) });
+    // Senha: no terminal, cada caractere aparece como "•" (a pergunta continua visível).
     if (secret && input.isTTY) {
       rl._writeToOutput = (s) => { if (s.includes(question)) output.write(s); else if (!/[\r\n]/.test(s)) output.write('•'); };
     }
@@ -25,8 +26,14 @@ export function ask(question, { secret = false, input = process.stdin, output = 
   });
 }
 
+// "s", "sim", "y" ou "yes" (sem diferenciar maiúsculas) contam como sim.
 const yes = (a) => /^(s|sim|y|yes)$/i.test(String(a || '').trim());
 
+/**
+ * `./dashboard desinstalar`: pede confirmação (ou --sim), oferece limpar o servidor, remove o
+ * serviço, o atalho, a chave e a configuração local, e pergunta se apaga o histórico.
+ * Opções: --sim, --limpar-servidor, --usuario, --senha-stdin, --apagar-historico.
+ */
 export async function desinstalar({ out, root, args = [], home = os.homedir(), deps = {} }) {
   const flags = parseFlags(args);
   const askFn = deps.ask ?? ask;
@@ -46,9 +53,9 @@ export async function desinstalar({ out, root, args = [], home = os.homedir(), d
   const knownHosts = path.join(root, 'data', 'ssh', 'known_hosts');
   if (server && fs.existsSync(knownHosts)) {
     out.line();
-    out.line('No servidor ficaram: o usuário dashmon (com a chave restrita) e a regra de sudo do smartctl.');
+    out.line(`No servidor ficaram: o usuário ${PANEL_USER} (com a chave restrita) e a regra de sudo do smartctl.`);
     out.line(out.c.dim('Para remover à mão, rode no servidor:'));
-    out.line(out.c.dim('  sudo userdel -r dashmon; sudo rm -f /etc/sudoers.d/dashboard'));
+    out.line(out.c.dim(`  sudo userdel -r ${PANEL_USER}; sudo rm -f ${SUDOERS}`));
     const want = flags['limpar-servidor'] || (interactive && !flags.sim && yes(await askFn(`Quer que eu faça isso agora em ${server.host}? Precisa de um usuário com sudo. [s/N] `)));
     if (want) {
       const user = String(flags.usuario || (interactive ? await askFn('Usuário administrador no servidor: ') : '')).trim();
@@ -56,12 +63,13 @@ export async function desinstalar({ out, root, args = [], home = os.homedir(), d
         out.fail('usuário inválido: o servidor não foi alterado');
       } else {
         const senha = flags['senha-stdin'] || interactive ? String(await askFn(`Senha de ${user} (em branco = sua chave SSH): `, { secret: true })) : '';
+        // Como o script vai virar root: já é root, sudo com a senha ou sudo sem senha.
         const sudo = user === 'root' ? 'root' : senha ? 'senha' : 'nopasswd';
         const r = await (deps.runAdmin ?? runAdmin)({
           host: server.host, port: server.port, user, password: senha, knownHosts,
           script: assistedScript(removalScript(), { sudo, password: senha }), timeoutMs: 60000,
         });
-        if (r.code === 0 && completedSteps(r.stdout).includes('removido')) out.ok('servidor limpo', 'usuário dashmon e regra de sudo removidos');
+        if (r.code === 0 && completedSteps(r.stdout).includes('removido')) out.ok('servidor limpo', `usuário ${PANEL_USER} e regra de sudo removidos`);
         else out.fail('não consegui limpar o servidor', /^@@erro senha$/m.test(r.stdout) ? 'o sudo recusou a senha' : describeAdminError(r));
       }
     } else {
@@ -75,6 +83,7 @@ export async function desinstalar({ out, root, args = [], home = os.homedir(), d
   if ((deps.removeService ?? removeService)({ home })) out.ok('serviço de usuário removido');
   if (removeShortcut({ home })) out.ok('atalho do menu removido');
   const key = keyFileFromConfig(root);
+  // Só apaga a chave se ela for do painel (nome dashboard*): nunca a chave pessoal de alguém.
   if (key && path.basename(key).startsWith('dashboard') && fs.existsSync(key)) {
     fs.rmSync(key, { force: true });
     fs.rmSync(`${key}.pub`, { force: true });

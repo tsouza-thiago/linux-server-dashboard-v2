@@ -8,15 +8,17 @@ import { Instalacao } from '../server/setup/instalacao.js';
 import { parseOutput } from '../server/collector/parser.js';
 import { targetsHash } from '../server/collector/builder.js';
 
+// Detecção de um Debian 12 (fixture anônima) e uma chave pública de exemplo do servidor.
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 export const FIXTURE = fs.readFileSync(path.join(HERE, '..', 'test', 'fixtures', 'instalacao', 'deteccao-debian12.txt'), 'utf8');
 const ED = 'AAAAC3NzaC1lZDI1NTE5AAAAICLXaq8Zb0WG4QWeKtFRHjyahVNxZFkczJ5it2xMlpU2';
 
 /** Servidor falso: responde à detecção, ao preparo e às coletas. */
-export function fakeServer({ sudoOk = true, smartPerm = true, detection = FIXTURE } = {}) {
+function fakeServer({ sudoOk = true, smartPerm = true, detection = FIXTURE } = {}) {
   const calls = [];
   const srv = {
     calls,
+    // Conexão do administrador: senha "certa" passa; detecção, conferência e preparo.
     async runAdmin(opts) {
       calls.push({ kind: 'admin', password: opts.password, script: opts.script });
       if (opts.password && opts.password !== 'certa') return { code: 255, stdout: '', stderr: 'Permission denied (password).' };
@@ -27,6 +29,7 @@ export function fakeServer({ sudoOk = true, smartPerm = true, detection = FIXTUR
       srv.prepared = opts.script;
       return { code: 0, stdout: '@@ok usuario\n@@ok chave\n@@ok sudoers\n', stderr: '' };
     },
+    // Coleta de teste: só depois do preparo; monta uma saída mínima com o hash dos alvos.
     async collect({ targets, access, runner }) {
       calls.push({ kind: 'collect', targets, access, runner });
       if (!srv.dashmon) return { ok: false, error: 'SSH falhou (exit 255) — host não encontrado ou chave inválida' };
@@ -49,6 +52,10 @@ export function fakeServer({ sudoOk = true, smartPerm = true, detection = FIXTUR
 }
 
 
+/**
+ * Instalação pronta para teste: pastas temporárias de projeto e de home, servidor falso,
+ * systemd falso. Devolve { inst, srv, root, home, services, cleanup }.
+ */
 export function makeInstalacao(serverOpts = {}) {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), 'dash-inst-'));
   const home = fs.mkdtempSync(path.join(os.tmpdir(), 'dash-inst-home-'));

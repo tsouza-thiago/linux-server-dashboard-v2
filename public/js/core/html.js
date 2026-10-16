@@ -1,11 +1,18 @@
 // Template `html` com escape automático (ADR 0010): toda interpolação é escapada; HTML
 // cru só entra por `raw()`, explícito e fácil de auditar (grep "raw(").
+//
+// Uso: html`<p title="${titulo}">${texto}</p>` devolve um SafeHtml; `mount(el, ...)` o
+// coloca na tela. Interpolar outro html`` não escapa de novo (ele já é seguro); listas
+// são concatenadas; null, undefined e false somem.
+// As 6 trocas que impedem sair do texto ou do atributo (inclusive a crase).
 const ESC = { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;', '`': '&#96;' };
 
+/** Texto com os caracteres especiais do HTML trocados por entidades. */
 export function escape(value) {
   return String(value ?? '').replace(/[&<>"'`]/g, (c) => ESC[c]);
 }
 
+// HTML que o próprio código montou (e por isso já está escapado).
 class SafeHtml {
   constructor(text) { this.text = text; }
   toString() { return this.text; }
@@ -14,6 +21,7 @@ class SafeHtml {
 /** Marca um trecho como HTML já seguro. Use só com texto produzido pelo próprio código. */
 export const raw = (text) => new SafeHtml(String(text));
 
+/** Uma interpolação do template: SafeHtml entra como está, o resto é escapado. */
 function piece(value) {
   if (value instanceof SafeHtml) return value.text;
   if (Array.isArray(value)) return value.map(piece).join('');
@@ -53,4 +61,3 @@ export function mount(el, template) {
   applyDataStyles(el);
 }
 
-export const isSafe = (v) => v instanceof SafeHtml;

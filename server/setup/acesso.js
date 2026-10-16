@@ -2,11 +2,14 @@
 // a linha do authorized_keys do usuário dashmon, a linha do sudoers (cada disco listado,
 // sem curinga) e o arquivo de configuração SSH próprio do painel (data/ssh/config).
 // Tudo é validado aqui antes de virar texto: nada do que a pessoa digita chega cru a um
-// arquivo de configuração ou a um comando (espelha o install-lib.sh da V1).
+// arquivo de configuração ou a um comando.
 import { buildForcedScript, normalizeTargets } from '../collector/builder.js';
 
+/** Usuário que o painel cria no servidor (sem senha; só roda a coleta). */
 export const PANEL_USER = 'dashmon';
+/** Nome do servidor no data/ssh/config (o SSH_HOST que a instalação grava). */
 export const SSH_ALIAS = 'servidor';
+/** Comentário da chave no authorized_keys (identifica a linha do painel). */
 export const KEY_COMMENT = 'server-dashboard';
 
 /** Endereço do servidor: IP ou nome, [A-Za-z0-9._-:] (IPv6 sem colchetes), sem '-' no início. */
@@ -87,6 +90,7 @@ export function sudoersLine({ devs, smartctl = '/usr/sbin/smartctl', user = PANE
   return `${user} ALL=(root) NOPASSWD: ${list.map((d) => `${smartctl} -H /dev/${d}`).join(', ')}`;
 }
 
+// Caminho entre aspas para o ssh_config; aspas e quebras de linha não têm escape seguro lá.
 const quotePath = (p) => {
   if (/["\r\n\0]/.test(p)) throw new Error(`caminho não suportado: ${p}`);
   return `"${p}"`;

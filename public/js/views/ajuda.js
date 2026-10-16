@@ -1,15 +1,19 @@
-// 8. Ajuda (prancheta "V2 · Ajuda"): o que fazer em cada alerta, como ler o painel, atalhos,
+// 8. Ajuda: o que fazer em cada alerta, como ler o painel, atalhos,
 // configuração ativa (só leitura, sem segredos), acesso ao servidor (chave restrita e sudo do
 // SMART, com a linha do sudoers pronta para copiar), versões e sessão.
 import { html, mount } from '../core/html.js';
 import * as f from '../core/format.js';
 import { $, icon, iconBox, panelHead } from './common.js';
 
+/** Subtítulo da tela. */
 export const sub = () => 'Como ler o painel, o que fazer em cada alerta e como ele está configurado';
 
+// Link do tutorial completo no GitHub (abre em outra aba).
 const TUTORIAL = 'https://github.com/tsouza-thiago/linux-server-dashboard-v2/blob/main/TUTORIAL.md';
+/** Botões no topo da tela. */
 export const actions = () => html`<a class="btn btn-surface" href="${TUTORIAL}" target="_blank" rel="noopener noreferrer">Abrir o tutorial completo <span class="ink-3 mono">TUTORIAL.md</span></a>`;
 
+/** "O que fazer" em cada tipo de alerta, com os limiares atuais. */
 function whatToDo(t) {
   const row = (level, ic, title, text) => html`<div class="help-row">${iconBox(level, ic)}<div><span class="help-title">${title}</span><span class="help-text">${text}</span></div></div>`;
   return html`
@@ -20,6 +24,7 @@ function whatToDo(t) {
     ${row('crit', 'outage', 'Servidor inacessível · serviço parado', 'Confira se o servidor está ligado e na rede. O painel tenta de novo a cada coleta e se recupera sozinho.')}`;
 }
 
+/** Como ler o painel (saúde, cores, gráficos). */
 function howToRead() {
   const k = (x) => html`<kbd>${x}</kbd>`;
   const sw = (c) => html`<span class="swatch c-${c}"></span>`;
@@ -39,6 +44,7 @@ function howToRead() {
     </div>`;
 }
 
+/** Configuração ativa (só leitura, vinda de /api/config: sem segredos). */
 function config(state) {
   const c = state.config;
   if (!c) return html`<p class="empty">Carregando configuração…</p>`;
@@ -62,6 +68,7 @@ function config(state) {
   </tbody></table>`;
 }
 
+/** Acesso ao servidor: modo, linha do sudoers para copiar, versões e sessão. */
 function access(state) {
   const c = state.config;
   const s = state.sample;
@@ -101,6 +108,7 @@ function access(state) {
     </div>` : ''}`;
 }
 
+/** Monta a tela inteira. */
 export function render(ctx) {
   mount(ctx.el, html`
     <div class="grid-2">
@@ -134,6 +142,7 @@ export function render(ctx) {
   update(ctx);
 }
 
+/** Atualiza só o que muda com os dados novos. */
 export function update(ctx) {
   const t = ctx.state.meta?.thresholds || ctx.state.config?.thresholds || {};
   mount($('#aj-todo', ctx.el), whatToDo(t));

@@ -1,9 +1,9 @@
-// `./dashboard instalar --sem-interface` (D10): os mesmos passos sem perguntas, por
+// `./dashboard instalar --sem-interface` (ADR 0011): os mesmos passos sem perguntas, por
 // opções, para quem automatiza. A identidade do servidor precisa ser informada
 // (--identidade SHA256:…) — nada de aceitar a primeira que aparecer — e a senha, quando
 // houver, vem pelo stdin (--senha-stdin), nunca pela linha de comando.
-import { THRESHOLD_LIMITS } from './instalacao.js';
 
+/** Texto de `--sem-interface --ajuda` (as opções são conferidas pelo docs.test.js). */
 export const HEADLESS_HELP = `Uso: ./dashboard instalar --sem-interface --servidor <ip> --usuario <nome> --identidade <SHA256:…> [opções]
 
   --porta <n>             porta SSH (padrão 22)
@@ -13,7 +13,7 @@ export const HEADLESS_HELP = `Uso: ./dashboard instalar --sem-interface --servid
   --smart "<sda sdb>"     discos com teste SMART, ou "nenhum" (padrão: os recomendados)
   --rede <interface>      interface de rede, ou "nenhuma" (padrão: a da rota padrão)
   --servicos "<a b>"      serviços, ou "nenhum" (padrão: os recomendados)
-  --disco <%> --memoria <%> --temperatura <°C>   limiares (padrão 90 / 90 / 60)
+  --disco <%> --memoria <%> --temperatura <°C>   limiares (padrão: os do .env; 90 / 90 / 60 se não houver)
   --modo manual           só mostra os blocos para colar no servidor e sai (código 3)
   --ja-preparado          o servidor já foi preparado à mão: só testa e conclui
   --sem-origem            não limita a chave a este computador (sem from=)
@@ -21,8 +21,10 @@ export const HEADLESS_HELP = `Uso: ./dashboard instalar --sem-interface --servid
   --sem-atalho            não cria o atalho no menu
 `;
 
+// Lista de uma opção: ausente = undefined (usa a recomendação); a palavra `none` = vazia.
 const list = (v, none) => (v === undefined ? undefined : String(v).trim() === none ? [] : String(v).split(/[\s,]+/).filter(Boolean));
 
+/** 1ª linha do stdin (a senha), sem guardar o resto. */
 async function readLine(stream) {
   let data = '';
   for await (const chunk of stream) {
@@ -32,6 +34,10 @@ async function readLine(stream) {
   return data.split('\n')[0].replace(/\r$/, '');
 }
 
+/**
+ * Instalação sem perguntas. Códigos de saída: 0 pronto, 2 erro de uso ou do servidor,
+ * 3 modo manual (os blocos foram mostrados; rode de novo com --ja-preparado).
+ */
 export async function runHeadless({ out, inst, flags, stdin = process.stdin }) {
   const fail = (msg, how) => { out.fail(msg); if (how) out.explain('', how); return 2; };
   if (flags.ajuda || flags.help) { out.line(HEADLESS_HELP); return 0; }
@@ -51,9 +57,11 @@ export async function runHeadless({ out, inst, flags, stdin = process.stdin }) {
     const det = await inst.conectar({ senha, confirmo: true });
     out.ok(`conectado como ${det.usuario}`, det.sudoTexto);
     const rec = det.escolhas;
+    // Só o limiar informado na linha de comando muda; os outros ficam como estão no .env
+    // (definirEscolhas usa os lidos na conexão, ou o padrão numa instalação nova).
     const lim = {};
     for (const [key, flag] of [['diskPct', 'disco'], ['ramPct', 'memoria'], ['tempC', 'temperatura']]) {
-      lim[key] = flags[flag] !== undefined ? Number(flags[flag]) : THRESHOLD_LIMITS[key][2];
+      if (flags[flag] !== undefined) lim[key] = Number(flags[flag]);
     }
     const ch = inst.definirEscolhas({
       mounts: list(flags.pastas, '') ?? rec.mounts,

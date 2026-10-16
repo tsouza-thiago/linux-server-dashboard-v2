@@ -1,4 +1,4 @@
-// A documentação bate com o código (critério de saída da F8). Cada fato que a documentação
+// A documentação bate com o código. Cada fato que a documentação
 // afirma e que dá para conferir sozinho é conferido aqui: links, arquivos citados, comandos e
 // opções do ./dashboard, scripts do npm, variáveis do .env (nomes, padrões e faixas), rotas
 // da API, versões das bibliotecas, o exemplo do comando de coleta e os IPs de exemplo.
@@ -88,7 +88,7 @@ test('docs: arquivos e pastas citados existem', () => {
 test('docs: subcomandos e opções do ./dashboard existem', () => {
   const problems = [];
   const knownFlag = (f) => cliSource.includes(`--${f}`) || cliSource.includes(`flags['${f}']`) || new RegExp(`flags\\.${f}\\b`).test(cliSource);
-  for (const file of [...MAIN_DOCS, ...ADRS, 'docs/PLANO_V2.md']) {
+  for (const file of [...MAIN_DOCS, ...ADRS]) {
     for (const [, sub, rest] of read(file).matchAll(/\.\/dashboard(?:[ \t]+([a-z][a-z0-9-]*))?([^`|\n#]*)/g)) {
       if (sub && !COMMAND_NAMES.includes(sub)) problems.push(`${file}: ./dashboard ${sub}`);
       for (const [, flag] of rest.matchAll(/--([a-z][a-z0-9-]*)/g)) {
@@ -286,6 +286,20 @@ test('docs: cada ameaça do SECURITY diz que teste a confere', () => {
     assert.ok(verified, `"${title}" sem "Verificado por"`);
     const tests = [...verified[1].matchAll(/`((?:test|scripts)\/[^`]+)`/g)].map((m) => m[1]);
     assert.ok(tests.length, `"${title}": "Verificado por" sem arquivo de teste`);
+  }
+});
+
+test('docs: o SECURITY cobre as 10 categorias do OWASP Top 10:2025, cada uma com teste que existe', () => {
+  const md = read('SECURITY.md');
+  const start = md.indexOf('## OWASP Top 10:2025');
+  assert.ok(start > 0, 'seção "OWASP Top 10:2025" no SECURITY');
+  const section = md.slice(start, md.indexOf('\n## ', start + 3));
+  const linhas = section.split('\n').filter((l) => /^\| A\d{2} /.test(l));
+  assert.deepEqual(linhas.map((l) => l.slice(2, 5)), ['A01', 'A02', 'A03', 'A04', 'A05', 'A06', 'A07', 'A08', 'A09', 'A10']);
+  for (const l of linhas) {
+    const testes = [...l.matchAll(/`((?:test|scripts)\/[^`]+)`/g)].map((m) => m[1]);
+    assert.ok(testes.length, `${l.slice(0, 40)}: sem teste`);
+    for (const t of testes) assert.ok(fs.existsSync(path.join(ROOT, t)), `${t} não existe`);
   }
 });
 

@@ -1,5 +1,8 @@
+// Cliente HTTP e SSE dos testes de integração: sobe o app numa porta livre de 127.0.0.1 e
+// faz pedidos com Host: localhost (o Host check recusaria outro nome).
 import http from 'node:http';
 
+/** Sobe o app numa porta livre de 127.0.0.1; devolve { server, port, base }. */
 export function listen(app) {
   return new Promise((resolve, reject) => {
     const server = app.listen(0, '127.0.0.1', () => {
@@ -10,18 +13,27 @@ export function listen(app) {
   });
 }
 
+/** Fecha o servidor e espera as conexões terminarem. */
 export function close(server) {
   return new Promise((resolve) => server.close(() => resolve()));
 }
 
+/**
+ * Um pedido HTTP. `body` objeto vira JSON. Devolve { status, headers, text, json }
+ * (json é null quando a resposta não é JSON).
+ */
 export function request(port, { method = 'GET', path = '/', headers = {}, body } = {}) {
+  // O corpo vai com Content-Length: sem ele, num DELETE o Node não enquadra o corpo e o
+  // servidor leria esses bytes como uma segunda requisição (inválida).
+  const payload = body === undefined ? undefined : Buffer.from(typeof body === 'string' ? body : JSON.stringify(body));
+  const framing = payload ? { 'Content-Length': payload.length } : {};
   return new Promise((resolve, reject) => {
     const req = http.request({
       host: '127.0.0.1',
       port,
       method,
       path,
-      headers: { Host: 'localhost', ...headers },
+      headers: { Host: 'localhost', ...framing, ...headers },
     }, (res) => {
       const chunks = [];
       res.on('data', (c) => chunks.push(c));
@@ -33,13 +45,15 @@ export function request(port, { method = 'GET', path = '/', headers = {}, body }
       });
     });
     req.on('error', reject);
-    if (body !== undefined) {
-      req.write(typeof body === 'string' ? body : JSON.stringify(body));
-    }
+    if (payload) req.write(payload);
     req.end();
   });
 }
 
+/**
+ * Lê o SSE até chegarem `until` eventos (blocos separados por linha em branco) ou o tempo
+ * acabar; então corta a conexão. No tempo esgotado devolve { timeout: true }.
+ */
 export function readSSE(port, { path = '/api/stream', headers = {}, until = 2, timeoutMs = 2000 } = {}) {
   return new Promise((resolve, reject) => {
     let settled = false;

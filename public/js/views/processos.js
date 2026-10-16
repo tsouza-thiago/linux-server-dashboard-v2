@@ -1,12 +1,14 @@
-// 5. Processos & serviços (prancheta "V2 · Processos & serviços"): estado de cada serviço
+// 5. Processos & serviços: estado de cada serviço
 // monitorado com o histórico de quedas, os processos que mais usam memória (busca e
 // ordenação sobrevivem às atualizações ao vivo) e para onde vai a memória.
 import { html, mount } from '../core/html.js';
 import * as f from '../core/format.js';
 import { $, iconBox, meter, panelHead } from './common.js';
 
+/** Subtítulo da tela. */
 export const sub = () => 'Serviços monitorados e os processos que mais usam memória, na última coleta';
 
+// Colunas da tabela de processos (ordenáveis).
 const COLS = [
   { key: 'pid', label: 'PID', num: true },
   { key: 'cmd', label: 'Comando' },
@@ -16,13 +18,15 @@ const COLS = [
   { key: 'cpu', label: 'CPU média*', num: true },
   { key: 'etimesSec', label: 'Rodando há', num: true },
 ];
+// Estado do systemd → [nível, texto, ícone]; o resto é parado (crítico).
 const SVC = {
   active: ['ok', 'ativo', 'check'], reloading: ['ok', 'recarregando', 'check'], activating: ['warn', 'iniciando', 'warn'],
   desconhecido: ['neutral', 'sem resposta', 'serious'],
 };
+// Busca e ordenação da tabela (ficam enquanto a tela está aberta).
 const view = { filter: '', sort: { key: 'mem', dir: -1 } };
-const cmdName = (cmd = '') => (cmd.split(/\s+/)[0] || '').split('/').pop() || cmd;
 
+/** Um cartão por serviço, com o histórico de quedas. */
 function services(state) {
   const list = Object.entries(state.sample?.services || {});
   const all = state.alerts?.all || [];
@@ -44,6 +48,7 @@ function services(state) {
     </article>`;
 }
 
+/** Linhas da tabela de processos, filtradas e ordenadas. */
 function rows(s) {
   const q = view.filter.toLowerCase();
   const { key, dir } = view.sort;
@@ -59,7 +64,7 @@ function rows(s) {
   const maxMem = Math.max(...(s.topProcs || []).map((p) => p.mem || 0), 1);
   return list.map((p) => html`<tr>
     <td class="ink-3">${p.pid}</td>
-    <td title="${p.cmd}">${cmdName(p.cmd)}</td>
+    <td title="${p.cmd}">${f.cmdName(p.cmd)}</td>
     <td class="ink-2">${p.user}</td>
     <td class="num"><span class="mem-cell">${meter({ pct: ((p.mem || 0) / maxMem) * 100, color: 's2' }, { size: 'sm' })}${f.pct(p.mem, 1)}</span></td>
     <td class="num ink-2">${f.bytes(typeof p.rssKB === 'number' ? p.rssKB * 1024 : null)}</td>
@@ -67,6 +72,7 @@ function rows(s) {
     <td class="num ink-2">${f.duration(p.etimesSec)}</td></tr>`);
 }
 
+/** Cabeçalho da tabela com a ordenação atual. */
 function head() {
   return html`<tr>${COLS.map((c) => {
     const on = view.sort.key === c.key;
@@ -75,6 +81,7 @@ function head() {
   })}</tr>`;
 }
 
+/** "Para onde vai a memória": usada, cache, disponível e os maiores processos. */
 function memory(s) {
   const r = s?.ram;
   const procs = (s?.topProcs || []).slice().sort((a, b) => (b.rssKB ?? 0) - (a.rssKB ?? 0));
@@ -91,13 +98,14 @@ function memory(s) {
     ...top2.map((p, i) => ({ pct: pct(mb(p.rssKB)), color: 's2', op: 1 - i * 0.2 })),
     { pct: pct(restMb), color: 's2', op: 0.6 }, { pct: pct(othersMb), color: 's2', op: 0.35 }], { size: 'lg mem-split' })}
     <div class="kv-list">
-      ${top2.map((p) => html`<div class="kv"><span>${cmdName(p.cmd)}</span><span class="mono ink-2">${f.bytes(p.rssKB * 1024)}</span></div>`)}
+      ${top2.map((p) => html`<div class="kv"><span>${f.cmdName(p.cmd)}</span><span class="mono ink-2">${f.bytes(p.rssKB * 1024)}</span></div>`)}
       ${rest.length ? html`<div class="kv"><span>outros ${rest.length} do topo</span><span class="mono ink-2">${f.mb(restMb)}</span></div>` : ''}
       <div class="kv"><span>demais processos e kernel</span><span class="mono ink-2">${f.mb(othersMb)}</span></div>
       <div class="kv sep"><span class="ink-2">disponível</span><span class="mono ink-2">${f.mb(r.avail)}</span></div>
     </div>`;
 }
 
+/** Monta a tela inteira. */
 export function render(ctx) {
   mount(ctx.el, html`
     <section class="grid-cards svc-grid" aria-label="Serviços monitorados" id="pr-services"></section>
@@ -130,6 +138,7 @@ export function render(ctx) {
   update(ctx);
 }
 
+/** Atualiza só o que muda com os dados novos. */
 export function update(ctx) {
   const s = ctx.state.sample;
   mount($('#pr-services', ctx.el), services(ctx.state));
@@ -138,4 +147,5 @@ export function update(ctx) {
   mount($('#pr-memory', ctx.el), memory(s));
 }
 
+/** Leva o cursor à busca de processos (tecla /). */
 export const focusSearch = (ctx) => $('#pr-filter', ctx.el)?.focus();

@@ -1,5 +1,5 @@
-/* Tokens do design system V2 (D1: Aurora + Cockpit, escuro primeiro).
-   Fonte: pranchetas "V2 · Design system" e "V2 · Visão geral" do canvas aprovado.
+/* Tokens do design system V2 (ADR 0009: Aurora + Cockpit, escuro primeiro): cores,
+   tipografia, espaços, raios e movimento. Todo o CSS usa só estes nomes.
    O tema escuro é o padrão e a referência; o claro é a variante com os mesmos nomes.
    Contraste dos textos sobre as superfícies conferido em test/unit/design-tokens.test.js. */
 
@@ -47,7 +47,6 @@
   --warn: #F5B83D;
   --warn-soft: rgba(245, 184, 61, 0.14);
   --warn-ink: #FCD34D;
-  --serious: #F97A4A;
   --serious-soft: rgba(249, 122, 74, 0.14);
   --serious-ink: #FDBA8C;
   --crit: #F0525C;
@@ -79,16 +78,10 @@
   --fs-section: 16px;
   --fs-body: 15px;
   --fs-small: 14px;
-  --fs-caption: 12px;
   --fs-number: 38px;
 
   /* Espaço, raio, toque e movimento */
-  --sp-1: 4px;
-  --sp-2: 8px;
-  --sp-3: 12px;
   --sp-4: 16px;
-  --sp-5: 24px;
-  --sp-6: 32px;
   --r-1: 8px;
   --r-2: 12px;
   --r-3: 18px;
@@ -121,7 +114,7 @@
   --accent-soft: rgba(11, 143, 163, 0.08);
   --accent-line: rgba(11, 143, 163, 0.35);
   --on-accent: #FFFFFF;
-  /* Prancheta usa #0B8FA3 sob o texto branco (3,8:1); escurecido até o AA (4,6:1). */
+  /* #0B8FA3 sob texto branco daria 3,8:1; escurecido até o AA (4,6:1). */
   --accent-strong: #0A8193;
   --focus: rgba(11, 143, 163, 0.6);
 
@@ -134,10 +127,9 @@
   --ok: #12A15C;
   --ok-soft: #E4F6EC;
   --ok-ink: #0A6E3E;
-  --warn: #B98009; /* prancheta: #C98A0B (2,95:1); escurecido para 3:1 em linhas e marcas */
+  --warn: #B98009; /* o original #C98A0B dava 2,95:1; escurecido para 3:1 em linhas e marcas */
   --warn-soft: #FDF1D8;
   --warn-ink: #8A5A00;
-  --serious: #D9622B;
   --serious-soft: #FDEBDD;
   --serious-ink: #9A3E12;
   --crit: #D03340;

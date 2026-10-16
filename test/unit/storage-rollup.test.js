@@ -1,3 +1,4 @@
+// Agregados de 5 min: só baldes completos, consulta por intervalo, 90 dias e linhas ruins.
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';

@@ -7,9 +7,11 @@ import net from 'node:net';
 import os from 'node:os';
 import path from 'node:path';
 
+// O binário do sshd (Debian/Ubuntu e outras distribuições).
 const SSHD = ['/usr/sbin/sshd', '/usr/bin/sshd'].find((p) => fs.existsSync(p));
 
-export const hasSsh = () => {
+/** Há ssh, ssh-keygen e sshd nesta máquina? */
+const hasSsh = () => {
   try {
     execFileSync('ssh', ['-V'], { stdio: 'ignore' });
     execFileSync('ssh-keygen', ['-?'], { stdio: 'ignore' });
@@ -19,6 +21,7 @@ export const hasSsh = () => {
   return Boolean(SSHD);
 };
 
+/** Uma porta livre em 127.0.0.1 (o sistema escolhe). */
 async function freePort() {
   const srv = net.createServer();
   await new Promise((r) => srv.listen(0, '127.0.0.1', r));
@@ -27,11 +30,16 @@ async function freePort() {
   return port;
 }
 
+/** Gera uma chave ed25519 sem senha em `file`; devolve a linha pública. */
 export function keygen(file, comment = 'teste') {
   execFileSync('ssh-keygen', ['-q', '-t', 'ed25519', '-N', '', '-C', comment, '-f', file]);
   return fs.readFileSync(`${file}.pub`, 'utf8').trim();
 }
 
+/**
+ * Sobe o sshd de teste: só chave (sem senha nem PAM), em 127.0.0.1, numa pasta temporária.
+ * Devolve porta, usuário, linha do known_hosts, `setAuthorizedKeys(texto)` e `stop()`.
+ */
 export async function startSshd() {
   if (!hasSsh()) return null;
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'dash-sshd-'));
@@ -55,6 +63,7 @@ export async function startSshd() {
   const child = spawn(SSHD, ['-D', '-e', '-f', path.join(dir, 'sshd_config')], { stdio: ['ignore', 'ignore', 'pipe'] });
   let log = '';
   child.stderr.on('data', (d) => { log += d; });
+  // Espera até 5 s a porta aceitar conexão (ou o sshd morrer).
   const until = Date.now() + 5000;
   let up = false;
   while (!up && Date.now() < until && child.exitCode === null) {

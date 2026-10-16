@@ -1,4 +1,4 @@
-// Ponta a ponta no Chromium (critério de saída da F5): o painel real, com 2 h de dados,
+// Ponta a ponta no Chromium: o painel real, com 2 h de dados,
 // abre as 8 telas sem erro de JavaScript nem violação de CSP. Precisa do playwright-core
 // (devDependency) e de um Chromium; sem eles o teste é pulado com aviso.
 import test from 'node:test';
@@ -11,6 +11,9 @@ import { listen, close } from '../../test-support/request.js';
 
 let chromium = null;
 try { ({ chromium } = await import('playwright-core')); } catch { /* sem playwright-core */ }
+// No CI (E2E_OBRIGATORIO=1) o e2e não pode pular calado: sem navegador, a suíte falha.
+const OBRIGATORIO = process.env.E2E_OBRIGATORIO === '1';
+if (OBRIGATORIO && !chromium) throw new Error('E2E_OBRIGATORIO=1, mas o playwright-core não está instalado');
 
 // Gráficos mínimos por tela: Visão geral = 3 mini-gráficos + 5 faixas de telemetria;
 // Recursos = CPU, RAM, temperatura + 3 faixas de PSI; Armazenamento = previsão + 1 faixa por disco.
@@ -50,9 +53,10 @@ async function setup(t, extra = {}) {
   const { server, port } = await listen(app.app);
   let browser;
   try {
-    browser = await chromium.launch();
+    browser = await chromium.launch({ executablePath: process.env.CHROMIUM || undefined });
   } catch (err) {
     await close(server);
+    if (OBRIGATORIO) throw err;
     return { skip: `Chromium indisponível: ${err.message.split('\n')[0]}` };
   }
   const page = await browser.newPage({ viewport: extra.viewport || { width: 1280, height: 900 } });
@@ -95,9 +99,9 @@ test('e2e: visão geral mostra a manchete e os dados da última coleta', { skip:
   assert.deepEqual(s.problems, []);
 });
 
-// Orçamento do plano (Q17): a página inicial transfere até 300 KB (HTML, CSS, JS, fontes,
+// Orçamento de desempenho (AGENTS): a página inicial transfere até 300 KB (HTML, CSS, JS, fontes,
 // uPlot e os dados das primeiras chamadas da API; o SSE fica de fora, ele não termina).
-test('e2e: a página inicial transfere até 300 KB (orçamento Q17)', { skip: !chromium && 'sem playwright-core' }, async (t) => {
+test('e2e: a página inicial transfere até 300 KB (orçamento de desempenho)', { skip: !chromium && 'sem playwright-core' }, async (t) => {
   const s = await setup(t);
   if (s.skip) return t.skip(s.skip);
   const sizes = [];
@@ -127,7 +131,7 @@ test('e2e: atalhos de teclado trocam de tela e de tema', { skip: !chromium && 's
   const before = await s.page.evaluate(() => document.documentElement.dataset.theme);
   await s.page.keyboard.press('t');
   assert.notEqual(await s.page.evaluate(() => document.documentElement.dataset.theme), before);
-  assert.equal(before, 'dark', 'escuro é o padrão (D1)');
+  assert.equal(before, 'dark', 'escuro é o padrão (ADR 0009)');
 });
 
 test('e2e: anotação com HTML malicioso aparece como texto (anti-XSS)', { skip: !chromium && 'sem playwright-core' }, async (t) => {
@@ -187,7 +191,7 @@ test('e2e: tema claro — telas abrem, gráficos recriados com as cores do tema 
   await s.page.waitForFunction(() => document.querySelectorAll('.uplot').length >= 6);
   assert.equal(await s.page.evaluate(() => document.documentElement.dataset.theme), 'light');
   const bg = await s.page.evaluate(() => getComputedStyle(document.body).backgroundColor);
-  assert.equal(bg, 'rgb(243, 245, 248)', 'fundo claro da prancheta');
+  assert.equal(bg, 'rgb(243, 245, 248)', 'fundo do tema claro');
   await s.page.keyboard.press('t');
   await s.page.waitForFunction(() => document.documentElement.dataset.theme === 'dark' && document.querySelectorAll('.uplot').length >= 6);
   assert.deepEqual(s.problems, []);

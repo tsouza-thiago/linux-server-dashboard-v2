@@ -1,3 +1,4 @@
+// API de ponta a ponta com coletor falso: Host check, CSRF, cabeçalhos, token, rotas e export.
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { mkdtempSync, rmSync } from 'node:fs';

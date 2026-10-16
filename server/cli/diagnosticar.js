@@ -1,16 +1,17 @@
-// `dashboard diagnosticar` (prancheta "Instalação · 1 comando no terminal"): testa Node,
+// `dashboard diagnosticar`: testa Node,
 // permissões, SSH, chave restrita, sudo e coleta, e explica cada falha em português
 // simples ("O que aconteceu / Como resolver"). Com o painel coletando, usa a última
 // amostra gravada em vez de abrir outra conexão (I1); só testa ao vivo se ela estiver velha.
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import { clampInt, loadEnvFile, isPlaceholderHost, sanitizeToken } from '../config.js';
+import { clampInt, loadEnvFile, isPlaceholderHost, sanitizeToken, sshAccess, sshConfigFile } from '../config.js';
 import { listDays, readNdjson } from '../storage/ndjson.js';
 import { collect, runSSH } from '../collector/index.js';
 import { normalizeTargets } from '../collector/builder.js';
 import { panelStatus } from './servico.js';
 
+// "há 40 s", "há 12 min", "há 3 h"; e número com vírgula decimal.
 const ago = (ms) => (ms < 90e3 ? `${Math.round(ms / 1000)} s` : ms < 90 * 60e3 ? `${Math.round(ms / 60e3)} min` : `${Math.round(ms / 3600e3)} h`);
 const comma = (n, d = 1) => n.toFixed(d).replace('.', ',');
 
@@ -25,6 +26,7 @@ export function latestSample(root) {
   return null;
 }
 
+/** Bits de permissão do arquivo (ex.: 0o600), ou null se ele não existir. */
 function mode(file) {
   try { return fs.statSync(file).mode & 0o777; } catch { return null; }
 }
@@ -36,10 +38,12 @@ export function permissionProblems(root, keyFile) {
     [path.join(root, 'data', 'ssh', 'config'), 0o600], [path.join(root, 'data', 'ssh', 'known_hosts'), 0o600],
     ...(keyFile ? [[keyFile, 0o600]] : []),
   ];
+  // Só reclama do que está aberto para grupo/outros e diferente do esperado.
   return want.filter(([f, m]) => { const got = mode(f); return got !== null && (got & 0o077) !== 0 && got !== m; })
     .map(([f, m]) => ({ file: f, want: m.toString(8), got: mode(f).toString(8) }));
 }
 
+/** Caminho da chave do painel, lido do `IdentityFile` do data/ssh/config (null sem ele). */
 export function keyFileFromConfig(root) {
   try {
     const m = /^\s*IdentityFile\s+"?([^"\n]+)"?/m.exec(fs.readFileSync(path.join(root, 'data', 'ssh', 'config'), 'utf8'));
@@ -47,6 +51,16 @@ export function keyFileFromConfig(root) {
   } catch {
     return null;
   }
+}
+
+/**
+ * Modo de acesso e arquivo `ssh -F` do .env desta pasta, com as MESMAS regras do painel
+ * (server/config.js): "Restrito" ou " restrito " valem como restrito; SSH_CONFIG vazio = sem
+ * `-F` (usa o ~/.ssh/config); caminho fora de data/ volta para data/ssh/config. Assim a
+ * coleta de teste conecta exatamente como o painel conectaria.
+ */
+export function sshSettings(env, root) {
+  return { access: sshAccess(env.SSH_ACESSO), configFile: sshConfigFile(env.SSH_CONFIG, root) };
 }
 
 /** Alvos do .env desta pasta (os mesmos que o painel usa). */
@@ -72,6 +86,11 @@ export function explainFailure(error) {
   return [error, 'rode dashboard reconfigurar; se continuar, veja data/dashboard.log.'];
 }
 
+/**
+ * `./dashboard diagnosticar`: painel, permissões, acesso, chave, coleta, SMART e o custo da
+ * última coleta, com "O que aconteceu / Como resolver" para cada problema. Devolve 0 sem
+ * erros (avisos não contam) e 1 com erro.
+ */
 export async function diagnosticar({ out, root, home = os.homedir(), deps = {} }) {
   const now = deps.now ?? Date.now();
   let warns = 0;
@@ -103,7 +122,9 @@ export async function diagnosticar({ out, root, home = os.homedir(), deps = {} }
     out.explain('outros usuários desta máquina poderiam ler a configuração ou a chave.', `rode: ${perms.map((p) => `chmod ${p.want} "${p.file}"`).join('; ')}`);
   }
 
-  const restricted = env.SSH_ACESSO === 'restrito' && fs.existsSync(path.join(root, 'data', 'ssh', 'config'));
+  // Modo de acesso e configuração SSH lidos como o painel lê (sshSettings).
+  const ssh = sshSettings(env, root);
+  const restricted = ssh.access === 'restrito';
   if (!restricted) {
     warn('acesso direto ao servidor (como na V1)');
     out.explain('a chave usada pelo painel pode rodar qualquer comando no servidor.', 'rode dashboard reconfigurar para trocar por um usuário próprio com chave restrita à coleta.');
@@ -116,12 +137,13 @@ export async function diagnosticar({ out, root, home = os.homedir(), deps = {} }
   const interval = clampInt(env.POLL_INTERVAL, 60000, 10000, 3600000);
   let sample = latestSample(root);
   let live = false;
+  // Amostra com menos de 3 intervalos vale (o painel está coletando): sem SSH extra (I1).
+  // Sem amostra recente, faz 1 coleta de teste, com o mesmo acesso do painel.
   if (!sample || now - Date.parse(sample.ts) > 3 * interval) {
     live = true;
-    const configFile = restricted ? path.join(root, 'data', 'ssh', 'config') : '';
     const res = await (deps.collect ?? collect)({
-      host: env.SSH_HOST, targets: envTargets(env), access: restricted ? 'restrito' : 'direto',
-      runner: deps.runner ?? ((h, c) => runSSH(h, c, 30000, { configFile })), now,
+      host: env.SSH_HOST, targets: envTargets(env), access: ssh.access,
+      runner: deps.runner ?? ((h, c) => runSSH(h, c, 30000, { configFile: ssh.configFile })), now,
     });
     if (!res.ok) {
       fail('o servidor não respondeu à coleta de teste', res.error);
@@ -138,6 +160,7 @@ export async function diagnosticar({ out, root, home = os.homedir(), deps = {} }
     out.explain('o .env mudou (outro disco, outra pasta ou serviço) depois que o servidor foi preparado; o painel continua coletando o que a linha antiga permite.', 'rode dashboard reconfigurar e confirme o passo "Preparar o servidor".');
   } else if (restricted) out.ok('chave restrita ao comando de coleta · em dia');
 
+  // SMART: sem permissão e sem smartctl são avisos com conserto; FAILED é erro.
   for (const s of sample.smart || []) {
     if (s.status === 'SEM_PERMISSAO') {
       warn(`SMART de /dev/${s.dev} sem permissão`);

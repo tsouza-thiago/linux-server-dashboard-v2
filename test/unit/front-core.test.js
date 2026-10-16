@@ -1,15 +1,17 @@
+// Núcleo do frontend no Node: template html com escape, formatos PT-BR, análise e estado.
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { html, raw, escape, mount, isSafe } from '../../public/js/core/html.js';
+import { html, raw, escape, mount } from '../../public/js/core/html.js';
 import * as fmt from '../../public/js/core/format.js';
 import { parseHash, buildHash, VIEWS, PERIODS, viewByKey } from '../../public/js/core/router.js';
-import { createStore, appendSample } from '../../public/js/core/store.js';
-import { series, xs, keysWith, diskEta, dailySummary, headline, fullestDisk, timeline, isOffline } from '../../public/js/core/analysis.js';
+import { createStore } from '../../public/js/core/store.js';
+import { series, xs, keysWith, diskEta, dailySummary, headline, fullestDisk, timeline, isOffline, mergeAlerts, ALERTS_LIMIT } from '../../public/js/core/analysis.js';
 
 test('html: toda interpolação é escapada; raw() é a única porta para HTML', () => {
   const evil = '<img src=x onerror=alert(1)>"\'`&';
   const out = html`<p title="${evil}">${evil}</p>`;
-  assert.ok(isSafe(out));
+  // O resultado já é HTML seguro: dentro de outro template não é escapado de novo.
+  assert.equal(String(html`<div>${out}</div>`), `<div>${String(out)}</div>`);
   assert.equal(String(out), '<p title="&lt;img src=x onerror=alert(1)&gt;&quot;&#39;&#96;&amp;">&lt;img src=x onerror=alert(1)&gt;&quot;&#39;&#96;&amp;</p>');
   assert.equal(String(html`<b>${raw('<i>ok</i>')}</b>`), '<b><i>ok</i></b>');
   assert.equal(String(html`<ul>${['a', '<b>'].map((x) => html`<li>${x}</li>`)}</ul>`), '<ul><li>a</li><li>&lt;b&gt;</li></ul>');
@@ -26,15 +28,18 @@ test('html: toda interpolação é escapada; raw() é a única porta para HTML',
 test('format: PT-BR e dado ausente vira "—" (I5)', () => {
   assert.equal(fmt.num(1234.5, 1), '1.234,5');
   assert.equal(fmt.pct(12.345, 1), '12,3%');
+  assert.equal(fmt.pct(99.987, 2), '99,99%', 'disponibilidade com 2 casas');
+  assert.equal(fmt.pct(Number.NaN, 2), '—', 'NaN não vira "—%"');
+  assert.equal(fmt.cmdName('/usr/bin/dockerd -H fd://'), 'dockerd');
+  assert.equal(fmt.cmdName(''), '');
   assert.equal(fmt.bytes(155475050496), '145 GB');
   assert.equal(fmt.bytes(1967845998592), '1,8 TB');
   assert.equal(fmt.bytes(512), '512 B');
   assert.equal(fmt.mb(840), '840 MB');
   assert.equal(fmt.mbps(0.02), '0,02 Mbps');
-  assert.equal(fmt.mbs(12.34), '12,3 MB/s');
   assert.equal(fmt.celsius(32), '32,0 °C');
   assert.equal(fmt.ms(6.13), '6,1 ms');
-  for (const f of [fmt.num, fmt.pct, fmt.bytes, fmt.mb, fmt.mbps, fmt.mbs, fmt.celsius, fmt.ms, fmt.duration, fmt.days]) {
+  for (const f of [fmt.num, fmt.pct, fmt.bytes, fmt.mb, fmt.mbps, fmt.celsius, fmt.ms, fmt.duration, fmt.days]) {
     assert.equal(f(null), '—', f.name);
     assert.equal(f(undefined), '—', f.name);
     assert.equal(f(Number.NaN), '—', f.name);
@@ -84,7 +89,7 @@ test('router: tela e período na URL, com padrões para valores desconhecidos', 
   assert.equal(viewByKey('9'), null);
 });
 
-test('store: set com objeto ou função avisa os inscritos; appendSample ordena e não repete', () => {
+test('store: set com objeto ou função avisa os inscritos', () => {
   const s = createStore({ a: 1 });
   const seen = [];
   const off = s.subscribe((state, patch) => seen.push([state.a, patch]));
@@ -94,14 +99,6 @@ test('store: set com objeto ou função avisa os inscritos; appendSample ordena 
   s.set({ a: 9 });
   assert.deepEqual(seen, [[2, { a: 2 }], [3, { a: 3 }]]);
   assert.equal(s.get().a, 9);
-  const t = (m) => new Date(Date.UTC(2026, 9, 7, 12, m)).toISOString();
-  let list = [{ ts: t(0) }, { ts: t(1) }];
-  list = appendSample(list, { ts: t(1) });
-  assert.equal(list.length, 2, 'repetida (backfill) ignorada');
-  list = appendSample(list, { ts: t(70) }, { periodMs: 60 * 60e3 });
-  assert.deepEqual(list.map((x) => x.ts), [t(70)], 'fora do período sai');
-  assert.equal(appendSample(list, null), list);
-  assert.equal(appendSample([], { ts: t(0) }, { max: 0 }).length, 0);
 });
 
 test('analysis: séries com buracos, eixo em segundos e chaves por prefixo', () => {
@@ -167,4 +164,20 @@ test('isOffline: só com falha de verdade (não logo após reiniciar o painel)',
   assert.equal(isOffline({ online: false, failures: 0, offlineSince: '2026-10-07T12:00:00Z' }), true, 'queda aberta antes de reiniciar');
   assert.equal(isOffline({ online: true, failures: 0 }), false);
   assert.equal(isOffline(null), false);
+});
+
+test('alertas ao vivo: o SSE (50 mais recentes) atualiza a lista sem encolher os 200 carregados', () => {
+  assert.equal(ALERTS_LIMIT, 200);
+  // Lista carregada da API: 200 alertas, do mais novo (a199) ao mais antigo (a0).
+  const prev = Array.from({ length: 200 }, (_, i) => ({ id: `a${199 - i}`, status: 'resolved' }));
+  // Evento SSE: um alerta novo e os 49 seguintes, com a199 agora reconhecido.
+  const recent = [{ id: 'a200', status: 'new' }, { id: 'a199', status: 'ack' },
+    ...Array.from({ length: 48 }, (_, i) => ({ id: `a${198 - i}`, status: 'resolved' }))];
+  const out = mergeAlerts(recent, prev);
+  assert.equal(out.length, 200, 'não encolhe para 50');
+  assert.deepEqual(out.slice(0, 2), [{ id: 'a200', status: 'new' }, { id: 'a199', status: 'ack' }], 'o SSE vence');
+  assert.equal(out.at(-1).id, 'a1', 'o mais antigo sai para caber o novo');
+  assert.equal(new Set(out.map((a) => a.id)).size, 200, 'sem repetidos');
+  assert.deepEqual(mergeAlerts(undefined, prev), prev);
+  assert.deepEqual(mergeAlerts([{ id: 'x' }], undefined), [{ id: 'x' }]);
 });

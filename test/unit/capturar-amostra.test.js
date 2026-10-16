@@ -1,3 +1,4 @@
+// Anonimização das fixtures: troca hostname, IPs, MACs e usuários e mantém o que o parser usa.
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { anonymize } from '../../scripts/capturar-amostra.mjs';

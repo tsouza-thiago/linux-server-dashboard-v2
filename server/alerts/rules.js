@@ -3,13 +3,16 @@
 // condição que persiste atualiza o mesmo alerta em vez de criar outro (corrige B3).
 // Limiares com histerese: dispara em `limiar` e só limpa quando cai `histerese` abaixo.
 
+/** Chave do alerta de servidor inacessível (criado pelo motor, não por uma regra). */
 export const OFFLINE_KEY = 'servidor-inacessivel';
 
 // Estados de serviço que não indicam parada.
 export const SERVICE_OK = new Set(['active', 'reloading', 'activating']);
 
-const isNum = (v) => typeof v === 'number' && Number.isFinite(v);
+/** Número de verdade (nem NaN, nem Infinity, nem texto): dado ausente não vira zero (I5). */
+export const isNum = (v) => typeof v === 'number' && Number.isFinite(v);
 
+/** RAM usada em % (null sem dado): usada ÷ total. */
 export function ramPct(s) {
   const r = s?.ram;
   return r && isNum(r.used) && isNum(r.total) && r.total > 0 ? (r.used / r.total) * 100 : null;
@@ -74,12 +77,16 @@ export function evaluate(sample, t, active = new Set()) {
   const conditions = [];
   const unknown = new Set();
   for (const rule of rulesFor(t)) {
+    // A amostra não trouxe a seção: os alertas abertos desta regra ficam como estão.
     const section = rule.section(sample);
     if (section === null || section === undefined) {
       for (const key of active) if (key.startsWith(rule.prefix)) unknown.add(key);
       continue;
     }
     for (const item of rule.items(sample)) {
+      // `on`: true = condição presente; false = ausente; null = não dá para saber.
+      // SMART e serviço dizem direto (`failing`); os medidos usam limiar + histerese: o
+      // alerta aberto só limpa abaixo de `clear`; o fechado só abre a partir de `fire`.
       let on;
       if ('failing' in item) {
         on = item.failing;

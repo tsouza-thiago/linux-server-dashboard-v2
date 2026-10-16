@@ -1,3 +1,4 @@
+// Export CSV: quebras de linha, colunas de I/O e nomes de pasta saneados.
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { toCSV, csvEscape } from '../../server/csv.js';

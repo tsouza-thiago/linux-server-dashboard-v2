@@ -1,0 +1,11 @@
+{
+  "_leia": "Achados das ferramentas de npm run seguranca aceitos depois de análise. Cada exceção diz a ferramenta, a regra, o arquivo (opcional), o motivo e o teste que confere que o risco está controlado. Sem exceção aqui, todo achado médio ou alto reprova.",
+  "excecoes": [
+    {
+      "ferramenta": "zap",
+      "regra": "40018 SQL Injection",
+      "motivo": "Falso positivo de endpoint com estado. O ZAP compara a resposta de GET /api/annotations (ou outra lista) com 'AND 1=1' e 'AND 1=2' depois de POSTs que criam itens: a lista muda porque cresceu, não por injeção. O painel não tem banco de dados nem SQL; os dados são NDJSON/JSON em data/. Analisado em 16/10/2026 (docs/seguranca/2026-10-16-linha-de-base.md).",
+      "verificadoPor": "test/seguranca/invariantes-estaticas.test.js"
+    }
+  ]
+}

@@ -3,7 +3,8 @@
 import fs from 'node:fs';
 import path from 'node:path';
 
-export const LOG_MAX_BYTES = 5 * 1024 * 1024;
+// Tamanho a partir do qual o log gira (5 MB: cerca de 2 meses de coletas).
+const LOG_MAX_BYTES = 5 * 1024 * 1024;
 
 /** Gira o arquivo se ele passou de `maxBytes`. Devolve true quando girou. */
 export function rotateIfNeeded(file, maxBytes = LOG_MAX_BYTES) {
@@ -33,6 +34,7 @@ export function createLogFile(file, { maxBytes = LOG_MAX_BYTES } = {}) {
   return {
     write(line) {
       const text = Buffer.from(`${line}\n`);
+      // A linha nova passaria do limite: fecha, gira e reabre um arquivo vazio.
       if (bytes > 0 && bytes + text.length > maxBytes) {
         fs.closeSync(fd);
         rotateIfNeeded(file, 0);

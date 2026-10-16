@@ -1,4 +1,4 @@
-// Assistente no navegador (D10, passo 2 da seção 11): servidor temporário em 127.0.0.1,
+// Assistente no navegador (ADR 0011): servidor temporário em 127.0.0.1,
 // na porta do painel, que só existe até o fim da 1ª configuração. Entrar exige o código de
 // uso único mostrado no terminal (trocado por um cookie HttpOnly + SameSite=Strict); valem
 // as mesmas proteções do painel: Host check, CSRF, CSP sem 'unsafe-inline', limite de
@@ -14,8 +14,9 @@ import { InstallError, STEPS } from './instalacao.js';
 import { createLoginCode } from '../http/entrar.js';
 
 const PUBLIC = path.join(path.dirname(fileURLToPath(import.meta.url)), '..', '..', 'public');
-export const SETUP_COOKIE = 'dash_setup';
-export const CODE_TTL_MS = 30 * 60 * 1000;
+// Cookie da sessão do assistente; validade do código (30 min) e tentativas erradas (20).
+const SETUP_COOKIE = 'dash_setup';
+const CODE_TTL_MS = 30 * 60 * 1000;
 const MAX_FAILURES = 20;
 // Sem letras/números que se confundem (0/O, 1/I/L, 2/Z, 5/S, 8/B).
 const ALPHABET = 'ACDEFGHJKMNPQRTUVWXY34679';
@@ -30,6 +31,7 @@ export function makeSetupCode(randomInt = crypto.randomInt) {
   return { raw, shown: `${raw.slice(0, 3)}-${raw.slice(3)}` };
 }
 
+/** Código como a pessoa digitou, sem hífen e em maiúsculas ("7kq-4mz" → "7KQ4MZ"). */
 export const normalizeCode = (v) => String(v ?? '').toUpperCase().replace(/[^A-Z0-9]/g, '');
 
 /**
@@ -41,11 +43,13 @@ export const normalizeCode = (v) => String(v ?? '').toUpperCase().replace(/[^A-Z
  */
 export function createWizardApp({ inst, code, onFinish = () => {}, onActivity = () => {}, log = () => {}, now = () => Date.now(), codeTtlMs = CODE_TTL_MS }) {
   const createdAt = now();
+  // O código ainda não usado, as tentativas erradas e o hash da sessão aberta (uma só).
   let pendingCode = normalizeCode(code);
   let failures = 0;
   let sessionHash = null;
   const hash = (v) => crypto.createHash('sha256').update(String(v)).digest('hex');
 
+  // As mesmas proteções do painel, na mesma ordem (conferida pela matriz de ataque).
   const app = createRouter();
   app.use(securityHeaders);
   app.use(hostCheck);
@@ -63,6 +67,7 @@ export function createWizardApp({ inst, code, onFinish = () => {}, onActivity = 
   });
   app.get('/configurar', (req, res) => sendFile(res, path.join(PUBLIC, 'configurar.html'), { req }));
 
+  // Troca do código pelo cookie: 10 tentativas por minuto, 20 erradas no total, 30 min.
   const loginLimit = makeRateLimit({ windowMs: 60000, max: 10 });
   app.post('/api/configurar/entrar', loginLimit, (req, res) => {
     const given = normalizeCode(req.body && req.body.codigo);
@@ -87,6 +92,8 @@ export function createWizardApp({ inst, code, onFinish = () => {}, onActivity = 
     return res.status(401).json({ error: 'Digite o código que aparece no terminal.', codigo: true });
   });
 
+  // Cada passo responde o que a Instalacao devolve; erro esperado (InstallError) vira a
+  // mensagem para a tela; o inesperado vai para o terminal e a tela recebe um texto genérico.
   const handle = (fn) => async (req, res) => {
     try {
       res.json(await fn(req.body || {}, req));

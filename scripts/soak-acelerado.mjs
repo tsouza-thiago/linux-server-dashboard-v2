@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-// Soak acelerado (F9): roda o painel de verdade (createApp: histórico NDJSON, agregados de
+// Soak acelerado: roda o painel de verdade (createApp: histórico NDJSON, agregados de
 // 5 min, motor de alertas, SSE com 1 navegador conectado) por mais de 72 h de coletas
 // simuladas, em poucos segundos. Cada coleta passa pelo coletor real (parser + taxas) com a
 // saída anonimizada do servidor do mantenedor; só o SSH e o relógio são falsos.
@@ -7,8 +7,8 @@
 // Fase 1 — enche a janela de 72 h depressa e confere que a memória ocupada (heap depois de
 //          um gc) para de crescer quando a janela enche: sem vazamento.
 // Fase 2 — num processo novo, o painel reinicia com as 72 h lidas do disco e faz coletas em
-//          ritmo calmo; mede a RAM do Node (RSS) como ela fica no uso real. Orçamento do
-//          plano (Q17, revisto em 16/10/2026): até 110 MB. O Node 24 vazio já usa ~44 MB e o
+//          ritmo calmo; mede a RAM do Node (RSS) como ela fica no uso real. Orçamento
+//          (AGENTS, "Orçamento de desempenho"): até 110 MB. O Node 24 vazio já usa ~44 MB e o
 //          painel sem histórico, ~62 MB.
 //
 //   npm run soak                      # 5000 coletas (~83 h simuladas)

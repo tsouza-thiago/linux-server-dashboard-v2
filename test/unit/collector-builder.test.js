@@ -1,3 +1,4 @@
+// Script de coleta: só leitura (I2/I3), LC_ALL=C e marcadores (I4), seções opcionais e escape.
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {

@@ -1,6 +1,6 @@
 {
   "name": "linux-server-dashboard",
-  "version": "2.0.0",
+  "version": "2.0.1",
   "description": "Server Dashboard: painel em tempo real de um servidor Linux, via 1 SSH por minuto",
   "type": "module",
   "main": "server/index.js",
@@ -10,7 +10,9 @@
     "test": "node --test",
     "test:unit": "node --test \"test/unit/**/*.test.js\"",
     "test:integration": "node --test \"test/integration/**/*.test.js\"",
+    "test:seguranca": "node --test \"test/seguranca/**/*.test.js\"",
     "check": "node scripts/check.mjs",
+    "seguranca": "node scripts/seguranca.mjs",
     "capturar-amostra": "node scripts/capturar-amostra.mjs",
     "migrar-v1": "node server/storage/migrate-v1.js",
     "soak": "node --expose-gc scripts/soak-acelerado.mjs",

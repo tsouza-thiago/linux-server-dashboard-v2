@@ -9,13 +9,181 @@ diante: `PATCH` corrige, `MINOR` acrescenta sem quebrar e `MAJOR` quebra.
 
 ## [Não publicado]
 
+## [2.0.1] — 2026-10-16
+
+Versão de manutenção: documentação conferida contra o código, código comentado em PT-BR,
+código sem uso removido, 6 bugs corrigidos e uma camada de verificação de segurança contínua.
+Nada muda na configuração, no formato de `data/` nem no acesso ao servidor: atualize com
+`./dashboard atualizar`.
+
+### Adicionado
+
+- Camada de verificação de segurança, redundante de propósito (AGENTS, "Verificação em
+  camadas"):
+  - `test/seguranca/` (65 testes, em todo `npm run check`): regras estáticas no código
+    (CWE-78/79/89/94/208/330/532/598/732/918/1321/1333…), matriz de ataque gerada das rotas
+    reais (Host, login, CSRF, cabeçalhos e erros em toda rota × método), corpus de ataques
+    do OWASP WSTG (path traversal, header injection, formula injection, XSS, injeção de
+    comando, prototype pollution, corpo gigante, ReDoS), segredos e OSINT em tudo que vai
+    para o repositório público e cadeia de suprimentos (hash dourado do script de coleta,
+    soma do Node, chave de `docs/allowed_signers`, imagens e actions presas).
+  - `npm run seguranca`: Semgrep (regras OWASP), Gitleaks (arquivos e todo o histórico),
+    ShellCheck, OSV-Scanner e OWASP ZAP (varredura ativa e autenticada da API, com OpenAPI
+    gerado das rotas), em imagens Docker presas por digest; e a mutação dos guardas
+    (`scripts/mutacao-seguranca.mjs`): 24 proteções quebradas de propósito, cada uma
+    acusada por algum teste.
+  - `npm run test:seguranca` roda só a rede de segurança.
+  - A própria varredura é endurecida: o ZAP escuta só em `127.0.0.1` (com `--network host`,
+    o padrão dele abriria proxy e API sem chave na rede local durante o ataque), tem teto
+    de 20 min, e a pasta de relatório do Gitleaks fica dentro de uma pasta 0700 (outro
+    usuário da máquina não planta um relatório "limpo").
+  - CI no GitHub (ADR 0014, `.github/workflows/seguranca.yml`): a cada push no `main` e a
+    cada PR, `npm run check`, e2e obrigatório (`E2E_OBRIGATORIO=1`: sem navegador, falha) e
+    `npm run seguranca`. Actions presas por SHA, só leitura, sem segredos.
+  - SECURITY: mapa do OWASP Top 10:2025 (cada categoria com as ameaças e os testes,
+    conferido pelo `docs.test.js`), seção "Verificação contínua" e 4 ameaças novas no
+    modelo: prototype pollution (17), ReDoS (18), cadeia de suprimentos e CI (19) e OSINT
+    no repositório público (20).
+  - Linha de base da `v2.0.0` analisada em `docs/seguranca/2026-10-16-linha-de-base.md`
+    (achados, decisões e OSINT do repositório público); exceções aceitas, com motivo e
+    teste, em `docs/seguranca/excecoes.json`.
+
+### Alterado
+
+- AGENTS: seção "Publicar uma versão" (o procedimento da ADR 0012, com `vX.Y.Z`); a
+  "Solução de problemas" fica só com o que é de desenvolvimento (o de quem usa está no
+  TUTORIAL); a regra de bug conhecido vale para bugs novos.
+- CLAUDE.md só com o que é específico do Claude Code; o resto está no AGENTS.
+- Código comentado em PT-BR: cada arquivo do servidor, do navegador, do CSS, dos scripts e
+  de `test-support/` diz o que faz e que regra garante; cada função e bloco não trivial diz
+  para que serve. Todo arquivo de teste ganhou um cabeçalho. Os comentários deixam de citar
+  o plano removido (fases F*, decisões D*/Q*, "pranchetas") e apontam as ADRs e o AGENTS.
+- TUTORIAL sem o rodapé repetido. `test/unit/bugs-v1.test.js` lista os 12 bugs da V1 no
+  cabeçalho (antes apontava para o plano).
+- Testes: a CLI (`main` e `instalar`) aceita a pasta pessoal injetada (`home`). Os testes de
+  `status` e de "painel já rodando" usam uma pasta temporária e não enxergam mais o painel
+  instalado na máquina de quem roda a suíte.
+- Testes de SSE esperam a conexão entrar no hub, em vez de um tempo fixo (falhavam às
+  vezes com a máquina carregada). Os outros testes com espera fixa (processo da CLI, TUI,
+  assistente) passam a esperar a condição real com `test-support/esperar.js`.
+- Testes e2e: `CHROMIUM=<caminho>` escolhe o navegador, como já fazia o e2e da instalação.
+- `test/unit/bugs-v1.test.js` volta a ter o teste do B6 (selo SMART de cada pasta acha o
+  disco dela: `sda2` → `sda`, `nvme0n1p1` → `nvme0n1`, `mmcblk0p1` → `mmcblk0`). Os 12
+  bugs da V1 têm teste de regressão de novo.
+- `npm run seguranca -- --so=<etapa>` com nome de etapa errado sai com erro (antes rodava
+  nada e dizia "SEGURANÇA OK"). As etapas e as opções estão no AGENTS.
+- `test-support/request.js` envia o corpo com `Content-Length` (num `DELETE` sem ele, o
+  corpo era lido como uma segunda requisição).
+- `.gitignore`: `.seguranca/` (relatórios brutos) e `.claude/` (configuração local).
+- `scripts/node-runtime.sh`: diretiva do ShellCheck explica por que `NODE_BIN` e
+  `NODE_ORIGEM` parecem sem uso (quem as lê é o `./dashboard`).
+
+### Removido
+
+- Código sem uso no servidor (cada item com uso zero conferido no código, nos testes e nos
+  scripts): `LOG_FILE` e o parâmetro `manual` dentro do `createApp`; `req.badUrl` e
+  `req.sessionId` (gravados, nunca lidos); `'::1'` sem colchetes na lista de Host (o
+  `parseHost` nunca devolve essa forma; `[::1]` continua valendo); `log`, `concluida` e
+  `deps.stopPanel` da `Instalacao`; o campo `heredoc` dos blocos de preparo; parâmetros
+  que ninguém passava (`out` no passo 6 da TUI, `root` no `runTui`); as reexportações do
+  `poller.js` e do `atualizar.js` que ninguém importava; a segunda definição do `ROOT` na
+  CLI (usa a do `config.js`); o ramo `win32` do `check.mjs` (só Linux, ADR 0013).
+- `export` de 21 constantes e funções que nenhum outro arquivo importa (continuam em uso
+  dentro do próprio módulo).
+- Código repetido, trocado pela versão que já existia com a mesma semântica: gravação
+  atômica do `entrar.js` (usa `writeFileAtomicSync`), `validTs` do `migrate-v1` (usa o do
+  `ndjson.js`), `isNum` do `health.js` (usa o de `rules.js`), nome do backup da V1 no
+  `importar-v1` (`BACKUP_NAME`), usuário e sudoers na dica do `desinstalar` (`PANEL_USER`,
+  `SUDOERS`) e o SSH do `capturar-amostra` (usa o `runSSH` do painel, que também recusa
+  host iniciado com `-` e corta resposta acima de 1 MB).
+- Código sem uso no navegador: `api.samples`, `levelWord`, `emptyState`, `appendSample`,
+  `mbs` e `isSafe` (com os testes que só os exercitavam); os ícones `menu`, `close`,
+  `pulse` e `server` (o `eventos`, apontado como duplicado, fica: a navegação monta o
+  ícone pelo id da tela); a opção `padRight`, os campos `current`/`ink` das faixas, o
+  `tip` guardado no grupo e as cores `border`/`accent` do gráfico, que ninguém lia;
+  imports sem uso (`panelHead` em Eventos, `chip` em Recursos); o `id="wz"` do
+  assistente; e o `export` de 9 símbolos que só o próprio módulo usa.
+- CSS sem uso: `.label`, `.wz-pre .k`, `.wz-chk.is-crit`, os tokens `--fs-caption`,
+  `--sp-1/2/3/5/6` e `--serious`; e regras do `configurar.css` que repetiam o `base.css`
+  (`body`, `.mono`, `box-sizing`).
+- `cmdName` repetido em duas telas vira `format.cmdName`; a disponibilidade usa
+  `format.pct(x, 2)` nas três telas (com `NaN`, mostra "—" em vez de "—%").
+- `docs/PLANO_V2.md`: o plano da V2 está concluído e fica como registro histórico na tag
+  `v2.0.0`. O que ainda vale passou para o AGENTS: as invariantes I1–I10 (citadas no
+  código), os navegadores suportados e a origem do orçamento de desempenho. As decisões
+  continuam nas ADRs.
+
+### Corrigido
+
+- Instalação pelo terminal (TUI): desmarcar "Iniciar com o computador" no passo 6 não
+  valia; o serviço era instalado e habilitado do mesmo jeito. Agora a TUI repassa a
+  escolha, como o assistente no navegador.
+- Eventos: cada alerta novo que chegava ao vivo encolhia a lista de 200 alertas para os 50
+  que o SSE traz (os mais antigos sumiam até recarregar a página). Agora o navegador junta
+  os 50 recentes com o que já tinha.
+- Relatórios: o "tempo fora" do cartão Disponibilidade somava a duração inteira de uma
+  queda que começou antes do período escolhido. Agora conta só a parte de dentro do
+  período, como a porcentagem ao lado já fazia.
+- `./dashboard diagnosticar` lê `SSH_ACESSO` e `SSH_CONFIG` com as mesmas regras do painel.
+  Antes, `SSH_ACESSO=Restrito` (com maiúscula) era tratado como acesso direto, e a coleta
+  de teste usava sempre `data/ssh/config`, ignorando o `SSH_CONFIG` do `.env`.
+- Reconfigurar: os limiares do `.env` são lidos com as faixas do painel. Um valor que o
+  painel recusa (ex.: `ALERT_DISK_PCT=5`) travava o passo 4 com "Valor fora da faixa";
+  agora vira o padrão, como no painel. O modo sem interface mantém os limiares do `.env`
+  que não vierem nas opções (antes voltavam a 90 / 90 / 60).
+- `./dashboard instalar --importar-v1`: com a V2 instalada como serviço, o recado "Para
+  voltar à V1" agora diz `systemctl --user disable --now server-dashboard.service`. Só
+  `./dashboard parar` deixava a V2 voltar no próximo boot, junto com a V1 (2 conexões por
+  minuto ao servidor). Em segundo plano, `./dashboard parar` continua bastando.
+- Documentação conferida contra o código:
+  - AGENTS: o `.env` guarda o `DASH_TOKEN`, não senhas; o `diagnosticar` reaproveita a
+    última amostra e só coleta se ela estiver velha; o link de entrada vale 2 min
+    (`abrir`) ou 10 min (fim da instalação); o `/api/history` reduz a `limit` (padrão 720,
+    máximo 2000); a regra da saúde está explicada ponto a ponto; o exemplo da amostra
+    traz os valores medidos (1,29 s, 2,9 KB); a Estrutura cita o `soak-acelerado.mjs`;
+    a `--sem-assinatura` está documentada; o `HISTORY_FILE` também define a pasta de
+    `history/` e `rollup/`.
+  - TUTORIAL: custo da coleta (cerca de 1 s, não "menos de 1 s"); os indicadores da
+    Visão geral; o nome da tela "Processos & serviços"; `data/` guarda os últimos 500
+    alertas, não "todo o histórico".
+  - README e TUTORIAL: "voltar à V1" agora desliga também o início automático da V2 (só
+    `./dashboard parar` deixava as duas rodando depois de reiniciar, com 2 conexões por
+    minuto ao servidor).
+  - CHANGELOG da 2.0.0: "10 fases (F0–F9)", não 9.
+- SECURITY: o erro da API devolve só `{ "error" }` (não existe `errorCode`); trocar o
+  `DASH_TOKEN` **não** encerra as sessões já abertas (agora explica como encerrá-las) e a
+  instalação usa 32 bytes aleatórios; o isolamento do systemd vale "quando o systemd
+  permite"; o `from=` da chave é o padrão, não garantia (pode ser desligado). Os limites
+  numéricos ficam só no AGENTS, como manda a regra da referência única.
+
+### Segurança
+
+- Export CSV: célula que começa com TAB ou CR também ganha o `'` na frente (o Excel e o
+  LibreOffice pulam esses caracteres e leriam o resto como fórmula), e CR no meio põe a
+  célula entre aspas. Antes, só `= + - @` eram protegidos. O `host` e o `kernel` do
+  relatório vêm do servidor monitorado (orientação do OWASP "CSV Injection").
+- Toda resposta ganha `Cross-Origin-Embedder-Policy: require-corp`, que completa o
+  isolamento entre origens junto com o COOP e o CORP que já existiam (OWASP ZAP 90004).
+- API, `/entrar` e assistente respondem com `Cache-Control: no-store`. Sessão, telemetria
+  e o token mostrado no fim da instalação não ficam no cache de disco do navegador
+  (OWASP ASVS V8).
+- A query da URL recusa os nomes `__proto__`, `constructor` e `prototype` e é montada sem
+  gravar propriedade com nome vindo de fora (`Object.fromEntries` de um `Map`, depois sem
+  protótipo). O objeto já não tinha protótipo; agora a proteção não depende disso. Achado do CodeQL *extended*
+  (`js/remote-property-injection`), analisado em `docs/seguranca/2026-10-16-codeql-extended.md`.
+- Testes conferem permissão e conteúdo de um arquivo pelo mesmo descritor
+  (`test-support/arquivos.js`), sem a janela entre `stat` e leitura apontada pelo CodeQL
+  (`js/file-system-race`).
+- Anotação: o instante (`ts`) é gravado em ISO canônico. Antes, o texto recebido era gravado
+  como veio, se fosse uma data válida.
+
 ## [2.0.0] — 2026-10-16
 
-Primeira versão estável da V2: a reformulação completa do painel, feita em 9 fases a partir
-da `v1.0.0` (plano em `docs/PLANO_V2.md`). Validada no computador e no servidor reais do
-mantenedor desde 08/10/2026, em contêineres Debian 12 e Ubuntu 24.04 limpos e pelo soak
-acelerado. As seções abaixo listam só o que mudou desde a `2.0.0-beta.2`; cada pré-versão
-tem a sua seção.
+Primeira versão estável da V2: a reformulação completa do painel, feita em 10 fases (F0–F9)
+a partir da `v1.0.0` (plano em `docs/PLANO_V2.md`, que ficou na tag `v2.0.0`). Validada no
+computador e no servidor reais do mantenedor desde 08/10/2026, em contêineres Debian 12 e
+Ubuntu 24.04 limpos e pelo soak acelerado. As seções abaixo listam só o que mudou desde a
+`2.0.0-beta.2`; cada pré-versão tem a sua seção.
 
 ### Resumo da V2 em relação à V1
 
@@ -470,7 +638,8 @@ Documentados no plano da V2 (seção 2.2, B1–B12), entre eles: alerta SMART fa
 rede zerada com contadores grandes, alerta duplicado a cada coleta e reescrita completa do
 histórico a cada minuto.
 
-[Não publicado]: https://github.com/tsouza-thiago/linux-server-dashboard-v2/compare/v2.0.0...HEAD
+[Não publicado]: https://github.com/tsouza-thiago/linux-server-dashboard-v2/compare/v2.0.1...HEAD
+[2.0.1]: https://github.com/tsouza-thiago/linux-server-dashboard-v2/compare/v2.0.0...v2.0.1
 [2.0.0]: https://github.com/tsouza-thiago/linux-server-dashboard-v2/compare/v2.0.0-beta.2...v2.0.0
 [2.0.0-beta.2]: https://github.com/tsouza-thiago/linux-server-dashboard-v2/compare/v2.0.0-beta.1...v2.0.0-beta.2
 [2.0.0-beta.1]: https://github.com/tsouza-thiago/linux-server-dashboard-v2/compare/v2.0.0-alpha.8...v2.0.0-beta.1

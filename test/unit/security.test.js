@@ -1,3 +1,4 @@
+// Guardas HTTP: Host, Origin, cabeçalhos de segurança e comparação do token.
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {
