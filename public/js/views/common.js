@@ -19,12 +19,8 @@ const PATHS = {
   download: '<path d="M12 3v12M7 10l5 5 5-5M5 21h14"/>',
   moon: '<path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8z"/>',
   sun: '<circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/>',
-  menu: '<path d="M4 6h16M4 12h16M4 18h16"/>',
-  close: '<path d="M6 6l12 12M18 6 6 18"/>',
-  pulse: '<polyline points="3 12 7 12 10 5 14 19 17 12 21 12"/>',
   bell: '<path d="M18 8a6 6 0 0 0-12 0c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.7 21a2 2 0 0 1-3.4 0"/>',
   plus: '<path d="M12 5v14M5 12h14"/>',
-  server: '<rect x="3" y="4" width="18" height="7" rx="2"/><rect x="3" y="13" width="18" height="7" rx="2"/><path d="M7 7.5h.01M7 16.5h.01"/>',
   sheet: '<path d="M14 3H6a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9z"/><path d="M14 3v6h6M8 13h8M8 17h8M12 11v8"/>',
   braces: '<path d="M8 3H7a2 2 0 0 0-2 2v4a2 2 0 0 1-2 2 2 2 0 0 1 2 2v4a2 2 0 0 0 2 2h1M16 3h1a2 2 0 0 1 2 2v4a2 2 0 0 0 2 2 2 2 0 0 0-2 2v4a2 2 0 0 1-2 2h-1"/>',
   printer: '<path d="M6 9V3h12v6"/><rect x="3" y="9" width="18" height="8" rx="2"/><path d="M6 14h12v7H6z"/>',
@@ -48,8 +44,6 @@ export function icon(name, size = 16, stroke = 2) {
 
 // ---------------- Status ----------------
 const LEVEL_ICON = { ok: 'check', warn: 'warn', serious: 'serious', crit: 'crit', neutral: null, accent: null };
-const LEVEL_WORD = { ok: 'Saudável', warn: 'Atenção', serious: 'Grave', crit: 'Crítico' };
-export const levelWord = (level) => LEVEL_WORD[level] || '';
 
 /** Selo de estado: sempre cor + ícone + texto (nunca só cor). */
 export function pill(level, text, { lg = false, iconOnly } = {}) {
@@ -68,7 +62,7 @@ export function iconBox(level, name, size = '') {
   return html`<span class="icon-box${size ? ` ${size}` : ''}${level ? ` is-${level}` : ''}">${icon(name, size === 'sm' ? 14 : size === 'lg' ? 20 : 16, 2.5)}</span>`;
 }
 
-export const SMART = {
+const SMART = {
   PASSED: { level: 'ok', text: 'PASSED' },
   FAILED: { level: 'crit', text: 'FAILED' },
   SEM_PERMISSAO: { level: 'neutral', text: 'sem permissão' },
@@ -158,7 +152,7 @@ export function drawStrips(ctx, root, groupId, rows, buckets = ctx.state.buckets
     const entries = [];
     let syncing = false;
     group = {
-      entries, tip, rows, data, xRange,
+      entries, rows, data, xRange,
       destroy() { entries.forEach((e) => e.destroy()); },
     };
     const ticks = () => {
@@ -212,13 +206,12 @@ export function drawStrips(ctx, root, groupId, rows, buckets = ctx.state.buckets
     const v = box.querySelector(`[data-strip-value="${r.id}"]`);
     if (!v) continue;
     const last = [...data[rows.indexOf(r)]].reverse().find((y) => y !== null && y !== undefined);
-    v.textContent = r.current !== undefined ? r.current : (last === undefined ? '—' : (r.valueFormat || r.format)(last));
-    v.className = `strip-value${r.ink ? ` ${r.ink}` : ''}`;
+    v.textContent = last === undefined ? '—' : (r.valueFormat || r.format)(last);
   }
 }
 
 /** Linha de uma faixa: rótulo | gráfico | valor atual. */
-export const stripRow = (r) => html`
+const stripRow = (r) => html`
   <div class="strip-row">
     <span class="strip-label"><span class="name">${r.color ? html`<span class="swatch line c-${r.color}"></span>` : ''}${r.label}</span>${r.sub ? html`<span class="sub">${r.sub}</span>` : ''}</span>
     ${chartBox(r.id)}
@@ -231,8 +224,6 @@ export const strips = (groupId, rows, cls = '') => html`
     ${rows.map(stripRow)}
     <div class="ticks strip-ticks"></div>
   </div>`;
-
-export const emptyState = (text) => html`<p class="empty">${text}</p>`;
 
 /** Cabeçalho de painel: título, nota e um lado direito opcional. */
 export const panelHead = (title, note = '', right = '') => html`

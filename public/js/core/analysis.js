@@ -6,7 +6,7 @@ const isNum = (v) => typeof v === 'number' && Number.isFinite(v);
 const AVG = 2;
 const MIN = 0;
 const MAX = 1;
-export const STAT = { min: MIN, max: MAX, avg: AVG };
+const STAT = { min: MIN, max: MAX, avg: AVG };
 
 /** Valores de uma métrica alinhados aos baldes (null onde não há dado: buraco no gráfico). */
 export function series(buckets, key, stat = 'avg') {

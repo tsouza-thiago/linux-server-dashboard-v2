@@ -3,7 +3,7 @@
 import { html, mount } from '../core/html.js';
 import * as f from '../core/format.js';
 import { keysWith, meanOf, peakOf, trendOf } from '../core/analysis.js';
-import { $, pill, chip, big, n0, meter, chartBox, legend, drawCharts, drawStrips, strips, panelHead } from './common.js';
+import { $, pill, big, n0, meter, chartBox, legend, drawCharts, drawStrips, strips, panelHead } from './common.js';
 
 export const sub = () => 'Processador, memória, pressão do sistema e temperatura';
 

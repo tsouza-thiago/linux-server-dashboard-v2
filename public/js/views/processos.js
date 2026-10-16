@@ -21,7 +21,6 @@ const SVC = {
   desconhecido: ['neutral', 'sem resposta', 'serious'],
 };
 const view = { filter: '', sort: { key: 'mem', dir: -1 } };
-const cmdName = (cmd = '') => (cmd.split(/\s+/)[0] || '').split('/').pop() || cmd;
 
 function services(state) {
   const list = Object.entries(state.sample?.services || {});
@@ -59,7 +58,7 @@ function rows(s) {
   const maxMem = Math.max(...(s.topProcs || []).map((p) => p.mem || 0), 1);
   return list.map((p) => html`<tr>
     <td class="ink-3">${p.pid}</td>
-    <td title="${p.cmd}">${cmdName(p.cmd)}</td>
+    <td title="${p.cmd}">${f.cmdName(p.cmd)}</td>
     <td class="ink-2">${p.user}</td>
     <td class="num"><span class="mem-cell">${meter({ pct: ((p.mem || 0) / maxMem) * 100, color: 's2' }, { size: 'sm' })}${f.pct(p.mem, 1)}</span></td>
     <td class="num ink-2">${f.bytes(typeof p.rssKB === 'number' ? p.rssKB * 1024 : null)}</td>
@@ -91,7 +90,7 @@ function memory(s) {
     ...top2.map((p, i) => ({ pct: pct(mb(p.rssKB)), color: 's2', op: 1 - i * 0.2 })),
     { pct: pct(restMb), color: 's2', op: 0.6 }, { pct: pct(othersMb), color: 's2', op: 0.35 }], { size: 'lg mem-split' })}
     <div class="kv-list">
-      ${top2.map((p) => html`<div class="kv"><span>${cmdName(p.cmd)}</span><span class="mono ink-2">${f.bytes(p.rssKB * 1024)}</span></div>`)}
+      ${top2.map((p) => html`<div class="kv"><span>${f.cmdName(p.cmd)}</span><span class="mono ink-2">${f.bytes(p.rssKB * 1024)}</span></div>`)}
       ${rest.length ? html`<div class="kv"><span>outros ${rest.length} do topo</span><span class="mono ink-2">${f.mb(restMb)}</span></div>` : ''}
       <div class="kv"><span>demais processos e kernel</span><span class="mono ink-2">${f.mb(othersMb)}</span></div>
       <div class="kv sep"><span class="ink-2">disponível</span><span class="mono ink-2">${f.mb(r.avail)}</span></div>

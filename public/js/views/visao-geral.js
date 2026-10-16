@@ -17,7 +17,7 @@ const RING = 2 * Math.PI * 58;
 export const ownSkeleton = true;
 
 // ---------------- Alerta crítico: título e "o que fazer" por tipo de alerta ----------------
-export function advice(alert) {
+function advice(alert) {
   const key = alert?.key || '';
   const name = key.split(':')[1] || '';
   if (key.startsWith('smart:')) return { title: `O disco ${name} avisou que pode falhar`, todo: 'Faça backup agora: copie os dados importantes desse disco para outro disco hoje.' };
@@ -107,7 +107,7 @@ function hero(ctx) {
         </div>` : ''}
       </div>
       <div class="hero-minis">
-        <div class="mini"><span class="k">Disponibilidade 90 d</span><span class="v big sm">${uptime === null || uptime === undefined ? '—' : `${f.num(uptime, 2)}%`}</span></div>
+        <div class="mini"><span class="k">Disponibilidade 90 d</span><span class="v big sm">${f.pct(uptime, 2)}</span></div>
         <div class="mini"><span class="k">Eventos 24 h</span><span class="v big sm">${ev24}</span></div>
         <div class="mini"><span class="k">Custo no servidor</span><span class="v big sm">${cost}</span></div>
       </div>
@@ -258,7 +258,6 @@ function eventsPanel(state) {
     <button class="btn btn-quiet align-start" type="button" data-annotate>${icon('plus', 16)} Anotar agora</button>`;
 }
 
-const cmdName = (cmd = '') => (cmd.split(/\s+/)[0] || '').split('/').pop() || cmd;
 
 function procsPanel(state) {
   const s = state.sample;
@@ -268,7 +267,7 @@ function procsPanel(state) {
     ${panelHead('Processos & serviços', '', html`<a class="link" href="#/processos">todos</a>`)}
     ${procs.length ? html`<div class="table-wrap"><table class="table compact">
       <thead><tr><th scope="col">comando</th><th scope="col" class="num">mem</th><th scope="col" class="num">rss</th></tr></thead>
-      <tbody class="mono">${procs.map((p) => html`<tr><td title="${p.cmd}">${cmdName(p.cmd)}</td><td class="num">${f.pct(p.mem, 1)}</td><td class="num ink-2">${f.bytes(p.rssKB * 1024)}</td></tr>`)}</tbody>
+      <tbody class="mono">${procs.map((p) => html`<tr><td title="${p.cmd}">${f.cmdName(p.cmd)}</td><td class="num">${f.pct(p.mem, 1)}</td><td class="num ink-2">${f.bytes(p.rssKB * 1024)}</td></tr>`)}</tbody>
     </table></div>` : html`<p class="empty">Sem processos na última coleta.</p>`}
     <div class="chips">${svc.map(([name, st]) => {
     const ok = ['active', 'reloading', 'activating'].includes(st);

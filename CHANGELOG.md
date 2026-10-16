@@ -75,6 +75,18 @@ diante: `PATCH` corrige, `MINOR` acrescenta sem quebrar e `MAJOR` quebra.
   `importar-v1` (`BACKUP_NAME`), usuário e sudoers na dica do `desinstalar` (`PANEL_USER`,
   `SUDOERS`) e o SSH do `capturar-amostra` (usa o `runSSH` do painel, que também recusa
   host iniciado com `-` e corta resposta acima de 1 MB).
+- Código sem uso no navegador: `api.samples`, `levelWord`, `emptyState`, `appendSample`,
+  `mbs` e `isSafe` (com os testes que só os exercitavam); os ícones `menu`, `close`,
+  `pulse` e `server` (o `eventos`, apontado como duplicado, fica: a navegação monta o
+  ícone pelo id da tela); a opção `padRight`, os campos `current`/`ink` das faixas, o
+  `tip` guardado no grupo e as cores `border`/`accent` do gráfico, que ninguém lia;
+  imports sem uso (`panelHead` em Eventos, `chip` em Recursos); o `id="wz"` do
+  assistente; e o `export` de 9 símbolos que só o próprio módulo usa.
+- CSS sem uso: `.label`, `.wz-pre .k`, `.wz-chk.is-crit`, os tokens `--fs-caption`,
+  `--sp-1/2/3/5/6` e `--serious`; e regras do `configurar.css` que repetiam o `base.css`
+  (`body`, `.mono`, `box-sizing`).
+- `cmdName` repetido em duas telas vira `format.cmdName`; a disponibilidade usa
+  `format.pct(x, 2)` nas três telas (com `NaN`, mostra "—" em vez de "—%").
 - `docs/PLANO_V2.md`: o plano da V2 está concluído e fica como registro histórico na tag
   `v2.0.0`. O que ainda vale passou para o AGENTS: as invariantes I1–I10 (citadas no
   código), os navegadores suportados e a origem do orçamento de desempenho. As decisões

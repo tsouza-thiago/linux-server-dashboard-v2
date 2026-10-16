@@ -3,7 +3,7 @@
 let authHandler = () => {};
 export const onAuthRequired = (fn) => { authHandler = fn; };
 
-export class ApiError extends Error {
+class ApiError extends Error {
   constructor(status, message) {
     super(message);
     this.status = status;
@@ -38,7 +38,6 @@ export const api = {
   status: () => request('/api/status'),
   config: () => request('/api/config'),
   buckets: ({ from, to, limit = 600 }) => request(`/api/history${qs({ formato: 'baldes', from, to, limit })}`),
-  samples: ({ from, to, limit = 720 }) => request(`/api/history${qs({ from, to, limit })}`),
   alerts: (limit = 200) => request(`/api/alerts${qs({ limit })}`),
   ack: (id) => request(`/api/alerts/${encodeURIComponent(id)}/ack`, { method: 'POST', body: {} }),
   resolve: (id) => request(`/api/alerts/${encodeURIComponent(id)}/resolve`, { method: 'POST', body: {} }),

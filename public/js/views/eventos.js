@@ -4,7 +4,7 @@
 import { html, mount } from '../core/html.js';
 import * as f from '../core/format.js';
 import { timeline, dayStatuses, levelOf, viewOfKey, offlineMsIn } from '../core/analysis.js';
-import { $, icon, iconBox, panelHead, onClick } from './common.js';
+import { $, icon, iconBox, onClick } from './common.js';
 
 export const sub = () => 'Alertas, quedas e anotações numa linha do tempo única';
 
@@ -50,7 +50,7 @@ function uptime(state) {
     <div class="panel-head">
       <div class="uptime-head">
         <h2>Disponibilidade · 90 dias</h2>
-        <span class="big md">${u?.uptimePct === null || u?.uptimePct === undefined ? '—' : `${f.num(u.uptimePct, 2)}%`}</span>
+        <span class="big md">${f.pct(u?.uptimePct, 2)}</span>
         <span class="note">${outs.length} queda${outs.length === 1 ? '' : 's'} · ${svcDown} serviço${svcDown === 1 ? '' : 's'} parado${svcDown === 1 ? '' : 's'} · ${f.duration(offMs / 1000)} fora no total</span>
       </div>
       <div class="legend small">

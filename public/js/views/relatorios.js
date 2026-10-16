@@ -64,7 +64,7 @@ function cards(ctx) {
   const when = (p) => (p ? `${WEEKDAY[new Date(p.t).getDay()]} ${f.time(p.t)}` : '');
   const card = (label, value, note) => html`<article class="card"><span class="card-label">${label}</span><span class="big md">${value}</span><span class="note">${note}</span></article>`;
   return html`
-    ${card('Disponibilidade', up === null ? '—' : `${f.num(up, 2)}%`, outs.length ? `${outs.length} queda${outs.length > 1 ? 's' : ''} · ${f.duration(outs.reduce((s, o) => s + o.durationSec, 0))} fora` : 'nenhuma queda')}
+    ${card('Disponibilidade', f.pct(up, 2), outs.length ? `${outs.length} queda${outs.length > 1 ? 's' : ''} · ${f.duration(outs.reduce((s, o) => s + o.durationSec, 0))} fora` : 'nenhuma queda')}
     ${card('CPU média', f.pct(meanOf(b, 'cpu')), cpuPeak ? `pico ${f.pct(cpuPeak.value)} · ${when(cpuPeak)}` : 'sem dados')}
     ${card('Memória média', f.pct(meanOf(b, 'ramPct')), ramPeak ? `pico ${f.pct(ramPeak.value)}` : 'sem dados')}
     ${card(disk ? disk.mount : 'Disco', grew === null ? '—' : `${grew >= 0 ? '+' : '−'}${f.bytes(Math.abs(grew))}`, pk.length > 1 ? `${f.pct(pk[0])} → ${f.pct(pk[pk.length - 1])} no período` : 'sem dados no período')}

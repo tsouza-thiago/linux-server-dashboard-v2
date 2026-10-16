@@ -9,6 +9,9 @@ export function num(v, digits = 0) {
 
 export const pct = (v, digits = 0) => (isNum(v) ? `${num(v, digits)}%` : DASH);
 
+/** Nome curto do processo: só o programa, sem caminho nem argumentos ("/usr/bin/dockerd -H" → "dockerd"). */
+export const cmdName = (cmd = '') => (cmd.split(/\s+/)[0] || '').split('/').pop() || cmd;
+
 /** Bytes em base 1024, como o `df -h`: "145 GB", "1,8 TB". */
 export function bytes(v, digits) {
   if (!isNum(v)) return DASH;
@@ -22,7 +25,6 @@ export function bytes(v, digits) {
 
 export const mb = (v) => (isNum(v) ? bytes(v * 1024 * 1024) : DASH);
 export const mbps = (v) => (isNum(v) ? `${num(v, v < 10 ? 2 : 1)} Mbps` : DASH);
-export const mbs = (v) => (isNum(v) ? `${num(v, v < 10 ? 2 : 1)} MB/s` : DASH);
 export const celsius = (v) => (isNum(v) ? `${num(v, 1)} °C` : DASH);
 export const ms = (v) => (isNum(v) ? `${num(v, v < 10 ? 1 : 0)} ms` : DASH);
 

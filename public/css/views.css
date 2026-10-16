@@ -5,7 +5,7 @@
 .row-between { display: flex; justify-content: space-between; gap: 12px; font-size: 13px; }
 .chips { display: flex; flex-wrap: wrap; gap: 8px; }
 .chips:empty { display: none; }
-.chips.sep, .sep { padding-top: 12px; border-top: 1px solid var(--grid); }
+.sep { padding-top: 12px; border-top: 1px solid var(--grid); }
 .status-ink { display: inline-flex; align-items: center; gap: 6px; }
 .ink-text { color: var(--text); }
 .chip.is-current { color: var(--text); }

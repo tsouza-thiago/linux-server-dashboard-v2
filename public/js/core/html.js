@@ -53,4 +53,3 @@ export function mount(el, template) {
   applyDataStyles(el);
 }
 
-export const isSafe = (v) => v instanceof SafeHtml;

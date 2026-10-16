@@ -16,8 +16,8 @@ export const PERIODS = {
   '1h': 3600e3, '6h': 6 * 3600e3, '24h': 24 * 3600e3, '72h': 72 * 3600e3,
   '7d': 7 * 86400e3, '30d': 30 * 86400e3, '90d': 90 * 86400e3,
 };
-export const DEFAULT_VIEW = 'visao-geral';
-export const DEFAULT_PERIOD = '24h';
+const DEFAULT_VIEW = 'visao-geral';
+const DEFAULT_PERIOD = '24h';
 
 export function parseHash(hash) {
   const text = String(hash || '').replace(/^#\/?/, '');

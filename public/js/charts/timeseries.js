@@ -14,7 +14,7 @@ const cssVar = (name, fallback) => {
   }
 };
 
-export function themeColors() {
+function themeColors() {
   return {
     s1: cssVar('--s1', DEFAULT_COLORS.s1),
     s2: cssVar('--s2', DEFAULT_COLORS.s2),
@@ -22,9 +22,7 @@ export function themeColors() {
     s4: cssVar('--s4', DEFAULT_COLORS.s4),
     text: cssVar('--text-3', '#8390A4'),
     grid: cssVar('--grid', 'rgba(148,163,184,0.08)'),
-    border: cssVar('--border', 'rgba(148,163,184,0.12)'),
     surface: cssVar('--surface', '#0F141D'),
-    accent: cssVar('--accent', '#3EE0D0'),
     warn: cssVar('--warn', '#F5B83D'),
     crit: cssVar('--crit', '#F0525C'),
     glow: cssVar('--glow', '1') !== '0',
@@ -48,7 +46,7 @@ export function timeTicks(splits, spanSec) {
 }
 
 /** Horário completo da dica: "07/10 15:02". */
-export const tipTime = (sec) => new Date(sec * 1000).toLocaleString('pt-BR', {
+const tipTime = (sec) => new Date(sec * 1000).toLocaleString('pt-BR', {
   day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit', hour12: false,
 });
 
@@ -246,7 +244,7 @@ export function timeChart(el, o) {
   if (!UPlot || !el) return null;
   const {
     series, format = String, height = 220, range, axes = true, interactive = true, tooltip = true,
-    thresholds, annotations, bands, onCursor, onZoom, padRight = 0,
+    thresholds, annotations, bands, onCursor, onZoom,
   } = o;
   const c = themeColors();
   const fmt = (v) => (v === null || v === undefined ? '—' : format(v));
@@ -263,7 +261,7 @@ export function timeChart(el, o) {
     width: Math.max(el.clientWidth, 120),
     height,
     pxAlign: false,
-    padding: axes ? [8, 8 + padRight, 0, 0] : [4, 0, 4, 0],
+    padding: axes ? [8, 8, 0, 0] : [4, 0, 4, 0],
     cursor: interactive
       ? { sync: { key: o.syncKey || SYNC_KEY }, drag: { x: true, y: false }, points: { size: 8, width: 2, fill: c.surface }, y: false }
       : { show: false },
