@@ -48,6 +48,8 @@ diante: `PATCH` corrige, `MINOR` acrescenta sem quebrar e `MAJOR` quebra.
 - Testes: a CLI (`main` e `instalar`) aceita a pasta pessoal injetada (`home`). Os testes de
   `status` e de "painel já rodando" usam uma pasta temporária e não enxergam mais o painel
   instalado na máquina de quem roda a suíte.
+- Testes de SSE esperam a conexão entrar no hub, em vez de um tempo fixo (falhavam às
+  vezes com a máquina carregada).
 - Testes e2e: `CHROMIUM=<caminho>` escolhe o navegador, como já fazia o e2e da instalação.
 - `test-support/request.js` envia o corpo com `Content-Length` (num `DELETE` sem ele, o
   corpo era lido como uma segunda requisição).
