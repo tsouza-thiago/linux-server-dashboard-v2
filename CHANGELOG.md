@@ -9,11 +9,18 @@ diante: `PATCH` corrige, `MINOR` acrescenta sem quebrar e `MAJOR` quebra.
 
 ## [Não publicado]
 
+## [2.0.1] — 2026-10-16
+
+Versão de manutenção: documentação conferida contra o código, código comentado em PT-BR,
+código sem uso removido, 6 bugs corrigidos e uma camada de verificação de segurança contínua.
+Nada muda na configuração, no formato de `data/` nem no acesso ao servidor: atualize com
+`./dashboard atualizar`.
+
 ### Adicionado
 
 - Camada de verificação de segurança, redundante de propósito (AGENTS, "Verificação em
   camadas"):
-  - `test/seguranca/` (62 testes, em todo `npm run check`): regras estáticas no código
+  - `test/seguranca/` (65 testes, em todo `npm run check`): regras estáticas no código
     (CWE-78/79/89/94/208/330/532/598/732/918/1321/1333…), matriz de ataque gerada das rotas
     reais (Host, login, CSRF, cabeçalhos e erros em toda rota × método), corpus de ataques
     do OWASP WSTG (path traversal, header injection, formula injection, XSS, injeção de
@@ -23,7 +30,7 @@ diante: `PATCH` corrige, `MINOR` acrescenta sem quebrar e `MAJOR` quebra.
   - `npm run seguranca`: Semgrep (regras OWASP), Gitleaks (arquivos e todo o histórico),
     ShellCheck, OSV-Scanner e OWASP ZAP (varredura ativa e autenticada da API, com OpenAPI
     gerado das rotas), em imagens Docker presas por digest; e a mutação dos guardas
-    (`scripts/mutacao-seguranca.mjs`): 21 proteções quebradas de propósito, cada uma
+    (`scripts/mutacao-seguranca.mjs`): 24 proteções quebradas de propósito, cada uma
     acusada por algum teste.
   - `npm run test:seguranca` roda só a rede de segurança.
   - A própria varredura é endurecida: o ZAP escuta só em `127.0.0.1` (com `--network host`,
@@ -631,7 +638,8 @@ Documentados no plano da V2 (seção 2.2, B1–B12), entre eles: alerta SMART fa
 rede zerada com contadores grandes, alerta duplicado a cada coleta e reescrita completa do
 histórico a cada minuto.
 
-[Não publicado]: https://github.com/tsouza-thiago/linux-server-dashboard-v2/compare/v2.0.0...HEAD
+[Não publicado]: https://github.com/tsouza-thiago/linux-server-dashboard-v2/compare/v2.0.1...HEAD
+[2.0.1]: https://github.com/tsouza-thiago/linux-server-dashboard-v2/compare/v2.0.0...v2.0.1
 [2.0.0]: https://github.com/tsouza-thiago/linux-server-dashboard-v2/compare/v2.0.0-beta.2...v2.0.0
 [2.0.0-beta.2]: https://github.com/tsouza-thiago/linux-server-dashboard-v2/compare/v2.0.0-beta.1...v2.0.0-beta.2
 [2.0.0-beta.1]: https://github.com/tsouza-thiago/linux-server-dashboard-v2/compare/v2.0.0-alpha.8...v2.0.0-beta.1
