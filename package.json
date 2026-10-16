@@ -13,6 +13,7 @@
     "check": "node scripts/check.mjs",
     "capturar-amostra": "node scripts/capturar-amostra.mjs",
     "migrar-v1": "node server/storage/migrate-v1.js",
+    "soak": "node --expose-gc scripts/soak-acelerado.mjs",
     "test:e2e": "node --test \"test/e2e/**/*.test.js\""
   },
   "engines": {

@@ -8,6 +8,15 @@ pré-versões `2.0.0-alpha.N` (uma por fase do plano), depois `beta`, `rc` e `2.
 
 ## [Não publicado]
 
+### Adicionado
+
+- `npm run soak` (`scripts/soak-acelerado.mjs`): soak acelerado. Roda o painel de verdade
+  (histórico, agregados, alertas, SSE com 1 navegador) por 83 h de coletas simuladas pelo
+  coletor real, com a saída anonimizada do servidor; depois reinicia o painel com as 72 h
+  do disco e mede a RAM. Confere o orçamento (RAM ≤ 110 MB) e que a memória para de
+  crescer quando a janela de 72 h enche.
+- AGENTS: seção "Orçamento de desempenho" com os limites, o medido e como conferir.
+
 ### Alterado
 
 - **RAM do histórico (orçamento Q17):** em memória, só a amostra mais recente guarda os
