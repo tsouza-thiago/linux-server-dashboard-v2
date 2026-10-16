@@ -227,6 +227,16 @@ test('A02: todo servidor HTTP escuta só em 127.0.0.1', () => {
   assert.match(semComentarios(ler('server/cli/servico.js')), /export function portFree\(port, host = '127\.0\.0\.1'\)/);
 });
 
+test('CWE-200: os clientes HTTP dos testes só falam com 127.0.0.1 (alerta #8 do CodeQL)', () => {
+  // Os testes mandam ao painel de teste dados lidos de arquivo (rotas lidas do código, token
+  // de teste). Isso só é inofensivo enquanto o destino for esta máquina: o host fica fixo.
+  const fonte = semComentarios(ler('test-support/request.js'));
+  const pedidos = fonte.match(/http\.request\(\{[^}]*\}/g) || [];
+  assert.equal(pedidos.length, 2, 'request() e readSSE()');
+  for (const p of pedidos) assert.match(p, /^http\.request\(\{\s*host: '127\.0\.0\.1',\s*port,/);
+  assert.doesNotMatch(fonte, /\bhost\s*[:=]\s*(?!'127\.0\.0\.1')[^,\s]/, 'nenhum host vindo de parâmetro');
+});
+
 test('CWE-918: o servidor não faz pedido de rede para fora (só ao próprio painel em 127.0.0.1)', () => {
   const fetches = procurar(SERVIDOR, /\bfetch\s*\([^;]*/g).filter((a) => !/fetch\(`http:\/\/127\.0\.0\.1:/.test(a));
   assert.deepEqual(fetches, []);
