@@ -9,12 +9,38 @@ diante: `PATCH` corrige, `MINOR` acrescenta sem quebrar e `MAJOR` quebra.
 
 ## [Não publicado]
 
+### Adicionado
+
+- Camada de verificação de segurança, redundante de propósito (AGENTS, "Verificação em
+  camadas"):
+  - `test/seguranca/` (60 testes, em todo `npm run check`): regras estáticas no código
+    (CWE-78/79/94/208/330/532/598/732/918/1321/1333…), matriz de ataque gerada das rotas
+    reais (Host, login, CSRF, cabeçalhos e erros em toda rota × método), corpus de ataques
+    do OWASP WSTG (path traversal, header injection, formula injection, XSS, injeção de
+    comando, prototype pollution, corpo gigante, ReDoS), segredos e OSINT em tudo que vai
+    para o repositório público e cadeia de suprimentos (hash dourado do script de coleta,
+    soma do Node, chave de `docs/allowed_signers`, imagens e actions presas).
+  - `npm run seguranca`: Semgrep (regras OWASP), Gitleaks (arquivos e todo o histórico),
+    ShellCheck, OSV-Scanner e OWASP ZAP (varredura ativa e autenticada da API, com OpenAPI
+    gerado das rotas), em imagens Docker presas por digest; e a mutação dos guardas
+    (`scripts/mutacao-seguranca.mjs`): 21 proteções quebradas de propósito, cada uma
+    acusada por algum teste.
+  - `npm run test:seguranca` roda só a rede de segurança.
+  - Linha de base da `v2.0.0` analisada em `docs/seguranca/2026-10-16-linha-de-base.md`
+    (achados, decisões e OSINT do repositório público); exceções aceitas, com motivo e
+    teste, em `docs/seguranca/excecoes.json`.
+
 ### Alterado
 
 - Testes: a CLI (`main` e `instalar`) aceita a pasta pessoal injetada (`home`). Os testes de
   `status` e de "painel já rodando" usam uma pasta temporária e não enxergam mais o painel
   instalado na máquina de quem roda a suíte.
 - Testes e2e: `CHROMIUM=<caminho>` escolhe o navegador, como já fazia o e2e da instalação.
+- `test-support/request.js` envia o corpo com `Content-Length` (num `DELETE` sem ele, o
+  corpo era lido como uma segunda requisição).
+- `.gitignore`: `.seguranca/` (relatórios brutos) e `.claude/` (configuração local).
+- `scripts/node-runtime.sh`: diretiva do ShellCheck explica por que `NODE_BIN` e
+  `NODE_ORIGEM` parecem sem uso (quem as lê é o `./dashboard`).
 
 ## [2.0.0] — 2026-10-16
 

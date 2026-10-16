@@ -15,13 +15,17 @@ export function close(server) {
 }
 
 export function request(port, { method = 'GET', path = '/', headers = {}, body } = {}) {
+  // O corpo vai com Content-Length: sem ele, num DELETE o Node não enquadra o corpo e o
+  // servidor leria esses bytes como uma segunda requisição (inválida).
+  const payload = body === undefined ? undefined : Buffer.from(typeof body === 'string' ? body : JSON.stringify(body));
+  const framing = payload ? { 'Content-Length': payload.length } : {};
   return new Promise((resolve, reject) => {
     const req = http.request({
       host: '127.0.0.1',
       port,
       method,
       path,
-      headers: { Host: 'localhost', ...headers },
+      headers: { Host: 'localhost', ...framing, ...headers },
     }, (res) => {
       const chunks = [];
       res.on('data', (c) => chunks.push(c));
@@ -33,9 +37,7 @@ export function request(port, { method = 'GET', path = '/', headers = {}, body }
       });
     });
     req.on('error', reject);
-    if (body !== undefined) {
-      req.write(typeof body === 'string' ? body : JSON.stringify(body));
-    }
+    if (payload) req.write(payload);
     req.end();
   });
 }

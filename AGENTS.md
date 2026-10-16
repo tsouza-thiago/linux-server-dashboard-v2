@@ -94,13 +94,28 @@ O teste `test/unit/docs.test.js` confere esta documentação contra o código.
   descartado como falso positivo com a análise em `docs/seguranca/` e, se possível, um
   teste que falhe na forma errada. Não aplique a sugestão do CodeQL sem conferir o formato
   real (ex.: o escape do `authorized_keys` segue o `opt_dequote`, não o padrão genérico).
+- **Verificação em camadas** (redundante de propósito):
+  1. `test/seguranca/` roda em todo `npm run check`: regras estáticas no código
+     (`invariantes-estaticas`), matriz de ataque gerada das rotas reais
+     (`superficie-ataque`), corpus de ataques OWASP (`payloads-owasp`), segredos e OSINT
+     no que vai para o repositório público (`segredos-osint`) e cadeia de suprimentos,
+     inclusive o hash dourado do script de coleta (`cadeia-suprimentos`).
+  2. `npm run seguranca` (`scripts/seguranca.mjs`): Semgrep (regras OWASP), Gitleaks
+     (arquivos e histórico), ShellCheck, OSV-Scanner e OWASP ZAP (ataque ativo e
+     autenticado a um painel de teste), em imagens Docker presas por digest; e a mutação
+     dos guardas (`scripts/mutacao-seguranca.mjs`): cada proteção é quebrada de propósito
+     numa cópia e algum teste precisa acusar. Achado médio ou alto só passa com análise
+     em `docs/seguranca/excecoes.json`.
 
 ## Desenvolvimento (obrigatório)
 
 - **Plano e decisões:** `docs/PLANO_V2.md` (fases F0–F9, invariantes, bugs B1–B12) e
   `docs/adr/` (uma ADR por decisão; ADR aceita não é editada, é substituída por outra).
 - **Antes de todo commit:** `npm run check` (sintaxe JS e shell, `.env`/`data/` fora do git,
-  testes + cobertura, `npm audit`). Nenhum commit vermelho.
+  testes + cobertura com `test/seguranca/`, `npm audit`). Nenhum commit vermelho.
+- **Mudou código de segurança, removeu código ou terminou uma etapa?** Rode também
+  `npm run seguranca` (precisa de Docker; sem ele, as ferramentas externas são puladas e a
+  mutação roda assim mesmo).
 - **Documentação junto com o código:** mudou comando, opção, variável, rota ou arquivo?
   Atualize este arquivo (e o README/TUTORIAL, se a pessoa usuária vê a mudança).
   `test/unit/docs.test.js` falha se a documentação divergir do código.
@@ -158,6 +173,8 @@ npm test                        # suíte de testes (node --test)
 npm run check                   # verificação completa, obrigatória antes de cada commit
 npm run test:unit               # só testes unitários (test/unit)
 npm run test:integration        # só integração (HTTP, shell, ssh falso, sshd real)
+npm run test:seguranca          # só a rede de segurança (test/seguranca)
+npm run seguranca               # Semgrep, Gitleaks, ShellCheck, OSV, OWASP ZAP e mutação (Docker)
 npm run test:e2e                # ponta a ponta no Chromium (playwright-core; pula sem navegador; CHROMIUM=<caminho> escolhe outro)
 npm run capturar-amostra        # 1 coleta real → data/amostra-{bruta,anonima}.txt (fixtures)
 npm run migrar-v1 -- --verificar  # resume o data/history.json da V1 sem gravar nada
@@ -414,7 +431,8 @@ linux-server-dashboard-v2/
 ├── package.json            sem dependências de runtime; devDependency: playwright-core (e2e)
 ├── .env.example            modelo do .env (sem valores reais)
 ├── docs/                   PLANO_V2.md, adr/, seguranca/ (análises do CodeQL) e allowed_signers
-├── scripts/                check.mjs, capturar-amostra.mjs, node-runtime.sh, askpass.sh, e2e-instalacao/
+├── scripts/                check.mjs, seguranca.mjs, mutacao-seguranca.mjs, soak-acelerado.mjs,
+│                           capturar-amostra.mjs, node-runtime.sh, askpass.sh, e2e-instalacao/
 ├── server/
 │   ├── index.js            rotas, loop de coleta, export
 │   ├── config.js           parser único do .env, faixas, sanitizeToken/sanitizeHost
@@ -436,8 +454,9 @@ linux-server-dashboard-v2/
 │   ├── fonts/              Geist + Geist Mono 1.7.2 (OFL, SHA-256 em vendor/vendor.json)
 │   ├── vendor/             uPlot 1.6.32 (SHA-256 em vendor.json)
 │   └── js/                 main.js, locale-guard.js, core/, charts/, views/ (as 8 telas)
-├── test/                   unit/, integration/, e2e/ e fixtures/ (node --test)
-└── test-support/           request.js (HTTP/SSE), sshd.js (sshd real), instalacao-fake.js
+├── test/                   unit/, integration/, seguranca/, e2e/ e fixtures/ (node --test)
+└── test-support/           request.js (HTTP/SSE), sshd.js (sshd real), instalacao-fake.js,
+                            rotas.js (rotas lidas do código), fonte.js (código sem comentários)
 ```
 
 ## Solução de problemas (para quem desenvolve)
