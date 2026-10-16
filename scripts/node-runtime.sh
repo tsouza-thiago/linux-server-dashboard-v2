@@ -1,5 +1,5 @@
 # shellcheck shell=bash
-# Node.js do painel (ADR 0002, Q18): usa o Node 24+ do sistema ou, se faltar ou for antigo,
+# Node.js do painel (ADR 0002): usa o Node 24+ do sistema ou, se faltar ou for antigo,
 # baixa o Node 24 oficial para dentro da pasta (.runtime/node), sem sudo, e confere a soma
 # SHA-256 fixada abaixo antes de extrair. Lido pelo ./dashboard (não executa nada sozinho).
 

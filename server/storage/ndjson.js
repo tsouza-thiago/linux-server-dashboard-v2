@@ -83,7 +83,7 @@ export function writeFileAtomicSync(file, data) {
 export const validTs = (s) => s && typeof s.ts === 'string' && Number.isFinite(Date.parse(s.ts));
 
 /**
- * Forma compacta de uma amostra que deixou de ser a mais recente (orçamento de RAM, Q17).
+ * Forma compacta de uma amostra que deixou de ser a mais recente (orçamento de RAM do AGENTS).
  * Os processos (`topProcs`, ~35% da amostra) só servem para a amostra atual: as telas não
  * os leem do histórico. A ida e volta por JSON deixa o objeto igual ao lido do disco
  * (mesma forma que após reiniciar) e mais leve que o montado pelo coletor. O arquivo

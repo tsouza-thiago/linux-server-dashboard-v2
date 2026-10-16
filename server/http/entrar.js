@@ -1,4 +1,4 @@
-// Link de entrada de uso único (Q4 + passo 6 do assistente): `dashboard abrir` e o fim da
+// Link de entrada de uso único (passo 6 do assistente): `dashboard abrir` e o fim da
 // instalação abrem o painel já logado, sem mostrar o DASH_TOKEN. Quem cria o link precisa
 // poder gravar em data/ (ou seja, já é o dono da instalação); em disco fica só o SHA-256 do
 // código, que vale uma vez e por pouco tempo.

@@ -1,18 +1,22 @@
 #!/usr/bin/env node
 // Verificação completa antes de cada commit: `npm run check`.
-// Roda em sequência e para no primeiro erro (exit != 0).
+// Roda em sequência e para no primeiro erro (exit != 0): sintaxe JS e shell, .env/data/
+// fora do git, testes com cobertura (inclui test/seguranca/) e npm audit do runtime.
 import { spawnSync } from 'node:child_process';
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const ROOT = path.join(path.dirname(fileURLToPath(import.meta.url)), '..');
+// Raiz do projeto e os scripts shell conferidos com `bash -n`.
 const SHELL_SCRIPTS = ['dashboard', 'scripts/node-runtime.sh', 'scripts/askpass.sh', 'scripts/e2e-instalacao/rodar.sh'];
 
+/** Roda um comando na raiz (sem shell) e devolve o resultado do spawnSync. */
 function run(cmd, args, opts = {}) {
   return spawnSync(cmd, args, { cwd: ROOT, encoding: 'utf8', ...opts });
 }
 
+/** Todos os .js/.mjs de uma pasta, recursivamente (caminhos relativos à raiz). */
 function listJs(dir) {
   const out = [];
   for (const entry of fs.readdirSync(path.join(ROOT, dir), { withFileTypes: true })) {
@@ -23,6 +27,7 @@ function listJs(dir) {
   return out;
 }
 
+// Os passos, na ordem: cada um devolve { ok, detail } para a linha do relatório.
 const steps = [
   {
     name: 'sintaxe JavaScript (node --check)',
@@ -42,6 +47,7 @@ const steps = [
   {
     name: 'segredos fora do git (.env e data/)',
     fn() {
+      // O .env e o data/ nunca podem estar no git (segredos e telemetria da rede interna).
       const r = run('git', ['ls-files', '--', '.env', 'data']);
       const tracked = (r.stdout || '').trim();
       return { ok: r.status === 0 && tracked === '', detail: tracked ? `rastreados: ${tracked}` : 'nada rastreado' };
@@ -50,6 +56,7 @@ const steps = [
   {
     name: 'testes + cobertura (node --test)',
     fn() {
+      // Testes e auxiliares ficam fora da conta de cobertura (só o código do painel conta).
       const r = run(process.execPath, [
         '--test',
         '--experimental-test-coverage',
@@ -71,6 +78,7 @@ const steps = [
   {
     name: 'dependências de runtime (npm audit)',
     fn() {
+      // Só o runtime importa (que hoje não tem dependência); devDependencies ficam de fora.
       const r = run('npm', ['audit', '--omit=dev', '--audit-level=moderate']);
       const line = `${r.stdout}`.trim().split('\n').pop();
       return { ok: r.status === 0, detail: line };
@@ -78,6 +86,7 @@ const steps = [
   },
 ];
 
+// Para no primeiro passo vermelho: nenhum commit com a verificação falhando.
 let failed = false;
 for (const step of steps) {
   const { ok, detail } = step.fn();

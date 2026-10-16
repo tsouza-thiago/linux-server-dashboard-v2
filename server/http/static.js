@@ -19,7 +19,7 @@ const MIME = {
 };
 
 // Texto (HTML, CSS, JS, JSON, SVG) vai em gzip quando o navegador aceita: a página inicial
-// cabe no orçamento de 300 KB (Q17). As fontes .woff2 e as imagens já vêm comprimidas. Os
+// cabe no orçamento de 300 KB (AGENTS). As fontes .woff2 e as imagens já vêm comprimidas. Os
 // arquivos são do próprio pacote, sem segredo nem dado do usuário (nada de BREACH).
 const COMPRESSIBLE = /^(text\/|application\/json|image\/svg\+xml)/;
 const MIN_GZIP_BYTES = 1024;

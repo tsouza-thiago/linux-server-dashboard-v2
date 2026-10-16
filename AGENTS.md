@@ -463,7 +463,7 @@ Motor em `server/alerts/` (ADR 0006).
 
 ## Orçamento de desempenho
 
-Definido no plano da V2 (Q17). O limite de RAM foi revisto em 16/10/2026, depois de medido.
+Definido no plano da V2. O limite de RAM foi revisto em 16/10/2026, depois de medido.
 
 | Medida | Limite | Medido | Como se confere |
 |---|---|---|---|
