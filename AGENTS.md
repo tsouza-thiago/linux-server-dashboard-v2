@@ -398,7 +398,7 @@ Definido no plano (Q17); o limite de RAM foi revisto em 16/10/2026, depois de me
 | Tempo do comando no servidor | ≤ 1,5 s | 1,26–1,31 s (servidor real, 1 núcleo) | faixa de status e `./dashboard diagnosticar` |
 | Tamanho da resposta | ≤ 16 KB | 2,9 KB (servidor real) | idem; acima de 1 MB a conexão é cortada |
 | Página inicial | ≤ 300 KB transferidos | 279 KB (com gzip) | `test/e2e/telas.test.js` |
-| RAM do Node com 72 h em memória | ≤ 110 MB | 102,6–103,5 MB (painel reiniciado com 72 h) | `npm run soak` |
+| RAM do Node com 72 h em memória | ≤ 110 MB | 102,6–105,3 MB (painel reiniciado com 72 h) | `npm run soak` |
 | Memória depois que a janela de 72 h enche | sem crescer (≤ +4 MB) | +1,1 a +1,8 MB em 11 h a mais | `npm run soak` |
 
 O Node 24 vazio usa ~44 MB e o painel sem histórico, ~62 MB: o resto é o histórico de

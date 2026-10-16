@@ -66,7 +66,7 @@ tem a sua seção.
   segredo nem dado do usuário. Um teste e2e mede o total transferido.
 - **Orçamento de RAM revisto de 80 para 110 MB** (decisão do mantenedor, 16/10/2026): o
   Node 24 vazio já usa ~44 MB e o painel sem histórico, ~62 MB. Medido com 72 h em
-  memória: 102,6–103,5 MB. Guardar em memória só os números dos gráficos fica para a 2.1.
+  memória: 102,6–105,3 MB. Guardar em memória só os números dos gráficos fica para a 2.1.
 - **F9 sem as 72 h reais e sem `rc`** (decisão do mantenedor): no lugar, o soak acelerado
   e a beta rodando no computador e no servidor reais desde 08/10. O teste de instalação em
   contêineres passa a cobrir o caminho real (`2.0.0-beta.2` → `2.0.0` assinada; a estável
