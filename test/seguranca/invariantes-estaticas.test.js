@@ -122,7 +122,8 @@ test('CWE-1333: new RegExp só com texto escapado ou fixo (sem ReDoS nem injeç�
 test('CWE-1321: o JSON do corpo descarta __proto__, constructor e prototype', () => {
   const fonte = semComentarios(ler('server/http/router.js'));
   assert.match(fonte, /JSON\.parse\(text, \(k, v\) => \(k === '__proto__' \|\| k === 'constructor' \|\| k === 'prototype' \? undefined : v\)\)/);
-  assert.match(fonte, /const out = Object\.create\(null\)/, 'query sem protótipo');
+  assert.match(fonte, /return Object\.setPrototypeOf\(Object\.fromEntries\(vistos\), null\);/, 'query sem protótipo e sem gravação por nome');
+  assert.match(fonte, /!CHAVES_PROIBIDAS\.has\(k\)/, 'query recusa __proto__, constructor e prototype');
 });
 
 // ---------------------------------------------------------------- XSS e CSP (A05, CWE-79)
@@ -242,8 +243,10 @@ test('CWE-829: import() dinâmico só com caminho fixo', () => {
 });
 
 test('frontend: nenhuma URL de outra origem no código (só o link do tutorial no GitHub)', () => {
+  // Cada achado é "arquivo:linha  <url>"; a URL inteira precisa COMEÇAR no repositório do
+  // projeto (âncora ^), senão "https://evil.example/?github.com/…" passaria.
   const urls = procurar(FRONTEND, /https?:\/\/[^'"`\s)]+/g)
-    .filter((a) => !/https:\/\/github\.com\/tsouza-thiago\/linux-server-dashboard-v2\//.test(a));
+    .filter((a) => !/^https:\/\/github\.com\/tsouza-thiago\/linux-server-dashboard-v2\//.test(a.split('  ').pop()));
   assert.deepEqual(urls, []);
 });
 

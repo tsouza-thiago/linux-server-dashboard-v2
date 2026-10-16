@@ -20,9 +20,11 @@ const CHAVES_PROIBIDAS = new Set(['__proto__', 'constructor', 'prototype']);
 
 /** Primeira ocorrência de cada parâmetro da query (`?a=1&a=2` → `a: '1'`). */
 function parseQuery(params) {
-  const out = Object.create(null);
-  for (const [k, v] of params) if (!CHAVES_PROIBIDAS.has(k) && !(k in out)) out[k] = v;
-  return out;
+  const vistos = new Map();
+  for (const [k, v] of params) if (!CHAVES_PROIBIDAS.has(k) && !vistos.has(k)) vistos.set(k, v);
+  // Nenhuma propriedade é gravada com nome vindo de fora (CodeQL js/remote-property-injection):
+  // Object.fromEntries cria as chaves como dados próprios e o objeto final fica sem protótipo.
+  return Object.setPrototypeOf(Object.fromEntries(vistos), null);
 }
 
 /** Acrescenta res.status/json/send (mesma forma usada pelas rotas e pelos testes). */

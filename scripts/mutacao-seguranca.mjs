@@ -42,7 +42,7 @@ const MUTACOES = [
   { nome: 'comparação de segredo sem tempo constante', arquivo: 'server/http/session.js', de: 'return crypto.timingSafeEqual(ab, bb);', para: 'return ab.toString() === bb.toString();' },
   { nome: 'cookie de sessão sem HttpOnly', arquivo: 'server/http/session.js', de: 'Path=/; HttpOnly; SameSite=Strict`;', para: 'Path=/; SameSite=Strict`;' },
   { nome: 'JSON do corpo sem filtro de __proto__', arquivo: 'server/http/router.js', de: "JSON.parse(text, (k, v) => (k === '__proto__' || k === 'constructor' || k === 'prototype' ? undefined : v))", para: 'JSON.parse(text)' },
-  { nome: 'query aceitando __proto__/constructor', arquivo: 'server/http/router.js', de: 'if (!CHAVES_PROIBIDAS.has(k) && !(k in out))', para: 'if (!(k in out))' },
+  { nome: 'query aceitando __proto__/constructor', arquivo: 'server/http/router.js', de: 'if (!CHAVES_PROIBIDAS.has(k) && !vistos.has(k))', para: 'if (!vistos.has(k))' },
   {
     nome: 'estáticos sem proteção de path traversal', arquivo: 'server/http/static.js',
     de: "    if (segments.some((seg) => seg.startsWith('.'))) return res.status(404).json({ error: 'não encontrado' });\n    const file = path.resolve(base, ...segments);\n    if (file !== base && !file.startsWith(base + path.sep)) return res.status(404).json({ error: 'não encontrado' });\n",
