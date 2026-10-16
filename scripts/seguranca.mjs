@@ -318,6 +318,12 @@ const ETAPAS = [
 
 async function main() {
   const { so, pular } = opcoes(process.argv.slice(2));
+  // Nome errado em --so/--pular não pode virar "OK" sem nenhuma ferramenta ter rodado.
+  const desconhecidas = [...so, ...pular].filter((n) => !ETAPAS.some((e) => e.nome === n));
+  if (desconhecidas.length) {
+    console.error(`etapa desconhecida: ${desconhecidas.join(', ')} (válidas: ${ETAPAS.map((e) => e.nome).join(', ')})`);
+    process.exit(2);
+  }
   const docker = temDocker();
   const noCI = process.env.CI === 'true';
   let falhou = false;

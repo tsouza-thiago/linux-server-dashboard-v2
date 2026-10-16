@@ -1,7 +1,7 @@
 // Estrutura do projeto: sintaxe de shell e JS e os arquivos essenciais presentes.
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { execFileSync } from 'node:child_process';
+import { execFileSync, spawnSync } from 'node:child_process';
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -58,4 +58,15 @@ test('arquivos essenciais existem (regressão de estrutura)', () => {
   for (const rel of required) {
     assert.ok(fs.existsSync(path.join(ROOT, rel)), `${rel} deveria existir`);
   }
+});
+
+test('npm run seguranca recusa etapa desconhecida em vez de passar sem rodar nada', () => {
+  // Um erro de digitação em --so= (ex.: "shellcheck" no lugar de "shell") não pode virar
+  // "SEGURANÇA OK" sem nenhuma ferramenta ter rodado.
+  const so = spawnSync(process.execPath, ['scripts/seguranca.mjs', '--so=inexistente'], { cwd: ROOT, encoding: 'utf8' });
+  assert.equal(so.status, 2, so.stdout + so.stderr);
+  assert.match(so.stderr, /etapa desconhecida: inexistente/);
+  assert.doesNotMatch(so.stdout, /SEGURANÇA OK/);
+  const pular = spawnSync(process.execPath, ['scripts/seguranca.mjs', '--pular=zapp'], { cwd: ROOT, encoding: 'utf8' });
+  assert.equal(pular.status, 2, pular.stdout + pular.stderr);
 });

@@ -122,7 +122,9 @@ O teste `test/unit/docs.test.js` confere esta documentação contra o código.
      autenticado a um painel de teste), em imagens Docker presas por digest; e a mutação
      dos guardas (`scripts/mutacao-seguranca.mjs`): cada proteção é quebrada de propósito
      numa cópia e algum teste precisa acusar. Achado médio ou alto só passa com análise
-     em `docs/seguranca/excecoes.json`.
+     em `docs/seguranca/excecoes.json`. Para rodar só algumas etapas:
+     `npm run seguranca -- --so=semgrep,shell` ou `--pular=zap` (etapas: `semgrep`,
+     `segredos`, `shell`, `osv`, `zap`, `mutacao`; nome errado sai com erro).
   3. CI no GitHub (ADR 0014, `.github/workflows/seguranca.yml`), a cada push no `main` e
      a cada PR: `npm run check`, `npm run test:e2e` com `E2E_OBRIGATORIO=1` (sem
      navegador, falha em vez de pular) e `npm run seguranca`. Actions presas por SHA,

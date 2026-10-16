@@ -60,6 +60,8 @@ diante: `PATCH` corrige, `MINOR` acrescenta sem quebrar e `MAJOR` quebra.
   vezes com a máquina carregada). Os outros testes com espera fixa (processo da CLI, TUI,
   assistente) passam a esperar a condição real com `test-support/esperar.js`.
 - Testes e2e: `CHROMIUM=<caminho>` escolhe o navegador, como já fazia o e2e da instalação.
+- `npm run seguranca -- --so=<etapa>` com nome de etapa errado sai com erro (antes rodava
+  nada e dizia "SEGURANÇA OK"). As etapas e as opções estão no AGENTS.
 - `test-support/request.js` envia o corpo com `Content-Length` (num `DELETE` sem ele, o
   corpo era lido como uma segunda requisição).
 - `.gitignore`: `.seguranca/` (relatórios brutos) e `.claude/` (configuração local).
