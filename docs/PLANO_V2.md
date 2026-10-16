@@ -7,7 +7,9 @@
 > revisão visual aprovada em 08/10/2026) · F7 concluída (`2.0.0-alpha.8`, e2e em contêineres
 > Debian 12 e Ubuntu 24.04 limpos: 27/27; validada no computador e no servidor real em
 > 08/10/2026) · F8 entregue (`2.0.0-beta.1`, docs conferidas por `test/unit/docs.test.js`) ·
-> `2.0.0-beta.2` (alertas do CodeQL, 16/10/2026) · próxima: **F9** ·
+> `2.0.0-beta.2` (alertas do CodeQL, 16/10/2026) · F9 concluída (`v2.0.0`, 16/10/2026: soak
+> acelerado no lugar das 72 h reais, por decisão do mantenedor; limite de RAM revisto para
+> 110 MB) · **V2 publicada** ·
 > base: `v1.0.0` (= `tsouza-thiago/linux-server-dashboard` @ `11a3286`, 196 testes verdes)
 >
 > Referência visual: canvas "Dashboard V2 — direções de design" (privado, do mantenedor).
@@ -296,7 +298,7 @@ commit** (testes + cobertura + `npm audit` + `bash -n`), e nenhum commit vermelh
 | **F6 — Design** ✅ | implementar em CSS/JS o design system **já aprovado no canvas** (tokens, componentes, estados, AA nos 2 temas, teclado, mobile, `prefers-reduced-motion`) + 8 telas | screenshots do Chromium comparados com as pranchetas aprovadas + **sua revisão visual** |
 | **F7 — Instalação** ✅ | comando `dashboard`, assistente no navegador + TUI reserva, detecção automática, configuração do servidor assistida/manual, SSH isolado, tag assinada, atalho e systemd de usuário, atualizar/desinstalar, upgrade V1→V2 | instalação de ponta a ponta numa VM Debian e numa Ubuntu limpas (sem git? sem Node?) + upgrade testado numa cópia de `data/` da V1 — **feito em contêineres** (`scripts/e2e-instalacao/rodar.sh`, 27/27): Debian 12 e Ubuntu 24.04 sem Node (git instalado pelo comando do README), servidores Debian e Ubuntu com sudo por senha; upgrade com o `data/` gerado pela própria V1 (`v1.0.0`) rodando contra o servidor. Validada pelo mantenedor em 08/10/2026: `--importar-v1` + `reconfigurar` no computador e no servidor reais, serviço systemd de usuário ativo depois de reiniciar, `diagnosticar` sem avisos |
 | **F8 — Docs** ✅ entregue | README enxuto, TUTORIAL, AGENTS e SECURITY (threat model com SSH restrito e sudo) → `beta` | docs batem com o código — conferido por `test/unit/docs.test.js` (links, arquivos, comandos e opções, scripts, variáveis com padrões e faixas, rotas, versões, exemplo da coleta, IPs, teste de cada ameaça) |
-| **F9 — Release** | soak de 72 h → `rc` → `v2.0.0` | dentro do orçamento (tempo do comando no servidor, saída, RAM/CPU local) |
+| **F9 — Release** ✅ | soak de 72 h → `rc` → `v2.0.0` | dentro do orçamento (tempo do comando no servidor, saída, RAM/CPU local) — **feito assim, por decisão do mantenedor (16/10/2026):** sem `rc` e sem as 72 h reais; no lugar, o soak acelerado (`npm run soak`: 83 h de coletas simuladas pelo coletor real, painel reiniciado com 72 h do disco) e a beta rodando no computador e no servidor reais desde 08/10. O soak achou o histórico acima do orçamento de RAM: corrigido (só a amostra atual guarda os processos, leitura em blocos; 127,8 → 102,6–103,5 MB) e o limite revisto para 110 MB. A página inicial passou de 441 para 279 KB (gzip). O e2e da instalação passou a cobrir `beta.2` → `2.0.0` (29/29) e achou a instalação nova indo para a rc do último commit: corrigido (fica na estável). Tabela final no AGENTS ("Orçamento de desempenho") |
 
 ---
 
@@ -349,7 +351,7 @@ Todas as recomendações abaixo foram aceitas como estão e passam a valer como 
 | Q14 | Navegadores suportados | Chrome/Edge, Firefox e Safari, **2 últimas versões** (permite ES modules, `<dialog>`, CSS moderno sem polyfill) |
 | Q15 | Playwright | Entra só como **devDependency** (testes e2e e screenshots); nada dele no runtime |
 | Q16 | Piso de cobertura | Começa em **80%** no backend na F1 e sobe para **90%** até o `beta`; frontend medido pelos e2e |
-| Q17 | Orçamento de desempenho | Comando no servidor **≤ 1,5 s** e **≤ 16 KB** de saída; página inicial **≤ 300 KB** transferidos; Node local **≤ 80 MB** de RAM |
+| Q17 | Orçamento de desempenho | Comando no servidor **≤ 1,5 s** e **≤ 16 KB** de saída; página inicial **≤ 300 KB** transferidos; Node local **≤ 80 MB** de RAM — **revisto em 16/10/2026 para ≤ 110 MB** (o Node 24 vazio já usa ~44 MB e o painel sem histórico, ~62 MB; medido: 102,6 MB com 72 h) |
 
 ---
 

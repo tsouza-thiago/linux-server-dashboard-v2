@@ -3,10 +3,45 @@
 Todas as mudanças relevantes deste projeto ficam registradas aqui.
 
 O formato segue o [Keep a Changelog](https://keepachangelog.com/pt-BR/1.1.0/) e o projeto
-usa [Versionamento Semântico](https://semver.org/lang/pt-BR/). A V2 é publicada em
-pré-versões `2.0.0-alpha.N` (uma por fase do plano), depois `beta`, `rc` e `2.0.0`.
+usa [Versionamento Semântico](https://semver.org/lang/pt-BR/). A V2 foi construída em
+pré-versões `2.0.0-alpha.N` (uma por fase do plano) e `beta`, até a `2.0.0`. Daqui em
+diante: `PATCH` corrige, `MINOR` acrescenta sem quebrar e `MAJOR` quebra.
 
 ## [Não publicado]
+
+## [2.0.0] — 2026-10-16
+
+Primeira versão estável da V2: a reformulação completa do painel, feita em 9 fases a partir
+da `v1.0.0` (plano em `docs/PLANO_V2.md`). Validada no computador e no servidor reais do
+mantenedor desde 08/10/2026, em contêineres Debian 12 e Ubuntu 24.04 limpos e pelo soak
+acelerado. As seções abaixo listam só o que mudou desde a `2.0.0-beta.2`; cada pré-versão
+tem a sua seção.
+
+### Resumo da V2 em relação à V1
+
+- **Instalação em 1 comando** (`./dashboard instalar`): assistente no navegador (ou no
+  terminal), Node 24 baixado e conferido se faltar, serviço de usuário e atalho no menu.
+  Atualizar, reconfigurar, diagnosticar e desinstalar pelo mesmo comando. Upgrade da V1
+  com `--importar-v1`.
+- **Acesso mínimo ao servidor:** usuário `dashmon` sem senha, chave restrita à coleta e só
+  a partir deste computador, `sudo` só para `smartctl -H` disco por disco. A senha do
+  administrador é usada uma vez e descartada.
+- **Versões assinadas:** a instalação e a atualização só aceitam tags assinadas pela chave
+  do projeto (`docs/allowed_signers`).
+- **Coleta corrigida e mais rica:** 1 SSH por minuto, SMART sem alerta falso, rede certa
+  com contadores grandes, CPU por tipo, PSI, inodes, latência dos discos, temperatura por
+  sensor; dado ausente é `null`, nunca zero.
+- **Histórico novo:** 72 h a cada minuto e 90 dias a cada 5 min, só acrescentando ao
+  arquivo (a V1 reescrevia ~6,8 MB por minuto).
+- **Alertas sem ruído:** chave estável, histerese, debounce do "servidor inacessível" e
+  quedas guardadas à parte, com disponibilidade de 90 dias.
+- **Painel redesenhado** (Aurora + Cockpit, escuro primeiro): 8 telas, gráficos uPlot
+  sincronizados, contraste AA nos 2 temas, teclado e celular.
+- **Mais seguro e sem dependências de runtime:** HTTP próprio em `node:http`, sessão por
+  cookie, CSP sem inline, link de entrada de uso único; todos os 12 bugs da V1 (B1–B12)
+  corrigidos, cada um com teste.
+- **Documentação conferida pelo código** (`test/unit/docs.test.js`) e modelo de ameaças
+  com o teste de cada defesa (SECURITY.md).
 
 ### Adicionado
 
@@ -29,6 +64,13 @@ pré-versões `2.0.0-alpha.N` (uma por fase do plano), depois `beta`, `rc` e `2.
   (HTML, CSS, JS, JSON, SVG) vão em gzip quando o navegador aceita (antes, 441 KB sem
   compressão). Fontes `.woff2` e imagens já vêm comprimidas. Só arquivos estáticos, sem
   segredo nem dado do usuário. Um teste e2e mede o total transferido.
+- **Orçamento de RAM revisto de 80 para 110 MB** (decisão do mantenedor, 16/10/2026): o
+  Node 24 vazio já usa ~44 MB e o painel sem histórico, ~62 MB. Medido com 72 h em
+  memória: 102,6–103,5 MB. Guardar em memória só os números dos gráficos fica para a 2.1.
+- **F9 sem as 72 h reais e sem `rc`** (decisão do mantenedor): no lugar, o soak acelerado
+  e a beta rodando no computador e no servidor reais desde 08/10. O teste de instalação em
+  contêineres passa a cobrir o caminho real (`2.0.0-beta.2` → `2.0.0` assinada; a estável
+  não instala pré-versão sem `--pre`).
 - **Instalação nova fica na estável:** um clone do `main` vai para a estável assinada mais
   nova, mesmo que o último commit tenha uma tag `-rc` (antes, instalava a rc). Pré-versão
   só sem estável publicada ou com `./dashboard instalar --pre`; quem escolheu a tag com
@@ -428,7 +470,8 @@ Documentados no plano da V2 (seção 2.2, B1–B12), entre eles: alerta SMART fa
 rede zerada com contadores grandes, alerta duplicado a cada coleta e reescrita completa do
 histórico a cada minuto.
 
-[Não publicado]: https://github.com/tsouza-thiago/linux-server-dashboard-v2/compare/v2.0.0-beta.2...HEAD
+[Não publicado]: https://github.com/tsouza-thiago/linux-server-dashboard-v2/compare/v2.0.0...HEAD
+[2.0.0]: https://github.com/tsouza-thiago/linux-server-dashboard-v2/compare/v2.0.0-beta.2...v2.0.0
 [2.0.0-beta.2]: https://github.com/tsouza-thiago/linux-server-dashboard-v2/compare/v2.0.0-beta.1...v2.0.0-beta.2
 [2.0.0-beta.1]: https://github.com/tsouza-thiago/linux-server-dashboard-v2/compare/v2.0.0-alpha.8...v2.0.0-beta.1
 [2.0.0-alpha.8]: https://github.com/tsouza-thiago/linux-server-dashboard-v2/compare/v2.0.0-alpha.7...v2.0.0-alpha.8
