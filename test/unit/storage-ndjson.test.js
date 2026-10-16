@@ -131,3 +131,38 @@ test('readNdjson e writeFileAtomicSync', () => {
   assert.deepEqual(readNdjson(path.join(dir, 'nada.ndjson')), { items: [], bad: 0, torn: false });
   assert.throws(() => readNdjson(dir), /EISDIR/);
 });
+
+test('RAM (Q17): só a amostra mais recente guarda os processos, em memória e depois de reiniciar; o disco guarda tudo', async () => {
+  const dir = tmp();
+  const procs = { topProcs: [{ user: 'root', pid: 1, cpu: 0, mem: 1, rssKB: 10, cmd: '/sbin/init' }] };
+  const store = new RawStore({ dir, log: silent });
+  for (let i = 0; i < 3; i++) store.append(sample(i, procs));
+  assert.deepEqual(store.samples.map((s) => 'topProcs' in s), [false, false, true]);
+  assert.deepEqual(store.getLatest().topProcs, procs.topProcs);
+  assert.equal(store.samples[0].load[0], 0.1, 'o resto da amostra antiga continua igual');
+  await store.flush();
+  // Amostra de outro dia (o fim de cada arquivo diário não pode ficar com processos).
+  store.append(sample(24 * 60, procs));
+  await store.flush();
+  const lines = listDays(dir).flatMap((d) => fs.readFileSync(path.join(dir, `${d}.ndjson`), 'utf8').trim().split('\n'));
+  assert.equal(lines.length, 4);
+  assert.ok(lines.every((l) => JSON.parse(l).topProcs), 'o NDJSON continua com a amostra inteira');
+  const again = new RawStore({ dir, log: silent });
+  assert.deepEqual(again.samples.map((s) => 'topProcs' in s), [false, false, false, true]);
+  assert.equal(again.getLatest().ts, at(24 * 60));
+});
+
+test('readNdjson: lê em blocos (linha e UTF-8 cortados entre blocos), map, linha inválida e arquivo cortado', () => {
+  const dir = tmp();
+  const file = path.join(dir, 'x.ndjson');
+  const long = 'ç'.repeat(700_000); // ~1,4 MB: a linha atravessa o bloco de 1 MB no meio de um caractere
+  fs.writeFileSync(file, `${JSON.stringify({ a: 1 })}\n{quebrada\n${JSON.stringify({ a: 2, s: long })}\n${JSON.stringify({ a: 3 })}`);
+  const r = readNdjson(file, { map: (o, i) => ({ ...o, i }) });
+  assert.deepEqual(r.items.map((o) => [o.a, o.i]), [[1, 0], [2, 1], [3, 2]]);
+  assert.equal(r.items[1].s, long);
+  assert.equal(r.bad, 1);
+  assert.equal(r.torn, true);
+  fs.appendFileSync(file, '\n');
+  assert.equal(readNdjson(file).torn, false);
+  assert.deepEqual(readNdjson(path.join(dir, 'nada.ndjson')), { items: [], bad: 0, torn: false });
+});

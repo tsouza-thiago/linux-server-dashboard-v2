@@ -1,9 +1,11 @@
 // Histórico bruto append-only (ADR 0005): 1 arquivo NDJSON por dia (UTC) em data/history/,
 // 1 linha por amostra. Gravar uma amostra acrescenta ~4 KB ao arquivo do dia em vez de
-// reescrever o histórico inteiro (corrige B7). As últimas 72 h ficam em memória.
+// reescrever o histórico inteiro (corrige B7). As últimas 72 h ficam em memória; só a
+// amostra mais recente guarda os processos (compactSample).
 import fs from 'node:fs';
 import fsp from 'node:fs/promises';
 import path from 'node:path';
+import { StringDecoder } from 'node:string_decoder';
 import { downsample } from './buckets.js';
 
 export const HOUR_MS = 3600000;
@@ -15,23 +17,45 @@ export const dayOf = (ts) => new Date(ts).toISOString().slice(0, 10);
 
 /**
  * Lê um NDJSON tolerando linhas inválidas e a última linha cortada por uma queda no meio
- * da gravação. `torn` indica que o arquivo não termina em \n.
+ * da gravação. `torn` indica que o arquivo não termina em \n. Lê em blocos de 1 MB (não o
+ * arquivo inteiro de uma vez): ao reiniciar com 72 h no disco, o pico de memória é o de um
+ * bloco, não o de ~17 MB de texto. `map` transforma cada item logo que ele é lido.
  */
-export function readNdjson(file) {
-  let raw;
+export function readNdjson(file, { map = null } = {}) {
+  let fd;
   try {
-    raw = fs.readFileSync(file, 'utf8');
+    fd = fs.openSync(file, 'r');
   } catch (err) {
     if (err.code === 'ENOENT') return { items: [], bad: 0, torn: false };
     throw err;
   }
   const items = [];
   let bad = 0;
-  for (const line of raw.split('\n')) {
-    if (!line.trim()) continue;
-    try { items.push(JSON.parse(line)); } catch { bad += 1; }
+  let rest = '';
+  let lastByte = null;
+  const decoder = new StringDecoder('utf8');
+  const take = (line) => {
+    if (!line.trim()) return;
+    let item;
+    try { item = JSON.parse(line); } catch { bad += 1; return; }
+    items.push(map ? map(item, items.length) : item);
+  };
+  try {
+    const buf = Buffer.allocUnsafe(1024 * 1024);
+    for (;;) {
+      const n = fs.readSync(fd, buf, 0, buf.length, null);
+      if (n === 0) break;
+      lastByte = buf[n - 1];
+      const text = rest + decoder.write(buf.subarray(0, n));
+      const lines = text.split('\n');
+      rest = lines.pop();
+      for (const line of lines) take(line);
+    }
+    take(rest + decoder.end());
+  } finally {
+    fs.closeSync(fd);
   }
-  return { items, bad, torn: raw.length > 0 && !raw.endsWith('\n') };
+  return { items, bad, torn: lastByte !== null && lastByte !== 0x0a };
 }
 
 /** Dias (AAAA-MM-DD) com arquivo NDJSON na pasta, em ordem. */
@@ -52,6 +76,18 @@ export function writeFileAtomicSync(file, data) {
 }
 
 const validTs = (s) => s && typeof s.ts === 'string' && Number.isFinite(Date.parse(s.ts));
+
+/**
+ * Forma compacta de uma amostra que deixou de ser a mais recente (orçamento de RAM, Q17).
+ * Os processos (`topProcs`, ~35% da amostra) só servem para a amostra atual: as telas não
+ * os leem do histórico. A ida e volta por JSON deixa o objeto igual ao lido do disco
+ * (mesma forma que após reiniciar) e mais leve que o montado pelo coletor. O arquivo
+ * NDJSON continua com a amostra inteira.
+ */
+export function compactSample(sample) {
+  const { topProcs, ...rest } = sample;
+  return JSON.parse(JSON.stringify(rest));
+}
 
 export class RawStore {
   /**
@@ -83,12 +119,20 @@ export class RawStore {
     // mais recente, então lemos de trás para frente até passar da janela.
     const keepDays = Math.ceil(this.retentionMs / DAY_MS) + 1;
     for (const day of days.slice(-keepDays)) {
-      const { items, bad, torn } = readNdjson(this.fileFor(day));
+      // Cada amostra perde os processos logo ao ser lida (compactSample); a mais recente
+      // é a última linha do último dia, e os processos dela voltam abaixo.
+      let last = null;
+      const { items, bad, torn } = readNdjson(this.fileFor(day), {
+        map: (s) => { last = s; const { topProcs, ...rest } = s; return rest; },
+      });
       if (bad) this.log(`[history] ${bad} linha(s) inválida(s) ignorada(s) em ${day}.ndjson`);
       if (torn) this._torn.add(day);
       for (const s of items) if (validTs(s)) list.push(s);
+      if (last && validTs(last) && list.length && list[list.length - 1].ts === last.ts) list[list.length - 1] = last;
     }
     list.sort((a, b) => (a.ts < b.ts ? -1 : a.ts > b.ts ? 1 : 0));
+    // Fora de ordem (relógio que voltou): só a mais recente fica com os processos.
+    for (let i = 0; i < list.length - 1; i++) if (list[i].topProcs) list[i] = compactSample(list[i]);
     this.samples = list;
     this._trim();
   }
@@ -112,6 +156,8 @@ export class RawStore {
   /** Acrescenta 1 amostra (memória na hora; disco em fila, sem bloquear o poll). */
   append(sample) {
     if (!validTs(sample)) return this._queue;
+    const prev = this.samples.length - 1;
+    if (prev >= 0) this.samples[prev] = compactSample(this.samples[prev]);
     this.samples.push(sample);
     this._trim();
     const day = dayOf(sample.ts);

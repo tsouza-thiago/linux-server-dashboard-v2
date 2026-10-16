@@ -8,6 +8,15 @@ pré-versões `2.0.0-alpha.N` (uma por fase do plano), depois `beta`, `rc` e `2.
 
 ## [Não publicado]
 
+### Alterado
+
+- **RAM do histórico (orçamento Q17):** em memória, só a amostra mais recente guarda os
+  processos (`topProcs`, ~35% da amostra; as telas só leem os da atual) e as antigas ficam
+  na forma compacta, igual à lida do disco. Ao reiniciar, os arquivos de 72 h são lidos em
+  blocos de 1 MB, não inteiros. Medido pelo soak acelerado: o histórico de 72 h cai de 33,6
+  para 15,7 MB de heap, e a RAM do painel reiniciado com 72 h, de 127,8 para 102,6 MB. O
+  NDJSON continua com a amostra inteira; `/api/history` traz `topProcs` só na mais recente.
+
 ## [2.0.0-beta.2] — 2026-10-16
 
 Correções da primeira análise do code scanning (CodeQL) do GitHub. Nenhum dos 2 alertas
