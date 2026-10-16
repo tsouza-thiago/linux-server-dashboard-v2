@@ -1,4 +1,4 @@
-// Upgrade V1 → V2 (`./dashboard instalar --importar-v1 <pasta-da-v1>`, Q11): para a V1
+// Upgrade V1 → V2 (`./dashboard instalar --importar-v1 <pasta-da-v1>`): para a V1
 // (nunca as duas juntas: seriam 2 SSH por minuto), traz as configurações e os dados dela
 // e liga a V2. A pasta da V1 não é alterada: ela é o backup e fica pronta para voltar.
 import fs from 'node:fs';
@@ -9,7 +9,9 @@ import { ensureDataDirs, updateEnv, installService, installShortcut } from '../s
 import { hasSystemdUser, systemctlUser, startPanel, waitForPort, panelPort } from './servico.js';
 import { BACKUP_NAME } from '../storage/migrate-v1.js';
 
+/** Nome do serviço systemd da V1 (o docs.test aceita os dois nomes na documentação). */
 export const V1_UNIT = 'linux-server-dashboard.service';
+// Arquivos de dados da V1 que a V2 aproveita (o histórico é convertido na 1ª subida).
 const DATA_FILES = ['history.json', 'alerts.json', 'annotations.json'];
 
 /** É uma instalação da V1? (package.json 1.x do linux-server-dashboard + server/index.js) */
@@ -28,6 +30,7 @@ export function detectV1(dir) {
 export function v1Settings(env) {
   const out = {};
   const host = sanitizeHost(env.SSH_HOST);
+  // Host só com caracteres de nome/endereço (alias, usuario@host, IPv6); o resto é descartado.
   if (env.SSH_HOST && !isPlaceholderHost(host) && /^[A-Za-z0-9._@:-]+$/.test(host)) out.SSH_HOST = host;
   const tokens = (k) => sanitizeToken(env[k] || '').join(' ');
   for (const k of ['DISK_MOUNTS', 'DISK_DEVS', 'SERVICES']) if (env[k] !== undefined) out[k] = tokens(k);
@@ -46,6 +49,7 @@ export function v1Pid(dir, procDir = '/proc') {
     if (!Number.isInteger(pid) || pid <= 1) return null;
     const args = fs.readFileSync(path.join(procDir, String(pid), 'cmdline'), 'utf8').split('\0');
     const script = path.join(dir, 'server', 'index.js');
+    // Caminho absoluto, ou relativo com o diretório do processo sendo a pasta da V1.
     return args.some((a) => a === script || (a === 'server/index.js' && fs.realpathSync(`${procDir}/${pid}/cwd`) === fs.realpathSync(dir))) ? pid : null;
   } catch {
     return null;
@@ -70,6 +74,10 @@ export async function stopV1(dir, { run, procDir = '/proc', kill = process.kill 
   return done;
 }
 
+/**
+ * O upgrade em si: confere que é a V1, para a V1, traz o .env saneado e os dados, instala o
+ * serviço (ou sobe em segundo plano) e confere que a V2 respondeu.
+ */
 export async function importarV1({ out, root, dir, home = os.homedir(), deps = {} }) {
   const v1 = path.resolve(String(dir || ''));
   const det = detectV1(v1);
@@ -96,6 +104,8 @@ export async function importarV1({ out, root, dir, home = os.homedir(), deps = {
   updateEnv(root, { ...settings, SSH_ACESSO: 'direto', SSH_CONFIG: '' });
   out.ok('configurações trazidas da V1', Object.keys(settings).filter((k) => k !== 'DASH_TOKEN').join(', '));
 
+  // Copia só o que ainda não existe na V2 (nunca sobrescreve dados dela); o histórico da V1
+  // não volta se ele já foi migrado antes (o backup existe).
   const copied = [];
   for (const f of DATA_FILES) {
     const src = path.join(v1, 'data', f);

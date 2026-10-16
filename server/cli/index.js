@@ -14,7 +14,7 @@ import { diagnosticar } from './diagnosticar.js';
 import { atualizar } from './atualizar.js';
 import { desinstalar } from './desinstalar.js';
 
-
+// Texto de `./dashboard ajuda` (as opções citadas aqui são conferidas pelo docs.test.js).
 const HELP = `Uso: ./dashboard <comando>
 
   instalar        primeira instalação (abre o assistente no navegador)
@@ -35,6 +35,7 @@ const HELP = `Uso: ./dashboard <comando>
   ajuda           esta ajuda
 `;
 
+/** Versão do package.json da pasta `root` ("?" se ilegível). */
 function version(root) {
   try { return JSON.parse(fs.readFileSync(path.join(root, 'package.json'), 'utf8')).version; } catch { return '?'; }
 }
@@ -54,6 +55,8 @@ export function panelUrl(root, port) {
   return { url: `${base}/entrar?codigo=${code}`, oneTime: true };
 }
 
+// Os subcomandos: cada um recebe { out, root, home, args } e devolve o código de saída
+// (0 ok, 1 falha, 2 uso errado, 3 painel parado no `status`).
 const COMMANDS = {
   instalar: (ctx) => instalar(ctx),
   reconfigurar: (ctx) => instalar({ ...ctx, reconfigurar: true }),
@@ -125,6 +128,7 @@ export const COMMAND_NAMES = Object.freeze(Object.keys(COMMANDS));
  */
 export async function main(argv = process.argv.slice(2), { out = makeOutput(), root = ROOT, home = os.homedir() } = {}) {
   const [name = 'ajuda', ...args] = argv;
+  // Formas alternativas aceitas para ajuda e versão.
   const alias = { '--help': 'ajuda', '-h': 'ajuda', help: 'ajuda', '--version': 'versao', versão: 'versao' };
   const cmd = COMMANDS[alias[name] ?? name];
   if (!cmd) {
@@ -135,6 +139,7 @@ export async function main(argv = process.argv.slice(2), { out = makeOutput(), r
   return cmd({ out, root, home, args });
 }
 
+// Rodando direto pelo ./dashboard? (importado pelos testes, não executa nada)
 const isCLI = process.argv[1] && fileURLToPath(import.meta.url) === path.resolve(process.argv[1]);
 if (isCLI) {
   main().then((code) => process.exit(code), (err) => {

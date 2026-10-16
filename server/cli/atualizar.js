@@ -1,4 +1,4 @@
-// `dashboard atualizar` (seção 11): git fetch → tag assinada mais nova (conferida com a
+// `dashboard atualizar` (ADR 0012): git fetch → tag assinada mais nova (conferida com a
 // lista de chaves da versão QUE JÁ ESTÁ instalada: a nova não se autoaprova) → backup de
 // data/ → troca de versão → a versão nova liga o painel e confere a saúde → se algo
 // falhar, volta sozinha para a versão anterior com o data/ do backup.
@@ -11,13 +11,16 @@ import { installService } from '../setup/local.js';
 import { panelPort, panelStatus, startPanel, stopPanel, unitPath, waitForPort, systemctlUser, UNIT_NAME } from './servico.js';
 import { parseFlags } from './instalar.js';
 
+// Cópias de data/ guardadas em .backups/ (as mais antigas saem).
 const KEEP_BACKUPS = 3;
 
+/** Roda o git na pasta do painel (argumentos em lista, teto de 2 min) e devolve o resultado. */
 function git(root, args, run = spawnSync) {
   const r = run('git', ['-C', root, ...args], { encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'], timeout: 120000 });
   return { status: r.status ?? -1, stdout: (r.stdout || '').trim(), stderr: (r.stderr || '').trim() };
 }
 
+// Versão instalada como tag ("v2.0.1"), lida do package.json da pasta (muda com o checkout).
 const versionOf = (root) => {
   try { return `v${JSON.parse(fs.readFileSync(path.join(root, 'package.json'), 'utf8')).version}`; } catch { return 'v0.0.0'; }
 };
@@ -36,6 +39,7 @@ export function backupData(root, label, now = new Date()) {
   return dir;
 }
 
+/** Volta o data/ da cópia de segurança (quando a versão nova falhou). */
 export function restoreData(root, backupDir) {
   const data = path.join(root, 'data');
   fs.rmSync(data, { recursive: true, force: true });
@@ -71,6 +75,10 @@ export async function afterUpdate({ out, root, home = os.homedir(), deps = {} })
   return 0;
 }
 
+/**
+ * `./dashboard atualizar`. Opções: --pre (aceita pré-versão) e --pos-atualizacao (interna:
+ * a 2ª fase, rodada pela versão nova). Devolve 0 atualizado ou já na mais nova, 1 falha.
+ */
 export async function atualizar({ out, root, args = [], home = os.homedir(), deps = {} }) {
   const flags = parseFlags(args);
   if (flags['pos-atualizacao']) return afterUpdate({ out, root, home, deps });
@@ -92,6 +100,7 @@ export async function atualizar({ out, root, args = [], home = os.homedir(), dep
   // A lista de chaves vem da versão instalada (copiada antes de qualquer checkout).
   const signers = path.join(fs.mkdtempSync(path.join(os.tmpdir(), 'dash-signers-')), 'allowed_signers');
   fs.copyFileSync(SIGNERS(root), signers);
+  // Pré-versões só para quem já está numa ou pediu --pre (AGENTS, "Versões").
   const pre = current.includes('-') || Boolean(flags.pre);
   const newer = signedReleaseTags(root, { signersFile: signers, includePre: pre, run: deps.gitRun })
     .filter((t) => compareVersions(t, current) > 0);
@@ -102,6 +111,7 @@ export async function atualizar({ out, root, args = [], home = os.homedir(), dep
   }
   const target = newer[0];
   out.ok(`versão nova encontrada: ${target}`, 'assinatura conferida com a chave da versão instalada');
+  // Arquivo do painel alterado à mão: o checkout apagaria a alteração, então para aqui.
   const dirty = git(root, ['status', '--porcelain', '--untracked-files=no'], run).stdout;
   if (dirty) {
     out.fail('há arquivos do painel alterados nesta pasta');
@@ -125,6 +135,7 @@ export async function atualizar({ out, root, args = [], home = os.homedir(), dep
     if (!wasRunning) out.line(out.c.dim('O painel estava parado antes; ele foi ligado para conferir a versão nova.'));
     return 0;
   }
+  // A versão nova não subiu: volta o código e os dados, e a versão anterior se liga de novo.
   out.fail(`a versão ${target} não funcionou aqui: voltando para ${current}`);
   await (deps.stopPanel ?? stopPanel)({ root, home });
   git(root, ['-c', 'advice.detachedHead=false', 'checkout', '--quiet', '--detach', oldRef], run);

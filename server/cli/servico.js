@@ -1,4 +1,4 @@
-// Controle do painel na máquina local: serviço systemd de usuário quando instalado (D12),
+// Controle do painel na máquina local: serviço systemd de usuário quando instalado (ADR 0013),
 // senão um processo em segundo plano com PID registrado em data/dashboard.pid.
 //
 // B12: `parar` só encerra o PID que o próprio painel registrou, e só depois de conferir em
@@ -11,9 +11,12 @@ import os from 'node:os';
 import path from 'node:path';
 import { clampInt, loadEnvFile } from '../config.js';
 
+/** Nome do serviço systemd de usuário do painel (o docs.test confere contra a documentação). */
 export const UNIT_NAME = 'server-dashboard.service';
 
+/** Onde fica o arquivo da unidade (~/.config/systemd/user/). */
 export const unitPath = (home = os.homedir()) => path.join(home, '.config', 'systemd', 'user', UNIT_NAME);
+// PID do painel em segundo plano e o script que ele roda (para conferir que é ele mesmo).
 const pidFile = (root) => path.join(root, 'data', 'dashboard.pid');
 const serverScript = (root) => path.join(root, 'server', 'index.js');
 
@@ -34,6 +37,7 @@ export function isOurProcess(pid, root, procDir = '/proc') {
   return args.includes(serverScript(root));
 }
 
+/** PID gravado em data/dashboard.pid (null se não houver ou se não for um número válido). */
 export function readPid(root) {
   try {
     const n = Number(fs.readFileSync(pidFile(root), 'utf8').trim());
@@ -49,6 +53,7 @@ export function runningPid(root, procDir = '/proc') {
   return pid && isOurProcess(pid, root, procDir) ? pid : null;
 }
 
+/** A porta está livre? (tenta escutar nela por um instante e fecha) */
 export function portFree(port, host = '127.0.0.1') {
   return new Promise((resolve) => {
     const srv = net.createServer();
@@ -72,6 +77,7 @@ export async function waitForPort(port, { timeoutMs = 15000, host = '127.0.0.1' 
   return false;
 }
 
+// Pausa assíncrona.
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
 /** systemctl --user (null se não houver systemd de usuário nesta sessão). */
@@ -81,6 +87,7 @@ export function systemctlUser(args, { run = spawnSync } = {}) {
   return { status: r.status, stdout: r.stdout || '', stderr: r.stderr || '' };
 }
 
+/** Esta sessão tem systemd de usuário funcionando? */
 export function hasSystemdUser(opts) {
   const r = systemctlUser(['show-environment'], opts);
   return Boolean(r && r.status === 0);
@@ -89,6 +96,7 @@ export function hasSystemdUser(opts) {
 /** Estado do painel: serviço systemd, processo em segundo plano ou parado. */
 export function panelStatus({ root, home = os.homedir(), procDir = '/proc', run } = {}) {
   const port = panelPort(root);
+  // Com a unidade instalada E o systemd de usuário de pé, quem manda é o serviço.
   const service = fs.existsSync(unitPath(home)) && hasSystemdUser({ run });
   if (service) {
     const active = systemctlUser(['is-active', UNIT_NAME], { run });
@@ -117,6 +125,7 @@ export async function startPanel({ root, home = os.homedir(), nodeBin = process.
     const up = await waitForPort(st.port);
     return { ok: up, error: up ? null : 'o serviço iniciou mas o painel não respondeu', ...st, running: up };
   }
+  // Sem systemd: processo destacado, com os erros de inicialização em data/ (0600).
   if (!(await portFree(st.port))) {
     return { ok: false, error: `a porta ${st.port} já está em uso por outro programa (mude PORT no .env)`, ...st };
   }
@@ -147,6 +156,7 @@ export async function stopPanel({ root, home = os.homedir(), procDir = '/proc', 
     fs.rmSync(pidFile(root), { force: true });
     return { ok: true, wasRunning: false, mode: 'parado', stalePid: pid };
   }
+  // Pede para sair (o painel grava o pendente, B11); passado o prazo, força.
   process.kill(pid, 'SIGTERM');
   const until = Date.now() + graceMs;
   while (Date.now() < until && isOurProcess(pid, root, procDir)) await sleep(100);
@@ -162,6 +172,7 @@ export async function stopPanel({ root, home = os.homedir(), procDir = '/proc', 
 /** Abre uma URL no navegador da sessão gráfica (false se não houver tela). */
 export function openBrowser(url, { env = process.env, spawnFn = spawn, run = spawnSync } = {}) {
   if (!env.DISPLAY && !env.WAYLAND_DISPLAY) return false;
+  // O xdg-open existe? (texto fixo no sh -c; a URL vai como argumento separado, sem shell)
   const has = run('sh', ['-c', 'command -v xdg-open'], { stdio: 'ignore' });
   if (has.status !== 0) return false;
   const child = spawnFn('xdg-open', [url], { detached: true, stdio: 'ignore' });

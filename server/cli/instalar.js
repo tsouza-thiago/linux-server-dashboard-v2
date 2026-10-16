@@ -1,4 +1,4 @@
-// `dashboard instalar` e `dashboard reconfigurar` (seção 11 do plano): confere a versão
+// `dashboard instalar` e `dashboard reconfigurar` (ADR 0011): confere a versão
 // assinada, o Node 24, os arquivos de terceiros (SHA-256), o SSH e a porta, e abre o
 // assistente no navegador — ou a TUI (--terminal) ou o modo sem perguntas (--sem-interface).
 import { spawnSync } from 'node:child_process';
@@ -11,6 +11,7 @@ import { currentVersionStatus, describeVersion, signedReleaseTags, installTag } 
 import { ensureDataDirs } from '../setup/local.js';
 import { openBrowser, panelPort, panelStatus, portFree, stopPanel } from './servico.js';
 
+// O assistente se desliga sozinho depois de 1 h sem nenhum pedido.
 const IDLE_MS = 60 * 60 * 1000;
 
 /** Confere uPlot e fontes contra as somas de public/vendor/vendor.json. */
@@ -32,6 +33,10 @@ export function verifyVendor(root) {
   return { ok: bad.length === 0, bad, count };
 }
 
+/**
+ * Opções da linha de comando: `--chave=valor`, `--chave valor` (só para as opções que
+ * levam valor, listadas abaixo) e `--chave` sozinha (= true). O resto vai para `_`.
+ */
 export function parseFlags(args) {
   const flags = { _: [] };
   for (let i = 0; i < args.length; i += 1) {
@@ -44,16 +49,24 @@ export function parseFlags(args) {
   return flags;
 }
 
+// Linha do Node na saída, conforme de onde o ./dashboard o tirou.
 const NODE_LINE = {
   baixado: ['Node.js 24 — baixado para .runtime/ e conferido', 'SHA-256'],
   pasta: ['Node.js 24 — em .runtime/', 'conferido ao baixar'],
   sistema: ['Node.js 24 — o do sistema', ''],
 };
 
-/** Verificações antes de abrir o assistente. Devolve false se algo impede continuar. */
+/**
+ * Verificações antes de abrir o assistente: versão assinada (fixa na tag certa se for um
+ * clone do main), Node, arquivos de terceiros, SSH e a pasta data/. Devolve true para seguir,
+ * false se algo impede continuar, ou o código de saída da nova execução depois de trocar de
+ * versão (o ./dashboard da tag escolhida roda de novo, com o Node que ela pede).
+ */
 export function preflight({ out, root, flags, env = process.env, run = spawnSync, reexec }) {
   const ver = currentVersionStatus(root);
+  // A pasta tem arquivo do painel alterado? (nesse caso, nunca troca de versão sozinho)
   const isDirty = () => Boolean(run('git', ['-C', root, 'status', '--porcelain', '--untracked-files=no'], { encoding: 'utf8' }).stdout?.trim());
+  // Troca para a tag e roda o ./dashboard de novo (null se o checkout falhar).
   const pin = (tag, label) => {
     out.step(`${label}: ${tag}`);
     const co = run('git', ['-C', root, '-c', 'advice.detachedHead=false', 'checkout', '--quiet', '--detach', tag], { encoding: 'utf8' });
@@ -99,6 +112,7 @@ export function preflight({ out, root, flags, env = process.env, run = spawnSync
   const [nodeText, nodeNote] = NODE_LINE[origem] || [`Node.js ${process.versions.node.split('.')[0]}`, ''];
   out.ok(nodeText, nodeNote);
 
+  // uPlot e fontes: as somas SHA-256 do vendor.json precisam bater (cadeia de suprimentos).
   const vendor = verifyVendor(root);
   if (!vendor.ok) {
     out.fail('arquivos de terceiros não conferem', vendor.bad.join(', '));
@@ -118,7 +132,11 @@ export function preflight({ out, root, flags, env = process.env, run = spawnSync
   return true;
 }
 
-/** Abre o assistente no navegador e espera ele terminar. */
+/**
+ * Abre o assistente no navegador (servidor temporário na porta do painel, com código de uso
+ * único) e espera ele terminar, ser cancelado (Ctrl+C) ou ficar 1 h parado. No fim, a senha
+ * é esquecida, o assistente se desliga e o painel é ligado com as escolhas feitas.
+ */
 export async function runWizard({ out, root, inst, port, open = openBrowser, idleMs = IDLE_MS, log = () => {} }) {
   const code = makeSetupCode();
   let idleTimer = null;
@@ -153,6 +171,7 @@ export async function runWizard({ out, root, inst, port, open = openBrowser, idl
   out.line(`${out.c.dim('Máquina sem tela? Rode:')} ./dashboard instalar --terminal`);
   out.line(out.c.dim('Deixe esta janela aberta até o fim do assistente.'));
 
+  // Ctrl+C ou SIGTERM durante o assistente: cancela de forma limpa.
   const onSignal = () => resolveDone({ cancel: true });
   process.once('SIGINT', onSignal);
   process.once('SIGTERM', onSignal);
@@ -186,9 +205,14 @@ export async function runWizard({ out, root, inst, port, open = openBrowser, idl
   return 0;
 }
 
+/**
+ * `./dashboard instalar` e `./dashboard reconfigurar`: preflight, depois o caminho escolhido
+ * (--importar-v1, --terminal, --sem-interface ou o assistente no navegador).
+ */
 export async function instalar({ out, root, args, home, reconfigurar = false, deps = {} }) {
   const flags = parseFlags(args);
   out.title(reconfigurar ? 'Server Dashboard · reconfigurar' : 'Server Dashboard · instalação');
+  // Roda o ./dashboard de novo com os mesmos argumentos (depois de trocar de versão).
   const reexec = deps.reexec ?? (() => {
     const env = { ...process.env, ...(process.env.DASHBOARD_NODE_ORIGEM === 'baixado' ? { DASHBOARD_NODE_BAIXADO: '1' } : {}) };
     const r = spawnSync(path.join(root, 'dashboard'), [reconfigurar ? 'reconfigurar' : 'instalar', ...args], { stdio: 'inherit', env });
@@ -218,6 +242,7 @@ export async function instalar({ out, root, args, home, reconfigurar = false, de
     await stopPanel({ root, home });
     out.ok('painel parado durante a reconfiguração', 'volta sozinho no fim');
   }
+  // O assistente usa a porta do painel: ela precisa estar livre.
   const port = panelPort(root);
   if (!(await portFree(port))) {
     out.fail(`a porta ${port} está em uso por outro programa`);

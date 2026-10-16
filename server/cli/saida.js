@@ -2,8 +2,13 @@
 // verificação com ✓ / ▲ / ✗ e o texto em português simples. Cores só num terminal de
 // verdade e sem NO_COLOR (funciona igual sem cores).
 
+/**
+ * Cria a saída da CLI sobre `stream` (os testes passam um stream em memória). Devolve
+ * funções para cada tipo de linha: título, ✓ ok, ▲ aviso, ✗ falha, → passo e explicação.
+ */
 export function makeOutput({ stream = process.stdout, env = process.env } = {}) {
   const color = Boolean(stream.isTTY) && !env.NO_COLOR && env.TERM !== 'dumb';
+  // Pinta com um código ANSI só quando há cor; sem cor, devolve o texto puro.
   const paint = (code) => (text) => (color ? `\x1b[${code}m${text}\x1b[0m` : String(text));
   const c = {
     ok: paint('32'),
@@ -14,6 +19,7 @@ export function makeOutput({ stream = process.stdout, env = process.env } = {}) 
     bold: paint('1'),
   };
   const write = (line = '') => stream.write(`${line}\n`);
+  // Detalhe entre parênteses, apagado, depois do texto principal.
   const note = (text) => (text ? ` ${c.dim(`(${text})`)}` : '');
   return {
     color,
