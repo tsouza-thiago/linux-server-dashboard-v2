@@ -10,6 +10,9 @@ import { makeInstalacao } from '../../test-support/instalacao-fake.js';
 
 let chromium = null;
 try { ({ chromium } = await import('playwright-core')); } catch { /* sem playwright-core */ }
+// No CI (E2E_OBRIGATORIO=1) o e2e não pode pular calado: sem navegador, a suíte falha.
+const OBRIGATORIO = process.env.E2E_OBRIGATORIO === '1';
+if (OBRIGATORIO && !chromium) throw new Error('E2E_OBRIGATORIO=1, mas o playwright-core não está instalado');
 
 async function setup(t, { viewport, theme, server } = {}) {
   if (!chromium) return { skip: 'playwright-core não instalado' };
@@ -23,6 +26,7 @@ async function setup(t, { viewport, theme, server } = {}) {
   } catch (err) {
     await close(http);
     fake.cleanup();
+    if (OBRIGATORIO) throw err;
     return { skip: `Chromium indisponível: ${err.message.split('\n')[0]}` };
   }
   const page = await browser.newPage({ viewport: viewport || { width: 1280, height: 900 } });

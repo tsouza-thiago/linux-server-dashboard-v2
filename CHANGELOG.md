@@ -26,6 +26,9 @@ diante: `PATCH` corrige, `MINOR` acrescenta sem quebrar e `MAJOR` quebra.
     (`scripts/mutacao-seguranca.mjs`): 21 proteções quebradas de propósito, cada uma
     acusada por algum teste.
   - `npm run test:seguranca` roda só a rede de segurança.
+  - CI no GitHub (ADR 0014, `.github/workflows/seguranca.yml`): a cada push no `main` e a
+    cada PR, `npm run check`, e2e obrigatório (`E2E_OBRIGATORIO=1`: sem navegador, falha) e
+    `npm run seguranca`. Actions presas por SHA, só leitura, sem segredos.
   - Linha de base da `v2.0.0` analisada em `docs/seguranca/2026-10-16-linha-de-base.md`
     (achados, decisões e OSINT do repositório público); exceções aceitas, com motivo e
     teste, em `docs/seguranca/excecoes.json`.

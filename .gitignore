@@ -24,8 +24,9 @@ UI_DESIGN_SYSTEM.md
 UI_RESTYLE_PROMPT.md
 PROMPT_DOCUMENTAR_E_PUBLICAR.md
 
-# Automação local do agente — não versionar
-.github/
+# Automação local do agente — não versionar (só os workflows do CI entram, ADR 0014)
+.github/*
+!.github/workflows/
 
 # Node.js baixado pelo ./dashboard (Q18) e cópias do dashboard atualizar
 .runtime/

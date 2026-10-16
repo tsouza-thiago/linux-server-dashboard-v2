@@ -18,3 +18,4 @@ Uma ADR aceita não é editada; se a decisão mudar, uma nova ADR a substitui.
 | [0011](0011-instalacao-assistente-no-navegador-tui-reserva.md) | Instalação: assistente no navegador + TUI reserva | Aceita |
 | [0012](0012-distribuicao-por-git-clone-com-tag-assinada.md) | Distribuição por `git clone` com tag assinada | Aceita |
 | [0013](0013-somente-linux-na-maquina-local.md) | Somente Linux na máquina local | Aceita |
+| [0014](0014-verificacao-de-seguranca-continua.md) | Verificação de segurança contínua (local e no GitHub) | Aceita |

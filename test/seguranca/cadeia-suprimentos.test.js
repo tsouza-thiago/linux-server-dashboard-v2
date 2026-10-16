@@ -100,7 +100,8 @@ test('A03: toda action do CI presa por SHA de commit, permissões mínimas e sem
   const dir = path.join(ROOT, '.github', 'workflows');
   const arquivos = fs.existsSync(dir) ? fs.readdirSync(dir).filter((f) => /\.ya?ml$/.test(f)) : [];
   for (const f of arquivos) {
-    const y = fs.readFileSync(path.join(dir, f), 'utf8');
+    // Sem os comentários do YAML: o texto que explica "nunca pull_request_target" não conta.
+    const y = fs.readFileSync(path.join(dir, f), 'utf8').replace(/(^|\s)#.*$/gm, '$1');
     for (const [, uso] of y.matchAll(/uses:\s*([^\s#]+)/g)) {
       assert.match(uso, /@[0-9a-f]{40}$/, `${f}: ${uso} sem SHA (tag pode ser movida)`);
     }

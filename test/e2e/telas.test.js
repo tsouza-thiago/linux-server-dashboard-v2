@@ -11,6 +11,9 @@ import { listen, close } from '../../test-support/request.js';
 
 let chromium = null;
 try { ({ chromium } = await import('playwright-core')); } catch { /* sem playwright-core */ }
+// No CI (E2E_OBRIGATORIO=1) o e2e não pode pular calado: sem navegador, a suíte falha.
+const OBRIGATORIO = process.env.E2E_OBRIGATORIO === '1';
+if (OBRIGATORIO && !chromium) throw new Error('E2E_OBRIGATORIO=1, mas o playwright-core não está instalado');
 
 // Gráficos mínimos por tela: Visão geral = 3 mini-gráficos + 5 faixas de telemetria;
 // Recursos = CPU, RAM, temperatura + 3 faixas de PSI; Armazenamento = previsão + 1 faixa por disco.
@@ -53,6 +56,7 @@ async function setup(t, extra = {}) {
     browser = await chromium.launch({ executablePath: process.env.CHROMIUM || undefined });
   } catch (err) {
     await close(server);
+    if (OBRIGATORIO) throw err;
     return { skip: `Chromium indisponível: ${err.message.split('\n')[0]}` };
   }
   const page = await browser.newPage({ viewport: extra.viewport || { width: 1280, height: 900 } });

@@ -1,0 +1,59 @@
+# Verificação contínua (ADR 0014): a cada push no main e a cada PR, roda tudo o que é
+# obrigatório antes de um commit, mais o que precisa de navegador e de Docker:
+#   npm run check      sintaxe, .env/data/ fora do git, testes (com test/seguranca/), npm audit
+#   npm run test:e2e   as 8 telas e o assistente no Chromium (sem navegador, FALHA: E2E_OBRIGATORIO)
+#   npm run seguranca  Semgrep, Gitleaks (todo o histórico), ShellCheck, OSV-Scanner, OWASP ZAP
+#                      e a mutação dos guardas de segurança
+#
+# Endurecimento do próprio workflow (OWASP A03:2025, cadeia de suprimentos):
+#   - cada action presa pelo SHA do commit (uma tag pode ser movida; um SHA, não)
+#   - permissões mínimas (só leitura do código), sem segredo nenhum
+#   - checkout sem guardar o token no .git (persist-credentials: false)
+#   - só pull_request (nunca pull_request_target): código de fora roda sem privilégio
+# test/seguranca/cadeia-suprimentos.test.js confere essas regras.
+name: verificação
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: verificacao-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  verificacao:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 40
+    steps:
+      - name: Código (com todo o histórico, para o Gitleaks)
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Node 24 (a mesma versão que o ./dashboard baixa)
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: 24.21.0
+
+      - name: Dependências de desenvolvimento (lockfile, com integridade sha512)
+        run: npm ci
+
+      - name: npm run check
+        run: npm run check
+
+      - name: Chromium para o e2e
+        run: npx playwright-core install --with-deps chromium
+
+      - name: npm run test:e2e
+        run: npm run test:e2e
+        env:
+          E2E_OBRIGATORIO: '1'
+
+      - name: npm run seguranca
+        run: npm run seguranca
