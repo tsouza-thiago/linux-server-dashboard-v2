@@ -124,6 +124,10 @@ diante: `PATCH` corrige, `MINOR` acrescenta sem quebrar e `MAJOR` quebra.
   painel recusa (ex.: `ALERT_DISK_PCT=5`) travava o passo 4 com "Valor fora da faixa";
   agora vira o padrão, como no painel. O modo sem interface mantém os limiares do `.env`
   que não vierem nas opções (antes voltavam a 90 / 90 / 60).
+- `./dashboard instalar --importar-v1`: com a V2 instalada como serviço, o recado "Para
+  voltar à V1" agora diz `systemctl --user disable --now server-dashboard.service`. Só
+  `./dashboard parar` deixava a V2 voltar no próximo boot, junto com a V1 (2 conexões por
+  minuto ao servidor). Em segundo plano, `./dashboard parar` continua bastando.
 - Documentação conferida contra o código:
   - AGENTS: o `.env` guarda o `DASH_TOKEN`, não senhas; o `diagnosticar` reaproveita a
     última amostra e só coleta se ela estiver velha; o link de entrada vale 2 min

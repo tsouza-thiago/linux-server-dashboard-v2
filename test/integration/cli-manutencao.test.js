@@ -292,9 +292,15 @@ test('V1 → V2: para a V1, traz configuração e dados saneados e liga a V2; a 
   assert.match(o.text(), /✓ V1 parada \(o serviço dela não inicia mais com o computador\)/);
   assert.match(o.text(), /▲ a V2 ainda usa o acesso completo da V1/);
   assert.match(o.text(), /systemctl --user enable --now linux-server-dashboard\.service/);
+  assert.match(o.text(), /Para voltar à V1: \.\/dashboard parar e,/, 'V2 em segundo plano: parar basta');
   const again = memOut();
   await importarV1({ out: again.out, root, dir: v1, home, deps: { stopV1: async () => [], hasSystemdUser: () => false, startPanel: async () => ({ ok: true }), waitForPort: async () => true } });
   assert.match(again.text(), /nenhum dado novo para copiar/, 'não sobrescreve o que a V2 já tem');
+  // V2 como serviço: "parar" não basta (ela voltaria com o computador e as duas fariam 2
+  // conexões por minuto ao servidor); o recado manda desligar o serviço.
+  const svc = memOut();
+  await importarV1({ out: svc.out, root, dir: v1, home, deps: { stopV1: async () => [], hasSystemdUser: () => true, installService: async () => ({ ok: true }), installShortcut: () => {}, waitForPort: async () => true } });
+  assert.match(svc.text(), /Para voltar à V1: systemctl --user disable --now server-dashboard\.service e,/);
 
   assert.deepEqual(detectV1(root), { ok: false, reason: 'nao-e-v1' });
   const notV1 = memOut();

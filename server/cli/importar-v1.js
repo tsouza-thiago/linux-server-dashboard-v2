@@ -6,7 +6,7 @@ import os from 'node:os';
 import path from 'node:path';
 import { clampInt, loadEnvFile, sanitizeToken, isPlaceholderHost, sanitizeHost } from '../config.js';
 import { ensureDataDirs, updateEnv, installService, installShortcut } from '../setup/local.js';
-import { hasSystemdUser, systemctlUser, startPanel, waitForPort, panelPort } from './servico.js';
+import { hasSystemdUser, systemctlUser, startPanel, waitForPort, panelPort, UNIT_NAME } from './servico.js';
 import { BACKUP_NAME } from '../storage/migrate-v1.js';
 
 /** Nome do serviço systemd da V1 (o docs.test aceita os dois nomes na documentação). */
@@ -131,6 +131,9 @@ export async function importarV1({ out, root, dir, home = os.homedir(), deps = {
   out.line();
   out.warn('a V2 ainda usa o acesso completo da V1 ao servidor');
   out.explain('', 'quando puder, rode ./dashboard reconfigurar: ele cria o usuário dashmon com a chave restrita à coleta.');
-  out.line(out.c.dim(`Para voltar à V1: ./dashboard parar e, na pasta ${v1}, ./start.sh --background${stopped.includes('servico-desligado') ? ` (ou systemctl --user enable --now ${V1_UNIT})` : ''}.`));
+  // Como serviço, `parar` não basta: a V2 voltaria com o computador e as duas fariam 2
+  // conexões por minuto ao servidor (I1). Por isso o recado manda desligar o serviço.
+  const pararV2 = servico && servico.ok ? `systemctl --user disable --now ${UNIT_NAME}` : './dashboard parar';
+  out.line(out.c.dim(`Para voltar à V1: ${pararV2} e, na pasta ${v1}, ./start.sh --background${stopped.includes('servico-desligado') ? ` (ou systemctl --user enable --now ${V1_UNIT})` : ''}.`));
   return 0;
 }
