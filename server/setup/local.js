@@ -10,8 +10,8 @@ import { loadEnvFile } from '../config.js';
 import { KEY_COMMENT, knownHostsName, sshConfigText, validHost, validPort } from './acesso.js';
 import { UNIT_NAME, unitPath, systemctlUser, hasSystemdUser } from '../cli/servico.js';
 
-export const DESKTOP_FILE = 'server-dashboard.desktop';
-export const desktopPath = (home = os.homedir()) => path.join(home, '.local', 'share', 'applications', DESKTOP_FILE);
+const DESKTOP_FILE = 'server-dashboard.desktop';
+const desktopPath = (home = os.homedir()) => path.join(home, '.local', 'share', 'applications', DESKTOP_FILE);
 
 const writeAtomic = (file, text, mode = 0o600) => {
   const tmp = `${file}.tmp-${process.pid}`;

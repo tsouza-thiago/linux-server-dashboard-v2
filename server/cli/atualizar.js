@@ -43,7 +43,7 @@ export function restoreData(root, backupDir) {
 }
 
 /** Painel respondendo de verdade (porta aberta e /api/session em JSON). */
-export async function panelHealthy(port, { timeoutMs = 30000 } = {}) {
+async function panelHealthy(port, { timeoutMs = 30000 } = {}) {
   if (!(await waitForPort(port, { timeoutMs }))) return false;
   try {
     const res = await fetch(`http://127.0.0.1:${port}/api/session`, { headers: { Host: '127.0.0.1' } });

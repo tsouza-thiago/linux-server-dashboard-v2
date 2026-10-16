@@ -9,13 +9,12 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { aggregate } from './buckets.js';
-import { readNdjson, writeFileAtomicSync, dayOf } from './ndjson.js';
+import { readNdjson, writeFileAtomicSync, dayOf, validTs } from './ndjson.js';
 import { RollupStore, ROLLUP_STEP_MS } from './rollup.js';
 import { RAW_RETENTION_MS } from './index.js';
 
 export const BACKUP_NAME = 'history.v1-migrado.json';
 
-const validTs = (s) => s && typeof s.ts === 'string' && Number.isFinite(Date.parse(s.ts));
 const byTs = (a, b) => (a.ts < b.ts ? -1 : a.ts > b.ts ? 1 : 0);
 
 function dedupe(list) {

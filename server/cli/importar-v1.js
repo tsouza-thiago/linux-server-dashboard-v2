@@ -7,6 +7,7 @@ import path from 'node:path';
 import { clampInt, loadEnvFile, sanitizeToken, isPlaceholderHost, sanitizeHost } from '../config.js';
 import { ensureDataDirs, updateEnv, installService, installShortcut } from '../setup/local.js';
 import { hasSystemdUser, systemctlUser, startPanel, waitForPort, panelPort } from './servico.js';
+import { BACKUP_NAME } from '../storage/migrate-v1.js';
 
 export const V1_UNIT = 'linux-server-dashboard.service';
 const DATA_FILES = ['history.json', 'alerts.json', 'annotations.json'];
@@ -100,7 +101,7 @@ export async function importarV1({ out, root, dir, home = os.homedir(), deps = {
     const src = path.join(v1, 'data', f);
     const dst = path.join(root, 'data', f);
     if (!fs.existsSync(src)) continue;
-    if (fs.existsSync(dst) || (f === 'history.json' && fs.existsSync(path.join(root, 'data', 'history.v1-migrado.json')))) continue;
+    if (fs.existsSync(dst) || (f === 'history.json' && fs.existsSync(path.join(root, 'data', BACKUP_NAME)))) continue;
     fs.copyFileSync(src, dst);
     fs.chmodSync(dst, 0o600);
     copied.push(f);

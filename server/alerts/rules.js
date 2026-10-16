@@ -8,7 +8,8 @@ export const OFFLINE_KEY = 'servidor-inacessivel';
 // Estados de serviço que não indicam parada.
 export const SERVICE_OK = new Set(['active', 'reloading', 'activating']);
 
-const isNum = (v) => typeof v === 'number' && Number.isFinite(v);
+/** Número de verdade (nem NaN, nem Infinity, nem texto): dado ausente não vira zero (I5). */
+export const isNum = (v) => typeof v === 'number' && Number.isFinite(v);
 
 export function ramPct(s) {
   const r = s?.ram;

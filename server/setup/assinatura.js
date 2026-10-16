@@ -6,7 +6,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 
 export const SIGNERS = (root) => path.join(root, 'docs', 'allowed_signers');
-export const RELEASE_TAG = /^v2\.\d+\.\d+(-(alpha|beta|rc)\.\d+)?$/;
+const RELEASE_TAG = /^v2\.\d+\.\d+(-(alpha|beta|rc)\.\d+)?$/;
 
 function git(root, args, run = spawnSync) {
   const r = run('git', ['-C', root, ...args], { encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] });

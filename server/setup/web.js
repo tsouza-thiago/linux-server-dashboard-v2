@@ -14,8 +14,8 @@ import { InstallError, STEPS } from './instalacao.js';
 import { createLoginCode } from '../http/entrar.js';
 
 const PUBLIC = path.join(path.dirname(fileURLToPath(import.meta.url)), '..', '..', 'public');
-export const SETUP_COOKIE = 'dash_setup';
-export const CODE_TTL_MS = 30 * 60 * 1000;
+const SETUP_COOKIE = 'dash_setup';
+const CODE_TTL_MS = 30 * 60 * 1000;
 const MAX_FAILURES = 20;
 // Sem letras/números que se confundem (0/O, 1/I/L, 2/Z, 5/S, 8/B).
 const ALPHABET = 'ACDEFGHJKMNPQRTUVWXY34679';

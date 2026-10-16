@@ -5,9 +5,10 @@
 import crypto from 'node:crypto';
 import fs from 'node:fs';
 import path from 'node:path';
+import { writeFileAtomicSync } from '../storage/ndjson.js';
 import { safeEqual } from './session.js';
 
-export const LOGIN_LINK_TTL_MS = 2 * 60 * 1000;
+const LOGIN_LINK_TTL_MS = 2 * 60 * 1000;
 const MAX_CODES = 5;
 const FILE = 'entrar.json';
 
@@ -22,12 +23,8 @@ function read(file, nowMs) {
   }
 }
 
-function write(file, list) {
-  fs.mkdirSync(path.dirname(file), { recursive: true, mode: 0o700 });
-  const tmp = `${file}.tmp`;
-  fs.writeFileSync(tmp, JSON.stringify(list), { mode: 0o600 });
-  fs.renameSync(tmp, file);
-}
+/** Grava a lista de códigos pendentes (atômico, 0600, pasta 0700). */
+const write = (file, list) => writeFileAtomicSync(file, JSON.stringify(list));
 
 /** Cria um código de entrada (devolve o código; só o hash fica em data/entrar.json). */
 export function createLoginCode(dataDir, { ttlMs = LOGIN_LINK_TTL_MS, now = Date.now() } = {}) {

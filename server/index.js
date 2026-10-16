@@ -384,7 +384,7 @@ export function createApp(deps = {}) {
   return { app, state, store, alertsStore, annotationsStore, outages, engine, sessions, broadcast, runPoll, parseRange, statusPayload, sse, shutdown };
 }
 
-export function startServer() {
+function startServer() {
   const SSH_HOST = config.SSH_HOST;
   const POLL_INTERVAL = config.POLL_INTERVAL;
   const PORT = config.PORT;

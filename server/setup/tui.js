@@ -15,7 +15,7 @@ const fmtBytes = (b) => {
 };
 const pad = (s, n) => String(s).padEnd(n);
 
-export class Cancelled extends Error {}
+class Cancelled extends Error {}
 
 /** Terminal: lê teclas (keypress) e redesenha a tela inteira a cada mudança. */
 export class Screen {

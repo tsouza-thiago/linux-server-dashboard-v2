@@ -65,6 +65,14 @@ diante: `PATCH` corrige, `MINOR` acrescenta sem quebrar e `MAJOR` quebra.
   que ninguém passava (`out` no passo 6 da TUI, `root` no `runTui`); as reexportações do
   `poller.js` e do `atualizar.js` que ninguém importava; a segunda definição do `ROOT` na
   CLI (usa a do `config.js`); o ramo `win32` do `check.mjs` (só Linux, ADR 0013).
+- `export` de 21 constantes e funções que nenhum outro arquivo importa (continuam em uso
+  dentro do próprio módulo).
+- Código repetido, trocado pela versão que já existia com a mesma semântica: gravação
+  atômica do `entrar.js` (usa `writeFileAtomicSync`), `validTs` do `migrate-v1` (usa o do
+  `ndjson.js`), `isNum` do `health.js` (usa o de `rules.js`), nome do backup da V1 no
+  `importar-v1` (`BACKUP_NAME`), usuário e sudoers na dica do `desinstalar` (`PANEL_USER`,
+  `SUDOERS`) e o SSH do `capturar-amostra` (usa o `runSSH` do painel, que também recusa
+  host iniciado com `-` e corta resposta acima de 1 MB).
 - `docs/PLANO_V2.md`: o plano da V2 está concluído e fica como registro histórico na tag
   `v2.0.0`. O que ainda vale passou para o AGENTS: as invariantes I1–I10 (citadas no
   código), os navegadores suportados e a origem do orçamento de desempenho. As decisões

@@ -9,7 +9,7 @@ import path from 'node:path';
 
 const SSHD = ['/usr/sbin/sshd', '/usr/bin/sshd'].find((p) => fs.existsSync(p));
 
-export const hasSsh = () => {
+const hasSsh = () => {
   try {
     execFileSync('ssh', ['-V'], { stdio: 'ignore' });
     execFileSync('ssh-keygen', ['-?'], { stdio: 'ignore' });

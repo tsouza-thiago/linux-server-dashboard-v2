@@ -5,11 +5,11 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import readline from 'node:readline';
-import { removalScript, assistedScript, completedSteps } from '../setup/preparo.js';
+import { removalScript, assistedScript, completedSteps, SUDOERS } from '../setup/preparo.js';
 import { runAdmin, describeAdminError } from '../setup/remoto.js';
 import { removeService, removeShortcut } from '../setup/local.js';
 import { currentServer } from '../setup/instalacao.js';
-import { validUser } from '../setup/acesso.js';
+import { validUser, PANEL_USER } from '../setup/acesso.js';
 import { stopPanel } from './servico.js';
 import { keyFileFromConfig } from './diagnosticar.js';
 import { parseFlags } from './instalar.js';
@@ -46,9 +46,9 @@ export async function desinstalar({ out, root, args = [], home = os.homedir(), d
   const knownHosts = path.join(root, 'data', 'ssh', 'known_hosts');
   if (server && fs.existsSync(knownHosts)) {
     out.line();
-    out.line('No servidor ficaram: o usuário dashmon (com a chave restrita) e a regra de sudo do smartctl.');
+    out.line(`No servidor ficaram: o usuário ${PANEL_USER} (com a chave restrita) e a regra de sudo do smartctl.`);
     out.line(out.c.dim('Para remover à mão, rode no servidor:'));
-    out.line(out.c.dim('  sudo userdel -r dashmon; sudo rm -f /etc/sudoers.d/dashboard'));
+    out.line(out.c.dim(`  sudo userdel -r ${PANEL_USER}; sudo rm -f ${SUDOERS}`));
     const want = flags['limpar-servidor'] || (interactive && !flags.sim && yes(await askFn(`Quer que eu faça isso agora em ${server.host}? Precisa de um usuário com sudo. [s/N] `)));
     if (want) {
       const user = String(flags.usuario || (interactive ? await askFn('Usuário administrador no servidor: ') : '')).trim();
@@ -61,7 +61,7 @@ export async function desinstalar({ out, root, args = [], home = os.homedir(), d
           host: server.host, port: server.port, user, password: senha, knownHosts,
           script: assistedScript(removalScript(), { sudo, password: senha }), timeoutMs: 60000,
         });
-        if (r.code === 0 && completedSteps(r.stdout).includes('removido')) out.ok('servidor limpo', 'usuário dashmon e regra de sudo removidos');
+        if (r.code === 0 && completedSteps(r.stdout).includes('removido')) out.ok('servidor limpo', `usuário ${PANEL_USER} e regra de sudo removidos`);
         else out.fail('não consegui limpar o servidor', /^@@erro senha$/m.test(r.stdout) ? 'o sudo recusou a senha' : describeAdminError(r));
       }
     } else {

@@ -1,8 +1,6 @@
 // Índice de saúde (0–100) derivado dos MESMOS limiares dos alertas (ADR 0006). Antes a UI
 // tinha limiares próprios (75/80/70) diferentes dos do poller (90/90/60).
-import { SERVICE_OK, ramPct } from './rules.js';
-
-const isNum = (v) => typeof v === 'number' && Number.isFinite(v);
+import { SERVICE_OK, ramPct, isNum } from './rules.js';
 
 /**
  * @param {object|null} sample amostra mais recente

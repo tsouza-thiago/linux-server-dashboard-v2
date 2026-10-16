@@ -11,7 +11,7 @@ import crypto from 'node:crypto';
 import { sanitizeToken } from '../config.js';
 
 export const COLLECTOR_VERSION = 2;
-export const MODES = ['basico', 'smart'];
+const MODES = ['basico', 'smart'];
 const MODE_PLACEHOLDER = '__MODO__';
 
 /**

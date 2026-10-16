@@ -3,7 +3,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 
-export const LOG_MAX_BYTES = 5 * 1024 * 1024;
+const LOG_MAX_BYTES = 5 * 1024 * 1024;
 
 /** Gira o arquivo se ele passou de `maxBytes`. Devolve true quando girou. */
 export function rotateIfNeeded(file, maxBytes = LOG_MAX_BYTES) {

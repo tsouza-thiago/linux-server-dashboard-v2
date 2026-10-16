@@ -7,7 +7,7 @@
 import { authorizedKeysLine, sudoersLine, PANEL_USER } from './acesso.js';
 import { shQuote } from './deteccao.js';
 
-const SUDOERS = '/etc/sudoers.d/dashboard';
+export const SUDOERS = '/etc/sudoers.d/dashboard';
 const KEY_EOF = 'FIM_DA_CHAVE';
 const SUDOERS_EOF = 'FIM_DA_REGRA';
 const SCRIPT_EOF = 'FIM_DO_PREPARO';

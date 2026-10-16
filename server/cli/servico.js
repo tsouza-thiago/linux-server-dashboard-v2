@@ -14,8 +14,8 @@ import { clampInt, loadEnvFile } from '../config.js';
 export const UNIT_NAME = 'server-dashboard.service';
 
 export const unitPath = (home = os.homedir()) => path.join(home, '.config', 'systemd', 'user', UNIT_NAME);
-export const pidFile = (root) => path.join(root, 'data', 'dashboard.pid');
-export const serverScript = (root) => path.join(root, 'server', 'index.js');
+const pidFile = (root) => path.join(root, 'data', 'dashboard.pid');
+const serverScript = (root) => path.join(root, 'server', 'index.js');
 
 /** Porta do painel (PORT do .env, padrão 3000). */
 export function panelPort(root) {

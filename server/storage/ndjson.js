@@ -75,7 +75,8 @@ export function writeFileAtomicSync(file, data) {
   fs.renameSync(tmp, file);
 }
 
-const validTs = (s) => s && typeof s.ts === 'string' && Number.isFinite(Date.parse(s.ts));
+/** A amostra tem `ts` em texto que é uma data válida (as outras são descartadas). */
+export const validTs = (s) => s && typeof s.ts === 'string' && Number.isFinite(Date.parse(s.ts));
 
 /**
  * Forma compacta de uma amostra que deixou de ser a mais recente (orçamento de RAM, Q17).
@@ -84,7 +85,7 @@ const validTs = (s) => s && typeof s.ts === 'string' && Number.isFinite(Date.par
  * (mesma forma que após reiniciar) e mais leve que o montado pelo coletor. O arquivo
  * NDJSON continua com a amostra inteira.
  */
-export function compactSample(sample) {
+function compactSample(sample) {
   const { topProcs, ...rest } = sample;
   return JSON.parse(JSON.stringify(rest));
 }

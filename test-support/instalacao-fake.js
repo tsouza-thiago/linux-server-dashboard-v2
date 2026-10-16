@@ -13,7 +13,7 @@ export const FIXTURE = fs.readFileSync(path.join(HERE, '..', 'test', 'fixtures',
 const ED = 'AAAAC3NzaC1lZDI1NTE5AAAAICLXaq8Zb0WG4QWeKtFRHjyahVNxZFkczJ5it2xMlpU2';
 
 /** Servidor falso: responde à detecção, ao preparo e às coletas. */
-export function fakeServer({ sudoOk = true, smartPerm = true, detection = FIXTURE } = {}) {
+function fakeServer({ sudoOk = true, smartPerm = true, detection = FIXTURE } = {}) {
   const calls = [];
   const srv = {
     calls,

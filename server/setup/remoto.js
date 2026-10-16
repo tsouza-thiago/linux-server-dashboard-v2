@@ -14,7 +14,7 @@ import { validHost, validPort, validUser } from './acesso.js';
 
 const ROOT = path.join(path.dirname(fileURLToPath(import.meta.url)), '..', '..');
 export const ASKPASS = path.join(ROOT, 'scripts', 'askpass.sh');
-export const HOST_KEY_ORDER = ['ssh-ed25519', 'ecdsa-sha2-nistp256', 'ecdsa-sha2-nistp384', 'ecdsa-sha2-nistp521', 'rsa-sha2-512', 'ssh-rsa'];
+const HOST_KEY_ORDER = ['ssh-ed25519', 'ecdsa-sha2-nistp256', 'ecdsa-sha2-nistp384', 'ecdsa-sha2-nistp521', 'rsa-sha2-512', 'ssh-rsa'];
 
 /** O endereço responde na porta do SSH? (passo 2: "encontrado na rede · respondeu em 3 ms") */
 export function probePort(host, port = 22, { timeoutMs = 5000 } = {}) {

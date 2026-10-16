@@ -11,7 +11,7 @@ import { currentVersionStatus, describeVersion, signedReleaseTags, installTag } 
 import { ensureDataDirs } from '../setup/local.js';
 import { openBrowser, panelPort, panelStatus, portFree, stopPanel } from './servico.js';
 
-export const IDLE_MS = 60 * 60 * 1000;
+const IDLE_MS = 60 * 60 * 1000;
 
 /** Confere uPlot e fontes contra as somas de public/vendor/vendor.json. */
 export function verifyVendor(root) {

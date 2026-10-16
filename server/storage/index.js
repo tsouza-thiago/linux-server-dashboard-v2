@@ -7,7 +7,7 @@ import { aggregate, mergeBuckets } from './buckets.js';
 
 export const RAW_RETENTION_MS = 72 * HOUR_MS;
 export const ROLLUP_DAYS = 90;
-export const MAX_BUCKETS = 2000;
+const MAX_BUCKETS = 2000;
 const MIN_MS = 60000;
 
 const ceilTo = (v, unit) => Math.ceil(v / unit) * unit;
