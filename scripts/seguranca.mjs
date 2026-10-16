@@ -122,7 +122,11 @@ function segredos() {
   if (!gitDir.startsWith(`${ROOT}/`)) montagens.push('-v', `${gitDir}:${gitDir}:ro`);
   const seguro = ['-e', 'GIT_CONFIG_COUNT=1', '-e', 'GIT_CONFIG_KEY_0=safe.directory', '-e', 'GIT_CONFIG_VALUE_0=*'];
   // O relatório sai numa pasta temporária montada com escrita (o resto é só leitura).
-  const rel = fs.mkdtempSync(path.join(os.tmpdir(), 'dash-segredos-'));
+  // A pasta aberta (0777, para o usuário do contêiner escrever) fica dentro de uma pasta
+  // 0700: outro usuário desta máquina não consegue plantar um relatório "limpo".
+  const base = fs.mkdtempSync(path.join(os.tmpdir(), 'dash-segredos-'));
+  const rel = path.join(base, 'relatorio');
+  fs.mkdirSync(rel);
   fs.chmodSync(rel, 0o777);
   montagens.push('-v', `${rel}:/relatorio:rw`);
   const achados = [];
@@ -136,7 +140,7 @@ function segredos() {
       guardar(`segredos-${modo}.json`, bruto);
       lista = JSON.parse(bruto);
     } catch {
-      fs.rmSync(rel, { recursive: true, force: true });
+      fs.rmSync(base, { recursive: true, force: true });
       return { ok: false, detalhe: `gitleaks ${modo}: ${(r.stderr || '').trim().split('\n').pop()}` };
     }
     // Quantos commits o modo "histórico" percorreu: zero quer dizer que o histórico não foi
@@ -144,7 +148,7 @@ function segredos() {
     if (extra.length) commits = Number((`${r.stderr}`.replace(/\x1b\[[0-9;]*m/g, '').match(/(\d+) commits scanned/) || [])[1] || 0);
     for (const x of lista) achados.push({ ferramenta: 'gitleaks', regra: x.RuleID, arquivo: x.File.replace(`${ROOT}/`, ''), linha: x.StartLine, commit: x.Commit });
   }
-  fs.rmSync(rel, { recursive: true, force: true });
+  fs.rmSync(base, { recursive: true, force: true });
   const { novos, aceitos } = triar(achados);
   return {
     ok: novos.length === 0 && commits > 0,
@@ -244,17 +248,26 @@ async function zap() {
   // O ZAP entra com `Authorization: Bearer <token>` em todo pedido (variáveis de ambiente dos
   // scans empacotados; o `-z` quebraria o valor no espaço). O token vai pelo ambiente do
   // `docker run`, não pela linha de comando do processo.
+  // Teto de 20 min: se o ZAP travar, o contêiner (com nome próprio) é parado e a etapa
+  // reprova "sem relatório", em vez de o `npm run seguranca` esperar para sempre.
+  const nome = `dash-zap-${process.pid}-${Date.now()}`;
+  const teto = setTimeout(() => spawnSync('docker', ['stop', nome], { stdio: 'ignore' }), 20 * 60 * 1000);
   const r = await new Promise((resolve) => {
-    const p = spawn('docker', ['run', '--rm', '--network', 'host', '-v', `${wrk}:/zap/wrk:rw`,
+    const p = spawn('docker', ['run', '--rm', '--name', nome, '--network', 'host', '-v', `${wrk}:/zap/wrk:rw`,
       '-e', 'ZAP_AUTH_HEADER=Authorization', '-e', 'ZAP_AUTH_HEADER_VALUE', '-e', 'ZAP_AUTH_HEADER_SITE=127.0.0.1',
       IMG.zap, 'zap-api-scan.py', '-t', '/zap/wrk/openapi.json', '-f', 'openapi', '-J', 'zap.json',
-      '-z', '-config ascan.maxScanDurationInMins=10'],
+      // Com --network host, o ZAP escutaria em todas as interfaces e com a API sem chave (padrão
+      // dos scans empacotados): `-host 127.0.0.1` prende proxy e API no loopback durante a
+      // varredura. (A lista api.addrs fica como o scan a quer: o script fala com a API pelo
+      // nome "zap".)
+      '-z', '-host 127.0.0.1 -config ascan.maxScanDurationInMins=10'],
     { cwd: ROOT, env: { ...process.env, ZAP_AUTH_HEADER_VALUE: `Bearer ${token}` } });
     let err = '';
     p.stdout.on('data', () => {});
     p.stderr.on('data', (c) => { err += c; });
     p.on('close', (status) => resolve({ status, err }));
   });
+  clearTimeout(teto);
   await app.shutdown();
   await new Promise((resolve) => server.close(resolve));
   let dados;

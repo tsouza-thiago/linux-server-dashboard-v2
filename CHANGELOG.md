@@ -26,6 +26,10 @@ diante: `PATCH` corrige, `MINOR` acrescenta sem quebrar e `MAJOR` quebra.
     (`scripts/mutacao-seguranca.mjs`): 21 proteções quebradas de propósito, cada uma
     acusada por algum teste.
   - `npm run test:seguranca` roda só a rede de segurança.
+  - A própria varredura é endurecida: o ZAP escuta só em `127.0.0.1` (com `--network host`,
+    o padrão dele abriria proxy e API sem chave na rede local durante o ataque), tem teto
+    de 20 min, e a pasta de relatório do Gitleaks fica dentro de uma pasta 0700 (outro
+    usuário da máquina não planta um relatório "limpo").
   - CI no GitHub (ADR 0014, `.github/workflows/seguranca.yml`): a cada push no `main` e a
     cada PR, `npm run check`, e2e obrigatório (`E2E_OBRIGATORIO=1`: sem navegador, falha) e
     `npm run seguranca`. Actions presas por SHA, só leitura, sem segredos.
