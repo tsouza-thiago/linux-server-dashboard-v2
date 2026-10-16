@@ -8,6 +8,7 @@ import { runTui, Screen } from '../../server/setup/tui.js';
 import { runHeadless, HEADLESS_HELP } from '../../server/setup/sem-interface.js';
 import { makeOutput } from '../../server/cli/saida.js';
 import { makeInstalacao } from '../../test-support/instalacao-fake.js';
+import { esperarAte } from '../../test-support/esperar.js';
 
 function memOut() {
   const chunks = [];
@@ -74,10 +75,10 @@ test('TUI: Esc volta um passo, erro aparece na tela e Ctrl+C cancela sem gravar'
   const o = memOut();
   const running = runTui({ out: o.out, inst: fake.inst, input: term.input, output: term.output });
   term.keys('Enter', '192.0.2.99', 'Enter', 'maria', 'Enter', 'Enter');
-  await new Promise((r) => setTimeout(r, 50));
+  await esperarAte(() => /✗ Ninguém respondeu nesse endereço/.test(term.last()));
   assert.match(term.last(), /✗ Ninguém respondeu nesse endereço/);
   term.keys('Esc');
-  await new Promise((r) => setTimeout(r, 20));
+  await esperarAte(() => /Vamos ligar o painel ao seu servidor/.test(term.last()));
   assert.match(term.last(), /Vamos ligar o painel ao seu servidor/);
   term.keys('CtrlC');
   assert.equal(await running, 1);
@@ -93,11 +94,11 @@ test('TUI: modo manual testa bloco por bloco; sem terminal interativo, explica',
   term.keys('Enter', '192.0.2.10', 'Enter', 'maria', 'Enter', 'Enter', 's', 'certa', 'Enter', 'Enter', 'Enter');
   // passo 5: desce até "Prefiro fazer à mão", marca e confirma
   term.keys('down', 'space', 'Enter');
-  await new Promise((r) => setTimeout(r, 80));
+  await esperarAte(() => /Preparar o servidor à mão · Criar o usuário dashmon/.test(term.last()));
   assert.match(term.last(), /Preparar o servidor à mão · Criar o usuário dashmon/);
   assert.match(term.last(), /sudo id dashmon/);
   term.keys('Enter');
-  await new Promise((r) => setTimeout(r, 30));
+  await esperarAte(() => /▲ O usuário dashmon ainda não existe/.test(term.last()));
   assert.match(term.last(), /▲ O usuário dashmon ainda não existe/);
   fake.srv.dashmon = true;
   term.keys('Enter', 'Enter', 'Enter', 'Enter', 'Enter');

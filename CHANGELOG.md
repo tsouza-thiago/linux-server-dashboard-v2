@@ -49,7 +49,8 @@ diante: `PATCH` corrige, `MINOR` acrescenta sem quebrar e `MAJOR` quebra.
   `status` e de "painel já rodando" usam uma pasta temporária e não enxergam mais o painel
   instalado na máquina de quem roda a suíte.
 - Testes de SSE esperam a conexão entrar no hub, em vez de um tempo fixo (falhavam às
-  vezes com a máquina carregada).
+  vezes com a máquina carregada). Os outros testes com espera fixa (processo da CLI, TUI,
+  assistente) passam a esperar a condição real com `test-support/esperar.js`.
 - Testes e2e: `CHROMIUM=<caminho>` escolhe o navegador, como já fazia o e2e da instalação.
 - `test-support/request.js` envia o corpo com `Content-Length` (num `DELETE` sem ele, o
   corpo era lido como uma segunda requisição).

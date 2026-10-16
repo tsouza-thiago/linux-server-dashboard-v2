@@ -14,6 +14,7 @@ import { createLoginCode, consumeLoginCode } from '../../server/http/entrar.js';
 import { rotateIfNeeded, createLogFile } from '../../server/logfile.js';
 import { main, isConfigured, panelUrl } from '../../server/cli/index.js';
 import { lerComModo } from '../../test-support/arquivos.js';
+import { esperarAte } from '../../test-support/esperar.js';
 
 const noSystemd = () => ({ error: new Error('sem systemctl') });
 
@@ -47,7 +48,8 @@ test('servico: reconhece só o processo que roda o server/index.js desta pasta',
   const ours = spawn(process.execPath, [path.join(root, 'server', 'index.js')], { stdio: 'ignore' });
   const other = spawn(process.execPath, ['-e', 'setInterval(() => {}, 1000)'], { stdio: 'ignore' });
   t.after(() => { ours.kill('SIGKILL'); other.kill('SIGKILL'); });
-  await new Promise((r) => setTimeout(r, 100));
+  // Espera o nosso processo aparecer no /proc com a linha de comando (não um tempo fixo).
+  await esperarAte(() => isOurProcess(ours.pid, root));
   assert.equal(isOurProcess(ours.pid, root), true);
   assert.equal(isOurProcess(other.pid, root), false);
   assert.equal(isOurProcess(1, root), false, 'nunca o PID 1');
@@ -67,10 +69,12 @@ test('servico: reconhece só o processo que roda o server/index.js desta pasta',
 });
 
 test('servico: processo que ignora o SIGTERM é forçado depois do prazo', async (t) => {
-  const root = fakeRoot(t, { script: "process.on('SIGTERM', () => {}); setInterval(() => {}, 1000);" });
-  const ours = spawn(process.execPath, [path.join(root, 'server', 'index.js')], { stdio: 'ignore' });
+  // O filho avisa "pronto" DEPOIS de instalar o tratador do SIGTERM. Uma espera fixa
+  // (150 ms) falhava com a máquina carregada: o SIGTERM chegava antes do tratador.
+  const root = fakeRoot(t, { script: "process.on('SIGTERM', () => {}); process.stdout.write('pronto\\n'); setInterval(() => {}, 1000);" });
+  const ours = spawn(process.execPath, [path.join(root, 'server', 'index.js')], { stdio: ['ignore', 'pipe', 'ignore'] });
   t.after(() => ours.kill('SIGKILL'));
-  await new Promise((r) => setTimeout(r, 150));
+  await new Promise((r) => ours.stdout.once('data', r));
   fs.writeFileSync(path.join(root, 'data', 'dashboard.pid'), String(ours.pid));
   const r = await stopPanel({ root, home: root, run: noSystemd, graceMs: 300 });
   assert.equal(r.forced, true);

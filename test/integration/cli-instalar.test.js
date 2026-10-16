@@ -11,6 +11,7 @@ import { verifyVendor, parseFlags, preflight, runWizard, instalar } from '../../
 import { makeOutput } from '../../server/cli/saida.js';
 import { request } from '../../test-support/request.js';
 import { makeInstalacao } from '../../test-support/instalacao-fake.js';
+import { esperarAte } from '../../test-support/esperar.js';
 
 const ROOT = path.join(path.dirname(fileURLToPath(import.meta.url)), '..', '..');
 
@@ -83,7 +84,7 @@ test('instalar: assistente abre na porta, aceita o código, conclui, fecha e lig
   const opened = [];
   const o = memOut();
   const running = runWizard({ out: o.out, root: fake.root, inst: fake.inst, port, open: (url) => { opened.push(url); return true; } });
-  await new Promise((r) => setTimeout(r, 100));
+  await esperarAte(() => /código de uso único: [A-Z0-9-]+/.test(o.text()) && opened.length > 0);
   const code = /código de uso único: ([A-Z0-9-]+)/.exec(o.text())[1];
   assert.match(opened[0], new RegExp(`^http://127\\.0\\.0\\.1:${port}/configurar#codigo=${code.replace('-', '')}$`));
   const page = await request(port, { path: '/configurar' });

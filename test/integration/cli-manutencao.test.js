@@ -12,6 +12,7 @@ import { atualizar, afterUpdate, backupData, restoreData } from '../../server/cl
 import { importarV1, detectV1, v1Settings, v1Pid, stopV1 } from '../../server/cli/importar-v1.js';
 import { desinstalar } from '../../server/cli/desinstalar.js';
 import { loadEnvFile } from '../../server/config.js';
+import { esperarAte } from '../../test-support/esperar.js';
 
 function memOut() {
   const chunks = [];
@@ -285,8 +286,9 @@ test('V1 → V2: para só o processo da V1 daquela pasta e o serviço dela', asy
   const v1 = v1Folder(t);
   const proc = spawn(process.execPath, [path.join(v1, 'server', 'index.js')], { stdio: 'ignore' });
   t.after(() => proc.kill('SIGKILL'));
-  await new Promise((r) => setTimeout(r, 150));
   fs.writeFileSync(path.join(v1, 'data', 'dashboard.pid'), String(proc.pid));
+  // Espera o processo da V1 aparecer no /proc com a linha de comando (não um tempo fixo).
+  await esperarAte(() => v1Pid(v1) === proc.pid);
   assert.equal(v1Pid(v1), proc.pid);
   const calls = [];
   const run = (cmd, args) => {
