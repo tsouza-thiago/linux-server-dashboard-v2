@@ -1,5 +1,5 @@
-/* Tokens do design system V2 (D1: Aurora + Cockpit, escuro primeiro).
-   Fonte: pranchetas "V2 · Design system" e "V2 · Visão geral" do canvas aprovado.
+/* Tokens do design system V2 (ADR 0009: Aurora + Cockpit, escuro primeiro): cores,
+   tipografia, espaços, raios e movimento. Todo o CSS usa só estes nomes.
    O tema escuro é o padrão e a referência; o claro é a variante com os mesmos nomes.
    Contraste dos textos sobre as superfícies conferido em test/unit/design-tokens.test.js. */
 
@@ -114,7 +114,7 @@
   --accent-soft: rgba(11, 143, 163, 0.08);
   --accent-line: rgba(11, 143, 163, 0.35);
   --on-accent: #FFFFFF;
-  /* Prancheta usa #0B8FA3 sob o texto branco (3,8:1); escurecido até o AA (4,6:1). */
+  /* #0B8FA3 sob texto branco daria 3,8:1; escurecido até o AA (4,6:1). */
   --accent-strong: #0A8193;
   --focus: rgba(11, 143, 163, 0.6);
 
@@ -127,7 +127,7 @@
   --ok: #12A15C;
   --ok-soft: #E4F6EC;
   --ok-ink: #0A6E3E;
-  --warn: #B98009; /* prancheta: #C98A0B (2,95:1); escurecido para 3:1 em linhas e marcas */
+  --warn: #B98009; /* o original #C98A0B dava 2,95:1; escurecido para 3:1 em linhas e marcas */
   --warn-soft: #FDF1D8;
   --warn-ink: #8A5A00;
   --serious-soft: #FDEBDD;

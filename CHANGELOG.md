@@ -47,6 +47,10 @@ diante: `PATCH` corrige, `MINOR` acrescenta sem quebrar e `MAJOR` quebra.
   "Solução de problemas" fica só com o que é de desenvolvimento (o de quem usa está no
   TUTORIAL); a regra de bug conhecido vale para bugs novos.
 - CLAUDE.md só com o que é específico do Claude Code; o resto está no AGENTS.
+- Código comentado em PT-BR: cada arquivo do servidor, do navegador, do CSS, dos scripts e
+  de `test-support/` diz o que faz e que regra garante; cada função e bloco não trivial diz
+  para que serve. Todo arquivo de teste ganhou um cabeçalho. Os comentários deixam de citar
+  o plano removido (fases F*, decisões D*/Q*, "pranchetas") e apontam as ADRs e o AGENTS.
 - TUTORIAL sem o rodapé repetido. `test/unit/bugs-v1.test.js` lista os 12 bugs da V1 no
   cabeçalho (antes apontava para o plano).
 - Testes: a CLI (`main` e `instalar`) aceita a pasta pessoal injetada (`home`). Os testes de

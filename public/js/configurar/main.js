@@ -1,13 +1,15 @@
-// Assistente de instalação no navegador (D10): os 6 passos das pranchetas "Instalação ·
-// Passo 1–6". Cada passo chama /api/configurar/* (server/setup/web.js), que usa os mesmos
+// Assistente de instalação no navegador (ADR 0011): os 6 passos da instalação. Cada passo chama /api/configurar/* (server/setup/web.js), que usa os mesmos
 // métodos da TUI (server/setup/instalacao.js). Toda interpolação passa pelo `html` com
 // escape; nada de style="" (CSP).
 import { html, raw, mount } from '../core/html.js';
 
+// Mesma chave de tema do painel: a escolha vale para os dois.
 const THEME_KEY = 'dash_theme';
 const $ = (id) => document.getElementById(id);
+// Onde cada passo é desenhado.
 const root = $('wz-main');
 
+// Ícones do assistente (próprios: importar os do painel puxaria os gráficos junto).
 const ICON = {
   check: '<polyline points="5 12 10 17 19 7"/>',
   x: '<path d="M6 6l12 12M18 6 6 18"/>',
@@ -20,6 +22,7 @@ const ICON = {
   moon: '<path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8z"/>',
   sun: '<circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/>',
 };
+// Ícone SVG por nome (nomes fixos no código: seguro para raw()).
 const icon = (name, size = 14, stroke = 3) => raw(`<svg width="${size}" height="${size}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="${stroke}" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${ICON[name]}</svg>`);
 
 // ---------------- Estado ----------------
@@ -73,6 +76,7 @@ async function api(path, body) {
   return data;
 }
 
+/** Roda uma ação mostrando "Aguarde…" e guardando o erro para a tela. */
 async function run(fn) {
   st.busy = true;
   st.error = '';
@@ -89,6 +93,7 @@ async function run(fn) {
   }
 }
 
+/** Vai para um passo (foco no título e aviso para o leitor de tela). */
 function go(step) {
   st.step = step;
   st.error = '';
@@ -109,8 +114,10 @@ const fmtBytes = (b) => {
   while (v >= 1000 && i < u.length - 1) { v /= 1000; i += 1; }
   return `${v >= 10 || i === 0 ? Math.round(v) : v.toFixed(1).replace('.', ',')} ${u[i]}`;
 };
+// Segundos com vírgula decimal.
 const fmtSec = (s) => String(s).replace('.', ',');
 
+/** Barra dos 6 passos (feitos, atual, por vir). */
 function stepsBar() {
   return html`<ol class="wz-steps" aria-label="Passos da configuração">${st.passos.map((nome, i) => {
     const n = i + 1;
@@ -124,6 +131,7 @@ function stepsBar() {
   })}</ol>`;
 }
 
+/** Coluna lateral: o que já foi decidido até aqui. */
 function meta() {
   const el = $('wzMeta');
   el.className = 'wz-meta';
@@ -136,6 +144,7 @@ function meta() {
   el.textContent = st.step === 1 ? 'passo 1 de 6 · cerca de 5 minutos' : st.step === 6 ? 'tudo pronto' : `passo ${st.step} de 6`;
 }
 
+// Caixa de erro/aviso; botões Voltar e Continuar.
 const alertBox = (msg, warn = false) => (msg ? html`<div class="wz-alert ${warn ? 'is-warn' : ''}" role="alert">${icon('alert', 16, 2.2)}<span>${msg}</span></div>` : '');
 const back = (to) => html`<button type="button" class="wz-back" data-go="${to}">← Voltar</button>`;
 const next = (label, act, { disabled = false, big = false } = {}) => html`<button type="button" class="wz-next ${big ? 'big' : ''}" data-act="${act}" ${disabled || st.busy ? raw('disabled') : ''}>${st.busy ? 'Aguarde…' : label}${st.busy ? '' : raw(' <span aria-hidden="true">→</span>')}</button>`;
@@ -154,6 +163,7 @@ function viewGate() {
   </main>`;
 }
 
+/** Troca o código pelo cookie da sessão do assistente. */
 async function enterCode(code) {
   try {
     await api('entrar', { codigo: code });
@@ -287,6 +297,7 @@ function choicePayload() {
   };
 }
 
+// Recalcula o custo estimado no servidor um instante depois de cada mudança.
 let costTimer = null;
 function scheduleCost() {
   clearTimeout(costTimer);
@@ -303,6 +314,7 @@ function scheduleCost() {
   }, 250);
 }
 
+/** Passo 4: pastas (com SMART por disco), rede, serviços, limiares e o custo estimado. */
 function viewStep4() {
   const d = st.det;
   const seenDisk = new Set();
@@ -366,6 +378,7 @@ function shortCommands(text, hash) {
   });
 }
 
+/** Passo 5: escolha entre assistido e à mão. */
 function viewStep5() {
   const p = st.plan;
   if (!p) return html`<main class="wz-card md"><h1 class="wz-h1 sm" tabindex="-1">Preparar o servidor</h1><p class="wz-hint">montando o plano…</p>${alertBox(st.error)}</main><footer class="wz-foot">${back(4)}</footer>`;
@@ -375,6 +388,7 @@ function viewStep5() {
   return st.mode === 'manual' ? viewManual(p, seg) : viewAssisted(p, seg);
 }
 
+/** Passo 5, assistido: as ações, os comandos exatos e o Confirmar. */
 function viewAssisted(p, seg) {
   const pr = st.prep;
   const done = new Set(pr.feitos);
@@ -418,6 +432,7 @@ function viewAssisted(p, seg) {
   <footer class="wz-foot">${running ? '' : back(4)}<span class="grow wz-foot-note">${running ? 'não feche esta janela' : pr.state === 'concluido' ? '' : '1 conexão · cerca de 10 segundos'}</span>${btn}</footer>`;
 }
 
+/** Passo 5, à mão: um bloco por vez, com Copiar e Testar. */
 function viewManual(p, seg) {
   const m = st.manual;
   const total = p.blocos.length;
@@ -513,6 +528,7 @@ async function loadState() {
   render();
 }
 
+/** Envia o passo 2 e já lê a identidade do servidor. */
 async function submitServer() {
   const f = st.form;
   f.host = $('host').value.trim();
@@ -530,6 +546,7 @@ async function submitServer() {
   });
 }
 
+/** Envia o passo 3 (confirmação + senha) e recebe a detecção. */
 async function submitConnect() {
   const senha = $('senha').value;
   await run(async () => {
@@ -545,12 +562,14 @@ async function submitConnect() {
   });
 }
 
+/** Pede o plano de preparo (com ou sem limitar a chave a este computador). */
 async function loadPlan(from = true) {
   const p = await api('plano', { from });
   st.plan = p;
   render();
 }
 
+/** Envia o passo 4 e carrega o plano do passo 5. */
 async function submitChoices() {
   await run(async () => {
     await api('escolhas', choicePayload());
@@ -562,6 +581,7 @@ async function submitChoices() {
   });
 }
 
+/** Modo assistido: prepara o servidor numa conexão e faz a coleta de teste. */
 async function prepare() {
   const senhaEl = $('sudoSenha');
   const senha = senhaEl ? senhaEl.value : undefined;
@@ -587,6 +607,7 @@ async function prepare() {
   render();
 }
 
+/** Modo à mão: testa um bloco já colado no servidor. */
 async function testBlock(id) {
   st.manual.busy = id;
   render();
@@ -603,6 +624,7 @@ async function testBlock(id) {
   render();
 }
 
+/** Copia um bloco para a área de transferência. */
 async function copyBlock(id) {
   const b = st.plan.blocos.find((x) => x.id === id);
   try {
@@ -615,6 +637,7 @@ async function copyBlock(id) {
   }
 }
 
+/** Conclui: o assistente fecha, espera o painel subir na mesma porta e entra já logado. */
 async function openPanel() {
   st.opening = true;
   st.error = '';
@@ -643,6 +666,7 @@ async function openPanel() {
   render();
 }
 
+// Formulários (Enter): código, servidor e conexão.
 root.addEventListener('submit', (e) => {
   e.preventDefault();
   const form = e.target.dataset.form;
@@ -651,6 +675,7 @@ root.addEventListener('submit', (e) => {
   else if (form === 'conectar' && st.ident && st.confirm) submitConnect();
 });
 
+// Cliques: navegação entre passos, modo, copiar, testar e as ações dos botões.
 root.addEventListener('click', (e) => {
   const t = e.target.closest('[data-go],[data-act],[data-mode],[data-copy],[data-test]');
   if (!t || t.disabled) return;
@@ -677,6 +702,7 @@ root.addEventListener('click', (e) => {
   }
 });
 
+// Caixas e opções: confirmação, from=, pastas, SMART, rede, serviços e preferências.
 root.addEventListener('change', (e) => {
   const t = e.target;
   if (t.dataset.act === 'confirm') { st.confirm = t.checked; render(); return; }
@@ -695,6 +721,7 @@ root.addEventListener('change', (e) => {
   }
 });
 
+// Digitação: limiares e os campos do passo 2.
 root.addEventListener('input', (e) => {
   const t = e.target;
   if (t.dataset.lim) {
@@ -715,11 +742,14 @@ function applyTheme(theme) {
   mount($('wzTheme'), icon(dark ? 'moon' : 'sun', 18, 2));
   $('wzTheme').setAttribute('aria-label', dark ? 'Usar tema claro' : 'Usar tema escuro');
 }
+// Tema lembrado (escuro por padrão).
 let theme = 'dark';
 try { theme = localStorage.getItem(THEME_KEY) === 'light' ? 'light' : 'dark'; } catch { /* bloqueado */ }
 applyTheme(theme);
 $('wzTheme').addEventListener('click', () => applyTheme(document.documentElement.dataset.theme === 'dark' ? 'light' : 'dark'));
 
+// Início: com #codigo= na URL (link do terminal), entra direto e tira o código do
+// endereço (não fica no histórico); sem ele, retoma o estado ou pede o código.
 (async () => {
   const m = /codigo=([A-Za-z0-9-]+)/.exec(location.hash);
   if (m) {

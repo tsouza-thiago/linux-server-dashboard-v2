@@ -6,6 +6,7 @@ import { series, xs } from '../core/analysis.js';
 import { timeChart, evenTicks, renderTip } from '../charts/timeseries.js';
 import * as f from '../core/format.js';
 
+/** Primeiro elemento que casa com o seletor (na tela inteira ou dentro de `root`). */
 export const $ = (sel, root = document) => root.querySelector(sel);
 
 // ---------------- Ícones (traço, herdam a cor do texto) ----------------
@@ -26,7 +27,7 @@ const PATHS = {
   printer: '<path d="M6 9V3h12v6"/><rect x="3" y="9" width="18" height="8" rx="2"/><path d="M6 14h12v7H6z"/>',
   copy: '<rect x="9" y="9" width="12" height="12" rx="2"/><path d="M5 15V5a2 2 0 0 1 2-2h10"/>',
   key: '<circle cx="8" cy="15" r="4"/><path d="M11 12l9-9M16 7l3 3"/>',
-  // Navegação (prancheta "Componente · Navegação")
+  // Navegação: um ícone por tela (o nome é o id da tela; main.js usa icon(v.id))
   'visao-geral': '<rect x="3" y="3" width="7" height="7" rx="2"/><rect x="14" y="3" width="7" height="7" rx="2"/><rect x="3" y="14" width="7" height="7" rx="2"/><rect x="14" y="14" width="7" height="7" rx="2"/>',
   recursos: '<rect x="5" y="5" width="14" height="14" rx="2"/><rect x="9" y="9" width="6" height="6"/><path d="M9 2v3M15 2v3M9 19v3M15 19v3M2 9h3M2 15h3M19 9h3M19 15h3"/>',
   armazenamento: '<ellipse cx="12" cy="5" rx="8" ry="3"/><path d="M4 5v14c0 1.7 3.6 3 8 3s8-1.3 8-3V5"/><path d="M4 12c0 1.7 3.6 3 8 3s8-1.3 8-3"/>',
@@ -43,6 +44,7 @@ export function icon(name, size = 16, stroke = 2) {
 }
 
 // ---------------- Status ----------------
+// Ícone de cada nível (neutro e destaque não têm ícone).
 const LEVEL_ICON = { ok: 'check', warn: 'warn', serious: 'serious', crit: 'crit', neutral: null, accent: null };
 
 /** Selo de estado: sempre cor + ícone + texto (nunca só cor). */
@@ -62,6 +64,7 @@ export function iconBox(level, name, size = '') {
   return html`<span class="icon-box${size ? ` ${size}` : ''}${level ? ` is-${level}` : ''}">${icon(name, size === 'sm' ? 14 : size === 'lg' ? 20 : 16, 2.5)}</span>`;
 }
 
+// Como cada estado do SMART aparece: nível (cor) e texto. Sem permissão/sem smartctl é neutro.
 const SMART = {
   PASSED: { level: 'ok', text: 'PASSED' },
   FAILED: { level: 'crit', text: 'FAILED' },
@@ -69,6 +72,7 @@ const SMART = {
   SEM_SMARTCTL: { level: 'neutral', text: 'smartctl ausente' },
   DESCONHECIDO: { level: 'neutral', text: 'desconhecido' },
 };
+/** Nível e texto de um estado SMART (desconhecido = neutro). */
 export const smartOf = (status) => SMART[status] || { level: 'neutral', text: status || 'sem dado' };
 
 // ---------------- Números e medidores ----------------
@@ -145,6 +149,7 @@ export function drawStrips(ctx, root, groupId, rows, buckets = ctx.state.buckets
   const data = rows.map((r) => series(buckets, r.key, r.stat || 'avg'));
   let group = ctx.charts.get(groupId);
   if (!group) {
+    // Uma dica só para o grupo inteiro: mostra o valor de todas as faixas no instante.
     const tip = document.createElement('div');
     tip.className = 'tip';
     tip.hidden = true;
@@ -155,6 +160,7 @@ export function drawStrips(ctx, root, groupId, rows, buckets = ctx.state.buckets
       entries, rows, data, xRange,
       destroy() { entries.forEach((e) => e.destroy()); },
     };
+    // Régua de tempo embaixo das faixas, refeita a cada zoom.
     const ticks = () => {
       const el = box.querySelector('.strip-ticks');
       const u = entries[0]?.chart;
@@ -183,6 +189,7 @@ export function drawStrips(ctx, root, groupId, rows, buckets = ctx.state.buckets
           const left = el.offsetLeft + u.cursor.left + 12;
           tip.style.left = `${left + tip.offsetWidth > box.clientWidth ? Math.max(0, left - tip.offsetWidth - 24) : left}px`;
         },
+        // Zoom numa faixa aplica a mesma janela nas outras (sem entrar em laço: `syncing`).
         onZoom: () => queueMicrotask(() => {
           if (syncing) return;
           syncing = true;
@@ -202,6 +209,7 @@ export function drawStrips(ctx, root, groupId, rows, buckets = ctx.state.buckets
   group.xRange = xRange;
   group.entries.forEach((e, i) => e && e.setData(x, [data[i]], xRange));
   group.ticks();
+  // Valor mais recente de cada faixa, à direita dela.
   for (const r of rows) {
     const v = box.querySelector(`[data-strip-value="${r.id}"]`);
     if (!v) continue;

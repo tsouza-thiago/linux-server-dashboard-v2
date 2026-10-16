@@ -1,7 +1,6 @@
 /* Componentes compartilhados: estrutura (navegação, faixa de status, cabeçalho), controles,
    cartões, selos, medidores, tabelas, avisos, esqueletos, gráficos e login.
-   Referência: pranchetas "Componente · Navegação", "Componente · Faixa de status",
-   "V2 · Design system", "V2 · Estados" e "V2 · Login". */
+   Só usa os tokens de tokens.css (nada de cor solta), para os dois temas valerem. */
 
 /* ---------------- Estrutura ---------------- */
 .app {

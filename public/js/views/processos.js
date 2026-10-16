@@ -1,12 +1,14 @@
-// 5. Processos & serviços (prancheta "V2 · Processos & serviços"): estado de cada serviço
+// 5. Processos & serviços: estado de cada serviço
 // monitorado com o histórico de quedas, os processos que mais usam memória (busca e
 // ordenação sobrevivem às atualizações ao vivo) e para onde vai a memória.
 import { html, mount } from '../core/html.js';
 import * as f from '../core/format.js';
 import { $, iconBox, meter, panelHead } from './common.js';
 
+/** Subtítulo da tela. */
 export const sub = () => 'Serviços monitorados e os processos que mais usam memória, na última coleta';
 
+// Colunas da tabela de processos (ordenáveis).
 const COLS = [
   { key: 'pid', label: 'PID', num: true },
   { key: 'cmd', label: 'Comando' },
@@ -16,12 +18,15 @@ const COLS = [
   { key: 'cpu', label: 'CPU média*', num: true },
   { key: 'etimesSec', label: 'Rodando há', num: true },
 ];
+// Estado do systemd → [nível, texto, ícone]; o resto é parado (crítico).
 const SVC = {
   active: ['ok', 'ativo', 'check'], reloading: ['ok', 'recarregando', 'check'], activating: ['warn', 'iniciando', 'warn'],
   desconhecido: ['neutral', 'sem resposta', 'serious'],
 };
+// Busca e ordenação da tabela (ficam enquanto a tela está aberta).
 const view = { filter: '', sort: { key: 'mem', dir: -1 } };
 
+/** Um cartão por serviço, com o histórico de quedas. */
 function services(state) {
   const list = Object.entries(state.sample?.services || {});
   const all = state.alerts?.all || [];
@@ -43,6 +48,7 @@ function services(state) {
     </article>`;
 }
 
+/** Linhas da tabela de processos, filtradas e ordenadas. */
 function rows(s) {
   const q = view.filter.toLowerCase();
   const { key, dir } = view.sort;
@@ -66,6 +72,7 @@ function rows(s) {
     <td class="num ink-2">${f.duration(p.etimesSec)}</td></tr>`);
 }
 
+/** Cabeçalho da tabela com a ordenação atual. */
 function head() {
   return html`<tr>${COLS.map((c) => {
     const on = view.sort.key === c.key;
@@ -74,6 +81,7 @@ function head() {
   })}</tr>`;
 }
 
+/** "Para onde vai a memória": usada, cache, disponível e os maiores processos. */
 function memory(s) {
   const r = s?.ram;
   const procs = (s?.topProcs || []).slice().sort((a, b) => (b.rssKB ?? 0) - (a.rssKB ?? 0));
@@ -97,6 +105,7 @@ function memory(s) {
     </div>`;
 }
 
+/** Monta a tela inteira. */
 export function render(ctx) {
   mount(ctx.el, html`
     <section class="grid-cards svc-grid" aria-label="Serviços monitorados" id="pr-services"></section>
@@ -129,6 +138,7 @@ export function render(ctx) {
   update(ctx);
 }
 
+/** Atualiza só o que muda com os dados novos. */
 export function update(ctx) {
   const s = ctx.state.sample;
   mount($('#pr-services', ctx.el), services(ctx.state));
@@ -137,4 +147,5 @@ export function update(ctx) {
   mount($('#pr-memory', ctx.el), memory(s));
 }
 
+/** Leva o cursor à busca de processos (tecla /). */
 export const focusSearch = (ctx) => $('#pr-filter', ctx.el)?.focus();

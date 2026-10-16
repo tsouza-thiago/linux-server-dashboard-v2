@@ -1,4 +1,4 @@
-// 3. Armazenamento (prancheta "V2 · Armazenamento"): espaço por ponto de montagem, previsão
+// 3. Armazenamento: espaço por ponto de montagem, previsão
 // de lotação (30 dias + projeção no ritmo atual), atividade de cada disco em faixas
 // sincronizadas e a saúde SMART com o histórico de 90 dias.
 import { html, mount } from '../core/html.js';
@@ -7,16 +7,20 @@ import { diskEta, diskForecast, fullestDisk, keysWith } from '../core/analysis.j
 import { $, chip, big, meter, chartBox, drawCharts, drawStrips, panelHead, icon, smartOf, onClick } from './common.js';
 
 const DAY = 86400e3;
+/** Subtítulo da tela. */
 export const sub = () => 'Espaço, previsão de lotação, saúde SMART e atividade de cada disco';
 
+/** Botões no topo da tela. */
 export const actions = (ctx) => {
   const at = ctx.state.sample?.smartAt;
   return html`<span class="page-note">SMART checado 1x por hora${at ? ` · última ${f.ago(at)}` : ''}</span>`;
 };
 
+// Limiares atuais e o histórico de 30 dias (para a previsão), se já carregado.
 const thr = (state) => state.meta?.thresholds || state.config?.thresholds || {};
 const history = (ctx) => ctx.local.disk30 || ctx.state.buckets || [];
 
+/** Pasta em destaque: a que enche primeiro; sem previsão, a mais cheia. */
 function hotMount(ctx) {
   const disks = ctx.state.sample?.disks || [];
   const filling = disks
@@ -26,6 +30,7 @@ function hotMount(ctx) {
   return filling ? filling.d.mount : fullestDisk(ctx.state.sample)?.mount;
 }
 
+/** Um cartão por pasta: uso, inodes, disco e selo SMART. */
 function mountCards(ctx) {
   const s = ctx.state.sample;
   const disks = s?.disks || [];
@@ -55,6 +60,7 @@ function forecastOf(ctx, mountPoint) {
   return diskForecast(history(ctx), mountPoint, { alertPct: thr(ctx.state).diskPct ?? 90 });
 }
 
+/** Título do painel de previsão, com a data estimada. */
 function forecastHead(ctx) {
   const disks = ctx.state.sample?.disks || [];
   const sel = ctx.local.mount;
@@ -65,6 +71,7 @@ function forecastHead(ctx) {
     disks.length > 1 ? html`<div class="segmented on-bg" role="group" aria-label="Disco">${disks.map((d) => html`<button type="button" data-mount="${d.mount}" aria-pressed="${d.mount === sel}">${d.mount}</button>`)}</div>` : '');
 }
 
+/** Selos de previsão de todas as pastas. */
 function forecastChips(ctx) {
   const fc = forecastOf(ctx, ctx.local.mount);
   const t = thr(ctx.state);
@@ -76,6 +83,7 @@ function forecastChips(ctx) {
       ${chip('crit', `cheio ~${date(fc.fullAt)}`, { ic: null, mono: true })}` : ''}`;
 }
 
+/** Gráfico do % usado com a reta da tendência até encher. */
 function forecastSpec(ctx) {
   const m = ctx.local.mount;
   const fc = forecastOf(ctx, m);
@@ -111,11 +119,13 @@ function devs(ctx) {
 }
 const mountOfDev = (s, dev) => (s?.disks || []).filter((d) => d.dev === dev).map((d) => d.mount).join(' ');
 
+/** Números de atividade de um disco (ocupação, leitura/gravação, latência). */
 function ioStats(io) {
   const cell = (k, v) => html`<span class="io-cell"><span class="k">${k}</span>${v}</span>`;
   return html`${cell('ocupado', f.pct(io?.utilPct))}${cell('ler/gravar MB/s', io ? `${f.num(io.readMBps, 1)} / ${f.num(io.writeMBps, 1)}` : '—')}${cell('latência', f.ms(io?.latencyMs))}`;
 }
 
+/** Tabela da saúde SMART de cada disco, com o histórico de falhas. */
 function smartTable(ctx) {
   const s = ctx.state.sample;
   const list = s?.smart || [];
@@ -180,12 +190,14 @@ export function render(ctx) {
   update(ctx);
 }
 
+/** Busca 30 dias de baldes para a previsão (uma vez por tela aberta). */
 function loadDisk30(ctx) {
   ctx.api.buckets({ from: new Date(Date.now() - 30 * DAY).toISOString(), to: new Date().toISOString(), limit: 720 })
     .then((r) => { ctx.local.disk30 = r.buckets || []; update(ctx); })
     .catch(() => {});
 }
 
+/** Atualiza só o que muda com os dados novos. */
 export function update(ctx) {
   if (devs(ctx).join(',') !== ctx.local.devs) { for (const c of ctx.charts.values()) c.destroy(); ctx.charts.clear(); render(ctx); return; }
   const s = ctx.state.sample;

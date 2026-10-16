@@ -1,5 +1,12 @@
 // Orquestração da tela: tema, login, navegação, faixa de status, dados, SSE ao vivo,
 // notificações do navegador e atalhos de teclado.
+//
+// Contrato de cada tela (public/js/views/*.js):
+//   sub(state)         subtítulo;              actions(ctx)  botões do topo (opcional)
+//   render(ctx)        monta a tela;           update(ctx)   atualiza com dados novos
+//   onAction(ctx, e)   clique nos botões do topo (opcional)
+// `ctx` traz o elemento da tela, os gráficos dela (`charts`), um estado local (`local`), a
+// API, as ações comuns (`act`) e o estado global (`state`).
 import { createStore } from './core/store.js';
 import { api, onAuthRequired } from './core/api.js';
 import { connect } from './core/sse.js';
@@ -17,13 +24,16 @@ import * as eventos from './views/eventos.js';
 import * as relatorios from './views/relatorios.js';
 import * as ajuda from './views/ajuda.js';
 
+// As 8 telas pelo id; as que usam os baldes do período; a chave do tema no navegador.
 const MODULES = {
   'visao-geral': visaoGeral, recursos, armazenamento, rede, processos, eventos, relatorios, ajuda,
 };
 const USES_BUCKETS = new Set(['visao-geral', 'recursos', 'armazenamento', 'rede']);
 const THEME_KEY = 'dash_theme';
+// Elemento da página pelo id.
 const $ = (id) => document.getElementById(id);
 
+// Estado global: tela, período e todos os dados vindos da API e do SSE.
 const route = parseHash(location.hash);
 const store = createStore({
   view: route.view, period: route.period, session: null, meta: null, sample: null, health: null,
@@ -31,7 +41,8 @@ const store = createStore({
   loading: true,
 });
 
-// ---------------- Tema (escuro é o padrão — D1) ----------------
+// ---------------- Tema (escuro é o padrão — ADR 0009) ----------------
+/** Aplica o tema na página, lembra a escolha e troca o ícone do botão. */
 function applyTheme(theme) {
   document.documentElement.dataset.theme = theme;
   try { localStorage.setItem(THEME_KEY, theme); } catch { /* armazenamento bloqueado */ }
@@ -39,10 +50,13 @@ function applyTheme(theme) {
   mount($('themeToggle'), icon(dark ? 'moon' : 'sun', 18));
   $('themeToggle').setAttribute('aria-label', dark ? 'Usar tema claro (T)' : 'Usar tema escuro (T)');
 }
+/** Tema lembrado (escuro se não houver ou se o armazenamento estiver bloqueado). */
 function currentTheme() {
   try { return localStorage.getItem(THEME_KEY) === 'light' ? 'light' : 'dark'; } catch { return 'dark'; }
 }
+// Tela aberta agora: { view, mod, ctx }.
 let current = null;
+/** Alterna o tema e redesenha a tela (os gráficos leem as cores ao serem criados). */
 function toggleTheme() {
   applyTheme(document.documentElement.dataset.theme === 'dark' ? 'light' : 'dark');
   if (current) renderView(); // gráficos leem as cores do tema ao serem criados
@@ -50,6 +64,7 @@ function toggleTheme() {
 
 // ---------------- Avisos rápidos (canto inferior direito, 4 s, "Desfazer" quando faz sentido) ----------------
 const TOAST_ICON = { ok: ['check', 'ink-ok'], warn: ['warn', 'ink-warn'], crit: ['crit', 'ink-crit'] };
+/** Mostra um aviso rápido; `action` vira um botão (ex.: Desfazer). */
 function toast(text, { level = 'ok', sub = '', action, ms = 4000 } = {}) {
   const el = document.createElement('div');
   el.className = 'toast';
@@ -65,12 +80,15 @@ function toast(text, { level = 'ok', sub = '', action, ms = 4000 } = {}) {
 }
 
 // ---------------- Login (ADR 0007) ----------------
+// O formulário de login está aberto? (enquanto estiver, a tela não redesenha)
 let loginShown = false;
+/** Mostra (ou limpa) o erro do login. */
 function setLoginError(message) {
   mount($('loginError'), message ? html`${icon('serious', 14, 2.6)}${message}` : '');
   $('loginToken').classList.toggle('is-invalid', Boolean(message));
   $('loginToken').setAttribute('aria-invalid', message ? 'true' : 'false');
 }
+/** Abre o login por cima de tudo (o resto da página fica inerte). */
 function showLogin(message = '') {
   loginShown = true;
   $('login').hidden = false;
@@ -81,6 +99,7 @@ function showLogin(message = '') {
   $('loginToken').focus();
 }
 onAuthRequired(() => showLogin());
+// Login: troca o token por uma sessão (cookie) e recarrega; o token não fica guardado.
 $('loginForm').addEventListener('submit', async (e) => {
   e.preventDefault();
   const token = $('loginToken').value.trim();
@@ -100,7 +119,9 @@ $('loginForm').addEventListener('submit', async (e) => {
 });
 
 // ---------------- Notificações do navegador (alertas novos com a aba em segundo plano) ----------------
+// Alertas já vistos (os existentes ao abrir não notificam).
 const seenAlerts = new Set();
+/** Notifica até 3 alertas novos, só com a aba em segundo plano e com permissão. */
 function notifyNewAlerts(list) {
   const fresh = (list || []).filter((a) => a.status === 'new' && !seenAlerts.has(a.id));
   for (const a of list || []) seenAlerts.add(a.id);
@@ -111,10 +132,12 @@ function notifyNewAlerts(list) {
 }
 
 // ---------------- Ações usadas pelas telas ----------------
+/** Recarrega a lista de alertas da API. */
 async function refreshAlerts() {
   const a = await api.alerts();
   store.set({ alerts: { active: a.active || [], all: a.all || [] } });
 }
+// Ações que as telas chamam (reconhecer, anotar, coletar, navegar…), com o aviso de cada uma.
 const act = {
   async ack(id) { await api.ack(id); await refreshAlerts(); toast('Alerta reconhecido'); },
   async resolve(id) { await api.resolve(id); await refreshAlerts(); toast('Alerta resolvido'); },
@@ -151,6 +174,7 @@ const act = {
 };
 
 // ---------------- Navegação ----------------
+/** Menu lateral com as telas por grupo e o número de alertas abertos em Eventos. */
 function renderNav() {
   const { view, alerts, period } = store.get();
   const open = alerts.active.length;
@@ -164,6 +188,7 @@ function renderNav() {
       </a>`)}`)}`);
 }
 
+/** Botões de período (só nas telas que usam o período). */
 function renderPeriod() {
   const { view, period } = store.get();
   const show = VIEWS.find((v) => v.id === view)?.period;
@@ -172,18 +197,22 @@ function renderPeriod() {
 }
 
 // ---------------- Faixa de status (online / coletando / offline) ----------------
+// "debian 13" a partir do nome do sistema.
 const shortOs = (os) => {
   const m = /^(\w+)[^\d]*(\d+(?:\.\d+)?)?/.exec(os?.name || '');
   return m ? `${m[1].toLowerCase()}${m[2] ? ` ${m[2]}` : ''}` : null;
 };
+// "há 12 s", "há 3 min".
 const secondsAgo = (ts, now = Date.now()) => {
   const t = Date.parse(ts);
   if (!Number.isFinite(t)) return '—';
   const s = Math.max(0, Math.round((now - t) / 1000));
   return s < 60 ? `há ${s} s` : `há ${f.duration(s)}`;
 };
+// Segundos até a próxima coleta (null sem previsão).
 const nextIn = (meta) => (meta?.nextPollAt ? Math.max(0, Math.round((Date.parse(meta.nextPollAt) - Date.now()) / 1000)) : null);
 
+/** Faixa de status do topo (e a barra do celular): online, coletando, reconectando ou offline. */
 function renderStrip() {
   const { meta, live, sample, config } = store.get();
   const strip = $('strip');
@@ -229,6 +258,7 @@ function renderStrip() {
   $('mobileLive').className = `live ${offline ? 'live-crit' : sample ? 'live-ok' : 'live-busy'}`;
 }
 
+/** Caixa "coletar agora": contagem para a próxima coleta e a versão do painel. */
 function renderPollBox() {
   const { meta, config } = store.get();
   const interval = meta?.pollIntervalMs || config?.pollIntervalMs || 60000;
@@ -242,12 +272,14 @@ function renderPollBox() {
 }
 
 // ---------------- Telas ----------------
+/** Fecha a tela atual e libera os gráficos dela. */
 function destroyCurrent() {
   if (!current) return;
   for (const c of current.ctx.charts.values()) c.destroy();
   current = null;
 }
 
+/** Título, subtítulo, botões do topo e período da tela atual. */
 function renderHead() {
   const { view } = store.get();
   const meta = VIEWS.find((v) => v.id === view);
@@ -259,6 +291,7 @@ function renderHead() {
   renderPeriod();
 }
 
+/** Monta a tela atual do zero (ou o esqueleto, se os dados ainda não chegaram). */
 function renderView() {
   const { view } = store.get();
   destroyCurrent();
@@ -279,6 +312,7 @@ function renderView() {
   mod.render(ctx);
 }
 
+/** Atualiza a tela atual com os dados novos (update, ou monta de novo se não houver). */
 function refreshView() {
   if (!current || current.ctx.pending) return renderView();
   renderHead();
@@ -287,6 +321,7 @@ function refreshView() {
 }
 
 let bucketsTimer = null;
+/** Busca os baldes do período (até 600 pontos) para os gráficos. */
 async function loadBuckets() {
   const { period } = store.get();
   const to = new Date();
@@ -296,15 +331,18 @@ async function loadBuckets() {
     store.set({ buckets: r.buckets || [], bucketsStep: r.step, bucketsRange: [from.getTime() / 1000, to.getTime() / 1000] });
   } catch { /* 401 já abre o login; outros erros: tenta na próxima coleta */ }
 }
+/** Recarrega os baldes logo depois de uma amostra nova (agrupa chegadas próximas). */
 function scheduleBuckets() {
   clearTimeout(bucketsTimer);
   bucketsTimer = setTimeout(() => { if (USES_BUCKETS.has(store.get().view)) loadBuckets(); }, 300);
 }
 
+/** Busca as quedas dos últimos 90 dias. */
 async function loadOutages() {
   try { store.set({ outages: await api.outages(90) }); } catch { /* tenta de novo depois */ }
 }
 
+// Cada mudança de estado redesenha só o que depende dela.
 store.subscribe((state, patch) => {
   if ('alerts' in patch || 'view' in patch || 'period' in patch) renderNav();
   if ('meta' in patch || 'live' in patch || 'sample' in patch || 'config' in patch) { renderStrip(); renderPollBox(); }
@@ -314,6 +352,7 @@ store.subscribe((state, patch) => {
   if (relevant.some((k) => k in patch)) refreshView();
 });
 
+/** Troca de tela ou de período a partir do hash da URL. */
 async function navigate() {
   const { view, period } = parseHash(location.hash);
   const changed = view !== store.get().view || period !== store.get().period;
@@ -327,6 +366,7 @@ async function navigate() {
 }
 
 // ---------------- Ao vivo (SSE) ----------------
+/** Evento SSE → estado: status (hello/status), amostra nova, alertas, anotações. */
 function onEvent(name, data) {
   if (name === 'hello' || name === 'status') {
     store.set({ meta: data.meta, health: data.health ?? store.get().health, ...(data.sample ? { sample: data.sample } : {}),
@@ -352,6 +392,7 @@ function onEvent(name, data) {
 }
 
 // ---------------- Teclado ----------------
+/** Atalhos: 1–8 telas, C coletar, T tema, ? ajuda, N anotação, / buscar, Esc fecha o menu. */
 function onKey(e) {
   if (e.ctrlKey || e.metaKey || e.altKey || loginShown) return;
   const tag = (e.target.tagName || '').toLowerCase();
@@ -370,12 +411,14 @@ function onKey(e) {
   } else if (e.key === 'Escape') closeNav();
 }
 
+/** Abre o menu no celular. */
 function openNav() {
   document.body.classList.add('nav-open');
   $('navScrim').hidden = false;
   $('navToggle').setAttribute('aria-expanded', 'true');
   $('side').querySelector('[aria-current="page"]')?.focus();
 }
+/** Fecha o menu no celular. */
 function closeNav() {
   if (!document.body.classList.contains('nav-open')) return;
   document.body.classList.remove('nav-open');
@@ -384,6 +427,10 @@ function closeNav() {
 }
 
 // ---------------- Início ----------------
+/**
+ * Início: tema, botões, sessão (login se preciso), a tela pedida com esqueleto, os dados
+ * iniciais da API e, por fim, a conexão ao vivo.
+ */
 async function start() {
   applyTheme(currentTheme());
   renderNav();

@@ -1,5 +1,5 @@
-/* Assistente de instalação (pranchetas "Instalação · Passo 1–6", "Passo 5 manual" e
-   "Componente · Passos" do canvas aprovado). Mesmos tokens do painel (tokens.css). */
+/* Assistente de instalação (configurar.html): barra dos 6 passos, cartões, campos e o que
+   é próprio de cada passo. Mesmos tokens do painel (tokens.css) e o mesmo base.css. */
 
 :root, :root[data-theme="dark"] {
   --wz-halo: 0 0 18px rgba(62, 224, 208, 0.35);

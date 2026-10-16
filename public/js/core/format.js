@@ -2,11 +2,13 @@
 const DASH = '—';
 const isNum = (v) => typeof v === 'number' && Number.isFinite(v);
 
+/** Número no padrão brasileiro ("1.234,5") com `digits` casas. */
 export function num(v, digits = 0) {
   if (!isNum(v)) return DASH;
   return v.toLocaleString('pt-BR', { minimumFractionDigits: digits, maximumFractionDigits: digits });
 }
 
+/** Percentual ("12,3%"). */
 export const pct = (v, digits = 0) => (isNum(v) ? `${num(v, digits)}%` : DASH);
 
 /** Nome curto do processo: só o programa, sem caminho nem argumentos ("/usr/bin/dockerd -H" → "dockerd"). */
@@ -23,6 +25,8 @@ export function bytes(v, digits) {
   return `${v < 0 ? '-' : ''}${num(x, d)} ${units[i]}`;
 }
 
+// Unidades: MB (vindo do /proc/meminfo), Mbps, °C e ms; casas decimais só quando o
+// número é pequeno.
 export const mb = (v) => (isNum(v) ? bytes(v * 1024 * 1024) : DASH);
 export const mbps = (v) => (isNum(v) ? `${num(v, v < 10 ? 2 : 1)} Mbps` : DASH);
 export const celsius = (v) => (isNum(v) ? `${num(v, 1)} °C` : DASH);
@@ -40,15 +44,18 @@ export function duration(sec) {
   return `${Math.round(sec)} s`;
 }
 
+// Aceita Date, ms ou texto ISO; data inválida vira "—".
 const toDate = (ts) => (ts instanceof Date ? ts : new Date(typeof ts === 'number' ? ts : Date.parse(ts)));
 const valid = (d) => !Number.isNaN(d.getTime());
 
+/** Hora local "14:05". */
 export function time(ts) {
   if (ts === null || ts === undefined) return DASH;
   const d = toDate(ts);
   return valid(d) ? d.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit', hour12: false }) : DASH;
 }
 
+/** Data e hora locais "07/10 14:05". */
 export function dateTime(ts) {
   if (ts === null || ts === undefined) return DASH;
   const d = toDate(ts);

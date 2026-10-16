@@ -1,5 +1,6 @@
-// 1. Visão geral (prancheta "V2 · Visão geral"): saúde em linguagem simples com o anel 0–100,
-// cinco indicadores com mini-gráfico, telemetria em faixas com cursor sincronizado e os
+// 1. Visão geral: saúde em linguagem simples com o anel 0–100,
+// cinco indicadores (CPU, RAM e temperatura com mini-gráfico; disco com medidor; rede com
+// barras), telemetria em faixas com cursor sincronizado e os
 // resumos de armazenamento, eventos e processos. Estados: carregando, primeiro uso, alerta
 // crítico, aviso de configuração e offline (valores da última coleta boa, em cinza).
 import { html, mount } from '../core/html.js';
@@ -13,6 +14,7 @@ import {
   $, icon, pill, chip, iconBox, big, n0, meter, chartBox, drawCharts, drawStrips, strips, panelHead, smartOf, onClick,
 } from './common.js';
 
+// Circunferência do anel de saúde (raio 58) e: esta tela desenha o próprio esqueleto.
 const RING = 2 * Math.PI * 58;
 export const ownSkeleton = true;
 
@@ -29,6 +31,7 @@ function advice(alert) {
   return { title: alert?.message || 'Alerta', todo: '' };
 }
 
+// Alerta mais grave (crítico antes de atenção).
 const worst = (alerts) => (alerts || []).slice().sort((a, b) => (levelOf(b) === 'crit') - (levelOf(a) === 'crit'))[0] || null;
 
 // ---------------- Peças ----------------
@@ -44,6 +47,7 @@ function ring(score, level) {
   </div>`;
 }
 
+/** Manchete e motivos ("Servidor saudável", "RAM 92%"…). */
 function narrative(state, local = {}) {
   const s = state.sample;
   const disk = fullestDisk(s);
@@ -62,6 +66,7 @@ function narrative(state, local = {}) {
   return parts;
 }
 
+/** Bloco do topo: anel, manchete, disponibilidade e custo da coleta. */
 function hero(ctx) {
   const { state } = ctx;
   const offline = isOffline(state.meta);
@@ -124,6 +129,7 @@ const cardShell = (id) => html`
     <div class="card-viz" data-slot="viz">${id === 'cpu' || id === 'ram' || id === 'temp' ? chartBox(`vg-${id}`, 'spark') : ''}</div>
   </article>`;
 
+/** Conteúdo dos 5 indicadores (mini-gráfico, medidor ou barras). */
 function cardContent(ctx) {
   const { state } = ctx;
   const s = state.sample;
@@ -203,6 +209,7 @@ function telemetryRows(state) {
   return rows;
 }
 
+/** Valores atuais ao lado da telemetria. */
 function telemetryChips(state) {
   const [from, to] = (state.bucketsRange || []).map((x) => x * 1000);
   const inRange = (ts) => { const t = Date.parse(ts); return t >= from && t <= to; };
@@ -238,6 +245,7 @@ function disksPanel(state, local) {
     </div>`;
 }
 
+/** Um evento recente (resumido). */
 function eventItem(e) {
   if (e.kind === 'alerta') {
     const lvl = levelOf(e);
@@ -250,6 +258,7 @@ function eventItem(e) {
   return html`<div class="ev-mini">${iconBox('', 'note', 'sm')}<div><span>${e.text}</span><span class="note">Anotação · ${f.dateTime(e.ts)}</span></div></div>`;
 }
 
+/** Os eventos mais recentes. */
 function eventsPanel(state) {
   const events = timeline({ alerts: state.alerts?.all, annotations: state.annotations, outages: state.outages?.outages }).slice(0, 3);
   return html`
@@ -259,6 +268,7 @@ function eventsPanel(state) {
 }
 
 
+/** Os processos que mais usam memória. */
 function procsPanel(state) {
   const s = state.sample;
   const procs = (s?.topProcs || []).slice().sort((a, b) => (b.rssKB ?? 0) - (a.rssKB ?? 0)).slice(0, 3);
@@ -287,6 +297,7 @@ function skeleton() {
     <p class="note">Carregando o histórico… · blocos no formato final, nada "pula" quando os dados chegam.</p>`;
 }
 
+/** Aviso de primeiro uso (dados ainda chegando). */
 function firstUse(state) {
   const s = state.sample;
   if (isOffline(state.meta) || (s && s.cpu && Number.isFinite(s.cpu.pct))) return '';
@@ -304,6 +315,7 @@ function firstUse(state) {
   </section>`;
 }
 
+/** Aviso de configuração desatualizada (chave do servidor, SMART). */
 function configWarning(state) {
   const c = state.sample?.collector;
   if (!c?.hashMismatch) return '';
@@ -319,6 +331,7 @@ function configWarning(state) {
 // ---------------- Montagem ----------------
 const sigOf = (state) => telemetryRows(state).map((r) => r.id).join(',');
 
+/** Monta a tela inteira. */
 export function render(ctx) {
   if (ctx.state.loading) { mount(ctx.el, skeleton()); ctx.local.skeleton = true; return; }
   ctx.local.skeleton = false;
@@ -356,6 +369,7 @@ function loadDisk30(ctx) {
     .catch(() => {});
 }
 
+/** Atualiza só o que muda com os dados novos. */
 export function update(ctx) {
   if (ctx.local.skeleton || ctx.state.loading) { if (!ctx.state.loading) render(ctx); return; }
   if (sigOf(ctx.state) !== ctx.local.sig) {

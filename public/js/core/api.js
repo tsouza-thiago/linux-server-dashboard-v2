@@ -3,6 +3,7 @@
 let authHandler = () => {};
 export const onAuthRequired = (fn) => { authHandler = fn; };
 
+// Erro de API com o status HTTP (a tela decide o que fazer com 401, 409, 429…).
 class ApiError extends Error {
   constructor(status, message) {
     super(message);
@@ -10,6 +11,7 @@ class ApiError extends Error {
   }
 }
 
+/** Um pedido à API: corpo em JSON, cookie de sessão da mesma origem, erro como ApiError. */
 async function request(path, { method = 'GET', body } = {}) {
   const opts = { method, credentials: 'same-origin', headers: {} };
   if (body !== undefined) {
@@ -24,6 +26,7 @@ async function request(path, { method = 'GET', body } = {}) {
   return data;
 }
 
+// Query string só com os valores presentes (`?a=1&b=2`, ou vazio).
 const qs = (params) => {
   const p = new URLSearchParams();
   for (const [k, v] of Object.entries(params)) if (v !== undefined && v !== null && v !== '') p.set(k, v);
@@ -31,6 +34,7 @@ const qs = (params) => {
   return s ? `?${s}` : '';
 };
 
+/** Uma função por rota da API. */
 export const api = {
   session: () => request('/api/session'),
   login: (token, { remember = true } = {}) => request('/api/login', { method: 'POST', body: { token, remember } }),

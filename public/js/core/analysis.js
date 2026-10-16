@@ -3,6 +3,7 @@
 import { localDay } from './format.js';
 
 const isNum = (v) => typeof v === 'number' && Number.isFinite(v);
+// Posições dentro de cada métrica do balde: [mínimo, máximo, média].
 const AVG = 2;
 const MIN = 0;
 const MAX = 1;
@@ -102,6 +103,7 @@ export function fullestDisk(sample) {
   return list.length ? list.reduce((a, b) => (b.pct > a.pct ? b : a)) : null;
 }
 
+// Alerta "servidor inacessível" e a queda viram um item só se começaram a até 10 min.
 const OFFLINE_KEY = 'servidor-inacessivel';
 const QUEDA_MATCH_MS = 10 * 60e3;
 
@@ -128,7 +130,7 @@ export function timeline({ alerts = [], annotations = [], outages = [] }) {
   return items.filter((i) => i.ts && !Number.isNaN(Date.parse(i.ts))).sort((a, b) => Date.parse(b.ts) - Date.parse(a.ts));
 }
 
-// ---------------- F6: cálculos das telas redesenhadas ----------------
+// ---------------- Cálculos das telas (níveis, disponibilidade, tráfego, picos) ----------------
 
 /** Nível visual do alerta: 'crit' (crítico) ou 'warn' (atenção). */
 export const levelOf = (alert) => (alert?.level === 'critical' ? 'crit' : 'warn');
@@ -142,6 +144,7 @@ export function viewOfKey(key = '') {
 }
 
 const DAY_MS = 86400e3;
+// Meia-noite local do dia que contém `ms`.
 const startOfLocalDay = (ms) => { const d = new Date(ms); d.setHours(0, 0, 0, 0); return d.getTime(); };
 
 /** Tempo fora do ar (ms) dentro de [fromMs, toMs], somando as quedas. */
