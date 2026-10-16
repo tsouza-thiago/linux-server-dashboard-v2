@@ -112,6 +112,21 @@ test('A05/CWE-1236: célula que começa com = + - @ vira texto no CSV', () => {
   assert.match(csv.split('\n')[1], /,'@SUM/);
 });
 
+test('A05/CWE-1236: TAB e CR no início também viram texto, e CR no meio fica entre aspas (OWASP CSV Injection)', () => {
+  // O Excel e o LibreOffice pulam TAB (0x09) e CR (0x0D) no começo da célula e leem o resto
+  // como fórmula. `host` e `kernel` vêm do servidor monitorado (ameaça 13 do SECURITY).
+  for (const f of ['\t=1+1', '\r=1+1', '\t@SUM(A1)', '\r+cmd|\'/C calc\'!A0']) {
+    const cell = csvEscape(f);
+    const unquoted = cell.startsWith('"') ? cell.slice(1, -1).replace(/""/g, '"') : cell;
+    assert.ok(unquoted.startsWith("'"), `${JSON.stringify(f)} → ${JSON.stringify(cell)}`);
+  }
+  // Um CR no meio quebraria a linha em alguns leitores: a célula vai entre aspas.
+  assert.equal(csvEscape('a\rb'), '"a\rb"');
+  const csv = toCSV([{ ts: '2026-10-16T00:00:00.000Z', host: '\t=cmd|\'/C calc\'!A0', os: { kernel: 'x\r=1' } }]);
+  assert.equal(csv.split('\n').length, 2, 'o CR do kernel não cria linha nova');
+  assert.match(csv, /,"?'\t=cmd/);
+});
+
 // ---------------------------------------------------------------- A05 · CWE-79
 
 const XSS = [

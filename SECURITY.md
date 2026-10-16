@@ -181,10 +181,13 @@ Inclua: o passo a passo para reproduzir, o impacto estimado e a versão afetada
   `test/integration/http-seguranca.test.js` e `test/integration/api-sse.test.js`.
 
 ### 15. Formula injection no export (CSV)
-- **Ameaça:** células que começam com `=`, `+`, `-` ou `@` viram fórmula no Excel.
-- **Mitigação:** `server/csv.js` põe `'` antes desses valores (`csvEscape`). O nome do
-  arquivo exportado também é saneado.
-- **Verificado por:** `test/unit/csv.test.js` e `test/unit/csv-ext.test.js`.
+- **Ameaça:** células que começam com `=`, `+`, `-`, `@`, TAB ou CR viram fórmula no Excel
+  e no LibreOffice. O `host` e o `kernel` vêm do servidor monitorado (ameaça 13).
+- **Mitigação:** `server/csv.js` põe `'` antes desses valores e coloca entre aspas a célula
+  com vírgula, aspas ou quebra de linha (`csvEscape`). O nome do arquivo exportado também
+  é saneado.
+- **Verificado por:** `test/unit/csv.test.js`, `test/unit/csv-ext.test.js` e
+  `test/seguranca/payloads-owasp.test.js`.
 
 ### 16. Detalhes internos em mensagens de erro
 - **Ameaça:** um erro com stack trace revela caminhos e versões do ambiente.

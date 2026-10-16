@@ -13,8 +13,8 @@ diante: `PATCH` corrige, `MINOR` acrescenta sem quebrar e `MAJOR` quebra.
 
 - Camada de verificação de segurança, redundante de propósito (AGENTS, "Verificação em
   camadas"):
-  - `test/seguranca/` (60 testes, em todo `npm run check`): regras estáticas no código
-    (CWE-78/79/94/208/330/532/598/732/918/1321/1333…), matriz de ataque gerada das rotas
+  - `test/seguranca/` (62 testes, em todo `npm run check`): regras estáticas no código
+    (CWE-78/79/89/94/208/330/532/598/732/918/1321/1333…), matriz de ataque gerada das rotas
     reais (Host, login, CSRF, cabeçalhos e erros em toda rota × método), corpus de ataques
     do OWASP WSTG (path traversal, header injection, formula injection, XSS, injeção de
     comando, prototype pollution, corpo gigante, ReDoS), segredos e OSINT em tudo que vai
@@ -41,6 +41,13 @@ diante: `PATCH` corrige, `MINOR` acrescenta sem quebrar e `MAJOR` quebra.
 - `.gitignore`: `.seguranca/` (relatórios brutos) e `.claude/` (configuração local).
 - `scripts/node-runtime.sh`: diretiva do ShellCheck explica por que `NODE_BIN` e
   `NODE_ORIGEM` parecem sem uso (quem as lê é o `./dashboard`).
+
+### Segurança
+
+- Export CSV: célula que começa com TAB ou CR também ganha o `'` na frente (o Excel e o
+  LibreOffice pulam esses caracteres e leriam o resto como fórmula), e CR no meio põe a
+  célula entre aspas. Antes, só `= + - @` eram protegidos. O `host` e o `kernel` do
+  relatório vêm do servidor monitorado (orientação do OWASP "CSV Injection").
 
 ## [2.0.0] — 2026-10-16
 

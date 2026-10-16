@@ -53,7 +53,7 @@ O teste `test/unit/docs.test.js` confere esta documentação contra o código.
   `public/js/core/html.js`, que escapa toda interpolação. HTML cru só por `raw()`
   explícito. Medidas vindas dos dados (largura de barra, cor) vão em `data-w`/`data-bg`/…
   e são aplicadas pelo CSSOM em `mount()`. Nunca `style="…"` no HTML.
-- **Export seguro**: `server/csv.js` impede formula injection (`=+-@` → prefixo `'`) e
+- **Export seguro**: `server/csv.js` impede formula injection (`=+-@`, TAB e CR → prefixo `'`) e
   saneia o nome do arquivo.
 - **Permissões**: `data/` e `data/ssh/` com 0700; `.env`, chave e arquivos de dados com
   0600. A instalação grava assim (`server/setup/local.js`), a escrita também

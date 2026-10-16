@@ -1,7 +1,13 @@
+/**
+ * Escapa uma célula do CSV contra formula injection (OWASP "CSV Injection"): célula que
+ * começa com = + - @, TAB ou CR ganha um apóstrofo na frente e vira texto no Excel e no
+ * LibreOffice (eles pulam TAB e CR e leriam o resto como fórmula). Vírgula, aspas e quebra
+ * de linha (\n ou \r) põem a célula entre aspas, com as aspas internas dobradas.
+ */
 export function csvEscape(value) {
   const s = String(value ?? '');
-  const guarded = /^[=+\-@]/.test(s) ? `'${s}` : s;
-  return /[",\n]/.test(guarded) ? `"${guarded.replace(/"/g, '""')}"` : guarded;
+  const guarded = /^[=+\-@\t\r]/.test(s) ? `'${s}` : s;
+  return /[",\r\n]/.test(guarded) ? `"${guarded.replace(/"/g, '""')}"` : guarded;
 }
 
 export function toCSV(samples) {

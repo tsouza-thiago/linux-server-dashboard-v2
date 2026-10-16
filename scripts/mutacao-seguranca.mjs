@@ -48,7 +48,7 @@ const MUTACOES = [
   { nome: 'arquivo de dados sem 0600', arquivo: 'server/storage/ndjson.js', de: 'fs.writeFileSync(tmp, data, { mode: 0o600 });', para: 'fs.writeFileSync(tmp, data);' },
   { nome: 'token do .env sem whitelist (injeção no SSH)', arquivo: 'server/config.js', de: ".filter((t) => TOKEN_RE.test(t) && !t.startsWith('-'));", para: '.filter((t) => t.length > 0);' },
   { nome: 'host do SSH aceitando opção (-oProxyCommand)', arquivo: 'server/config.js', de: "if (!v || v.startsWith('-')) return 'seu-host';", para: "if (!v) return 'seu-host';" },
-  { nome: 'CSV sem proteção contra fórmula', arquivo: 'server/csv.js', de: "const guarded = /^[=+\\-@]/.test(s) ? `'${s}` : s;", para: 'const guarded = s;', testes: ['test/unit/csv.test.js'] },
+  { nome: 'CSV sem proteção contra fórmula', arquivo: 'server/csv.js', de: "const guarded = /^[=+\\-@\\t\\r]/.test(s) ? `'${s}` : s;", para: 'const guarded = s;', testes: ['test/unit/csv.test.js'] },
   { nome: 'template html sem escape', arquivo: 'public/js/core/html.js', de: '  return escape(value);\n}\n\nexport function html', para: '  return String(value);\n}\n\nexport function html' },
   { nome: 'SSH aceitando identidade nova do servidor', arquivo: 'server/setup/remoto.js', de: "'StrictHostKeyChecking=yes'", para: "'StrictHostKeyChecking=accept-new'" },
   { nome: 'script de coleta com texto a mais (authorized_keys quebrado)', arquivo: 'server/collector/builder.js', de: `"echo '===FIM==='",`, para: `"echo '===FIM==='; true",` },
