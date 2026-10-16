@@ -2,7 +2,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {
-  timeline, levelOf, viewOfKey, offlineMsIn, uptimeIn, dayStatuses, trafficOf, dailyTraffic,
+  timeline, levelOf, viewOfKey, offlineMsIn, outagesIn, uptimeIn, dayStatuses, trafficOf, dailyTraffic,
   peakOf, meanOf, trendOf, topPeaks, diskEta, diskForecast, healthLevel,
 } from '../../public/js/core/analysis.js';
 import { applyDataStyles, html, mount } from '../../public/js/core/html.js';
@@ -37,6 +37,22 @@ test('timeline: alerta "servidor inacessível" e a queda viram um item só, com 
   assert.equal(items[0].id, 'off');
   assert.equal(items[0].status, 'new', 'reconhecer a queda reconhece o alerta');
   assert.equal(items[1].key, 'ram:usage');
+});
+
+test('quedas no período: só as que tocam o intervalo, com o tempo recortado a ele', () => {
+  const from = Date.parse('2026-10-01T00:00:00Z');
+  const to = Date.parse('2026-10-08T00:00:00Z');
+  const now = Date.parse('2026-10-07T12:00:00Z');
+  const outages = [
+    // 10 h fora, das quais só as 2 últimas caem dentro do período.
+    { from: '2026-09-30T14:00:00Z', to: '2026-10-01T02:00:00Z', durationSec: 12 * 3600 },
+    // Inteira antes do período: não conta.
+    { from: '2026-09-20T00:00:00Z', to: '2026-09-20T05:00:00Z', durationSec: 5 * 3600 },
+    // Em andamento: conta até agora (30 min).
+    { from: '2026-10-07T11:30:00Z', to: null, durationSec: 1800, ongoing: true },
+  ];
+  assert.deepEqual(outagesIn(outages, from, to, now), { count: 2, offlineSec: 2 * 3600 + 1800 });
+  assert.deepEqual(outagesIn(undefined, from, to, now), { count: 0, offlineSec: 0 });
 });
 
 test('disponibilidade: tempo fora, % no intervalo e quadradinhos por dia local', () => {

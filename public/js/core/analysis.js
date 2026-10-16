@@ -173,6 +173,15 @@ export function offlineMsIn(outages, fromMs, toMs, nowMs = Date.now()) {
   return off;
 }
 
+/**
+ * Quedas que tocam [fromMs, toMs] e o tempo fora dentro do intervalo (s). Uma queda que
+ * começou antes do período conta só a parte de dentro, como na disponibilidade.
+ */
+export function outagesIn(outages, fromMs, toMs, nowMs = Date.now()) {
+  const inside = (outages || []).filter((o) => Date.parse(o.from) <= toMs && (o.to ? Date.parse(o.to) : nowMs) >= fromMs);
+  return { count: inside.length, offlineSec: Math.round(offlineMsIn(inside, fromMs, toMs, nowMs) / 1000) };
+}
+
 /** Disponibilidade (%) num intervalo; null antes do início do monitoramento. */
 export function uptimeIn(outages, fromMs, toMs, { sinceMs = -Infinity, nowMs = Date.now() } = {}) {
   const start = Math.max(fromMs, sinceMs);

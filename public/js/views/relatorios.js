@@ -3,7 +3,7 @@
 import { html, mount } from '../core/html.js';
 import * as f from '../core/format.js';
 import {
-  dailySummary, dailyTraffic, uptimeIn, meanOf, peakOf, timeline, levelOf, fullestDisk,
+  dailySummary, dailyTraffic, outagesIn, uptimeIn, meanOf, peakOf, timeline, levelOf, fullestDisk,
 } from '../core/analysis.js';
 import { $, icon, panelHead, onClick } from './common.js';
 
@@ -59,9 +59,9 @@ function cards(ctx) {
   const b = ctx.local.buckets;
   if (!b) return html`${[1, 2, 3, 4, 5].map(() => html`<div class="skel soft card-skel"></div>`)}`;
   const { from, to } = range();
-  const outs = (ctx.state.outages?.outages || []).filter((o) => Date.parse(o.from) <= to && (!o.to || Date.parse(o.to) >= from));
+  const outs = outagesIn(ctx.state.outages?.outages, from, to);
   const since = ctx.state.outages?.uptime?.from ? Date.parse(ctx.state.outages.uptime.from) : -Infinity;
-  const up = uptimeIn(outs, from, to, { sinceMs: since });
+  const up = uptimeIn(ctx.state.outages?.outages, from, to, { sinceMs: since });
   const cpuPeak = peakOf(b, 'cpu');
   const ramPeak = peakOf(b, 'ramPct');
   const disk = fullestDisk(ctx.state.sample);
@@ -72,7 +72,7 @@ function cards(ctx) {
   const when = (p) => (p ? `${WEEKDAY[new Date(p.t).getDay()]} ${f.time(p.t)}` : '');
   const card = (label, value, note) => html`<article class="card"><span class="card-label">${label}</span><span class="big md">${value}</span><span class="note">${note}</span></article>`;
   return html`
-    ${card('Disponibilidade', f.pct(up, 2), outs.length ? `${outs.length} queda${outs.length > 1 ? 's' : ''} · ${f.duration(outs.reduce((s, o) => s + o.durationSec, 0))} fora` : 'nenhuma queda')}
+    ${card('Disponibilidade', f.pct(up, 2), outs.count ? `${outs.count} queda${outs.count > 1 ? 's' : ''} · ${f.duration(outs.offlineSec)} fora` : 'nenhuma queda')}
     ${card('CPU média', f.pct(meanOf(b, 'cpu')), cpuPeak ? `pico ${f.pct(cpuPeak.value)} · ${when(cpuPeak)}` : 'sem dados')}
     ${card('Memória média', f.pct(meanOf(b, 'ramPct')), ramPeak ? `pico ${f.pct(ramPeak.value)}` : 'sem dados')}
     ${card(disk ? disk.mount : 'Disco', grew === null ? '—' : `${grew >= 0 ? '+' : '−'}${f.bytes(Math.abs(grew))}`, pk.length > 1 ? `${f.pct(pk[0])} → ${f.pct(pk[pk.length - 1])} no período` : 'sem dados no período')}

@@ -111,6 +111,9 @@ diante: `PATCH` corrige, `MINOR` acrescenta sem quebrar e `MAJOR` quebra.
 - Eventos: cada alerta novo que chegava ao vivo encolhia a lista de 200 alertas para os 50
   que o SSE traz (os mais antigos sumiam até recarregar a página). Agora o navegador junta
   os 50 recentes com o que já tinha.
+- Relatórios: o "tempo fora" do cartão Disponibilidade somava a duração inteira de uma
+  queda que começou antes do período escolhido. Agora conta só a parte de dentro do
+  período, como a porcentagem ao lado já fazia.
 - Documentação conferida contra o código:
   - AGENTS: o `.env` guarda o `DASH_TOKEN`, não senhas; o `diagnosticar` reaproveita a
     última amostra e só coleta se ela estiver velha; o link de entrada vale 2 min
