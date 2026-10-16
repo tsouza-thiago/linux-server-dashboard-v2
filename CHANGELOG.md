@@ -96,6 +96,12 @@ diante: `PATCH` corrige, `MINOR` acrescenta sem quebrar e `MAJOR` quebra.
 - API, `/entrar` e assistente respondem com `Cache-Control: no-store`. Sessão, telemetria
   e o token mostrado no fim da instalação não ficam no cache de disco do navegador
   (OWASP ASVS V8).
+- A query da URL recusa os nomes `__proto__`, `constructor` e `prototype` (o objeto já
+  não tinha protótipo; agora a proteção não depende disso). Achado do CodeQL *extended*
+  (`js/remote-property-injection`), analisado em `docs/seguranca/2026-10-16-codeql-extended.md`.
+- Testes conferem permissão e conteúdo de um arquivo pelo mesmo descritor
+  (`test-support/arquivos.js`), sem a janela entre `stat` e leitura apontada pelo CodeQL
+  (`js/file-system-race`).
 - Anotação: o instante (`ts`) é gravado em ISO canônico. Antes, o texto recebido era gravado
   como veio, se fosse uma data válida.
 

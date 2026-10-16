@@ -215,7 +215,7 @@ Inclua: o passo a passo para reproduzir, o impacto estimado e a versão afetada
   protótipo de todos os objetos do processo e muda o comportamento do painel.
 - **Mitigação:** o leitor do corpo JSON (`server/http/router.js`) descarta as chaves
   `__proto__`, `constructor` e `prototype`; a query é lida num objeto sem protótipo
-  (`Object.create(null)`).
+  (`Object.create(null)`) e também recusa esses três nomes.
 - **Verificado por:** `test/seguranca/payloads-owasp.test.js` e
   `test/seguranca/invariantes-estaticas.test.js`.
 
@@ -290,6 +290,8 @@ Os detalhes estão no AGENTS ("Verificação em camadas") e na ADR 0014.
 Análises publicadas:
 - [Alertas do CodeQL de 16/10/2026](docs/seguranca/2026-10-16-codeql.md): viés no sorteio
   do código do assistente, corrigido; escape do `authorized_keys`, falso positivo.
+- [Alertas do CodeQL *extended*](docs/seguranca/2026-10-16-codeql-extended.md): nome de
+  parâmetro da query (endurecido) e conferir-e-depois-ler em testes (corrigido).
 - [Linha de base da 2.0.1](docs/seguranca/2026-10-16-linha-de-base.md): resultado de todas
   as ferramentas na `v2.0.0`, correções feitas e o que o repositório público revela.
 - Achados aceitos depois de análise: `docs/seguranca/excecoes.json`.

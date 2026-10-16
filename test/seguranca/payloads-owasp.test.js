@@ -238,6 +238,16 @@ test('A08/CWE-1321: __proto__ e constructor no JSON ou na query não poluem obje
   assert.equal(Object.prototype.poluido, undefined);
 });
 
+test('A08/CWE-1321: a query nunca traz __proto__, constructor nem prototype como parâmetro', async (t) => {
+  const { createRouter } = await import('../../server/http/router.js');
+  const app = createRouter();
+  app.get('/eco', (req, res) => res.json({ chaves: Object.keys(req.query), proto: Object.getPrototypeOf(req.query) }));
+  const { server, port } = await listen(app);
+  t.after(() => close(server));
+  const r = await request(port, { path: '/eco?__proto__=1&constructor=2&prototype=3&a=4&a=5' });
+  assert.deepEqual(r.json, { chaves: ['a'], proto: null });
+});
+
 // ---------------------------------------------------------------- A10 · CWE-400 / CWE-674
 
 test('A10/CWE-400/674: corpo grande demais é 413; JSON profundo ou quebrado é 400; o painel segue respondendo', async (t) => {

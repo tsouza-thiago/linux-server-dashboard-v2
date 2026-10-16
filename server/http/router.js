@@ -14,10 +14,14 @@ function compile(pattern) {
   return { re: new RegExp(`^${re}/?$`), names };
 }
 
+// Nomes que nunca viram parâmetro: o objeto já não tem protótipo, mas recusar estes nomes
+// fecha de vez a porta para prototype pollution (CWE-1321) se o objeto for copiado adiante.
+const CHAVES_PROIBIDAS = new Set(['__proto__', 'constructor', 'prototype']);
+
 /** Primeira ocorrência de cada parâmetro da query (`?a=1&a=2` → `a: '1'`). */
 function parseQuery(params) {
   const out = Object.create(null);
-  for (const [k, v] of params) if (!(k in out)) out[k] = v;
+  for (const [k, v] of params) if (!CHAVES_PROIBIDAS.has(k) && !(k in out)) out[k] = v;
   return out;
 }
 

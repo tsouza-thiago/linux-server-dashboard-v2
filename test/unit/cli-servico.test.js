@@ -13,6 +13,7 @@ import {
 import { createLoginCode, consumeLoginCode } from '../../server/http/entrar.js';
 import { rotateIfNeeded, createLogFile } from '../../server/logfile.js';
 import { main, isConfigured, panelUrl } from '../../server/cli/index.js';
+import { lerComModo } from '../../test-support/arquivos.js';
 
 const noSystemd = () => ({ error: new Error('sem systemctl') });
 
@@ -149,8 +150,9 @@ test('entrar: código de uso único vale uma vez, no prazo, e em disco fica só 
   t.after(() => fs.rmSync(dir, { recursive: true, force: true }));
   const code = createLoginCode(dir, { now: 1000 });
   const file = path.join(dir, 'entrar.json');
-  assert.equal(fs.statSync(file).mode & 0o777, 0o600);
-  assert.ok(!fs.readFileSync(file, 'utf8').includes(code), 'o código não fica gravado');
+  const gravado = lerComModo(file);
+  assert.equal(gravado.modo, 0o600);
+  assert.ok(!gravado.texto.includes(code), 'o código não fica gravado');
   assert.equal(consumeLoginCode(dir, 'x'.repeat(32), { now: 1000 }), false);
   assert.equal(consumeLoginCode(dir, code, { now: 1000 + 121e3 }), false, 'vencido');
   const code2 = createLoginCode(dir, { now: 1000 });
@@ -158,7 +160,7 @@ test('entrar: código de uso único vale uma vez, no prazo, e em disco fica só 
   assert.equal(consumeLoginCode(dir, code2, { now: 2000 }), false, 'segunda vez não');
   assert.equal(consumeLoginCode(dir, undefined), false);
   for (let i = 0; i < 7; i += 1) createLoginCode(dir, { now: 3000 });
-  assert.equal(JSON.parse(fs.readFileSync(file, 'utf8')).length, 5, 'guarda no máximo 5 pendentes');
+  assert.equal(JSON.parse(lerComModo(file).texto).length, 5, 'guarda no máximo 5 pendentes');
 });
 
 test('log: gira em dashboard.log.1 ao passar do limite', async (t) => {

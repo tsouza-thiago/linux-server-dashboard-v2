@@ -7,6 +7,7 @@ import { migrateV1, inspectV1, describe, BACKUP_NAME } from '../../server/storag
 import { History } from '../../server/storage/index.js';
 import { ROLLUP_STEP_MS } from '../../server/storage/rollup.js';
 import { listDays, readNdjson, dayOf, HOUR_MS } from '../../server/storage/ndjson.js';
+import { lerComModo } from '../../test-support/arquivos.js';
 
 const MIN = 60000;
 const BASE = Date.UTC(2026, 9, 1, 0, 0);
@@ -69,8 +70,9 @@ test('migração: grava bruto (72 h) + agregados de todo o período e só então
   assert.equal(r.status, 'migrado');
   assert.ok(!fs.existsSync(v1File), 'arquivo da V1 virou backup');
   assert.equal(r.backup, path.join(dataDir, BACKUP_NAME));
-  assert.equal(fs.statSync(r.backup).mode & 0o777, 0o600);
-  assert.equal(JSON.parse(fs.readFileSync(r.backup, 'utf8')).length, minutes, 'backup é o arquivo original inteiro');
+  const backup = lerComModo(r.backup);
+  assert.equal(backup.modo, 0o600);
+  assert.equal(JSON.parse(backup.texto).length, minutes, 'backup é o arquivo original inteiro');
 
   const rawDays = listDays(path.join(dataDir, 'history'));
   const latest = Date.parse(at(minutes - 1));
