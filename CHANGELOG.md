@@ -9,6 +9,13 @@ diante: `PATCH` corrige, `MINOR` acrescenta sem quebrar e `MAJOR` quebra.
 
 ## [Não publicado]
 
+### Segurança
+
+- Alerta 8 do CodeQL (`js/file-access-to-http`, em `test-support/request.js`) analisado e
+  descartado como falso positivo: o cliente HTTP dos testes só fala com `127.0.0.1`. Uma
+  regra nova em `test/seguranca/invariantes-estaticas.test.js` trava esse destino. Análise
+  em `docs/seguranca/2026-10-16-codeql-file-access-to-http.md`.
+
 ## [2.0.1] — 2026-10-16
 
 Versão de manutenção: documentação conferida contra o código, código comentado em PT-BR,

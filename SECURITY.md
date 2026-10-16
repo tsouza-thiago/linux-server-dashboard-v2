@@ -292,6 +292,9 @@ Análises publicadas:
   do código do assistente, corrigido; escape do `authorized_keys`, falso positivo.
 - [Alertas do CodeQL *extended*](docs/seguranca/2026-10-16-codeql-extended.md): nome de
   parâmetro da query (endurecido) e conferir-e-depois-ler em testes (corrigido).
+- [Alerta 8 do CodeQL](docs/seguranca/2026-10-16-codeql-file-access-to-http.md): dado de
+  arquivo num pedido HTTP do cliente dos testes, falso positivo (destino só `127.0.0.1`,
+  travado por teste).
 - [Linha de base da 2.0.1](docs/seguranca/2026-10-16-linha-de-base.md): resultado de todas
   as ferramentas na `v2.0.0`, correções feitas e o que o repositório público revela.
 - Achados aceitos depois de análise: `docs/seguranca/excecoes.json`.
