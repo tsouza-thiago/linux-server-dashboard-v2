@@ -7,7 +7,7 @@
 > revisão visual aprovada em 08/10/2026) · F7 concluída (`2.0.0-alpha.8`, e2e em contêineres
 > Debian 12 e Ubuntu 24.04 limpos: 27/27; validada no computador e no servidor real em
 > 08/10/2026) · F8 entregue (`2.0.0-beta.1`, docs conferidas por `test/unit/docs.test.js`) ·
-> próxima: **F9** ·
+> `2.0.0-beta.2` (alertas do CodeQL, 16/10/2026) · próxima: **F9** ·
 > base: `v1.0.0` (= `tsouza-thiago/linux-server-dashboard` @ `11a3286`, 196 testes verdes)
 >
 > Referência visual: canvas "Dashboard V2 — direções de design" (privado, do mantenedor).

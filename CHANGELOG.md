@@ -8,6 +8,12 @@ pré-versões `2.0.0-alpha.N` (uma por fase do plano), depois `beta`, `rc` e `2.
 
 ## [Não publicado]
 
+## [2.0.0-beta.2] — 2026-10-16
+
+Correções da primeira análise do code scanning (CodeQL) do GitHub. Nenhum dos 2 alertas
+afetava o painel na prática; a análise completa está em
+`docs/seguranca/2026-10-16-codeql.md`.
+
 ### Adicionado
 
 - `CLAUDE.md`: orientação para o Claude Code. Importa o AGENTS.md (a referência técnica
@@ -396,7 +402,8 @@ Documentados no plano da V2 (seção 2.2, B1–B12), entre eles: alerta SMART fa
 rede zerada com contadores grandes, alerta duplicado a cada coleta e reescrita completa do
 histórico a cada minuto.
 
-[Não publicado]: https://github.com/tsouza-thiago/linux-server-dashboard-v2/compare/v2.0.0-beta.1...HEAD
+[Não publicado]: https://github.com/tsouza-thiago/linux-server-dashboard-v2/compare/v2.0.0-beta.2...HEAD
+[2.0.0-beta.2]: https://github.com/tsouza-thiago/linux-server-dashboard-v2/compare/v2.0.0-beta.1...v2.0.0-beta.2
 [2.0.0-beta.1]: https://github.com/tsouza-thiago/linux-server-dashboard-v2/compare/v2.0.0-alpha.8...v2.0.0-beta.1
 [2.0.0-alpha.8]: https://github.com/tsouza-thiago/linux-server-dashboard-v2/compare/v2.0.0-alpha.7...v2.0.0-alpha.8
 [2.0.0-alpha.7]: https://github.com/tsouza-thiago/linux-server-dashboard-v2/compare/v2.0.0-alpha.6...v2.0.0-alpha.7
