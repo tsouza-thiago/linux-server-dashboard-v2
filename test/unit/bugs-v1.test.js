@@ -89,6 +89,24 @@ test('B5 — resumo diário agrupa pelo dia do fuso local, não UTC', () => {
   }
 });
 
+test('B6 — o selo SMART de cada pasta acha o disco dela (partição → disco)', () => {
+  const out = [
+    '===HOST===', 'srv',
+    '===DF===', 'Filesystem 1B-blocks Used Avail Use% IUse% Mounted',
+    '/dev/sda2 / 100 64 36 64% 1%', '/dev/nvme0n1p1 /mnt/rapido 100 10 90 10% 1%',
+    '/dev/mmcblk0p1 /boot 100 50 50 50% 1%', 'tmpfs /run 100 1 99 1% 1%',
+    '===SMART===', 'sda PASSED', 'nvme0n1 FAILED',
+  ].join('\n');
+  const s = parseOutput(out, TS, OPTS);
+  // A tela (armazenamento.js) casa o SMART pelo `dev` da pasta; na V1 casava pelo ponto de
+  // montagem e o selo ficava quase sempre "—".
+  const selo = (mount) => s.smart.find((x) => x.dev === s.disks.find((d) => d.mount === mount)?.dev)?.status ?? null;
+  assert.deepEqual(s.disks.map((d) => d.dev), ['sda', 'nvme0n1', 'mmcblk0', null]);
+  assert.equal(selo('/'), 'PASSED');
+  assert.equal(selo('/mnt/rapido'), 'FAILED');
+  assert.equal(selo('/run'), null, 'sem disco físico, sem selo (nada inventado)');
+});
+
 test('B7 — gravar uma amostra não reescreve o histórico inteiro', async () => {
   const dir = tmpDir();
   const store = new RawStore({ dir, limit: 5000, log: () => {} });

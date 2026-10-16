@@ -60,6 +60,9 @@ diante: `PATCH` corrige, `MINOR` acrescenta sem quebrar e `MAJOR` quebra.
   vezes com a máquina carregada). Os outros testes com espera fixa (processo da CLI, TUI,
   assistente) passam a esperar a condição real com `test-support/esperar.js`.
 - Testes e2e: `CHROMIUM=<caminho>` escolhe o navegador, como já fazia o e2e da instalação.
+- `test/unit/bugs-v1.test.js` volta a ter o teste do B6 (selo SMART de cada pasta acha o
+  disco dela: `sda2` → `sda`, `nvme0n1p1` → `nvme0n1`, `mmcblk0p1` → `mmcblk0`). Os 12
+  bugs da V1 têm teste de regressão de novo.
 - `npm run seguranca -- --so=<etapa>` com nome de etapa errado sai com erro (antes rodava
   nada e dizia "SEGURANÇA OK"). As etapas e as opções estão no AGENTS.
 - `test-support/request.js` envia o corpo com `Content-Length` (num `DELETE` sem ele, o
