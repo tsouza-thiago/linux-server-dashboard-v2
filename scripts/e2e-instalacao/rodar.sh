@@ -62,16 +62,19 @@ rm -rf "$GIT" && mkdir -p "$GIT"
 ssh-keygen -q -t ed25519 -N '' -C mantenedor-teste -f "$OUT/assinatura"
 git clone -q --no-hardlinks "$REPO" "$GIT/release"
 cd "$GIT/release"
+# Só as tags deste teste: as reais (v2.0.0-beta.2…) viriam junto do clone e confundiriam a
+# escolha da "versão assinada mais nova".
+git tag -l | xargs -r git tag -d >/dev/null
 git config user.email teste@example.com && git config user.name "Mantenedor (teste)"
 printf 'teste@example.com namespaces="git" %s\n' "$(cut -d' ' -f1,2 "$OUT/assinatura.pub")" >> docs/allowed_signers
 versao() { node -e "const f='package.json',p=JSON.parse(require('fs').readFileSync(f));p.version='$1';require('fs').writeFileSync(f,JSON.stringify(p,null,2)+'\n')"; }
 assina() { git -c gpg.format=ssh -c gpg.ssh.program=ssh-keygen -c user.signingkey="$OUT/assinatura" tag -s "$1" -m "$1 (e2e)"; }
-versao 2.0.0-alpha.8 && git commit -qam "e2e: chave de teste" && assina v2.0.0-alpha.8
+versao 2.0.0-beta.2 && git commit -qam "e2e: chave de teste" && assina v2.0.0-beta.2
 git commit -q --allow-empty -m "trabalho em andamento (sem tag)"
 cd "$REPO"
 git daemon --reuseaddr --export-all --base-path="$GIT" --port=9418 --listen=127.0.0.1 --detach --pid-file="$OUT/gitd.pid"
 sleep 1
-ok "release v2.0.0-alpha.8 assinada em git://127.0.0.1:9418/release"
+ok "release v2.0.0-beta.2 assinada em git://127.0.0.1:9418/release"
 
 servidor() { docker run -d --init --name "$1" --network host "$2" /usr/sbin/sshd -D -e -p "$3" >/dev/null; }
 cliente() { docker run -d --init --name "$1" --network host "${envs[@]}" "$2" sleep infinity >/dev/null; }
@@ -85,7 +88,7 @@ cliente e2e-cli-deb dash-e2e-cliente-debian
 FP=$(identidade 2201)
 confere "A: computador sem Node" bash -c "! docker exec e2e-cli-deb sh -c 'command -v node'"
 em e2e-cli-deb "git clone -q git://127.0.0.1:9418/release linux-server-dashboard-v2 && cd linux-server-dashboard-v2 && printf 'PORT=3101\n' > .env && echo senha-de-teste | ./dashboard instalar --sem-interface --servidor 127.0.0.1 --porta 2201 --usuario maria --identidade '$FP' --senha-stdin --smart nenhum" | tee "$OUT/A-instalar.txt"
-confere "A: fixou na versão assinada mais nova" grep -q "usando a versão assinada mais nova: v2.0.0-alpha.8" "$OUT/A-instalar.txt"
+confere "A: fixou na versão assinada mais nova" grep -q "usando a versão assinada mais nova: v2.0.0-beta.2" "$OUT/A-instalar.txt"
 confere "A: assinatura conferida" grep -q "assinatura conferida" "$OUT/A-instalar.txt"
 confere "A: Node 24 baixado e conferido" grep -q "baixado para .runtime/ e conferido" "$OUT/A-instalar.txt"
 confere "A: servidor preparado (dashmon, chave restrita)" grep -q "servidor preparado" "$OUT/A-instalar.txt"
@@ -93,10 +96,15 @@ confere "A: 2 coletas pelo painel" espera_coletas e2e-cli-deb linux-server-dashb
 em e2e-cli-deb "cd linux-server-dashboard-v2 && ./dashboard diagnosticar" | tee "$OUT/A-diagnosticar.txt" || true
 confere "A: diagnóstico sem avisos nem erros" grep -q "nenhum aviso, nenhum erro" "$OUT/A-diagnosticar.txt"
 confere "A: dashmon no servidor só com a chave restrita" docker exec e2e-srv-deb sh -c 'grep -q "^restrict,from=\"127.0.0.1\",command=" /home/dashmon/.ssh/authorized_keys'
-cd "$GIT/release" && versao 2.0.0-alpha.9 && git commit -qam "e2e: alpha.9" && assina v2.0.0-alpha.9 && git tag v2.0.0-alpha.10 && cd "$REPO"
+# O caminho da v2.0.0: da pré-versão para a estável assinada (a v2.0.1 sem assinatura é ignorada).
+cd "$GIT/release" && versao 2.0.0 && git commit -qam "e2e: 2.0.0" && assina v2.0.0 && git tag v2.0.1 && cd "$REPO"
 em e2e-cli-deb "cd linux-server-dashboard-v2 && ./dashboard atualizar && ./dashboard versao" | tee "$OUT/A-atualizar.txt"
-confere "A: atualizou para a alpha.9 assinada (a alpha.10 sem assinatura foi ignorada)" grep -q "atualizado de v2.0.0-alpha.8 para v2.0.0-alpha.9" "$OUT/A-atualizar.txt"
+confere "A: atualizou para a v2.0.0 assinada (a v2.0.1 sem assinatura foi ignorada)" grep -q "atualizado de v2.0.0-beta.2 para v2.0.0" "$OUT/A-atualizar.txt"
 confere "A: painel de volta depois de atualizar" espera_coletas e2e-cli-deb linux-server-dashboard-v2 3
+# Na estável, uma pré-versão nova (mesmo assinada) não é instalada sem --pre.
+cd "$GIT/release" && versao 2.0.1-rc.1 && git commit -qam "e2e: 2.0.1-rc.1" && assina v2.0.1-rc.1 && cd "$REPO"
+em e2e-cli-deb "cd linux-server-dashboard-v2 && ./dashboard atualizar" | tee "$OUT/A-atualizar-estavel.txt"
+confere "A: na estável, a rc assinada não é instalada sem --pre" grep -q "versão mais nova (v2.0.0)" "$OUT/A-atualizar-estavel.txt"
 em e2e-cli-deb "cd linux-server-dashboard-v2 && echo senha-de-teste | ./dashboard desinstalar --sim --limpar-servidor --usuario maria --senha-stdin" | tee "$OUT/A-desinstalar.txt"
 confere "A: servidor limpo pelo desinstalar" bash -c "! docker exec e2e-srv-deb id dashmon"
 confere "A: chave e configuração locais apagadas" bash -c "! docker exec e2e-cli-deb sh -c 'ls /home/ana/.ssh/dashboard_ed25519 /home/ana/linux-server-dashboard-v2/.env'"
