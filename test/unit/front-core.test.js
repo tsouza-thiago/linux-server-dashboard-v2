@@ -5,7 +5,7 @@ import { html, raw, escape, mount } from '../../public/js/core/html.js';
 import * as fmt from '../../public/js/core/format.js';
 import { parseHash, buildHash, VIEWS, PERIODS, viewByKey } from '../../public/js/core/router.js';
 import { createStore } from '../../public/js/core/store.js';
-import { series, xs, keysWith, diskEta, dailySummary, headline, fullestDisk, timeline, isOffline } from '../../public/js/core/analysis.js';
+import { series, xs, keysWith, diskEta, dailySummary, headline, fullestDisk, timeline, isOffline, mergeAlerts, ALERTS_LIMIT } from '../../public/js/core/analysis.js';
 
 test('html: toda interpolação é escapada; raw() é a única porta para HTML', () => {
   const evil = '<img src=x onerror=alert(1)>"\'`&';
@@ -164,4 +164,20 @@ test('isOffline: só com falha de verdade (não logo após reiniciar o painel)',
   assert.equal(isOffline({ online: false, failures: 0, offlineSince: '2026-10-07T12:00:00Z' }), true, 'queda aberta antes de reiniciar');
   assert.equal(isOffline({ online: true, failures: 0 }), false);
   assert.equal(isOffline(null), false);
+});
+
+test('alertas ao vivo: o SSE (50 mais recentes) atualiza a lista sem encolher os 200 carregados', () => {
+  assert.equal(ALERTS_LIMIT, 200);
+  // Lista carregada da API: 200 alertas, do mais novo (a199) ao mais antigo (a0).
+  const prev = Array.from({ length: 200 }, (_, i) => ({ id: `a${199 - i}`, status: 'resolved' }));
+  // Evento SSE: um alerta novo e os 49 seguintes, com a199 agora reconhecido.
+  const recent = [{ id: 'a200', status: 'new' }, { id: 'a199', status: 'ack' },
+    ...Array.from({ length: 48 }, (_, i) => ({ id: `a${198 - i}`, status: 'resolved' }))];
+  const out = mergeAlerts(recent, prev);
+  assert.equal(out.length, 200, 'não encolhe para 50');
+  assert.deepEqual(out.slice(0, 2), [{ id: 'a200', status: 'new' }, { id: 'a199', status: 'ack' }], 'o SSE vence');
+  assert.equal(out.at(-1).id, 'a1', 'o mais antigo sai para caber o novo');
+  assert.equal(new Set(out.map((a) => a.id)).size, 200, 'sem repetidos');
+  assert.deepEqual(mergeAlerts(undefined, prev), prev);
+  assert.deepEqual(mergeAlerts([{ id: 'x' }], undefined), [{ id: 'x' }]);
 });

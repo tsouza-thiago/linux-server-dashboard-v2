@@ -132,6 +132,21 @@ export function timeline({ alerts = [], annotations = [], outages = [] }) {
 
 // ---------------- Cálculos das telas (níveis, disponibilidade, tráfego, picos) ----------------
 
+// Quantos alertas a tela guarda (os mais recentes), pedidos a /api/alerts ao abrir.
+export const ALERTS_LIMIT = 200;
+
+/**
+ * Junta os alertas recentes do evento SSE `alerts` (só os 50 mais novos) com a lista que a
+ * tela já tem (até ALERTS_LIMIT). O SSE vence para o mesmo id (status atualizado); os que
+ * ele não trouxe continuam, na ordem. Sem isso, cada alerta novo encolhia Eventos para 50.
+ * As duas listas vêm do mais novo para o mais antigo.
+ */
+export function mergeAlerts(recent, prev, max = ALERTS_LIMIT) {
+  if (!Array.isArray(recent)) return prev || [];
+  const ids = new Set(recent.map((a) => a.id));
+  return [...recent, ...(prev || []).filter((a) => !ids.has(a.id))].slice(0, max);
+}
+
 /** Nível visual do alerta: 'crit' (crítico) ou 'warn' (atenção). */
 export const levelOf = (alert) => (alert?.level === 'critical' ? 'crit' : 'warn');
 

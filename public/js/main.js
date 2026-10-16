@@ -12,7 +12,7 @@ import { api, onAuthRequired } from './core/api.js';
 import { connect } from './core/sse.js';
 import { VIEWS, PERIODS, parseHash, buildHash, viewByKey } from './core/router.js';
 import { html, mount } from './core/html.js';
-import { isOffline } from './core/analysis.js';
+import { isOffline, mergeAlerts } from './core/analysis.js';
 import * as f from './core/format.js';
 import { icon } from './views/common.js';
 import * as visaoGeral from './views/visao-geral.js';
@@ -385,7 +385,7 @@ function onEvent(name, data) {
     scheduleBuckets();
   } else if (name === 'alerts') {
     notifyNewAlerts(data.all || data.alerts);
-    store.set({ alerts: { active: data.alerts || [], all: data.all || store.get().alerts.all } });
+    store.set({ alerts: { active: data.alerts || [], all: mergeAlerts(data.all, store.get().alerts.all) } });
   } else if (name === 'annotations') {
     store.set({ annotations: data.annotations || [] });
   }

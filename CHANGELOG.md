@@ -108,6 +108,9 @@ diante: `PATCH` corrige, `MINOR` acrescenta sem quebrar e `MAJOR` quebra.
 - Instalação pelo terminal (TUI): desmarcar "Iniciar com o computador" no passo 6 não
   valia; o serviço era instalado e habilitado do mesmo jeito. Agora a TUI repassa a
   escolha, como o assistente no navegador.
+- Eventos: cada alerta novo que chegava ao vivo encolhia a lista de 200 alertas para os 50
+  que o SSE traz (os mais antigos sumiam até recarregar a página). Agora o navegador junta
+  os 50 recentes com o que já tinha.
 - Documentação conferida contra o código:
   - AGENTS: o `.env` guarda o `DASH_TOKEN`, não senhas; o `diagnosticar` reaproveita a
     última amostra e só coleta se ela estiver velha; o link de entrada vale 2 min
