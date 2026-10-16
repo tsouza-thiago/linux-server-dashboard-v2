@@ -8,11 +8,14 @@ import path from 'node:path';
 import { aggregate } from './buckets.js';
 import { readNdjson, listDays, dayOf, DAY_MS } from './ndjson.js';
 
+/** Tamanho de um balde agregado: 5 min. */
 export const ROLLUP_STEP_MS = 5 * 60000;
 
+// Início do balde de 5 min que contém `ms`; e se um balde lido do disco tem a forma certa.
 const bucketStart = (ms) => Math.floor(ms / ROLLUP_STEP_MS) * ROLLUP_STEP_MS;
 const validBucket = (b) => b && Number.isFinite(b.t) && Number.isFinite(b.n) && b.m && typeof b.m === 'object';
 
+/** Os agregados de 5 min em data/rollup/ (gravação só por acréscimo, em fila). */
 export class RollupStore {
   constructor({ dir, retentionDays = 90, log = (m) => console.warn(m) } = {}) {
     this.dir = dir;
@@ -21,13 +24,16 @@ export class RollupStore {
     this._queue = Promise.resolve();
     this._prunedFor = null;
     this._torn = new Set();
+    // Início do último balde já gravado: tudo até ele está fechado.
     this.lastT = this._readLastT();
   }
 
+  /** Caminho do arquivo NDJSON de um dia. */
   fileFor(day) {
     return path.join(this.dir, `${day}.ndjson`);
   }
 
+  /** Lê do disco o último balde gravado (do dia mais novo para trás); nenhum = -Infinity. */
   _readLastT() {
     const days = listDays(this.dir);
     for (let i = days.length - 1; i >= 0; i -= 1) {
@@ -39,6 +45,7 @@ export class RollupStore {
     return -Infinity;
   }
 
+  /** Põe uma gravação na fila; erro de disco vai para o log e não para as seguintes. */
   _enqueue(fn) {
     this._queue = this._queue.then(fn).catch((err) => this.log(`[rollup] falha ao gravar: ${err.message}`));
     return this._queue;
@@ -58,6 +65,7 @@ export class RollupStore {
     if (!pending.length) return this._queue;
     const buckets = aggregate(pending, ROLLUP_STEP_MS);
     this.lastT = buckets[buckets.length - 1].t;
+    // Agrupa as linhas por arquivo diário para gravar cada dia de uma vez.
     const byDay = new Map();
     for (const b of buckets) {
       const day = dayOf(b.t);
@@ -127,11 +135,12 @@ export class RollupStore {
     for (const b of buckets) if (b.t > this.lastT) this.lastT = b.t;
   }
 
+  /** Espera as gravações pendentes. */
   async flush() {
     await this._queue;
   }
 
-  /** Bytes ocupados pelos agregados (para a tela de configuração/diagnóstico). */
+  /** Bytes ocupados pelos agregados em disco (conferido em test/unit/storage-rollup.test.js). */
   sizeBytes() {
     return listDays(this.dir).reduce((n, d) => {
       try { return n + fs.statSync(this.fileFor(d)).size; } catch { return n; }

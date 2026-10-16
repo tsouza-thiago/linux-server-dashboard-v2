@@ -1,10 +1,13 @@
 // Agregação por balde (ADR 0005). Duas formas, as duas preservando picos (corrige B8):
 // - `aggregate()`: baldes compactos { t, n, m: { métrica: [mín, máx, média] } } — formato dos
 //   rollups de 5 min e da resposta `formato=baldes` de /api/history;
-// - `downsample()`: amostras no formato original para o frontend atual, em que cada ponto
-//   reduzido carrega o PIOR valor do balde (máximo de uso, mínimo de folga).
+// - `downsample()`: amostras no formato original (resposta padrão de /api/history, usada por
+//   scripts e pelo export), em que cada ponto reduzido carrega o PIOR valor do grupo
+//   (máximo de uso, mínimo de folga). As telas usam os baldes.
 // Dado ausente nunca vira zero (I5): métrica sem valor no balde simplesmente não aparece.
 
+// Cópia local de rules.isNum: importar as regras de alerta aqui acoplaria o armazenamento
+// aos alertas por causa de uma linha.
 const isNum = (v) => typeof v === 'number' && Number.isFinite(v);
 
 /** Arredonda para gravar: inteiros grandes sem casas, demais com 2 casas. */
@@ -15,6 +18,7 @@ export function roundValue(v) {
 /** Métricas numéricas de uma amostra (v1 ou v2), achatadas em { chave: número }. */
 export function flatten(s) {
   const out = {};
+  // Só entra o que é número de verdade (I5); o nome da chave diz de onde veio o valor.
   const put = (key, v) => { if (isNum(v)) out[key] = v; };
   if (Array.isArray(s.load)) { put('load1', s.load[0]); put('load5', s.load[1]); put('load15', s.load[2]); }
   if (s.cpu) {
@@ -45,10 +49,13 @@ export function flatten(s) {
   return out;
 }
 
+// Início do balde de `step` ms que contém `ms` (alinhado à época, igual em toda máquina).
 const bucketStart = (ms, step) => Math.floor(ms / step) * step;
 
+// Acumulador de um balde: por métrica, mínimo, máximo, soma e contagem.
 function newAcc(t) { return { t, n: 0, m: new Map() }; }
 
+/** Soma uma amostra achatada ao acumulador do balde. */
 function addToAcc(acc, flat) {
   acc.n += 1;
   for (const [k, v] of Object.entries(flat)) {
@@ -63,6 +70,7 @@ function addToAcc(acc, flat) {
   }
 }
 
+/** Fecha o balde: { t, n, m: { métrica: [mín, máx, média] } }, arredondado. */
 function finishAcc(acc) {
   const m = {};
   for (const [k, a] of acc.m) m[k] = [roundValue(a.min), roundValue(a.max), roundValue(a.sum / a.c)];
@@ -111,6 +119,8 @@ export function mergeBuckets(buckets, step) {
   return [...out.values()].sort((a, b) => a.t - b.t).map(finishAcc);
 }
 
+// Maior e menor valor de um campo num grupo de amostras (ignorando quem não tem o dado), e o
+// item de uma lista pelo campo-chave (o mesmo disco em amostras diferentes).
 const maxOf = (list, get) => {
   let best = null;
   for (const x of list) { const v = get(x); if (isNum(v) && (best === null || v > best)) best = v; }

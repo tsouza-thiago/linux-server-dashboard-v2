@@ -1,3 +1,7 @@
+// Export CSV do relatório (/api/export?format=csv): 1 linha por amostra, com colunas fixas e
+// um grupo de colunas por pasta e por disco. Toda célula passa pelo csvEscape (SECURITY,
+// ameaça 15).
+
 /**
  * Escapa uma célula do CSV contra formula injection (OWASP "CSV Injection"): célula que
  * começa com = + - @, TAB ou CR ganha um apóstrofo na frente e vira texto no Excel e no
@@ -10,11 +14,13 @@ export function csvEscape(value) {
   return /[",\r\n]/.test(guarded) ? `"${guarded.replace(/"/g, '""')}"` : guarded;
 }
 
+/** Monta o CSV inteiro (cabeçalho + linhas) a partir das amostras, em ordem. */
 export function toCSV(samples) {
   const mounts = [...new Set(samples.flatMap((s) => (s.disks || []).map((d) => d.mount)))];
   // 1 par de colunas por dispositivo de I/O, como os discos (B4: antes as colunas eram
   // repetidas por linha e o cabeçalho só tinha um par)
   const devs = [...new Set(samples.flatMap((s) => (s.io || []).map((d) => d.dev)))].filter(Boolean);
+  // Nome de coluna seguro a partir da pasta/disco ("/mnt/disco1" → "_mnt_disco1").
   const colKey = (v) => String(v).replace(/[^a-zA-Z0-9]/g, '_');
   const headers = [
     'ts', 'host', 'uptimeSec', 'cores', 'kernel', 'load1', 'load5', 'load15',

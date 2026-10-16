@@ -10,6 +10,7 @@ import { downsample } from './buckets.js';
 
 export const HOUR_MS = 3600000;
 export const DAY_MS = 24 * HOUR_MS;
+// Nome dos arquivos diários: AAAA-MM-DD.ndjson (qualquer outro arquivo da pasta é ignorado).
 const FILE_RE = /^(\d{4}-\d{2}-\d{2})\.ndjson$/;
 
 /** Dia UTC (AAAA-MM-DD) de um timestamp ISO ou em ms. */
@@ -34,6 +35,7 @@ export function readNdjson(file, { map = null } = {}) {
   let rest = '';
   let lastByte = null;
   const decoder = new StringDecoder('utf8');
+  // Uma linha → um item; linha vazia é pulada e JSON inválido só conta em `bad`.
   const take = (line) => {
     if (!line.trim()) return;
     let item;
@@ -46,6 +48,8 @@ export function readNdjson(file, { map = null } = {}) {
       const n = fs.readSync(fd, buf, 0, buf.length, null);
       if (n === 0) break;
       lastByte = buf[n - 1];
+      // O StringDecoder não parte um caractere UTF-8 de vários bytes entre dois blocos, e o
+      // pedaço depois do último \n (`rest`) espera o bloco seguinte.
       const text = rest + decoder.write(buf.subarray(0, n));
       const lines = text.split('\n');
       rest = lines.pop();
@@ -90,6 +94,7 @@ function compactSample(sample) {
   return JSON.parse(JSON.stringify(rest));
 }
 
+/** As amostras brutas: em memória (as últimas 72 h) e nos arquivos diários de data/history/. */
 export class RawStore {
   /**
    * @param {object} opts
@@ -103,16 +108,21 @@ export class RawStore {
     this.retentionMs = retentionMs;
     this.log = log;
     this.samples = [];
+    // Dias cujo arquivo terminou com linha cortada (a próxima gravação fecha a linha antes).
     this._torn = new Set();
+    // Fila das gravações em disco (uma de cada vez, na ordem das coletas).
     this._queue = Promise.resolve();
+    // Dia para o qual a limpeza de arquivos velhos já rodou (1 vez por dia basta).
     this._prunedFor = null;
     this.load();
   }
 
+  /** Caminho do arquivo NDJSON de um dia. */
   fileFor(day) {
     return path.join(this.dir, `${day}.ndjson`);
   }
 
+  /** Recarrega do disco as amostras da janela (ao iniciar o painel). */
   load() {
     const days = listDays(this.dir);
     const list = [];
@@ -138,6 +148,7 @@ export class RawStore {
     this._trim();
   }
 
+  /** Tira da memória o que saiu da janela de 72 h ou passou de `limit` amostras. */
   _trim() {
     const latest = this.getLatest();
     if (latest) {
@@ -149,6 +160,7 @@ export class RawStore {
     if (this.samples.length > this.limit) this.samples.splice(0, this.samples.length - this.limit);
   }
 
+  /** Põe uma gravação na fila; erro de disco vai para o log e não para as seguintes. */
   _enqueue(fn) {
     this._queue = this._queue.then(fn).catch((err) => this.log(`[history] falha ao gravar: ${err.message}`));
     return this._queue;
@@ -184,14 +196,17 @@ export class RawStore {
     }
   }
 
+  /** Espera as gravações pendentes (encerramento do painel, B11). */
   async flush() {
     await this._queue;
   }
 
+  /** A amostra mais recente (a única com os processos), ou null. */
   getLatest() {
     return this.samples.length ? this.samples[this.samples.length - 1] : null;
   }
 
+  /** As `limit` amostras mais recentes, em ordem. */
   getSamples(limit = 120) {
     return this.samples.slice(-limit);
   }
@@ -202,6 +217,7 @@ export class RawStore {
     return downsample(list, limit);
   }
 
+  /** Quantas amostras estão em memória. */
   get length() {
     return this.samples.length;
   }

@@ -13,10 +13,13 @@ import { readNdjson, writeFileAtomicSync, dayOf, validTs } from './ndjson.js';
 import { RollupStore, ROLLUP_STEP_MS } from './rollup.js';
 import { RAW_RETENTION_MS } from './index.js';
 
+/** Nome do backup do arquivo da V1, ao lado dele em data/. */
 export const BACKUP_NAME = 'history.v1-migrado.json';
 
+// Ordem cronológica pelo texto ISO do `ts` (texto ISO ordena igual ao tempo).
 const byTs = (a, b) => (a.ts < b.ts ? -1 : a.ts > b.ts ? 1 : 0);
 
+/** Uma amostra por instante (a última vence), em ordem. */
 function dedupe(list) {
   const map = new Map();
   for (const s of list) map.set(s.ts, s);
@@ -38,6 +41,7 @@ export function inspectV1(v1File) {
   } catch (err) {
     return { status: 'invalido', file: v1File, error: `JSON inválido: ${err.message}` };
   }
+  // A V1 gravou uma lista; versões intermediárias, `{ samples: [...] }`.
   const list = Array.isArray(parsed) ? parsed : Array.isArray(parsed?.samples) ? parsed.samples : null;
   if (!list) return { status: 'invalido', file: v1File, error: 'formato desconhecido (esperado uma lista de amostras)' };
   const samples = dedupe(list.filter(validTs));
@@ -55,6 +59,7 @@ export function inspectV1(v1File) {
   };
 }
 
+/** Caminho do backup; se já existir um (migração repetida), outro com data e hora no nome. */
 function backupPath(v1File) {
   const dir = path.dirname(v1File);
   const first = path.join(dir, BACKUP_NAME);
@@ -126,6 +131,7 @@ export function describe(result, root = process.cwd()) {
   return lines.join('\n');
 }
 
+// Rodando direto (`npm run migrar-v1`)? Lê a configuração só nesse caso.
 const isCLI = process.argv[1] && import.meta.url === pathToFileURL(path.resolve(process.argv[1])).href;
 if (isCLI) {
   const { config, ROOT } = await import('../config.js');

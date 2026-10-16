@@ -5,8 +5,10 @@ import fsp from 'node:fs/promises';
 import path from 'node:path';
 import { readNdjson, writeFileAtomicSync, DAY_MS } from './ndjson.js';
 
+// Evento válido: "off" (caiu) ou "on" (voltou) com instante de verdade.
 const validEvent = (e) => e && (e.ev === 'off' || e.ev === 'on') && Number.isFinite(Date.parse(e.ts));
 
+/** Quedas do servidor: eventos off/on em memória, gravados só por acréscimo no NDJSON. */
 export class OutageLog {
   constructor({ file, retentionDays = 90, now = () => Date.now(), log = (m) => console.warn(m) } = {}) {
     this.file = file;
@@ -18,6 +20,10 @@ export class OutageLog {
     this.load();
   }
 
+  /**
+   * Lê o arquivo, corrige a sequência (descarta repetidos e o que saiu da janela) e, se
+   * precisou corrigir, reescreve o arquivo limpo de uma vez (gravação atômica).
+   */
   load() {
     const { items, bad, torn } = readNdjson(this.file);
     if (bad) this.log(`[quedas] ${bad} linha(s) inválida(s) ignorada(s) em ${path.basename(this.file)}`);
@@ -42,6 +48,7 @@ export class OutageLog {
     return this.events.at(-1)?.ev === 'off';
   }
 
+  /** Guarda o evento em memória e acrescenta 1 linha ao arquivo (fila, 0600). */
   _append(event) {
     this.events.push(event);
     const line = `${JSON.stringify(event)}\n`;
@@ -116,6 +123,7 @@ export class OutageLog {
     };
   }
 
+  /** Espera as gravações pendentes (encerramento do painel, B11). */
   async flush() {
     await this._queue;
   }

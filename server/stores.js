@@ -1,17 +1,23 @@
+// Listas guardadas em JSON em data/: alertas (data/alerts.json) e anotações
+// (data/annotations.json). Tudo em memória, gravado em arquivo 0600 de forma atômica e em
+// fila, sem perder a última versão se o painel cair no meio da gravação.
 import fs from 'node:fs';
 import fsp from 'node:fs/promises';
 import path from 'node:path';
 import { randomUUID } from 'node:crypto';
 
+/** Lista em memória (`data`) espelhada num arquivo JSON. */
 export class JsonStore {
   constructor({ file, defaults = [] }) {
     this.file = file;
     this.data = defaults;
+    // `_pending`: a versão mais nova ainda não gravada; `_lastSave`: a gravação em curso.
     this._pending = null;
     this._lastSave = Promise.resolve();
     this.load();
   }
 
+  /** Lê o arquivo; ausente começa vazio, ilegível avisa no log e começa vazio. */
   load() {
     try {
       const parsed = JSON.parse(fs.readFileSync(this.file, 'utf8'));
@@ -23,6 +29,7 @@ export class JsonStore {
     }
   }
 
+  /** Grava via arquivo temporário + rename (atômico), pasta 0700 e arquivo 0600. */
   async _atomicWrite(data) {
     try {
       await fsp.mkdir(path.dirname(this.file), { recursive: true, mode: 0o700 });
@@ -34,6 +41,10 @@ export class JsonStore {
     }
   }
 
+  /**
+   * Pede uma gravação. Várias chamadas seguidas viram uma só (vale a versão mais nova), e
+   * duas gravações nunca correm ao mesmo tempo.
+   */
   save() {
     this._pending = JSON.stringify(this.data);
     const run = async () => {
@@ -47,6 +58,7 @@ export class JsonStore {
     return this._lastSave;
   }
 
+  /** Espera as gravações pendentes (encerramento do painel, B11). */
   async flush() {
     await this._lastSave;
   }
@@ -56,6 +68,10 @@ export class JsonStore {
 // arquivo a cada coleta: grava no máximo a cada 10 min, e sempre no encerramento.
 const VALUE_SAVE_MS = 10 * 60000;
 
+/**
+ * Alertas com ciclo de vida `new` → `ack` (reconhecido) → `resolved`, até `max` (500); os
+ * mais antigos saem primeiro.
+ */
 export class AlertsStore extends JsonStore {
   constructor({ file = 'data/alerts.json', max = 500, now = () => Date.now() } = {}) {
     super({ file });
@@ -65,17 +81,20 @@ export class AlertsStore extends JsonStore {
     this._savedAt = 0;
   }
 
+  // Toda gravação real zera a pendência de "só mudou o valor".
   save() {
     this._dirty = false;
     this._savedAt = this.now();
     return super.save();
   }
 
+  // No encerramento, grava também a mudança de valor que estava esperando os 10 min.
   async flush() {
     if (this._dirty) this.save();
     await super.flush();
   }
 
+  /** Abre um alerta novo (id aleatório, status `new`). */
   add({ level, message, key, value }) {
     const ts = new Date(this.now()).toISOString();
     const alert = { id: randomUUID(), ts, level, message, status: 'new' };
@@ -88,6 +107,7 @@ export class AlertsStore extends JsonStore {
     return alert;
   }
 
+  /** Muda o status (reconhecer ou resolver); id inexistente devolve null. */
   setStatus(id, status) {
     const a = this.data.find((x) => x.id === id);
     if (!a) return null;
@@ -97,16 +117,19 @@ export class AlertsStore extends JsonStore {
     return a;
   }
 
+  /** Mantém só os `max` alertas mais recentes. */
   trim() {
     if (this.data.length > this.max) {
       this.data.splice(0, this.data.length - this.max);
     }
   }
 
+  /** Alertas abertos (novos ou reconhecidos). */
   get active() {
     return this.data.filter((a) => a.status === 'new' || a.status === 'ack');
   }
 
+  /** Os mais recentes primeiro, com filtro opcional de status e nível. */
   list({ status, level, limit = 100 } = {}) {
     let out = this.data;
     if (status) out = out.filter((a) => a.status === status);
@@ -128,6 +151,7 @@ export class AlertsStore extends JsonStore {
     const nowIso = new Date(this.now()).toISOString();
     const wanted = new Map();
     for (const c of conditions) if (!wanted.has(keyOf(c))) wanted.set(keyOf(c), c);
+    // `structural`: alerta abriu ou fechou (grava já); `valueChanged`: só o valor mudou.
     let structural = false;
     let valueChanged = false;
     for (const a of this.active) {
@@ -159,6 +183,7 @@ export class AlertsStore extends JsonStore {
   }
 }
 
+/** Anotações da linha do tempo (texto até 500 caracteres, rótulo até 80). */
 export class AnnotationsStore extends JsonStore {
   constructor({ file = 'data/annotations.json' } = {}) {
     super({ file });
@@ -176,6 +201,7 @@ export class AnnotationsStore extends JsonStore {
     return annotation;
   }
 
+  /** Remove a anotação; devolve se ela existia. */
   remove(id) {
     const before = this.data.length;
     this.data = this.data.filter((a) => a.id !== id);

@@ -1,5 +1,6 @@
-// Índice de saúde (0–100) derivado dos MESMOS limiares dos alertas (ADR 0006). Antes a UI
-// tinha limiares próprios (75/80/70) diferentes dos do poller (90/90/60).
+// Índice de saúde (0–100) derivado dos MESMOS limiares dos alertas (ADR 0006): a tela, os
+// alertas e o índice nunca discordam sobre o que é "alto". A regra ponto a ponto está no
+// AGENTS ("Alertas", Saúde 0–100).
 import { SERVICE_OK, ramPct, isNum } from './rules.js';
 
 /**
@@ -23,6 +24,7 @@ export function healthScore(sample, t, { offline = false } = {}) {
     add('Sem dados', 100, 'bad');
     return { score: 0, level: 'bad', parts };
   }
+  // Cada problema tira pontos; alguns já avisam antes do limiar (ex.: RAM a 15 pontos dele).
   const cores = sample.cores || 1;
   const load1 = Array.isArray(sample.load) ? sample.load[0] : null;
   if (isNum(load1) && load1 > cores * 1.5) add(`Load ${load1.toFixed(2)} alto (${cores} núcleo${cores > 1 ? 's' : ''})`, 10, 'warn');
@@ -46,6 +48,7 @@ export function healthScore(sample, t, { offline = false } = {}) {
   for (const [svc, st] of Object.entries(sample.services || {})) {
     if (st && st !== 'desconhecido' && !SERVICE_OK.has(st)) add(`Serviço ${svc} ${st}`, 25, 'bad');
   }
+  // Faixas: 80–100 saudável, 50–79 atenção, 0–49 crítico.
   const level = score >= 80 ? 'ok' : score >= 50 ? 'warn' : 'bad';
   return { score, level, parts };
 }

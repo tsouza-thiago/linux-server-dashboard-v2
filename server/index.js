@@ -1,3 +1,9 @@
+// O painel: servidor HTTP (só em 127.0.0.1), API REST, SSE em tempo real e o laço de
+// coleta (1 SSH por intervalo). Rotas e formatos: AGENTS, seção "API".
+//
+// createApp(deps) monta tudo com dependências injetáveis (coletor, arquivos, limites): os
+// testes sobem o app de verdade com dados falsos. startServer() é o painel em produção
+// (`npm start`, o serviço de usuário): log em arquivo, timer da coleta e encerramento limpo.
 import path from 'node:path';
 import { createRouter, jsonBody } from './http/router.js';
 import { serveStatic } from './http/static.js';
@@ -16,6 +22,10 @@ import { hostCheck, csrfCheck, securityHeaders, makeRequireAuth, issueCsrfCookie
 import { toCSV } from './csv.js';
 import { createLogFile } from './logfile.js';
 
+/**
+ * Monta o painel: stores, motor de alertas, sessões, SSE e o roteador com todas as rotas.
+ * Devolve o app (função do http.Server) e as peças que os testes e o startServer usam.
+ */
 export function createApp(deps = {}) {
   const SSH_HOST = deps.sshHost ?? config.SSH_HOST;
   const POLL_INTERVAL = deps.pollInterval ?? config.POLL_INTERVAL;
@@ -36,6 +46,7 @@ export function createApp(deps = {}) {
     if (migration.status === 'invalido') log(`[migração] histórico da V1 não migrado: ${migration.error}`);
     store = new History({ dataDir: DATA_DIR, limit: deps.historyLimit ?? config.HISTORY_LIMIT, log });
   }
+  // Alertas, anotações e quedas: arquivos em data/ (os testes passam caminhos temporários).
   const alertsStore = deps.alertsStore || new AlertsStore({
     file: deps.alertsFile ?? path.join(ROOT, 'data/alerts.json'),
   });
@@ -49,6 +60,7 @@ export function createApp(deps = {}) {
   });
   const engine = new AlertEngine({ alerts: alertsStore, outages, thresholds });
 
+  // Estado da coleta, mostrado na faixa de status e em /api/status.
   const state = {
     online: false,
     offlineSince: null,
@@ -60,6 +72,7 @@ export function createApp(deps = {}) {
     failures: 0,
   };
 
+  // Mutações da API: 120 por minuto por IP.
   const apiRateLimit = makeRateLimit({ windowMs: 60000, max: deps.rateLimitMax ?? 120 });
   // Tentativas de login: limite próprio, bem menor (força bruta no token).
   const loginRateLimit = makeRateLimit({ windowMs: 60000, max: deps.loginRateMax ?? 10 });
@@ -68,16 +81,24 @@ export function createApp(deps = {}) {
     log,
   });
 
+  // Conexões SSE (uma por aba aberta), até 20.
   const sse = deps.sse || new SseHub({ maxClients: deps.sseMaxClients ?? 20 });
 
+  /** Manda um evento para todas as telas abertas. */
   function broadcast(event, data, id) {
     sse.send(event, data, id);
   }
 
+  /** Alertas abertos + os 50 mais recentes, para as telas. */
   function broadcastAlerts() {
     broadcast('alerts', { alerts: alertsStore.active, all: alertsStore.list({ limit: 50 }) });
   }
 
+  /**
+   * Uma coleta. Nunca duas ao mesmo tempo (I1): se uma está em andamento, a nova chamada
+   * não faz nada. Sucesso: guarda a amostra, reavalia os alertas e avisa as telas. Falha:
+   * conta para o "servidor inacessível" (recordFailure).
+   */
   async function runPoll() {
     if (state.polling) return;
     state.polling = true;
@@ -122,6 +143,7 @@ export function createApp(deps = {}) {
     broadcastAlerts();
   }
 
+  /** O que /api/status, o "hello" do SSE e o evento "status" mandam: meta + amostra + saúde. */
   function statusPayload() {
     return {
       meta: {
@@ -145,6 +167,7 @@ export function createApp(deps = {}) {
   }
 
   const HOUR_MS = 3600000;
+  // Maior intervalo aceito em formato=baldes: os 90 dias dos agregados (+1 de folga).
   const MAX_RANGE_MS = 91 * 24 * HOUR_MS;
 
   /** Intervalo de `formato=baldes`: padrão últimas 24 h; null se inválido. */
@@ -157,6 +180,7 @@ export function createApp(deps = {}) {
     return { fromMs, toMs, maxPoints };
   }
 
+  /** from/to (ISO, opcionais) e limit (padrão 720, de 1 a 2000) das amostras brutas. */
   function parseRange(req) {
     const from = req.query.from || undefined;
     const to = req.query.to || undefined;
@@ -171,6 +195,7 @@ export function createApp(deps = {}) {
   app.use(csrfCheck);
   app.use(issueCsrfCookie);
   app.use(jsonBody({ limit: 50 * 1024 }));
+  // Limite de taxa só nas mutações da API (GET não muda nada e as telas fazem vários).
   app.use('/api', (req, res, next) => {
     if (['POST', 'PUT', 'PATCH', 'DELETE'].includes(req.method)) return apiRateLimit(req, res, next);
     next();
@@ -222,6 +247,7 @@ export function createApp(deps = {}) {
     res.json({ ok: true });
   });
 
+  // Daqui para baixo, toda rota de /api exige sessão ou Bearer (quando há DASH_TOKEN).
   app.use('/api', makeRequireAuth(DASH_TOKEN, sessions));
 
   app.post('/api/logout-all', (req, res) => {
@@ -236,6 +262,7 @@ export function createApp(deps = {}) {
   });
 
   app.get('/api/history', (req, res) => {
+    // Formato das telas: baldes com mín/máx/média (até 90 dias). Sem ele: amostras reduzidas.
     if (req.query.formato === 'baldes') {
       const range = parseBucketRange(req);
       if (!range) return res.status(400).json({ error: 'intervalo inválido (from ≤ to, até 90 dias)' });
@@ -325,6 +352,8 @@ export function createApp(deps = {}) {
 
   app.get('/api/export', (req, res) => {
     const { from, to } = parseRange(req);
+    // Até 5000 amostras; o nome do arquivo usa só letras, números, ".", "_" e "-" (sem
+    // aspas nem quebra de linha no cabeçalho Content-Disposition).
     const samples = store.getRange(from, to, 5000);
     const fmt = req.query.format === 'json' ? 'json' : 'csv';
     const stamp = new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19);
@@ -357,6 +386,8 @@ export function createApp(deps = {}) {
   });
 
   app.post('/api/poll', (req, res) => {
+    // "Coletar agora": nunca durante outra coleta e no máximo 1 a cada 5 s (o servidor é
+    // modesto; I1).
     if (state.polling) return res.status(409).json({ error: 'coleta em andamento' });
     if (Date.now() - state.lastManualPollAt < 5000) {
       return res.status(429).json({ error: 'aguarde alguns segundos entre coletas manuais' });
@@ -366,8 +397,11 @@ export function createApp(deps = {}) {
     res.json({ ok: true });
   });
 
+  // Arquivos da tela (public/), depois de todas as rotas da API.
   app.use(serveStatic(path.join(ROOT, 'public'), { maxAge: 3600 }));
 
+  // Tratador de erro central: o detalhe vai para o log; a resposta é genérica, sem stack
+  // nem caminho (SECURITY, ameaça 16).
   app.use((err, req, res, next) => {
     const status = err.status || err.statusCode || 500;
     if (status >= 500) log(`ERRO não tratado: ${err.stack || err.message}`);
@@ -384,12 +418,14 @@ export function createApp(deps = {}) {
   return { app, state, store, alertsStore, annotationsStore, outages, engine, sessions, broadcast, runPoll, parseRange, statusPayload, sse, shutdown };
 }
 
+/** O painel em produção: log em arquivo, escuta em 127.0.0.1, coleta a cada intervalo. */
 function startServer() {
   const SSH_HOST = config.SSH_HOST;
   const POLL_INTERVAL = config.POLL_INTERVAL;
   const PORT = config.PORT;
   const LOG_FILE = config.LOG_FILE;
 
+  // Log no terminal (journal do systemd) e em data/dashboard.log, com rotação.
   const logFile = createLogFile(LOG_FILE);
   const log = (msg) => {
     const line = `[${new Date().toISOString()}] ${msg}`;
@@ -400,6 +436,7 @@ function startServer() {
 
   const { app, runPoll, shutdown: flushAll } = createApp({ log });
 
+  // 1ª coleta assim que o servidor sobe; depois, uma por intervalo.
   let pollTimer = null;
   const server = app.listen(PORT, '127.0.0.1', () => {
     log(`dashboard em http://127.0.0.1:${PORT} — host: ${SSH_HOST}, intervalo: ${POLL_INTERVAL}ms`);
@@ -407,6 +444,7 @@ function startServer() {
     pollTimer = setInterval(runPoll, POLL_INTERVAL);
   });
 
+  /** SIGINT/SIGTERM: para a coleta, grava o pendente (B11) e sai; no máximo 5 s. */
   async function shutdown() {
     log('encerrando...');
     if (pollTimer) clearInterval(pollTimer);
@@ -419,6 +457,8 @@ function startServer() {
   process.on('SIGTERM', shutdown);
 }
 
+// Rodando direto (`node server/index.js`, `npm start`, o serviço)? Compara só o nome do
+// arquivo: funciona também com a pasta atrás de um link simbólico.
 const isCLI = process.argv[1] && import.meta.url.endsWith(process.argv[1].split('/').pop());
 if (isCLI) {
   if (isPlaceholderHost(config.SSH_HOST)) {
