@@ -137,6 +137,7 @@ em e2e-cli-v1 "cd linux-server-dashboard && printf 'SSH_HOST=dash-127_0_0_1\nPOL
 confere "C: a V1 coletou 3 amostras" timeout 150 bash -c "until [ \"\$(docker exec e2e-cli-v1 sh -c 'grep -c \"poll OK\" /home/ana/linux-server-dashboard/data/nohup.log 2>/dev/null || echo 0')\" -ge 3 ]; do sleep 3; done"
 em e2e-cli-v1 "\$HOME/linux-server-dashboard-v2/.runtime/node/bin/node -e \"fetch('http://127.0.0.1:3103/api/annotations',{method:'POST',headers:{'Content-Type':'application/json',Authorization:'Bearer token-de-teste-da-v1-123456'},body:JSON.stringify({text:'troquei o disco (anotação da V1)'})}).then(r=>console.log('anotação V1:',r.status))\""
 em e2e-cli-v1 "cd linux-server-dashboard-v2 && ./dashboard instalar --importar-v1 /home/ana/linux-server-dashboard" | tee "$OUT/C-importar.txt"
+confere "C: instalação nova fica na estável assinada (não na rc do último commit)" grep -q "usando a versão estável assinada mais nova: v2.0.0$" "$OUT/C-importar.txt"
 confere "C: V1 parada" bash -c "! docker exec e2e-cli-v1 sh -c 'kill -0 \$(cat /home/ana/linux-server-dashboard/data/dashboard.pid) 2>/dev/null'"
 confere "C: V2 no ar com a configuração da V1" grep -q "V2 no ar em http://127.0.0.1:3103" "$OUT/C-importar.txt"
 confere "C: V2 coletando pelo alias da V1" espera_coletas e2e-cli-v1 linux-server-dashboard-v2 1

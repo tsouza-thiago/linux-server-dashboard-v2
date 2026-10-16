@@ -7,7 +7,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { Instalacao } from '../setup/instalacao.js';
 import { createWizardApp, makeSetupCode } from '../setup/web.js';
-import { currentVersionStatus, describeVersion, signedReleaseTags } from '../setup/assinatura.js';
+import { currentVersionStatus, describeVersion, signedReleaseTags, installTag } from '../setup/assinatura.js';
 import { ensureDataDirs } from '../setup/local.js';
 import { openBrowser, panelPort, panelStatus, portFree, stopPanel } from './servico.js';
 
@@ -53,16 +53,32 @@ const NODE_LINE = {
 /** Verificações antes de abrir o assistente. Devolve false se algo impede continuar. */
 export function preflight({ out, root, flags, env = process.env, run = spawnSync, reexec }) {
   const ver = currentVersionStatus(root);
+  const isDirty = () => Boolean(run('git', ['-C', root, 'status', '--porcelain', '--untracked-files=no'], { encoding: 'utf8' }).stdout?.trim());
+  const pin = (tag, label) => {
+    out.step(`${label}: ${tag}`);
+    const co = run('git', ['-C', root, '-c', 'advice.detachedHead=false', 'checkout', '--quiet', '--detach', tag], { encoding: 'utf8' });
+    return co.status === 0 ? reexec() : null;
+  };
+  // Clone do main parado numa pré-versão (o último merge tem tag -rc): quem instala do zero
+  // fica na estável. Quem escolheu a tag (git checkout <tag>, HEAD solto) continua nela.
+  if (ver.ok && ver.tag.includes('-') && !flags.pre && reexec
+      && run('git', ['-C', root, 'symbolic-ref', '-q', 'HEAD'], { encoding: 'utf8' }).status === 0 && !isDirty()) {
+    const stable = installTag(signedReleaseTags(root));
+    if (stable && !stable.includes('-')) {
+      const r = pin(stable, 'usando a versão estável assinada mais nova');
+      if (r !== null) return r;
+    }
+  }
   if (ver.ok) {
     out.ok(describeVersion(ver), 'chave do projeto');
   } else if (ver.reason === 'sem-tag' && !flags['sem-assinatura']) {
-    // Clonou o main: fixa na versão assinada mais nova (se a pasta estiver limpa).
-    const dirty = run('git', ['-C', root, 'status', '--porcelain', '--untracked-files=no'], { encoding: 'utf8' }).stdout?.trim();
-    const newest = dirty ? null : signedReleaseTags(root)[0];
+    // Clonou o main: fixa na versão assinada mais nova (se a pasta estiver limpa); a estável,
+    // se houver uma (pré-versão só com --pre).
+    const dirty = isDirty();
+    const newest = dirty ? null : installTag(signedReleaseTags(root), { pre: Boolean(flags.pre) });
     if (newest && reexec) {
-      out.step(`usando a versão assinada mais nova: ${newest}`);
-      const co = run('git', ['-C', root, '-c', 'advice.detachedHead=false', 'checkout', '--quiet', '--detach', newest], { encoding: 'utf8' });
-      if (co.status === 0) return reexec();
+      const r = pin(newest, 'usando a versão assinada mais nova');
+      if (r !== null) return r;
     }
     out.fail(describeVersion(ver));
     out.explain(

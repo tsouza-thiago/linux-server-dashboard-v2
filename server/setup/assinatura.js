@@ -76,6 +76,16 @@ export function signedReleaseTags(root, { signersFile, includePre = true, run } 
     .filter((t) => verifyTag(root, t, { signersFile, run }).ok);
 }
 
+/**
+ * Versão para uma instalação nova (clone do main): a estável assinada mais nova. Pré-versão
+ * só se ainda não houver estável, ou com `pre` (opção --pre). `tags` vem de
+ * signedReleaseTags (da mais nova para a mais antiga).
+ */
+export function installTag(tags, { pre = false } = {}) {
+  if (pre) return tags[0] ?? null;
+  return tags.find((t) => !t.includes('-')) ?? tags[0] ?? null;
+}
+
 /** Frase da verificação para o terminal e o passo 1. */
 export function describeVersion(st) {
   if (st.ok) return `versão ${st.tag} — assinatura conferida`;

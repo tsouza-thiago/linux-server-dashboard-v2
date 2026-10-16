@@ -29,6 +29,10 @@ pré-versões `2.0.0-alpha.N` (uma por fase do plano), depois `beta`, `rc` e `2.
   (HTML, CSS, JS, JSON, SVG) vão em gzip quando o navegador aceita (antes, 441 KB sem
   compressão). Fontes `.woff2` e imagens já vêm comprimidas. Só arquivos estáticos, sem
   segredo nem dado do usuário. Um teste e2e mede o total transferido.
+- **Instalação nova fica na estável:** um clone do `main` vai para a estável assinada mais
+  nova, mesmo que o último commit tenha uma tag `-rc` (antes, instalava a rc). Pré-versão
+  só sem estável publicada ou com `./dashboard instalar --pre`; quem escolheu a tag com
+  `git checkout <tag>` continua nela.
 
 ## [2.0.0-beta.2] — 2026-10-16
 

@@ -21,6 +21,7 @@ const HELP = `Uso: ./dashboard <comando>
                     --terminal       os mesmos passos no terminal (máquina sem tela)
                     --sem-interface  sem perguntas, por opções (veja --sem-interface --ajuda)
                     --importar-v1 <pasta>  traz configuração e histórico da V1 (e para a V1)
+                    --pre            aceita pré-versão (rc); sem ela, fica na estável
   abrir           abre o painel no navegador, já logado
   iniciar         inicia o painel (serviço de usuário ou segundo plano)
   parar           para o painel
@@ -28,6 +29,7 @@ const HELP = `Uso: ./dashboard <comando>
   diagnosticar    testa tudo e explica cada problema em português simples
   reconfigurar    reabre o assistente (trocar servidor, discos, serviços)
   atualizar       baixa a versão assinada mais nova, com backup e volta atrás se falhar
+                    --pre            aceita pré-versão (rc) mesmo estando na estável
   desinstalar     remove serviço, atalho e arquivos locais (e ajuda a limpar o servidor)
   versao          mostra a versão
   ajuda           esta ajuda

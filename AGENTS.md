@@ -111,8 +111,10 @@ O teste `test/unit/docs.test.js` confere esta documentação contra o código.
   remove o `todo` (o teste vira regressão).
 - **Versões:** SemVer a partir da `v2.0.0`: `PATCH` corrige, `MINOR` acrescenta sem quebrar,
   `MAJOR` quebra (configuração, formato de `data/` ou acesso ao servidor). Pré-versões
-  (`-rc.N`) são opcionais e só chegam a quem já está numa pré-versão ou usa
-  `./dashboard atualizar --pre`. Toda versão é uma tag assinada + GitHub Release
+  (`-rc.N`) são opcionais e só chegam a quem já está numa pré-versão ou usa `--pre`
+  (`./dashboard instalar --pre`, `./dashboard atualizar --pre`): uma instalação nova a
+  partir do `main` fica na estável assinada mais nova, mesmo que o último commit tenha uma
+  tag `-rc`. Toda versão é uma tag assinada + GitHub Release
   (procedimento na ADR 0012; a release escolhe a tag já existente).
 - **Orçamento de desempenho:** veja [Orçamento de desempenho](#orçamento-de-desempenho).
   Mudou coleta, histórico ou frontend? Rode `npm run soak` e `npm run test:e2e`.
