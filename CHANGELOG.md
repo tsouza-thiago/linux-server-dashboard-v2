@@ -13,6 +13,9 @@ pré-versões `2.0.0-alpha.N` (uma por fase do plano), depois `beta`, `rc` e `2.
 - `CLAUDE.md`: orientação para o Claude Code. Importa o AGENTS.md (a referência técnica
   única) e só acrescenta como rodar um teste isolado, a estrutura dos testes e o que o
   `test/unit/docs.test.js` confere.
+- `docs/seguranca/2026-10-16-codeql.md`: análise dos 2 primeiros alertas do code scanning
+  (CodeQL), com o risco real de cada um e o plano de correção. O SECURITY ganha a seção
+  "Análise estática" e o AGENTS, a regra de triagem dos alertas.
 
 ### Segurança
 

@@ -89,6 +89,10 @@ O teste `test/unit/docs.test.js` confere esta documentação contra o código.
   com código de uso único e tem as mesmas proteções do painel.
 - **Versões assinadas** (ADR 0012): o instalador e o `./dashboard atualizar` só aceitam
   tags assinadas por uma chave de `docs/allowed_signers`.
+- **Code scanning** (CodeQL padrão do GitHub, a cada push): todo alerta é corrigido ou
+  descartado como falso positivo com a análise em `docs/seguranca/` e, se possível, um
+  teste que falhe na forma errada. Não aplique a sugestão do CodeQL sem conferir o formato
+  real (ex.: o escape do `authorized_keys` segue o `opt_dequote`, não o padrão genérico).
 
 ## Desenvolvimento (obrigatório)
 
@@ -384,7 +388,7 @@ linux-server-dashboard-v2/
 ├── dashboard               comando único: garante o Node 24 (scripts/node-runtime.sh) e chama server/cli/
 ├── package.json            sem dependências de runtime; devDependency: playwright-core (e2e)
 ├── .env.example            modelo do .env (sem valores reais)
-├── docs/                   PLANO_V2.md, adr/ e allowed_signers (chaves das releases)
+├── docs/                   PLANO_V2.md, adr/, seguranca/ (análises do CodeQL) e allowed_signers
 ├── scripts/                check.mjs, capturar-amostra.mjs, node-runtime.sh, askpass.sh, e2e-instalacao/
 ├── server/
 │   ├── index.js            rotas, loop de coleta, export

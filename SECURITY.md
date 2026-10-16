@@ -194,6 +194,16 @@ Inclua: o passo a passo para reproduzir, o impacto estimado e a versão afetada
 
 ---
 
+## Análise estática (CodeQL)
+
+O repositório usa o code scanning do GitHub (CodeQL, configuração padrão) a cada push.
+Cada alerta é corrigido ou descartado como falso positivo com a análise escrita em
+`docs/seguranca/`. Primeira análise: [2 alertas de 16/10/2026](docs/seguranca/2026-10-16-codeql.md)
+(viés no sorteio do código do assistente, corrigido; escape do `authorized_keys`, falso
+positivo).
+
+---
+
 ## Princípios
 
 - **Servidor somente leitura**, sem agente: o servidor só lê `/proc` e `/sys` e roda `df`,
