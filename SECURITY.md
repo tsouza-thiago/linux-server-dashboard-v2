@@ -95,7 +95,8 @@ Inclua: o passo a passo para reproduzir, o impacto estimado e a versão afetada
   ler dados ou mandar comandos ao servidor.
 - **Mitigação:** o assistente escuta só em `127.0.0.1`, tem as mesmas proteções do painel
   (Host check, CSRF, cabeçalhos) e só abre com o **código de uso único** mostrado no
-  terminal (30 min, 20 tentativas). O código vira um cookie HttpOnly + SameSite=Strict.
+  terminal (30 min, 20 tentativas). O código tem 6 caracteres de um alfabeto de 25,
+  sorteados sem viés (`crypto.randomInt`), e vira um cookie HttpOnly + SameSite=Strict.
 - **Verificado por:** `test/integration/assistente-http.test.js`.
 
 ### 7. Versão adulterada (ADR 0012)

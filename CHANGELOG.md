@@ -14,6 +14,13 @@ pré-versões `2.0.0-alpha.N` (uma por fase do plano), depois `beta`, `rc` e `2.
   única) e só acrescenta como rodar um teste isolado, a estrutura dos testes e o que o
   `test/unit/docs.test.js` confere.
 
+### Segurança
+
+- Código de uso único do assistente de instalação sorteado sem viés (`crypto.randomInt`).
+  Antes, `byte % 25` deixava 6 das 25 letras 10% mais prováveis (alerta do CodeQL
+  `js/biased-cryptographic-random`). Impacto prático desprezível: o código já tinha limite
+  de 20 tentativas e 30 minutos e só abre em `127.0.0.1`.
+
 ## [2.0.0-beta.1] — 2026-10-08
 
 Fase F8 do plano (documentação). A V2 passa a `beta`: instalação validada no computador e

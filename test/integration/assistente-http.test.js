@@ -39,6 +39,15 @@ test('código de uso único: 6 caracteres sem ambíguos, mostrado com hífen', (
   assert.equal(normalizeCode(' 7kq-4mz '), '7KQ4MZ');
 });
 
+test('código de uso único: cada caractere é sorteado sem viés entre as 25 letras', () => {
+  const ranges = [];
+  const seq = [0, 5, 6, 12, 23, 24];
+  const c = makeSetupCode((max) => { ranges.push(max); return seq[ranges.length - 1]; });
+  // randomInt(25) cobre o alfabeto inteiro, sem módulo sobre um byte (256 % 25 = 6 sobrando).
+  assert.deepEqual(ranges, [25, 25, 25, 25, 25, 25]);
+  assert.equal(c.raw, 'AGHQ79');
+});
+
 test('assistente: página com CSP e Host check; API só depois do código, que vale uma vez', async (t) => {
   const s = await start(t);
   assert.equal(s.page.status, 200);

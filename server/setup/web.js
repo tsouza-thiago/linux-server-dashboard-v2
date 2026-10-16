@@ -20,10 +20,13 @@ const MAX_FAILURES = 20;
 // Sem letras/números que se confundem (0/O, 1/I/L, 2/Z, 5/S, 8/B).
 const ALPHABET = 'ACDEFGHJKMNPQRTUVWXY34679';
 
-/** Código de uso único para o terminal: 6 caracteres, mostrado como "7KQ-4MZ". */
-export function makeSetupCode() {
-  const bytes = crypto.randomBytes(6);
-  const raw = [...bytes].map((b) => ALPHABET[b % ALPHABET.length]).join('');
+/**
+ * Código de uso único para o terminal: 6 caracteres, mostrado como "7KQ-4MZ". Cada
+ * caractere vem de `crypto.randomInt` (sorteio por rejeição, sem viés): `byte % 25`
+ * deixava as 6 primeiras letras 10% mais prováveis (CodeQL js/biased-cryptographic-random).
+ */
+export function makeSetupCode(randomInt = crypto.randomInt) {
+  const raw = Array.from({ length: 6 }, () => ALPHABET[randomInt(ALPHABET.length)]).join('');
   return { raw, shown: `${raw.slice(0, 3)}-${raw.slice(3)}` };
 }
 
