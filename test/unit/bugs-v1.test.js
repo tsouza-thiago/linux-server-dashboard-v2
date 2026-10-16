@@ -1,11 +1,19 @@
-// Bugs conhecidos da V1 (plano da V2, seção 2.2).
-// Cada teste descreve o comportamento CORRETO. Os ainda abertos estão marcados como `todo`
-// (aparecem no relatório sem deixar a suíte vermelha); o commit que corrige o bug remove o
-// `todo` e o teste passa a valer como regressão. Corrigidos na F1: B1, B2, B6, I5.
-// Corrigidos na F2: B4, B7, B8, B11 (detalhes em test/unit/storage-*.test.js).
-// Corrigidos na F3: B3, B9 (detalhes em test/unit/alerts-*.test.js).
-// Corrigidos na F5: B5, B10 (detalhes em test/unit/front-core.test.js).
-// Corrigido na F7: B12 (detalhes em test/unit/cli-servico.test.js). Nenhum bug da V1 aberto.
+// Regressões dos 12 bugs da V1, todos corrigidos na V2. Cada teste descreve o comportamento
+// CORRETO; se um bug voltar, o teste dele falha.
+//   B1  SMART sem permissão virava alerta crítico falso
+//   B2  rede sempre 0: contador colado ao nome da interface; eth0 casava com veth0
+//   B3  1 alerta novo por coleta (a chave era a mensagem, com o valor dentro)
+//   B4  CSV desalinhado com 2+ discos de I/O
+//   B5  resumo diário agrupado pelo dia UTC (no Brasil, o dia "virava" às 21 h)
+//   B6  selo SMART por disco quase sempre "—" (casava disco com ponto de montagem)
+//   B7  ~6,8 MB de JSON regravados a cada minuto (~10 GB por dia no SSD)
+//   B8  gráficos de 24/72 h escondiam picos (redução por passo)
+//   B9  disponibilidade calculada a partir dos alertas (limite de 500)
+//   B10 anotação fora do instante certo no gráfico (eixo por categoria)
+//   B11 encerrar sem gravar o que estava pendente
+//   B12 `parar` podia matar processo alheio (lsof/pgrep)
+// I5 é a invariante "dado ausente é null, nunca zero" (AGENTS, "Invariantes").
+// Mais casos de cada correção: storage-*, alerts-*, front-core e cli-servico.test.js.
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';

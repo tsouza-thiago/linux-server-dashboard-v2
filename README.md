@@ -6,9 +6,9 @@ Uma vez por minuto, o painel conecta no servidor por SSH, lê dezenas de métric
 tudo em gráficos. Ele roda no **seu computador**: o servidor só responde 1 comando de
 leitura por minuto. Funciona até em hardware muito limitado (1 núcleo, pouca RAM).
 
-> **Versão 2.0.** Mudanças: [CHANGELOG.md](CHANGELOG.md). Plano e decisões:
-> [docs/PLANO_V2.md](docs/PLANO_V2.md) e [docs/adr/](docs/adr/README.md). A V1 continua na
-> tag [`v1.0.0`](https://github.com/tsouza-thiago/linux-server-dashboard-v2/releases/tag/v1.0.0).
+> **Versão 2.** Mudanças: [CHANGELOG.md](CHANGELOG.md). Decisões de projeto:
+> [docs/adr/](docs/adr/README.md). A V1 continua na tag
+> [`v1.0.0`](https://github.com/tsouza-thiago/linux-server-dashboard-v2/releases/tag/v1.0.0).
 
 ```
   [seu computador]                                   [servidor Linux]
@@ -126,7 +126,8 @@ Isto para a V1, traz a configuração e o histórico e liga a V2 com o mesmo ace
 A pasta da V1 **não é alterada**. Depois, rode `./dashboard reconfigurar` para trocar o
 acesso completo da V1 pela chave restrita à coleta.
 
-Para voltar à V1: `./dashboard parar` e, na pasta da V1, `./start.sh --background`.
+Para voltar à V1: na pasta da V2, `systemctl --user disable --now server-dashboard` (não
+inicia mais com o computador) e, na pasta da V1, `./start.sh --background`.
 
 ---
 
@@ -165,7 +166,7 @@ de propósito. Para acesso remoto, use VPN ou túnel SSH.
 | [SECURITY.md](SECURITY.md) | Quem quer auditar: modelo de ameaças e como reportar falhas |
 | [AGENTS.md](AGENTS.md) | Quem desenvolve: regras, configuração, coleta, API, formato dos dados |
 | [CHANGELOG.md](CHANGELOG.md) | Mudanças de cada versão |
-| [docs/](docs/PLANO_V2.md) | Plano da V2 e decisões (ADRs) |
+| [docs/adr/](docs/adr/README.md) | Decisões de projeto (ADRs) e análises de segurança em `docs/seguranca/` |
 
 ## Licença
 

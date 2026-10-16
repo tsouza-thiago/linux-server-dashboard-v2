@@ -98,7 +98,7 @@ o fim do assistente.
    para o servidor? Deixe a senha em branco.
 4. **O que monitorar** — discos, pastas, rede e serviços que o assistente encontrou, já
    marcados como recomendado, e os limites de aviso. O resumo ao lado mostra o custo
-   estimado no servidor (menos de 1 segundo por minuto).
+   estimado no servidor (cerca de 1 segundo por coleta, num servidor de 1 núcleo).
 5. **Preparar o servidor** — confira os comandos exatos e clique em **Confirmar e
    preparar** (*assistido*), ou escolha **Prefiro fazer à mão** e cole os blocos no
    servidor, clicando em **Testar** depois de cada um. Isso cria o usuário `dashmon`, sem
@@ -153,6 +153,10 @@ configurações e o histórico vêm junto e a pasta da V1 fica intacta (para vol
 precisar). Depois, `./dashboard reconfigurar` troca o acesso completo da V1 pela chave
 restrita à coleta.
 
+Para voltar à V1: na pasta da V2, `systemctl --user disable --now server-dashboard` (para
+a V2 e impede que ela volte a iniciar com o computador) e, na pasta da V1,
+`./start.sh --background`. As duas juntas fariam 2 conexões por minuto ao servidor.
+
 ---
 
 ## 6. Como usar o dashboard
@@ -161,7 +165,7 @@ O painel tem 8 telas, listadas na coluna esquerda (ou nas teclas `1` a `8`).
 
 | Tela | O que mostra |
 |------|--------------|
-| **1 Visão geral** | Anel de saúde 0–100 com a frase "Servidor saudável" / "Atenção" / "Crítico" e por quê; disponibilidade de 90 dias e custo da coleta no servidor; 5 indicadores com mini-gráfico (processador, memória, disco mais cheio com previsão, temperatura, rede); telemetria em faixas com cursor sincronizado; resumo de discos, eventos e processos |
+| **1 Visão geral** | Anel de saúde 0–100 com a frase "Servidor saudável" / "Atenção" / "Crítico" e por quê; disponibilidade de 90 dias e custo da coleta no servidor; 5 indicadores (processador, memória e temperatura com mini-gráfico; disco mais cheio com medidor e previsão; rede com barras); telemetria em faixas com cursor sincronizado; resumo de discos, eventos e processos |
 | **2 Recursos** | CPU empilhada (usuário, sistema, espera de disco), carga, memória (média, pico, tendência, swap), temperatura com o limite e os sensores, pressão do sistema (PSI) |
 | **3 Armazenamento** | Espaço e inodes por ponto de montagem, **previsão de lotação** com as datas do alerta e de "cheio", atividade de cada disco (ocupação, leitura/gravação, latência) e saúde SMART |
 | **4 Rede** | Download e upload agora com o pico do período, volume do dia, erros e descartes, tráfego no período, volume por dia (7 dias) e maiores picos |
@@ -209,7 +213,7 @@ Dicas por tela:
 
 | Termo | O que significa | Valor saudável |
 |-------|-----------------|----------------|
-| **Load (1/5/15)** | Carga do processador na média de 1, 5 e 15 min. Com 1 núcleo, 1,0 = 100% de uso; com 4 núcleos, 4,0 = 100% | abaixo do número de núcleos |
+| **Load (1/5/15)** | Carga do processador na média de 1, 5 e 15 min. Com 1 núcleo, 1,0 = 100% de uso; com 4 núcleos, 4,0 = 100% | abaixo do número de núcleos (a saúde perde pontos acima de 1,5 × os núcleos) |
 | **RAM usada** | Memória em uso agora | abaixo de 90% |
 | **Swap usada** | Memória "emprestada" do disco. Se estiver subindo, falta RAM | 0 (zero) |
 | **Temperatura** | Calor do processador em °C | abaixo de 60 °C |
@@ -237,7 +241,7 @@ Dicas por tela:
 | Alerta | Nível | O que fazer |
 |--------|-------|-------------|
 | `Disco X com NN% usado` | warning | Liberar espaço: apagar arquivos temporários, mover dados grandes para outros discos. Atenção em `/` (sistema). |
-| `RAM usada em NN%` | warning | Verificar processos pesados na tela **Processos**. Fechar aplicações, ou reduzir carga. |
+| `RAM usada em NN%` | warning | Verificar processos pesados na tela **Processos & serviços**. Fechar aplicações, ou reduzir carga. |
 | `Temperatura CPU NN.N°C` | warning | Verificar ventilação do gabinete, poeira nos coolers, posição do computador. |
 | `SMART /dev/sdX: FAILED` | critical | **Backup imediato** dos dados do disco. Pode ser falha física. |
 | `Serviço X <estado>` | critical | Reiniciar o serviço no servidor com o **seu** usuário (a chave do painel só faz a coleta). Ex.: `ssh usuario@192.0.2.10 'sudo systemctl restart smbd'`. |
@@ -314,13 +318,8 @@ Cada coleta registra uma linha: `poll OK (123ms) — amostras: 45` ou `poll FALH
 6. **Fique de olho na previsão de disco** — em **Armazenamento**, "enche em ~N dias"
    avisa com antecedência, antes que vire alerta.
 7. **Mantenha o histórico** — não apague `data/` por acidente; ele guarda 3 dias de
-   amostras detalhadas, 90 dias resumidos e todo o histórico de alertas e anotações.
+   amostras detalhadas, 90 dias resumidos, os últimos 500 alertas e as anotações.
 8. **Backup do histórico (opcional)** — se quiser guardar além de 90 dias, exporte CSV
    periodicamente ou copie as pastas `data/history/` e `data/rollup/` para outro lugar.
 9. **Segurança na prática** — não torne o painel acessível fora do seu computador.
    O endereço local `127.0.0.1` é de propósito. Se precisar acessar de longe, use VPN.
-
----
-
-*Server Dashboard — monitoramento somente leitura via SSH, 1 coleta/min,
-dashboard local em 127.0.0.1:3000. O servidor não instala nada.*

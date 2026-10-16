@@ -25,13 +25,28 @@ O teste `test/unit/docs.test.js` confere esta documentação contra o código.
 - **Apenas comandos não interativos.** O painel conecta pelo alias `servidor` do
   `data/ssh/config`. Para inspeções à mão, use o seu alias do `~/.ssh/config`
   (ex.: `ssh meu-servidor '<comando>'` → `usuario@192.0.2.10:22`).
-- **NUNCA** exibir, imprimir ou commitar o conteúdo de `.env`. O `.env` do servidor tem
-  senhas. O painel não guarda senha: a coleta usa uma chave SSH. A senha do administrador
-  serve só na instalação, fica na memória e é descartada.
+- **NUNCA** exibir, imprimir ou commitar o conteúdo de `.env`: ele guarda o `DASH_TOKEN`
+  (o acesso ao painel). O painel não guarda senha: a coleta usa uma chave SSH. A senha do
+  administrador serve só na instalação, fica na memória e é descartada.
 - **Nunca commitar `data/`.** Ela tem hostnames, IPs e telemetria da rede interna.
 - Dado dinâmico (temperatura, espaço, status) é sempre coletado ao vivo, nunca presumido.
   Dado ausente é `null`, nunca zero inventado.
 - O painel escuta só em `127.0.0.1`.
+
+### Invariantes (citadas no código como I1–I10)
+
+| # | Invariante | Como é garantida |
+|---|---|---|
+| I1 | 1 SSH por coleta, sem paralelismo | trava de coleta; "coletar agora" com intervalo mínimo; o `diagnosticar` reaproveita a última amostra |
+| I2 | Servidor só leitura | o script só lê `/proc`, `/sys`, `df`, `systemctl is-active`, `ps` e `smartctl -H`; o que a instalação cria lá é mostrado antes e reversível |
+| I3 | Discos SMR: nada de escrita no servidor | SMART 1 vez por hora (cada `sudo` grava 1 linha de log lá) |
+| I4 | Não interativo e imune ao idioma | `LC_ALL=C`, `BatchMode=yes`, `ConnectTimeout=10` |
+| I5 | Dado ausente é `null`, nunca zero inventado | parser, agregados e formatação da tela |
+| I6 | Só `127.0.0.1` | teste do endereço de escuta e regra estática |
+| I7 | `.env` e `data/` fora do git; acesso por chave | `.gitignore`, `npm run check` e `test/seguranca/segredos-osint.test.js` |
+| I8 | Nada da configuração vira comando | `sanitizeToken`/`sanitizeHost` + fuzz e payloads |
+| I9 | Proteções HTTP (Host, CSRF, CSP, escape, CSV, permissões, token, limites, erros) | `test/integration/http-seguranca.test.js` (caracterização) e `test/seguranca/` |
+| I10 | Interatividade toda no navegador | nenhuma ação da tela abre SSH, exceto "coletar agora" |
 
 ### Regras de segurança (security by design)
 
@@ -115,8 +130,10 @@ O teste `test/unit/docs.test.js` confere esta documentação contra o código.
 
 ## Desenvolvimento (obrigatório)
 
-- **Plano e decisões:** `docs/PLANO_V2.md` (fases F0–F9, invariantes, bugs B1–B12) e
-  `docs/adr/` (uma ADR por decisão; ADR aceita não é editada, é substituída por outra).
+- **Decisões:** `docs/adr/` (uma ADR por decisão; ADR aceita não é editada, é substituída
+  por outra). O plano da V2 (fases F0–F9, decisões D0–D13, perguntas Q1–Q20) está concluído
+  e fica como registro histórico na
+  [tag v2.0.0](https://github.com/tsouza-thiago/linux-server-dashboard-v2/blob/v2.0.0/docs/PLANO_V2.md).
 - **Antes de todo commit:** `npm run check` (sintaxe JS e shell, `.env`/`data/` fora do git,
   testes + cobertura com `test/seguranca/`, `npm audit`). Nenhum commit vermelho.
 - **Mudou código de segurança, removeu código ou terminou uma etapa?** Rode também
@@ -128,19 +145,42 @@ O teste `test/unit/docs.test.js` confere esta documentação contra o código.
 - **Commits:** Conventional Commits em PT-BR (`feat(escopo):`, `fix:`, `test:`, `docs:`,
   `refactor:`, `style:`, `perf:`, `chore:`, `security:`), uma mudança lógica por commit.
 - **CHANGELOG.md** atualizado no mesmo commit da mudança (Keep a Changelog).
-- **Bugs conhecidos** ficam em `test/unit/bugs-v1.test.js` como `todo`; o commit que corrige
-  remove o `todo` (o teste vira regressão).
+- **Bug conhecido** ainda sem correção entra como teste `todo` no arquivo de testes da área;
+  o commit que corrige tira o `todo` e o teste vira regressão. Os 12 bugs da V1 (B1–B12),
+  todos corrigidos na V2, são regressões em `test/unit/bugs-v1.test.js`.
 - **Versões:** SemVer a partir da `v2.0.0`: `PATCH` corrige, `MINOR` acrescenta sem quebrar,
   `MAJOR` quebra (configuração, formato de `data/` ou acesso ao servidor). Pré-versões
   (`-rc.N`) são opcionais e só chegam a quem já está numa pré-versão ou usa `--pre`
   (`./dashboard instalar --pre`, `./dashboard atualizar --pre`): uma instalação nova a
   partir do `main` fica na estável assinada mais nova, mesmo que o último commit tenha uma
-  tag `-rc`. Toda versão é uma tag assinada + GitHub Release
-  (procedimento na ADR 0012; a release escolhe a tag já existente).
+  tag `-rc`. Toda versão é uma tag assinada + GitHub Release (abaixo).
 - **Orçamento de desempenho:** veja [Orçamento de desempenho](#orçamento-de-desempenho).
   Mudou coleta, histórico ou frontend? Rode `npm run soak` e `npm run test:e2e`.
 - **Node.js 24** é a versão mínima (ADR 0002).
+- **Navegadores:** Chrome/Edge, Firefox e Safari, nas 2 últimas versões (ES modules,
+  `<dialog>` e CSS moderno, sem polyfill).
 - **Exemplos** usam só IPs de documentação (`192.0.2.x`, RFC 5737) e nomes genéricos.
+
+### Publicar uma versão (ADR 0012)
+
+1. PR no `main` com o CI verde, a seção `[X.Y.Z] — data` no CHANGELOG e a versão no
+   `package.json` e no `package-lock.json`.
+2. Depois do merge, na máquina do mantenedor, com a chave listada em `docs/allowed_signers`:
+
+   ```bash
+   git fetch origin && git checkout --detach origin/main
+   git -c gpg.format=ssh -c user.signingkey=~/.ssh/id_ed25519.pub tag -s vX.Y.Z -m "vX.Y.Z"
+   git -c gpg.format=ssh -c gpg.ssh.allowedSignersFile=docs/allowed_signers verify-tag vX.Y.Z
+   git push origin vX.Y.Z
+   ```
+
+3. Release no GitHub **escolhendo a tag que já existe** (`gh release create vX.Y.Z
+   --verify-tag`), com as notas do CHANGELOG. A interface do GitHub cria tags leves, sem
+   assinatura, que o instalador ignora.
+
+Trocar a chave exige um commit em `docs/allowed_signers` **antes** da tag nova: quem já tem
+o painel instalado só aceita a versão nova se a chave dela estiver na lista da versão
+instalada.
 
 ## Arquitetura
 
@@ -164,11 +204,12 @@ navegador. O backend só coleta, persiste e serve. O limite de 1 SSH por minuto 
 ```bash
 ./dashboard instalar            # assistente no navegador (--terminal: TUI; --sem-interface: sem perguntas)
 ./dashboard instalar --importar-v1 <pasta>   # upgrade V1 → V2 (para a V1, traz .env e data/)
+./dashboard instalar --sem-assinatura        # só para desenvolvimento: pasta sem tag assinada (cópia, ramo)
 ./dashboard abrir               # abre o painel já logado (link de uso único)
 ./dashboard iniciar             # serviço de usuário ou segundo plano
 ./dashboard parar               # para só o processo do painel desta pasta (PID conferido, B12)
 ./dashboard status              # rodando ou parado
-./dashboard diagnosticar        # explica cada problema; usa a última amostra (sem SSH extra)
+./dashboard diagnosticar        # explica cada problema; reaproveita a última amostra e só coleta se ela estiver velha
 ./dashboard reconfigurar        # reabre o assistente
 ./dashboard atualizar           # tag assinada mais nova, backup de data/, volta atrás se falhar
 ./dashboard desinstalar         # remove daqui e oferece limpar o servidor
@@ -205,7 +246,7 @@ log).
 | `POLL_INTERVAL` | `60000` | `10000`–`3600000` | Intervalo entre coletas, em ms |
 | `PORT` | `3000` | `1`–`65535` | Porta do painel (só em 127.0.0.1) |
 | `HISTORY_LIMIT` | `4320` | `100`–`100000` | Amostras brutas em memória (4320 = 72 h a 1 por minuto) |
-| `HISTORY_FILE` | `data/history.json` | dentro de `data/` | Histórico da V1 a migrar (1 vez, com backup) |
+| `HISTORY_FILE` | `data/history.json` | dentro de `data/` | Histórico da V1 a migrar (1 vez, com backup). A pasta dele também é a de `history/` e `rollup/`; mantenha em `data/` |
 | `LOG_FILE` | `data/dashboard.log` | dentro de `data/` | Log do painel (gira em 5 MB para `dashboard.log.1`) |
 | `NET_IF` | *(vazio)* | 1 interface | Interface de rede. Vazio = sem a seção de rede |
 | `DISK_MOUNTS` | `/` | pontos de montagem | Pastas acompanhadas, separadas por espaço |
@@ -289,7 +330,7 @@ depois de um reboot ou com contador que voltou. Exemplo (listas encurtadas):
   "schemaVersion": 2,
   "ts": "2026-10-07T13:51:00.000Z",
   "collector": { "version": 2, "hash": "73cebb436c7c", "mode": "smart", "complete": true,
-                 "expectedVersion": 2, "durationMs": 901, "outputBytes": 6350 },
+                 "expectedVersion": 2, "durationMs": 1290, "outputBytes": 2949 },
   "host": "servidor-exemplo",
   "os": { "kernel": "6.12.111+deb13-amd64", "name": "Debian GNU/Linux 13 (trixie)" },
   "cores": 1,
@@ -341,7 +382,7 @@ Tudo fica no disco local. Nada é gravado no servidor.
 | `data/outages.ndjson` | Quedas do servidor (`off`/`on`), 90 dias, separadas dos alertas (B9) |
 | `data/history.v1-migrado.json` | Backup do histórico da V1, feito pela migração (pode ser apagado) |
 | `data/sessions.json` | SHA-256 das sessões do navegador |
-| `data/entrar.json` | Hash do link de entrada de uso único (2 min) |
+| `data/entrar.json` | Hash do link de entrada de uso único (2 min no `./dashboard abrir`, 10 min no fim da instalação) |
 | `data/ssh/` | `config` e `known_hosts` próprios do painel (0700) |
 | `data/dashboard.log` | Log (gira em 5 MB para `dashboard.log.1`) |
 | `data/dashboard.pid`, `data/dashboard-erros.log` | Modo segundo plano (sem systemd): PID e erros de inicialização |
@@ -372,7 +413,7 @@ segurança, rate limit das mutações e error handler sem stack trace. Com `DASH
 | `/api/logout` | POST | Encerra a sessão deste navegador |
 | `/api/logout-all` | POST | Encerra todas as sessões (exige estar logado) |
 | `/api/status` | GET | Última amostra + meta (online, lastPollAt, nextPollAt, offlineSince) + saúde + alertas ativos |
-| `/api/history` | GET | `?limit=N&from=&to=` → amostras (reduzidas a até 720, com o pior caso de cada grupo; `topProcs` só na mais recente). `&formato=baldes` → `{from, to, step, buckets}` com mín/máx/média, até 90 dias |
+| `/api/history` | GET | `?limit=N&from=&to=` → amostras (reduzidas a `limit`: padrão 720, máximo 2000, com o pior caso de cada grupo; `topProcs` só na mais recente). `&formato=baldes` → `{from, to, step, buckets}` com mín/máx/média, até 90 dias |
 | `/api/config` | GET | Configuração ativa para a Ajuda: versões, alvos, modo de acesso, limiares (sem segredos) |
 | `/api/outages` | GET | `?days=1..90` (padrão 30) → `{days, outages, uptime}` |
 | `/api/alerts` | GET | `?status=&level=&limit=` → `{active, all}` |
@@ -409,24 +450,32 @@ Motor em `server/alerts/` (ADR 0006).
   falha. Durante a queda, os outros alertas ficam como estão (nada foi medido).
 - **Dado ausente** não cria nem resolve alerta.
 - **Saúde 0–100** (`server/alerts/health.js`): começa em 100 e perde pontos por problema,
-  com os mesmos limiares. 80–100 saudável, 50–79 atenção, 0–49 crítico. A tela só mostra o
-  que vem em `/api/status` (`health`).
+  a partir dos mesmos limiares dos alertas:
+  - RAM: −15 no limiar, −5 a partir de 15 pontos abaixo dele;
+  - disco: −15 no limiar, −5 a partir de 10 pontos abaixo;
+  - temperatura: −15 no limiar, −25 a partir de 10 °C acima;
+  - carga acima de 1,5 × núcleos: −10;
+  - SMART `FAILED`: −40; serviço parado: −25;
+  - offline ou sem dado: 0.
+
+  Faixas: 80–100 saudável, 50–79 atenção, 0–49 crítico. A tela só mostra o que vem em
+  `/api/status` (`health`).
 
 ## Orçamento de desempenho
 
-Definido no plano (Q17); o limite de RAM foi revisto em 16/10/2026, depois de medido.
+Definido no plano da V2 (Q17). O limite de RAM foi revisto em 16/10/2026, depois de medido.
 
 | Medida | Limite | Medido | Como se confere |
 |---|---|---|---|
 | Tempo do comando no servidor | ≤ 1,5 s | 1,26–1,31 s (servidor real, 1 núcleo) | faixa de status e `./dashboard diagnosticar` |
 | Tamanho da resposta | ≤ 16 KB | 2,9 KB (servidor real) | idem; acima de 1 MB a conexão é cortada |
-| Página inicial | ≤ 300 KB transferidos | 279 KB (com gzip) | `test/e2e/telas.test.js` |
+| Página inicial | ≤ 300 KB transferidos | 281 KB (com gzip) | `test/e2e/telas.test.js` |
 | RAM do Node com 72 h em memória | ≤ 110 MB | 102,6–105,3 MB (painel reiniciado com 72 h) | `npm run soak` |
 | Memória depois que a janela de 72 h enche | sem crescer (≤ +4 MB) | +1,1 a +1,8 MB em 11 h a mais | `npm run soak` |
 
 O Node 24 vazio usa ~44 MB e o painel sem histórico, ~62 MB: o resto é o histórico de
-72 h (~3,6 KB por amostra em memória). Para voltar a 80 MB, o próximo passo é guardar em
-memória só os números que os gráficos usam (2.1).
+72 h (~3,6 KB por amostra em memória). Para voltar a 80 MB, o próximo passo (previsto para
+a 2.1) é guardar em memória só os números que os gráficos usam.
 
 ## Estrutura
 
@@ -436,7 +485,8 @@ linux-server-dashboard-v2/
 ├── dashboard               comando único: garante o Node 24 (scripts/node-runtime.sh) e chama server/cli/
 ├── package.json            sem dependências de runtime; devDependency: playwright-core (e2e)
 ├── .env.example            modelo do .env (sem valores reais)
-├── docs/                   PLANO_V2.md, adr/, seguranca/ (análises do CodeQL) e allowed_signers
+├── .github/workflows/      seguranca.yml: CI a cada push no main e PR (ADR 0014)
+├── docs/                   adr/, seguranca/ (análises e excecoes.json) e allowed_signers
 ├── scripts/                check.mjs, seguranca.mjs, mutacao-seguranca.mjs, soak-acelerado.mjs,
 │                           capturar-amostra.mjs, node-runtime.sh, askpass.sh, e2e-instalacao/
 ├── server/
@@ -467,14 +517,14 @@ linux-server-dashboard-v2/
 
 ## Solução de problemas (para quem desenvolve)
 
-- **Primeiro passo:** `./dashboard diagnosticar`. Ele explica o problema e diz como
-  resolver.
-- **Servidor fora:** a faixa do topo fica vermelha, o histórico é preservado e a coleta
-  tenta de novo no próximo intervalo. Confira com `ping 192.0.2.10`.
-- **Coleta lenta ou parada:** veja `data/dashboard.log` e
-  `journalctl --user -u server-dashboard`. A faixa de status mostra o tempo e o tamanho de
-  cada coleta.
-- **Histórico vazio:** confira `data/history/` (arquivo `.ndjson` de hoje) e as permissões
-  de `data/`. Veio da V1? `npm run migrar-v1 -- --verificar`.
-- **Chave recusada, identidade do servidor mudou ou disco novo:** `./dashboard reconfigurar`.
-- **403 "Host não permitido":** abra por `http://127.0.0.1:3000` ou `http://localhost:3000`.
+Os problemas de quem usa estão no TUTORIAL ("Solução de problemas"); comece sempre pelo
+`./dashboard diagnosticar`. Para quem mexe no código:
+
+- **Coleta lenta ou parada:** `data/dashboard.log` e `journalctl --user -u server-dashboard`.
+  A faixa de status mostra o tempo e o tamanho de cada coleta.
+- **Histórico vazio:** confira `data/history/` (o `.ndjson` de hoje) e as permissões de
+  `data/`. Veio da V1? `npm run migrar-v1 -- --verificar`.
+- **Suíte vermelha só na sua máquina:** rode os testes num clone sem `.env` (o `.env` de
+  uma instalação de verdade muda os padrões) e com o Node 24 (`.runtime/node/bin`).
+- **e2e pulado:** instale o `playwright-core` (`npm ci`) e um Chromium, ou aponte um com
+  `CHROMIUM=<caminho>`.

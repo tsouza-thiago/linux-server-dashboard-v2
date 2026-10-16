@@ -39,6 +39,12 @@ diante: `PATCH` corrige, `MINOR` acrescenta sem quebrar e `MAJOR` quebra.
 
 ### Alterado
 
+- AGENTS: seção "Publicar uma versão" (o procedimento da ADR 0012, com `vX.Y.Z`); a
+  "Solução de problemas" fica só com o que é de desenvolvimento (o de quem usa está no
+  TUTORIAL); a regra de bug conhecido vale para bugs novos.
+- CLAUDE.md só com o que é específico do Claude Code; o resto está no AGENTS.
+- TUTORIAL sem o rodapé repetido. `test/unit/bugs-v1.test.js` lista os 12 bugs da V1 no
+  cabeçalho (antes apontava para o plano).
 - Testes: a CLI (`main` e `instalar`) aceita a pasta pessoal injetada (`home`). Os testes de
   `status` e de "painel já rodando" usam uma pasta temporária e não enxergam mais o painel
   instalado na máquina de quem roda a suíte.
@@ -49,8 +55,30 @@ diante: `PATCH` corrige, `MINOR` acrescenta sem quebrar e `MAJOR` quebra.
 - `scripts/node-runtime.sh`: diretiva do ShellCheck explica por que `NODE_BIN` e
   `NODE_ORIGEM` parecem sem uso (quem as lê é o `./dashboard`).
 
+### Removido
+
+- `docs/PLANO_V2.md`: o plano da V2 está concluído e fica como registro histórico na tag
+  `v2.0.0`. O que ainda vale passou para o AGENTS: as invariantes I1–I10 (citadas no
+  código), os navegadores suportados e a origem do orçamento de desempenho. As decisões
+  continuam nas ADRs.
+
 ### Corrigido
 
+- Documentação conferida contra o código:
+  - AGENTS: o `.env` guarda o `DASH_TOKEN`, não senhas; o `diagnosticar` reaproveita a
+    última amostra e só coleta se ela estiver velha; o link de entrada vale 2 min
+    (`abrir`) ou 10 min (fim da instalação); o `/api/history` reduz a `limit` (padrão 720,
+    máximo 2000); a regra da saúde está explicada ponto a ponto; o exemplo da amostra
+    traz os valores medidos (1,29 s, 2,9 KB); a Estrutura cita o `soak-acelerado.mjs`;
+    a `--sem-assinatura` está documentada; o `HISTORY_FILE` também define a pasta de
+    `history/` e `rollup/`.
+  - TUTORIAL: custo da coleta (cerca de 1 s, não "menos de 1 s"); os indicadores da
+    Visão geral; o nome da tela "Processos & serviços"; `data/` guarda os últimos 500
+    alertas, não "todo o histórico".
+  - README e TUTORIAL: "voltar à V1" agora desliga também o início automático da V2 (só
+    `./dashboard parar` deixava as duas rodando depois de reiniciar, com 2 conexões por
+    minuto ao servidor).
+  - CHANGELOG da 2.0.0: "10 fases (F0–F9)", não 9.
 - SECURITY: o erro da API devolve só `{ "error" }` (não existe `errorCode`); trocar o
   `DASH_TOKEN` **não** encerra as sessões já abertas (agora explica como encerrá-las) e a
   instalação usa 32 bytes aleatórios; o isolamento do systemd vale "quando o systemd
@@ -73,11 +101,11 @@ diante: `PATCH` corrige, `MINOR` acrescenta sem quebrar e `MAJOR` quebra.
 
 ## [2.0.0] — 2026-10-16
 
-Primeira versão estável da V2: a reformulação completa do painel, feita em 9 fases a partir
-da `v1.0.0` (plano em `docs/PLANO_V2.md`). Validada no computador e no servidor reais do
-mantenedor desde 08/10/2026, em contêineres Debian 12 e Ubuntu 24.04 limpos e pelo soak
-acelerado. As seções abaixo listam só o que mudou desde a `2.0.0-beta.2`; cada pré-versão
-tem a sua seção.
+Primeira versão estável da V2: a reformulação completa do painel, feita em 10 fases (F0–F9)
+a partir da `v1.0.0` (plano em `docs/PLANO_V2.md`, que ficou na tag `v2.0.0`). Validada no
+computador e no servidor reais do mantenedor desde 08/10/2026, em contêineres Debian 12 e
+Ubuntu 24.04 limpos e pelo soak acelerado. As seções abaixo listam só o que mudou desde a
+`2.0.0-beta.2`; cada pré-versão tem a sua seção.
 
 ### Resumo da V2 em relação à V1
 

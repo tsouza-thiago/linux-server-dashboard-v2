@@ -1,7 +1,7 @@
 // Assistente de instalação no Chromium (critério da F7): os 6 passos das pranchetas, nos
 // modos assistido e manual, nos 2 temas e no celular, sem erro de JavaScript nem violação
 // de CSP. Servidor, ssh e systemd são falsos (test-support/instalacao-fake.js); o caminho
-// real é testado contra contêineres Debian/Ubuntu (ver docs/PLANO_V2.md, F7).
+// real é testado contra contêineres Debian/Ubuntu (scripts/e2e-instalacao/rodar.sh).
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { createWizardApp } from '../../server/setup/web.js';

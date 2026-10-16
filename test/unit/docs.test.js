@@ -88,7 +88,7 @@ test('docs: arquivos e pastas citados existem', () => {
 test('docs: subcomandos e opções do ./dashboard existem', () => {
   const problems = [];
   const knownFlag = (f) => cliSource.includes(`--${f}`) || cliSource.includes(`flags['${f}']`) || new RegExp(`flags\\.${f}\\b`).test(cliSource);
-  for (const file of [...MAIN_DOCS, ...ADRS, 'docs/PLANO_V2.md']) {
+  for (const file of [...MAIN_DOCS, ...ADRS]) {
     for (const [, sub, rest] of read(file).matchAll(/\.\/dashboard(?:[ \t]+([a-z][a-z0-9-]*))?([^`|\n#]*)/g)) {
       if (sub && !COMMAND_NAMES.includes(sub)) problems.push(`${file}: ./dashboard ${sub}`);
       for (const [, flag] of rest.matchAll(/--([a-z][a-z0-9-]*)/g)) {
