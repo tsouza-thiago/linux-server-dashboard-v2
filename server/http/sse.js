@@ -1,8 +1,10 @@
 // SSE (Server-Sent Events) com backfill: cada amostra sai com `id:` = instante dela (ms).
 // Quando a conexão cai, o navegador reconecta sozinho mandando `Last-Event-ID`, e o
 // servidor reenvia as amostras que ficaram faltando antes de seguir ao vivo.
+/** Máximo de amostras reenviadas numa reconexão (~33 h a 1 por minuto). */
 export const MAX_BACKFILL = 2000;
 
+/** Um evento no formato SSE: `id:` (opcional), `event:` e os dados em JSON, numa linha só. */
 export function formatEvent(event, data, id) {
   return `${id !== undefined && id !== null ? `id: ${id}\n` : ''}event: ${event}\ndata: ${JSON.stringify(data)}\n\n`;
 }
@@ -15,11 +17,17 @@ export function lastEventId(req) {
   return Number.isSafeInteger(n) && n > 0 ? n : null;
 }
 
+/** Id SSE de uma amostra: o instante dela em ms (undefined se o `ts` não for data). */
 export const sampleId = (sample) => {
   const ms = Date.parse(sample?.ts);
   return Number.isFinite(ms) ? ms : undefined;
 };
 
+/**
+ * Conexões SSE abertas com as telas. Limita o número de conexões (cada aba aberta é uma),
+ * manda um "ping" a cada 30 s para proxies e o navegador não derrubarem a conexão parada,
+ * e diz ao navegador para reconectar depois de 5 s se ela cair.
+ */
 export class SseHub {
   constructor({ maxClients = 20, heartbeatMs = 30000, retryMs = 5000 } = {}) {
     this.maxClients = maxClients;
@@ -28,6 +36,7 @@ export class SseHub {
     this.clients = new Set();
   }
 
+  /** Quantas conexões estão abertas. */
   get size() {
     return this.clients.size;
   }
@@ -46,11 +55,13 @@ export class SseHub {
       Connection: 'keep-alive',
       'X-Accel-Buffering': 'no',
     });
+    // Intervalo de reconexão do navegador, depois o backfill e o estado inicial.
     res.write(`retry: ${this.retryMs}\n\n`);
     for (const [event, data, id] of initial) res.write(formatEvent(event, data, id));
     this.clients.add(res);
     const keepAlive = setInterval(() => res.write(': ping\n\n'), this.heartbeatMs);
     keepAlive.unref?.();
+    // Aba fechada ou rede caída: para o ping e tira a conexão da lista.
     req.on('close', () => {
       clearInterval(keepAlive);
       this.clients.delete(res);
@@ -58,11 +69,13 @@ export class SseHub {
     return res;
   }
 
+  /** Manda o mesmo evento para todas as telas conectadas. */
   send(event, data, id) {
     const payload = formatEvent(event, data, id);
     for (const res of this.clients) res.write(payload);
   }
 
+  /** Fecha todas as conexões (encerramento do painel). */
   closeAll() {
     for (const res of this.clients) res.end();
     this.clients.clear();

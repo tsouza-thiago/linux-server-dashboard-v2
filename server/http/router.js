@@ -3,8 +3,14 @@
 // o Express sem nenhuma dependência de runtime.
 import http from 'node:http';
 
+// Como no Express: middleware com 4 parâmetros `(err, req, res, next)` é tratador de erro.
 const isErrorHandler = (fn) => fn.length === 4;
 
+/**
+ * Transforma o padrão da rota (`/api/alerts/:id/ack`) numa regex ancorada e na lista dos
+ * nomes dos parâmetros. O texto fixo é escapado (nada do padrão vira regex por acidente);
+ * cada `:nome` casa um trecho sem `/`. A barra final é opcional.
+ */
 function compile(pattern) {
   const names = [];
   const re = pattern.replace(/[.*+?^${}()|[\]\\]/g, '\\$&').replace(/\/:([A-Za-z_]\w*)/g, (_, name) => {
@@ -27,7 +33,10 @@ function parseQuery(params) {
   return Object.setPrototypeOf(Object.fromEntries(vistos), null);
 }
 
-/** Acrescenta res.status/json/send (mesma forma usada pelas rotas e pelos testes). */
+/**
+ * Acrescenta res.status/json/send (mesma forma usada pelas rotas e pelos testes) e prepara
+ * req.path, req.query, req.params e req.ip. URL que nem o `URL` consegue ler vira "/".
+ */
 function decorate(req, res) {
   res.status = (code) => { res.statusCode = code; return res; };
   res.json = (obj) => {
@@ -56,7 +65,14 @@ function decorate(req, res) {
   req.ip = req.socket?.remoteAddress || '?';
 }
 
+/**
+ * Cria o roteador: uma função `(req, res)` para o http.Server, com `use`, `get`, `post`,
+ * `put`, `patch`, `delete` e `listen`. As camadas rodam na ordem em que foram registradas;
+ * `next()` passa para a seguinte e `next(err)` pula direto para os tratadores de erro.
+ * `onError` trata o erro que nenhum tratador registrado respondeu.
+ */
 export function createRouter({ onError } = {}) {
+  // Camadas na ordem de registro: { método (null = qualquer), regex do caminho, nomes, fn }.
   const stack = [];
   const add = (method, pattern, handlers) => {
     const { re, names } = compile(pattern);
@@ -80,8 +96,10 @@ export function createRouter({ onError } = {}) {
             try { return [n, decodeURIComponent(match[k + 1])]; } catch { return [n, match[k + 1]]; }
           }));
         }
+        // Com erro, só tratadores de erro rodam; sem erro, só middlewares e rotas comuns.
         if (err && !isErrorHandler(layer.fn)) continue;
         if (!err && isErrorHandler(layer.fn)) continue;
+        // Rota assíncrona que rejeita também vira next(err) (a resposta não fica pendurada).
         try {
           const ret = err ? layer.fn(err, req, res, next) : layer.fn(req, res, next);
           if (ret && typeof ret.catch === 'function') ret.catch(next);
@@ -101,6 +119,10 @@ export function createRouter({ onError } = {}) {
     next();
   }
 
+  /**
+   * Middleware para todos os caminhos, ou só para um prefixo (`use('/api', fn)` vale para
+   * `/api` e `/api/...`, mas não para `/apis`).
+   */
   handle.use = (pathOrFn, ...fns) => {
     if (typeof pathOrFn === 'string') {
       const prefix = pathOrFn.replace(/\/$/, '');
@@ -111,6 +133,7 @@ export function createRouter({ onError } = {}) {
     }
     return handle;
   };
+  // Rotas por método: `handle.get('/x', ...fns)` e assim por diante.
   for (const m of ['get', 'post', 'put', 'patch', 'delete']) {
     handle[m] = (pattern, ...fns) => { add(m.toUpperCase(), pattern, fns); return handle; };
   }
@@ -126,8 +149,11 @@ export function createRouter({ onError } = {}) {
 export function jsonBody({ limit = 50 * 1024 } = {}) {
   return function readJson(req, res, next) {
     if (!['POST', 'PUT', 'PATCH', 'DELETE'].includes(req.method)) return next();
+    // Corpo que não é JSON é ignorado (as rotas só leem JSON).
     const type = String(req.headers['content-type'] || '');
     if (!type.includes('application/json')) { req.body = {}; return next(); }
+    // 1ª barreira: o tamanho declarado; 2ª: o tamanho que realmente chega (sem
+    // Content-Length, ou mentindo nele, o corte acontece no meio da leitura).
     const declared = Number(req.headers['content-length']);
     if (Number.isFinite(declared) && declared > limit) {
       req.resume();

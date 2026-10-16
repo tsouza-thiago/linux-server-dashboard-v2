@@ -4,6 +4,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import zlib from 'node:zlib';
 
+// Tipos servidos; arquivo de outra extensão (.md, .map, sem extensão) nunca sai.
 const MIME = {
   '.html': 'text/html; charset=utf-8',
   '.css': 'text/css; charset=utf-8',
@@ -24,6 +25,10 @@ const COMPRESSIBLE = /^(text\/|application\/json|image\/svg\+xml)/;
 const MIN_GZIP_BYTES = 1024;
 const gzipCache = new Map();
 
+/**
+ * Conteúdo em gzip, guardado em memória por arquivo (a chave muda se o arquivo mudar de
+ * tamanho ou data, e a versão anterior sai do cache).
+ */
 function gzipped(file, stat) {
   const key = `${file}:${stat.size}:${stat.mtimeMs}`;
   let buf = gzipCache.get(key);
@@ -45,6 +50,7 @@ export function sendFile(res, file, { cacheControl = 'no-cache', req = null } = 
   res.setHeader('Content-Type', type);
   res.setHeader('Cache-Control', cacheControl);
   if (COMPRESSIBLE.test(type)) res.setHeader('Vary', 'Accept-Encoding');
+  // gzip só para texto, acima de 1 KB e quando o navegador aceita; o resto sai como está.
   const acceptsGzip = /\bgzip\b/i.test(String(req?.headers?.['accept-encoding'] || ''));
   if (acceptsGzip && COMPRESSIBLE.test(type) && stat.size >= MIN_GZIP_BYTES) {
     let body;
@@ -73,8 +79,11 @@ export function serveStatic(root, { maxAge = 3600 } = {}) {
     } catch {
       return res.status(400).json({ error: 'caminho inválido' });
     }
+    // Byte nulo e barra invertida nunca são legítimos num caminho do painel (CWE-22).
     if (rel.includes('\0') || rel.includes('\\')) return res.status(400).json({ error: 'caminho inválido' });
     if (rel === '/' || rel === '') rel = '/index.html';
+    // Proteção em 2 camadas contra path traversal (CWE-22): nenhum trecho pode começar com
+    // "." (tira `..`, `.env`, `.git`), e o caminho final precisa ficar dentro da raiz.
     const segments = rel.split('/').filter(Boolean);
     if (segments.some((seg) => seg.startsWith('.'))) return res.status(404).json({ error: 'não encontrado' });
     const file = path.resolve(base, ...segments);
@@ -83,6 +92,7 @@ export function serveStatic(root, { maxAge = 3600 } = {}) {
     let stat;
     try { stat = fs.statSync(file); } catch { return next(); }
     if (!stat.isFile()) return next();
+    // HTML sempre conferido de novo (pega a versão nova depois de atualizar); o resto, cache.
     const cacheControl = file.endsWith('.html') ? 'no-cache' : `public, max-age=${maxAge}`;
     return sendFile(res, file, { cacheControl, req });
   };

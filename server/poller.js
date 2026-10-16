@@ -1,5 +1,6 @@
-// Fachada da coleta usada pelo servidor (server/index.js) e pelo CLI `--once`.
-// A implementação V2 vive em ./collector/ (builder, parser, rates).
+// Fachada da coleta: liga ./collector/ (builder, parser, rates) à configuração do .env e às
+// regras de alerta. Quem usa: o servidor (server/index.js), o `npm run poll` (`--once`, uma
+// coleta impressa em JSON) e o scripts/capturar-amostra.mjs.
 import { config, isPlaceholderHost } from './config.js';
 import { collect as collectV2, runSSH } from './collector/index.js';
 import { buildScript, normalizeTargets } from './collector/builder.js';
@@ -17,8 +18,8 @@ export function configTargets() {
 }
 
 /**
- * Comando de coleta (modo direto). Aceita os nomes antigos de override da V1
- * (netIf, diskMounts, diskDevs, services) para os chamadores existentes.
+ * Comando de coleta (modo direto), com os alvos do .env e, se dados, alguns trocados.
+ * Aceita os nomes da V1 (`diskMounts`, `diskDevs`) além de `mounts` e `devs`.
  */
 export function buildCommand(overrides = {}, mode = 'basico') {
   const base = configTargets();
@@ -44,11 +45,13 @@ export function computeAlerts(sample, thresholds = config.ALERTS) {
 /** SSH com a configuração própria do painel (data/ssh/config), quando houver. */
 const configRunner = (host, command) => runSSH(host, command, 45000, { configFile: config.SSH_CONFIG });
 
-/** Coleta com os alvos e o acesso do .env; mesmos parâmetros da V1 (`runner` recebe host e comando). */
+/** Coleta com os alvos e o acesso do .env (`runner` recebe host e comando; injetável nos testes). */
 export function collect({ host, prev, runner = configRunner, targets = configTargets(), now, access = config.SSH_ACESSO } = {}) {
   return collectV2({ host, prev, runner, targets, now, access, alerts: computeAlerts });
 }
 
+// Rodando direto (`node server/poller.js --once`, o `npm run poll`)? Compara só o nome do
+// arquivo: funciona também com a pasta atrás de um link simbólico.
 const isCLI = process.argv[1] && import.meta.url.endsWith(process.argv[1].split('/').pop());
 if (isCLI) {
   const host = config.SSH_HOST;

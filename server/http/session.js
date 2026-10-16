@@ -6,11 +6,15 @@ import fs from 'node:fs';
 import fsp from 'node:fs/promises';
 import path from 'node:path';
 
+/** Nome do cookie de sessão do painel. */
 export const SESSION_COOKIE = 'dash_session';
+/** Validade de uma sessão: 30 dias, renovados enquanto ela é usada. */
 export const SESSION_TTL_MS = 30 * 24 * 3600 * 1000;
 const RENEW_EVERY_MS = 3600 * 1000; // grava a renovação no máximo 1x por hora por sessão
+// No máximo 50 navegadores com sessão; os mais antigos saem primeiro.
 const MAX_SESSIONS = 50;
 
+// O que vai para o disco: o SHA-256 do identificador, nunca o identificador.
 const hash = (id) => crypto.createHash('sha256').update(String(id)).digest('hex');
 
 /** Comparação em tempo constante (tamanhos diferentes já são recusados). */
@@ -31,8 +35,13 @@ export function sessionCookie(id, maxAgeMs = SESSION_TTL_MS) {
   return maxAgeMs === null ? base : `${base}; Max-Age=${Math.floor(maxAgeMs / 1000)}`;
 }
 
+/** Cookie que apaga a sessão no navegador (sair). */
 export const clearSessionCookie = () => `${SESSION_COOKIE}=; Path=/; HttpOnly; SameSite=Strict; Max-Age=0`;
 
+/**
+ * Sessões abertas, em memória e em `data/sessions.json` (0600, gravação atômica). Cada uma
+ * guarda o hash do identificador e os instantes de criação, último uso e validade.
+ */
 export class SessionStore {
   constructor({ file, ttlMs = SESSION_TTL_MS, now = () => Date.now(), log = (m) => console.warn(m) } = {}) {
     this.file = file;
@@ -44,6 +53,7 @@ export class SessionStore {
     this.load();
   }
 
+  /** Lê o arquivo de sessões; descarta as vencidas e recomeça vazio se ele estiver ilegível. */
   load() {
     try {
       const list = JSON.parse(fs.readFileSync(this.file, 'utf8'));
@@ -56,6 +66,10 @@ export class SessionStore {
     }
   }
 
+  /**
+   * Grava as sessões em fila (uma gravação de cada vez, na ordem), via arquivo temporário +
+   * rename (atômico) e com modo 0600. Erro de gravação vai para o log e não derruba o painel.
+   */
   _save() {
     const data = JSON.stringify(this.sessions);
     this._queue = this._queue
@@ -79,7 +93,10 @@ export class SessionStore {
     return id;
   }
 
-  /** Sessão válida (renovada) ou null. */
+  /**
+   * Sessão válida (renovada) ou null. Identificador curto demais nem é procurado; a busca
+   * compara os hashes em tempo constante; sessão vencida é apagada na hora.
+   */
   touch(id) {
     if (typeof id !== 'string' || id.length < 32) return null;
     const h = hash(id);
@@ -99,6 +116,7 @@ export class SessionStore {
     return s;
   }
 
+  /** Encerra a sessão deste identificador (sair); devolve se havia uma. */
   revoke(id) {
     if (typeof id !== 'string') return false;
     const h = hash(id);
@@ -108,6 +126,7 @@ export class SessionStore {
     return this.sessions.length !== before;
   }
 
+  /** Encerra todas as sessões (Ajuda → "Encerrar todas as sessões"); devolve quantas eram. */
   revokeAll() {
     const n = this.sessions.length;
     this.sessions = [];
@@ -115,10 +134,12 @@ export class SessionStore {
     return n;
   }
 
+  /** Quantas sessões estão abertas. */
   get count() {
     return this.sessions.length;
   }
 
+  /** Espera as gravações pendentes (encerramento do painel, B11). */
   async flush() {
     await this._queue;
   }

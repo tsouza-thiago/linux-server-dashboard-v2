@@ -8,12 +8,16 @@ import path from 'node:path';
 import { writeFileAtomicSync } from '../storage/ndjson.js';
 import { safeEqual } from './session.js';
 
+// Validade do link do `./dashboard abrir`; o fim da instalação passa um prazo maior.
 const LOGIN_LINK_TTL_MS = 2 * 60 * 1000;
+// Códigos pendentes guardados ao mesmo tempo (os mais antigos saem).
 const MAX_CODES = 5;
 const FILE = 'entrar.json';
 
+// Em disco só fica o SHA-256 do código: quem lê o arquivo não consegue entrar.
 const hash = (code) => crypto.createHash('sha256').update(String(code)).digest('hex');
 
+/** Códigos ainda válidos do arquivo (os vencidos e os malformados são ignorados). */
 function read(file, nowMs) {
   try {
     const list = JSON.parse(fs.readFileSync(file, 'utf8'));
@@ -38,12 +42,14 @@ export function createLoginCode(dataDir, { ttlMs = LOGIN_LINK_TTL_MS, now = Date
 
 /** Confere e consome um código: true só na primeira vez e dentro do prazo. */
 export function consumeLoginCode(dataDir, code, { now = Date.now() } = {}) {
+  // O código tem 32 caracteres (24 bytes em base64url); fora disso nem é procurado.
   if (typeof code !== 'string' || code.length < 32 || code.length > 64) return false;
   const file = path.join(dataDir, FILE);
   const list = read(file, now);
   const h = hash(code);
   const found = list.find((c) => safeEqual(c.hash, h));
   if (!found) return false;
+  // Uso único: o código sai do arquivo assim que é usado.
   write(file, list.filter((c) => c !== found));
   return true;
 }

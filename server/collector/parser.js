@@ -1,18 +1,24 @@
 // Interpreta a saída do comando de coleta V2 (./builder.js) e monta a amostra
 // schemaVersion 2. Regras:
 // - Seção ausente ou ilegível vira null ("sem dado"), nunca zero inventado (invariante I5).
-// - Campos usados pelo frontend da V1 são mantidos com o mesmo significado (compatibilidade
-//   até a F5/F6); os novos entram ao lado deles.
+// - A saída vem de um servidor que pode estar comprometido (SECURITY, ameaça 13): ela só é
+//   lida, nunca executada, e qualquer seção estranha vira "sem dado" sem derrubar a amostra.
+// - Os campos de texto de `disks` (size, used, avail, no estilo do `df -h`) seguem existindo
+//   ao lado dos `*Bytes`: fazem parte do formato documentado (AGENTS, "Formato da amostra")
+//   e do export JSON.
 // - Taxas (CPU %, Mbps, MB/s, % de uso do disco) dependem da amostra anterior e são
 //   calculadas em ./rates.js.
 import { COLLECTOR_VERSION } from './builder.js';
 
+/** Versão do formato da amostra (amostras sem o campo são da V1). */
 export const SCHEMA_VERSION = 2;
 
 // Sensores preferidos para "a temperatura da CPU", em ordem.
 const CPU_SENSORS = ['x86_pkg_temp', 'coretemp', 'k10temp', 'cpu-thermal', 'cpu_thermal', 'soc_thermal', 'acpitz'];
+// Estados que o script do SMART pode imprimir; qualquer outro texto vira DESCONHECIDO.
 const SMART_STATES = new Set(['PASSED', 'FAILED', 'SEM_PERMISSAO', 'SEM_SMARTCTL', 'DESCONHECIDO']);
 
+// Número (aceita vírgula decimal) ou null; inteiro ou null.
 const num = (v) => {
   const n = Number(String(v).replace(',', '.'));
   return Number.isFinite(n) ? n : null;
@@ -51,7 +57,10 @@ export function humanBytes(bytes) {
   return `${shown}${units[i]}`;
 }
 
+// Uma função por seção do script. Cada uma lê as linhas dela e preenche a amostra `s`;
+// `ctx.targets` traz os alvos pedidos (para filtrar e conferir o que veio).
 const parsers = {
+  // "2 6443f6bd222e" (versão e hash dos alvos) e, na linha seguinte, o modo.
   VER(lines, s) {
     const [version, hash] = (lines[0] || '').trim().split(/\s+/);
     s.collector.version = int(version);
@@ -61,6 +70,7 @@ const parsers = {
   HOST(lines, s) {
     s.host = (lines[0] || '').trim() || null;
   },
+  // 1ª linha: `uname -r`; depois PRETTY_NAME/NAME do /etc/os-release.
   OS(lines, s) {
     s.os = { kernel: (lines[0] || '').trim() || null, name: null };
     const pretty = lines.find((l) => l.startsWith('PRETTY_NAME='));
@@ -72,6 +82,7 @@ const parsers = {
     const n = int((lines[0] || '').trim());
     s.cores = n && n > 0 ? n : null;
   },
+  // /proc/uptime: segundos desde o boot (o 1º número); daí o instante do boot.
   UPTIME(lines, s) {
     const sec = num((lines[0] || '').trim().split(/\s+/)[0]);
     if (sec !== null && sec >= 0) {
@@ -79,16 +90,20 @@ const parsers = {
       s.bootAt = new Date(Date.parse(s.ts) - sec * 1000).toISOString();
     }
   },
+  // /proc/loadavg: carga média de 1, 5 e 15 min.
   LOAD(lines, s) {
     const parts = (lines[0] || '').trim().split(/\s+/).slice(0, 3).map(num);
     s.load = parts.length === 3 && parts.every((v) => v !== null) ? parts : null;
   },
+  // 1ª linha do /proc/stat: tiques acumulados da CPU (as % saem em ./rates.js).
   STAT(lines, s) {
     const parts = (lines[0] || '').trim().split(/\s+/);
     if (parts[0] !== 'cpu' || parts.length < 5) return;
     const [user, nice, system, idle, iowait = 0, irq = 0, softirq = 0, steal = 0] = parts.slice(1).map((v) => int(v) ?? 0);
     s.cpuTicks = { user, nice, system, idle, iowait, irq, softirq, steal, total: user + nice + system + idle + iowait + irq + softirq + steal };
   },
+  // /proc/meminfo em kB → MB. "Usada" = total − disponível (MemAvailable; kernels antigos
+  // sem ele usam o MemFree).
   MEM(lines, s) {
     const kb = {};
     for (const line of lines) {
@@ -111,6 +126,9 @@ const parsers = {
       writeback: mb(kb.Writeback),
     };
   },
+  // `df -B1 --output=source,target,size,used,avail,pcent,ipcent`, em bytes. Cada ponto de
+  // montagem uma vez só; o disco (sda, nvme0n1…) sai do nome do dispositivo. As pastas
+  // pedidas que não apareceram vão para `missingMounts` (pasta que não é ponto de montagem).
   DF(lines, s, ctx) {
     const seen = new Set();
     s.disks = [];
@@ -141,6 +159,8 @@ const parsers = {
     const wanted = ctx.targets?.mounts || [];
     s.missingMounts = wanted.filter((m) => !seen.has(m));
   },
+  // /proc/net/dev: "iface: rx_bytes rx_packets rx_errs rx_drop … tx_bytes …" (16 campos).
+  // O nome vai até o ":" (com contador grande, não há espaço entre eles: B2).
   NET(lines, s, ctx) {
     for (const line of lines) {
       const colon = line.indexOf(':');
@@ -158,6 +178,8 @@ const parsers = {
       return;
     }
   },
+  // /proc/diskstats: os campos 4–14 são contadores de leituras, setores, tempos e o tempo
+  // total ocupado (as taxas saem em ./rates.js).
   IO(lines, s, ctx) {
     const devs = new Set(ctx.targets?.devs || []);
     s.io = [];
@@ -176,6 +198,8 @@ const parsers = {
       });
     }
   },
+  // /proc/pressure/{cpu,memory,io}: % do tempo com tarefas esperando (médias de 10 e 60 s).
+  // Kernel sem PSI: a seção vem vazia e `psi` fica null.
   PSI(lines, s) {
     const psi = {};
     for (const line of lines) {
@@ -190,6 +214,8 @@ const parsers = {
     }
     s.psi = Object.keys(psi).length ? psi : null;
   },
+  // "tipo milésimos-de-grau" de cada thermal_zone. A temperatura "da CPU" é a do 1º sensor
+  // da lista CPU_SENSORS que existir; sem nenhum deles, a maior.
   TEMP(lines, s) {
     const temps = [];
     for (const line of lines) {
@@ -204,6 +230,8 @@ const parsers = {
     s.tempC = chosen ? chosen.c : null;
     s.tempSensor = chosen ? chosen.type : null;
   },
+  // "sda PASSED" por disco, ou "pulado" no modo básico (aí `smart` fica null e a coleta
+  // reaproveita o último resultado).
   SMART(lines, s) {
     if (lines.length === 1 && lines[0].trim() === 'pulado') return;
     s.smart = [];
@@ -214,6 +242,7 @@ const parsers = {
     }
     s.smartAt = s.ts;
   },
+  // "nome estado" (`systemctl is-active`); sem resposta vira "desconhecido" (neutro).
   SERVICES(lines, s) {
     s.services = {};
     for (const line of lines) {
@@ -221,6 +250,7 @@ const parsers = {
       if (name) s.services[name] = state || 'desconhecido';
     }
   },
+  // `ps` ordenado por memória: até 8 processos, sem o cabeçalho e sem o próprio `ps`.
   PS(lines, s) {
     s.topProcs = [];
     for (const line of lines) {
@@ -243,6 +273,8 @@ const parsers = {
 };
 
 /**
+ * Monta a amostra a partir da saída. Todo campo começa como "sem dado" (null ou lista vazia)
+ * e só é preenchido pela seção que o traz; `complete` diz se o marcador final chegou.
  * @param {string} stdout saída bruta do comando de coleta
  * @param {string} ts timestamp ISO da coleta
  * @param {{ targets?: object }} [ctx] alvos normalizados (para filtrar NET/IO e conferir mounts)

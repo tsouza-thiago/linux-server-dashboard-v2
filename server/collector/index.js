@@ -6,9 +6,12 @@ import { buildScript, normalizeTargets } from './builder.js';
 import { parseOutput } from './parser.js';
 import { computeRates } from './rates.js';
 
+// SSH nunca interativo (sem pedir senha ou confirmação) e com 10 s para conectar: servidor
+// fora do ar falha rápido em vez de travar a coleta (invariante I4).
 export const SSH_OPTS = ['-o', 'BatchMode=yes', '-o', 'ConnectTimeout=10'];
+/** Intervalo mínimo entre dois testes SMART (1 h). */
 export const SMART_INTERVAL_MS = 3600000;
-// Uma coleta normal tem ~3–7 KB. Acima de 1 MB a resposta não é a da coleta (servidor
+// Uma coleta normal tem ~3 KB (2,9 KB medidos no servidor real). Acima de 1 MB a resposta não é a da coleta (servidor
 // comprometido ou quebrado): a conexão é cortada para não encher a memória desta máquina.
 export const MAX_OUTPUT_BYTES = 1024 * 1024;
 
@@ -23,6 +26,7 @@ export function runSSH(host, command, timeoutMs = 45000, { configFile = '', maxB
       resolve({ stdout: '', stderr: '', code: 255, timedOut: false, error: 'host inválido' });
       return;
     }
+    // Argumentos em lista, sem shell local: o comando só é interpretado no servidor.
     const args = [...(configFile ? ['-F', configFile] : []), ...SSH_OPTS, host, command];
     const child = spawn('ssh', args, { stdio: ['ignore', 'pipe', 'pipe'] });
     let stdout = '';
@@ -30,10 +34,12 @@ export function runSSH(host, command, timeoutMs = 45000, { configFile = '', maxB
     let timedOut = false;
     let bytes = 0;
     let tooBig = false;
+    // Teto de tempo da conexão inteira: estourou, o ssh é morto e o resultado diz timeout.
     const timer = setTimeout(() => {
       timedOut = true;
       child.kill('SIGKILL');
     }, timeoutMs);
+    // Conta os bytes recebidos; passou do limite, corta a conexão e descarta o resto.
     const take = (d) => {
       bytes += d.length;
       if (bytes <= maxBytes) return String(d);
@@ -57,6 +63,7 @@ export function runSSH(host, command, timeoutMs = 45000, { configFile = '', maxB
   });
 }
 
+/** Motivo da falha do SSH em português, para o log, a faixa de status e o diagnosticar. */
 export function describeError({ code, error, stderr, timedOut }) {
   if (timedOut) return 'timeout — servidor não respondeu (rede/servidor fora do ar?)';
   if (error) return error;
@@ -80,7 +87,7 @@ export function smartDue(targets, prev, nowMs, intervalMs = SMART_INTERVAL_MS) {
  * @param {object} p
  * @param {string} p.host alias SSH ou user@host
  * @param {object|null} p.prev amostra anterior (para taxas e para manter o último SMART)
- * @param {object} p.targets alvos da coleta (netIf, mounts, devs, services)
+ * @param {object} p.targets alvos da coleta (netIf, mounts, devs, smartDevs, services)
  * @param {Function} [p.runner] (host, command) => resultado do SSH (injetável nos testes)
  * @param {Function} [p.alerts] amostra => lista de alertas
  * @param {number} [p.now] relógio (ms), injetável
@@ -88,22 +95,27 @@ export function smartDue(targets, prev, nowMs, intervalMs = SMART_INTERVAL_MS) {
  *   painel envia só a palavra do modo ("basico" ou "smart")
  */
 export async function collect({ host, prev = null, targets, runner = runSSH, alerts = () => [], now = Date.now(), access = 'direto' }) {
+  // 1) Alvos saneados, instante da amostra e modo (SMART só se estiver na hora).
   const t = normalizeTargets(targets);
   const ts = new Date(now).toISOString();
   const mode = smartDue(t, prev, now) ? 'smart' : 'basico';
   const { script, hash } = buildScript(t, mode);
+  // 2) A única conexão SSH desta coleta (I1). No acesso restrito, só a palavra do modo vai.
   const started = performance.now();
   const { stdout, stderr, code, timedOut, error } = await runner(host, access === 'restrito' ? mode : script);
   const durationMs = Math.round(performance.now() - started);
+  // Sem nem a seção HOST, não há o que ler: a coleta falhou (o motivo vem do describeError).
   if (code !== 0 || !stdout || !stdout.includes('===HOST===')) {
     return { ok: false, error: describeError({ code, error, stderr, timedOut }), ts };
   }
+  // 3) Saída → amostra, e conferência do hash dos alvos (authorized_keys desatualizado?).
   const sample = parseOutput(stdout, ts, { targets: t });
   sample.collector.expectedHash = hash;
   sample.collector.hashMismatch = sample.collector.hash !== null && sample.collector.hash !== hash;
   // Custo da coleta no servidor (faixa de status e Visão geral): tempo do SSH e tamanho da saída.
   sample.collector.durationMs = durationMs;
   sample.collector.outputBytes = Buffer.byteLength(stdout);
+  // 4) Coleta sem SMART (modo básico) reaproveita o último resultado; depois, as taxas.
   if (sample.smart === null && prev && prev.smart) {
     sample.smart = prev.smart;
     sample.smartAt = prev.smartAt ?? null;
