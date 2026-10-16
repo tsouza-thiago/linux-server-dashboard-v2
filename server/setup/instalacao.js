@@ -8,7 +8,7 @@ import { spawnSync } from 'node:child_process';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import { loadEnvFile } from '../config.js';
+import { alertThresholds, loadEnvFile } from '../config.js';
 import { collect as collectV2, runSSH } from '../collector/index.js';
 import { normalizeTargets } from '../collector/builder.js';
 import { SSH_ALIAS, validHost, validIp, validPort, validUser } from './acesso.js';
@@ -25,7 +25,7 @@ import { hasSystemdUser, panelPort, startPanel, unitPath } from '../cli/servico.
 /** Nomes dos 6 passos, na ordem em que a tela os mostra. */
 export const STEPS = ['Boas-vindas', 'Servidor', 'Conectar', 'O que monitorar', 'Preparar servidor', 'Pronto'];
 /** Limiares que a instalação pergunta: [mínimo, máximo, padrão] (as faixas do .env). */
-export const THRESHOLD_LIMITS = { diskPct: [50, 99, 90], ramPct: [50, 99, 90], tempC: [30, 110, 60] };
+const THRESHOLD_LIMITS = { diskPct: [50, 99, 90], ramPct: [50, 99, 90], tempC: [30, 110, 60] };
 
 /**
  * Erro esperado de um passo (dado inválido, servidor recusou): a mensagem vai para a tela,
@@ -186,12 +186,11 @@ export class Instalacao {
     this.deteccao = det;
     this.#senha = senha;
     const rec = recommendedChoices(det);
+    // Limiares do .env (reconfigurar) com as faixas do painel: valor que o painel recusaria
+    // vira o padrão aqui também, em vez de travar o passo 4 com "fora da faixa".
     const env = loadEnvFile(path.join(this.root, '.env'));
-    this.limiares = {
-      diskPct: Number(env.ALERT_DISK_PCT) || 90,
-      ramPct: Number(env.ALERT_RAM_PCT) || 90,
-      tempC: Number(env.ALERT_TEMP_C) || 60,
-    };
+    const { diskPct, ramPct, tempC } = alertThresholds((k) => env[k] ?? '');
+    this.limiares = { diskPct, ramPct, tempC };
     this.escolhas = { ...rec };
     return this.resumoDeteccao();
   }

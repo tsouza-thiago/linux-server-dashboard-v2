@@ -9,6 +9,9 @@ import { runHeadless, HEADLESS_HELP } from '../../server/setup/sem-interface.js'
 import { makeOutput } from '../../server/cli/saida.js';
 import { makeInstalacao } from '../../test-support/instalacao-fake.js';
 import { esperarAte } from '../../test-support/esperar.js';
+import { loadEnvFile } from '../../server/config.js';
+import fs from 'node:fs';
+import path from 'node:path';
 
 function memOut() {
   const chunks = [];
@@ -173,6 +176,21 @@ test('sem interface: exige identidade conferida, lê a senha do stdin e conclui'
   assert.match(c.text(), /SMART sda · rede — · serviços smbd/);
   assert.match(c.text(), /✓ servidor preparado \(usuário dashmon · chave restrita · sudo só para smartctl -H\)/);
   assert.match(c.text(), /link de entrada \(uso único, 2 min\): http:\/\/127\.0\.0\.1:3999\/entrar\?codigo=/);
+});
+
+test('sem interface: sem --disco/--memoria/--temperatura, mantém os limiares do .env', async (t) => {
+  const fake = makeInstalacao();
+  t.after(fake.cleanup);
+  fs.writeFileSync(path.join(fake.root, '.env'), 'ALERT_RAM_PCT=80\nALERT_TEMP_C=70\n', { mode: 0o600 });
+  const o = memOut();
+  const code = await runHeadless({
+    out: o.out, inst: fake.inst, stdin: Readable.from(['certa\n']),
+    flags: { servidor: '192.0.2.10', usuario: 'maria', identidade: 'SHA256:8oOm2IqGGSLMQ94IC6SBJJ/EIGqCSF6BhAsYUkBWlXw', 'senha-stdin': true, disco: '85', 'sem-atalho': true },
+  });
+  assert.equal(code, 0, o.text());
+  const env = loadEnvFile(path.join(fake.root, '.env'));
+  // --disco vence; memória e temperatura ficam como estavam (antes voltavam a 90 e 60).
+  assert.deepEqual([env.ALERT_DISK_PCT, env.ALERT_RAM_PCT, env.ALERT_TEMP_C], ['85', '80', '70']);
 });
 
 test('sem interface: modo manual mostra os blocos; --ja-preparado testa e conclui', async (t) => {

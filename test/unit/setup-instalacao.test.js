@@ -70,6 +70,17 @@ test('passo 4: só o que existe no servidor e limiares nas faixas', async (t) =>
   assert.deepEqual(r.limiares, { diskPct: 90, ramPct: 90, tempC: 65 });
 });
 
+test('passo 4: limiares do .env lidos com as faixas do painel (fora da faixa = padrão)', async (t) => {
+  const { inst, root } = setup(t);
+  // Reconfigurar: o .env já existe. 5 e 70.5 o painel recusa (usa 90 e 60); 85 vale.
+  fs.writeFileSync(path.join(root, '.env'), 'ALERT_DISK_PCT=5\nALERT_RAM_PCT=85\nALERT_TEMP_C=70.5\n', { mode: 0o600 });
+  await throughStep4(inst);
+  assert.deepEqual(inst.resumoDeteccao().limiares, { diskPct: 90, ramPct: 85, tempC: 60 });
+  // Sem limiares novos, o passo 4 aceita os do .env (antes: "Valor fora da faixa" com o 5).
+  const r = inst.definirEscolhas({ mounts: ['/'] });
+  assert.deepEqual(r.limiares, { diskPct: 90, ramPct: 85, tempC: 60 });
+});
+
 test('passo 5 assistido → 6: prepara, testa a coleta, grava tudo e descarta a senha', async (t) => {
   const { inst, srv, root, home, services } = setup(t);
   await throughStep4(inst);

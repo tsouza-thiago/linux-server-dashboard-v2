@@ -2,7 +2,6 @@
 // opções, para quem automatiza. A identidade do servidor precisa ser informada
 // (--identidade SHA256:…) — nada de aceitar a primeira que aparecer — e a senha, quando
 // houver, vem pelo stdin (--senha-stdin), nunca pela linha de comando.
-import { THRESHOLD_LIMITS } from './instalacao.js';
 
 /** Texto de `--sem-interface --ajuda` (as opções são conferidas pelo docs.test.js). */
 export const HEADLESS_HELP = `Uso: ./dashboard instalar --sem-interface --servidor <ip> --usuario <nome> --identidade <SHA256:…> [opções]
@@ -14,7 +13,7 @@ export const HEADLESS_HELP = `Uso: ./dashboard instalar --sem-interface --servid
   --smart "<sda sdb>"     discos com teste SMART, ou "nenhum" (padrão: os recomendados)
   --rede <interface>      interface de rede, ou "nenhuma" (padrão: a da rota padrão)
   --servicos "<a b>"      serviços, ou "nenhum" (padrão: os recomendados)
-  --disco <%> --memoria <%> --temperatura <°C>   limiares (padrão 90 / 90 / 60)
+  --disco <%> --memoria <%> --temperatura <°C>   limiares (padrão: os do .env; 90 / 90 / 60 se não houver)
   --modo manual           só mostra os blocos para colar no servidor e sai (código 3)
   --ja-preparado          o servidor já foi preparado à mão: só testa e conclui
   --sem-origem            não limita a chave a este computador (sem from=)
@@ -58,9 +57,11 @@ export async function runHeadless({ out, inst, flags, stdin = process.stdin }) {
     const det = await inst.conectar({ senha, confirmo: true });
     out.ok(`conectado como ${det.usuario}`, det.sudoTexto);
     const rec = det.escolhas;
+    // Só o limiar informado na linha de comando muda; os outros ficam como estão no .env
+    // (definirEscolhas usa os lidos na conexão, ou o padrão numa instalação nova).
     const lim = {};
     for (const [key, flag] of [['diskPct', 'disco'], ['ramPct', 'memoria'], ['tempC', 'temperatura']]) {
-      lim[key] = flags[flag] !== undefined ? Number(flags[flag]) : THRESHOLD_LIMITS[key][2];
+      if (flags[flag] !== undefined) lim[key] = Number(flags[flag]);
     }
     const ch = inst.definirEscolhas({
       mounts: list(flags.pastas, '') ?? rec.mounts,

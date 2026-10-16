@@ -117,6 +117,10 @@ diante: `PATCH` corrige, `MINOR` acrescenta sem quebrar e `MAJOR` quebra.
 - `./dashboard diagnosticar` lê `SSH_ACESSO` e `SSH_CONFIG` com as mesmas regras do painel.
   Antes, `SSH_ACESSO=Restrito` (com maiúscula) era tratado como acesso direto, e a coleta
   de teste usava sempre `data/ssh/config`, ignorando o `SSH_CONFIG` do `.env`.
+- Reconfigurar: os limiares do `.env` são lidos com as faixas do painel. Um valor que o
+  painel recusa (ex.: `ALERT_DISK_PCT=5`) travava o passo 4 com "Valor fora da faixa";
+  agora vira o padrão, como no painel. O modo sem interface mantém os limiares do `.env`
+  que não vierem nas opções (antes voltavam a 90 / 90 / 60).
 - Documentação conferida contra o código:
   - AGENTS: o `.env` guarda o `DASH_TOKEN`, não senhas; o `diagnosticar` reaproveita a
     última amostra e só coleta se ela estiver velha; o link de entrada vale 2 min
