@@ -19,6 +19,11 @@ diante: `PATCH` corrige, `MINOR` acrescenta sem quebrar e `MAJOR` quebra.
   sem issue em branco, template de PR com o checklist de cada entrega, `CODEOWNERS`,
   `CONTRIBUTING.md` e o `SECURITY.md` apontando o reporte privado. Um teste em
   `test/unit/docs.test.js` confere esses arquivos.
+- Superfície pública mínima no GitHub (ADR 0017, que substitui o item 10 da ADR 0016): a
+  Wiki fica ligada, editada só por colaboradores; o GitHub só aceita actions do GitHub e do
+  Scorecard, presas por SHA; PR de fora só roda o CI com aprovação; logs e artefatos ficam
+  30 dias; o quadro do Projects e o repositório da V1 ficam privados; o histórico não é
+  reescrito. Só configuração e documentação: nada muda no painel.
 
 ### Segurança
 
