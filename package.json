@@ -5,7 +5,7 @@
   "type": "module",
   "main": "server/index.js",
   "scripts": {
-    "start": "node server/index.js",
+    "start": "node --max-semi-space-size=2 server/index.js",
     "poll": "node server/poller.js --once",
     "test": "node --test",
     "test:unit": "node --test \"test/unit/**/*.test.js\"",
@@ -15,7 +15,7 @@
     "seguranca": "node scripts/seguranca.mjs",
     "capturar-amostra": "node scripts/capturar-amostra.mjs",
     "migrar-v1": "node server/storage/migrate-v1.js",
-    "soak": "node --expose-gc scripts/soak-acelerado.mjs",
+    "soak": "node --expose-gc --max-semi-space-size=2 scripts/soak-acelerado.mjs",
     "test:e2e": "node --test \"test/e2e/**/*.test.js\""
   },
   "engines": {

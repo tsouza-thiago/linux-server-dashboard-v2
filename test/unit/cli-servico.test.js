@@ -7,10 +7,13 @@ import fs from 'node:fs';
 import net from 'node:net';
 import os from 'node:os';
 import path from 'node:path';
+import { fileURLToPath } from 'node:url';
 import {
   isOurProcess, readPid, runningPid, panelStatus, panelPort, startPanel, stopPanel, portFree, waitForPort, openBrowser, hasSystemdUser,
 } from '../../server/cli/servico.js';
 import { createLoginCode, consumeLoginCode } from '../../server/http/entrar.js';
+import { PANEL_NODE_FLAGS } from '../../server/node-flags.js';
+import { unitText } from '../../server/setup/local.js';
 import { rotateIfNeeded, createLogFile } from '../../server/logfile.js';
 import { main, isConfigured, panelUrl } from '../../server/cli/index.js';
 import { lerComModo } from '../../test-support/arquivos.js';
@@ -91,6 +94,9 @@ test('servico: iniciar em segundo plano grava o PID (0600) e espera a porta resp
   t.after(() => { if (r.pid) try { process.kill(r.pid, 'SIGKILL'); } catch { /* já saiu */ } });
   assert.equal(r.ok, true, r.error);
   assert.equal(readPid(root), r.pid);
+  // Em segundo plano, o Node do painel sobe com as opções de memória (#26).
+  const cmdline = fs.readFileSync(`/proc/${r.pid}/cmdline`, 'utf8').split('\0');
+  for (const flag of PANEL_NODE_FLAGS) assert.ok(cmdline.includes(flag), `segundo plano sem ${flag}`);
   assert.equal(fs.statSync(path.join(root, 'data', 'dashboard.pid')).mode & 0o777, 0o600);
   assert.equal((await startPanel({ root, home: root, run: noSystemd })).already, true, 'não sobe 2 vezes');
   assert.equal(await portFree(port), false);
@@ -233,4 +239,23 @@ test('saída: símbolos sem cor fora do terminal; com cor num TTY', () => {
     noColor.stream.isTTY = true;
     assert.equal(makeOutput({ stream: noColor.stream, env: { NO_COLOR: '1' } }).color, false);
   });
+});
+
+// O painel sobe por 4 caminhos, e todos precisam das mesmas opções de memória do Node (#26):
+// sem elas, a geração jovem do V8 cresce na carga das 72 h e o RSS passa de ~89 para ~101 MB.
+test('servico: todo caminho que inicia o painel usa as opções do Node de server/node-flags.js', () => {
+  const ROOT = path.join(path.dirname(fileURLToPath(import.meta.url)), '..', '..');
+  assert.ok(PANEL_NODE_FLAGS.length > 0);
+  // Cada opção entra crua no ExecStart do systemd: nada de espaço, aspas, % ou $.
+  for (const flag of PANEL_NODE_FLAGS) assert.match(flag, /^--[a-z0-9-]+=[0-9]+$/);
+  const unit = unitText({ root: '/r', nodeBin: '/n' });
+  assert.match(unit, new RegExp(`^ExecStart="/n" ${PANEL_NODE_FLAGS.join(' ')} "/r/server/index\\.js"$`, 'm'), 'serviço systemd');
+  const { scripts } = JSON.parse(fs.readFileSync(path.join(ROOT, 'package.json'), 'utf8'));
+  for (const flag of PANEL_NODE_FLAGS) {
+    assert.ok(scripts.start.split(' ').includes(flag), `npm start sem ${flag}`);
+    assert.ok(scripts.soak.split(' ').includes(flag), `npm run soak sem ${flag}`);
+  }
+  // A fase 2 do soak (a que mede o RSS) roda num processo novo com as mesmas opções.
+  const soak = fs.readFileSync(path.join(ROOT, 'scripts', 'soak-acelerado.mjs'), 'utf8');
+  assert.match(soak, /spawnSync\(process\.execPath, \['--expose-gc', \.\.\.PANEL_NODE_FLAGS, SELF, '--fase2'/, 'fase 2 do soak');
 });

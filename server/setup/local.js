@@ -9,6 +9,7 @@ import path from 'node:path';
 import { loadEnvFile } from '../config.js';
 import { KEY_COMMENT, knownHostsName, sshConfigText, validHost, validPort } from './acesso.js';
 import { UNIT_NAME, unitPath, systemctlUser, hasSystemdUser } from '../cli/servico.js';
+import { PANEL_NODE_FLAGS } from '../node-flags.js';
 
 // Atalho do menu de aplicativos (~/.local/share/applications/).
 const DESKTOP_FILE = 'server-dashboard.desktop';
@@ -143,7 +144,8 @@ export function unitText({ root, nodeBin, hardening = true }) {
     '[Service]',
     'Type=simple',
     `WorkingDirectory=${unitEscape(root)}`,
-    `ExecStart=${unitQuote(nodeBin)} ${unitQuote(path.join(root, 'server', 'index.js'))}`,
+    // As opções do Node (server/node-flags.js) não têm espaço nem caractere especial do systemd.
+    `ExecStart=${unitQuote(nodeBin)} ${PANEL_NODE_FLAGS.join(' ')} ${unitQuote(path.join(root, 'server', 'index.js'))}`,
     'Restart=on-failure',
     'RestartSec=10',
     'UMask=0077',

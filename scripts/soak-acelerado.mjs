@@ -7,9 +7,10 @@
 // Fase 1 — enche a janela de 72 h depressa e confere que a memória ocupada (heap depois de
 //          um gc) para de crescer quando a janela enche: sem vazamento.
 // Fase 2 — num processo novo, o painel reinicia com as 72 h lidas do disco e faz coletas em
-//          ritmo calmo; mede a RAM do Node (RSS) como ela fica no uso real. Orçamento
-//          (AGENTS, "Orçamento de desempenho"): até 110 MB. O Node 24 vazio já usa ~44 MB e o
-//          painel sem histórico, ~62 MB.
+//          ritmo calmo; mede a RAM do Node (RSS) como ela fica no uso real, com as opções do
+//          Node do painel (server/node-flags.js). Orçamento (AGENTS, "Orçamento de
+//          desempenho"): até 95 MB. O Node 24 vazio já usa ~44 MB e o painel sem histórico,
+//          ~63 MB.
 //
 //   npm run soak                      # 5000 coletas (~83 h simuladas)
 //   npm run soak -- --coletas 8000
@@ -21,10 +22,11 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { createApp } from '../server/index.js';
 import { collect } from '../server/collector/index.js';
+import { PANEL_NODE_FLAGS } from '../server/node-flags.js';
 
 const SELF = fileURLToPath(import.meta.url);
 const ROOT = path.join(path.dirname(SELF), '..');
-const RAM_LIMIT_MB = 110;
+const RAM_LIMIT_MB = 95;
 const GROWTH_LIMIT_MB = 4;
 const STEP_MS = 60_000;
 const WINDOW = 4320;
@@ -134,7 +136,8 @@ const diskKB = (d) => (fs.existsSync(d) ? Math.round(fs.readdirSync(d).reduce((a
 const rawKB = diskKB(path.join(dir, 'history'));
 const rollupKB = diskKB(path.join(dir, 'rollup'));
 
-const child = spawnSync(process.execPath, ['--expose-gc', SELF, '--fase2', '--dir', dir, '--inicio', String(startMs), '--depois-de', String(TOTAL)], { encoding: 'utf8' });
+// A fase 2 roda com as mesmas opções do Node do painel de verdade (server/node-flags.js).
+const child = spawnSync(process.execPath, ['--expose-gc', ...PANEL_NODE_FLAGS, SELF, '--fase2', '--dir', dir, '--inicio', String(startMs), '--depois-de', String(TOTAL)], { encoding: 'utf8' });
 fs.rmSync(dir, { recursive: true, force: true });
 if (child.status !== 0) {
   console.error(child.stderr || child.stdout);
