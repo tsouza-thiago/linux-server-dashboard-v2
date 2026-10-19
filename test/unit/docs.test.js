@@ -106,8 +106,11 @@ test('telas: comandos citados na interface existem', () => {
   const files = ['public/index.html', 'public/configurar.html', ...fs.readdirSync(path.join(ROOT, 'public', 'js'), { recursive: true })
     .filter((f) => f.endsWith('.js')).map((f) => `public/js/${f}`)];
   for (const file of files) {
-    // Sem as tags do HTML; caminhos de import ('./x.js', ../x.js, ./core/…) não são comandos.
-    const text = read(file).replace(/<[^>]*>/g, '');
+    // Sem as tags do HTML, tiradas até não sobrar nenhuma (uma passada só deixaria
+    // "<<b>x>" virar tag de novo: CodeQL js/incomplete-multi-character-sanitization).
+    // Caminhos de import ('./x.js', ../x.js, ./core/…) não são comandos.
+    let text = read(file);
+    for (let prev = null; prev !== text;) { prev = text; text = text.replace(/<[^>]*>/g, ''); }
     for (const [, name, sub] of text.matchAll(/(?<![.\w'"`])\.\/([A-Za-z][A-Za-z0-9_.-]*)(?![\w/])(?:[ \t]+([a-z][a-z0-9-]*))?/g)) {
       if (name === 'dashboard') {
         if (sub && !COMMAND_NAMES.includes(sub)) problems.push(`${file}: ./dashboard ${sub}`);
