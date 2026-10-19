@@ -239,7 +239,8 @@ Inclua: o passo a passo para reproduzir, o impacto estimado e a versão afetada
   integridade sha512; o Node é conferido pela soma SHA-256 **antes** de extrair; versões
   assinadas (ameaça 7); ferramentas de segurança em imagens presas por digest; actions do
   CI presas por SHA, só leitura e sem segredos (ADR 0014); hash dourado do script de
-  coleta.
+  coleta; Dependency Review em todo PR, OpenSSF Scorecard e Dependabot com 14 dias de espera
+  por versão nova (ADR 0016).
 - **Verificado por:** `test/seguranca/cadeia-suprimentos.test.js`, `test/unit/vendor.test.js`
   e `test/integration/assinatura.test.js`.
 

@@ -1,0 +1,45 @@
+# OpenSSF Scorecard (ADR 0016): nota pública das práticas de segurança do repositório
+# (proteção de ramo, actions presas, permissões, revisão, dependências…). Roda a cada push no
+# main e toda segunda-feira; o resultado vai para o code scanning (Security → Code scanning).
+#
+# Regras do Scorecard para publicar o resultado: sem env nem defaults no workflow ou no job,
+# runner Ubuntu hospedado e id-token só no job do Scorecard.
+# Mesmo endurecimento do verificação (ADR 0014): actions presas por SHA, workflow só leitura,
+# sem segredo, checkout sem persistir o token.
+# test/seguranca/cadeia-suprimentos.test.js confere essas regras.
+name: scorecard
+
+on:
+  push:
+    branches: [main]
+  schedule:
+    - cron: "17 9 * * 1"
+
+permissions:
+  contents: read
+
+jobs:
+  analise:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    permissions:
+      contents: read
+      security-events: write
+      id-token: write
+    steps:
+      - name: Código
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Scorecard
+        uses: ossf/scorecard-action@2d1146689b8cda280b9bc96326124645441f03bc # v2.4.4
+        with:
+          results_file: scorecard.sarif
+          results_format: sarif
+          publish_results: true
+
+      - name: Resultado no code scanning
+        uses: github/codeql-action/upload-sarif@2892aa5e19bbd11bc0cff5427e3b750a04d9e3c2 # v4.38.2
+        with:
+          sarif_file: scorecard.sarif

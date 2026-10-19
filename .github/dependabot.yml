@@ -1,0 +1,39 @@
+# Dependabot de versões (ADR 0016): propõe, por PR, as atualizações das actions do CI e das
+# dependências de desenvolvimento do npm. O painel não tem dependência de runtime.
+#   - as actions continuam presas por SHA: o Dependabot troca o SHA e o comentário da versão;
+#   - cooldown de 14 dias: versão recém-publicada não entra logo (cadeia de suprimentos, A03);
+#   - um PR por ecossistema por semana, agrupado, para revisar de uma vez.
+# As imagens Docker de scripts/seguranca.mjs ficam presas por digest e são atualizadas à mão.
+version: 2
+updates:
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+      day: monday
+      time: "06:00"
+      timezone: America/Sao_Paulo
+    cooldown:
+      default-days: 14
+    groups:
+      actions:
+        patterns: ["*"]
+    commit-message:
+      prefix: "chore(deps)"
+    open-pull-requests-limit: 3
+
+  - package-ecosystem: npm
+    directory: /
+    schedule:
+      interval: weekly
+      day: monday
+      time: "06:00"
+      timezone: America/Sao_Paulo
+    cooldown:
+      default-days: 14
+    groups:
+      desenvolvimento:
+        dependency-type: development
+    commit-message:
+      prefix: "chore(deps)"
+    open-pull-requests-limit: 3
