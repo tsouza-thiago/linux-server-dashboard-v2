@@ -1,0 +1,70 @@
+# Formulário de bug (ADR 0016): toda correção começa por uma issue com evidência e versão.
+name: Bug
+description: Algo no painel, na coleta ou na instalação não funciona como deveria.
+title: "[bug] "
+labels: ["tipo:bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        **Vulnerabilidade não é issue pública:** use o reporte privado (veja o SECURITY.md).
+        Antes de colar qualquer saída, tire token, IPs e nomes reais da sua rede: a issue é pública.
+  - type: textarea
+    id: acontece
+    attributes:
+      label: O que acontece
+      description: O que você viu, em qual tela ou comando.
+    validations:
+      required: true
+  - type: textarea
+    id: esperado
+    attributes:
+      label: O que era esperado
+    validations:
+      required: true
+  - type: textarea
+    id: passos
+    attributes:
+      label: Como reproduzir
+      placeholder: |
+        1. Abra a tela …
+        2. Escolha o período …
+        3. Veja …
+    validations:
+      required: true
+  - type: input
+    id: versao
+    attributes:
+      label: Versão
+      description: Saída de `./dashboard versao`.
+      placeholder: Server Dashboard 2.0.5
+    validations:
+      required: true
+  - type: dropdown
+    id: area
+    attributes:
+      label: Área
+      options:
+        - Coleta (SSH e script)
+        - Histórico e agregados
+        - Telas
+        - Alertas e saúde
+        - Instalação e atualização
+        - Comando ./dashboard
+        - CI e segurança
+        - Documentação
+    validations:
+      required: true
+  - type: textarea
+    id: diagnostico
+    attributes:
+      label: Saída do ./dashboard diagnosticar
+      description: Sem IPs nem nomes reais.
+      render: text
+  - type: checkboxes
+    id: sensivel
+    attributes:
+      label: Dados sensíveis
+      options:
+        - label: Conferi que não colei token, `.env`, IP nem nome real da minha rede.
+          required: true

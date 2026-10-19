@@ -11,6 +11,7 @@ documentos não repetem estes detalhes:
 - [README.md](README.md): visão geral, instalação e comandos.
 - [TUTORIAL.md](TUTORIAL.md): passo a passo para leigos.
 - [SECURITY.md](SECURITY.md): modelo de ameaças.
+- [CONTRIBUTING.md](CONTRIBUTING.md): o caminho de uma contribuição (issue, PR, checks).
 
 O teste `test/unit/docs.test.js` confere esta documentação contra o código.
 
@@ -500,11 +501,13 @@ a 2.1) é guardar em memória só os números que os gráficos usam.
 
 ```
 linux-server-dashboard-v2/
-├── AGENTS.md · README.md · TUTORIAL.md · SECURITY.md · CHANGELOG.md · LICENSE (MIT)
+├── AGENTS.md · README.md · TUTORIAL.md · SECURITY.md · CONTRIBUTING.md · CHANGELOG.md · LICENSE (MIT)
 ├── dashboard               comando único: garante o Node 24 (scripts/node-runtime.sh) e chama server/cli/
 ├── package.json            sem dependências de runtime; devDependency: playwright-core (e2e)
 ├── .env.example            modelo do .env (sem valores reais)
-├── .github/workflows/      seguranca.yml: CI a cada push no main e PR (ADR 0014)
+├── .github/                workflows/seguranca.yml: CI a cada push no main e PR (ADR 0014);
+│                           ISSUE_TEMPLATE/ (bug, funcionalidade, tarefa), template de PR e
+│                           CODEOWNERS (ADR 0016)
 ├── docs/                   adr/, seguranca/ (análises e excecoes.json) e allowed_signers
 ├── scripts/                check.mjs, seguranca.mjs, mutacao-seguranca.mjs, soak-acelerado.mjs,
 │                           capturar-amostra.mjs, node-runtime.sh, askpass.sh, e2e-instalacao/
