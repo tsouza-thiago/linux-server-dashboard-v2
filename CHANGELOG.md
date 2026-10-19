@@ -9,6 +9,13 @@ diante: `PATCH` corrige, `MINOR` acrescenta sem quebrar e `MAJOR` quebra.
 
 ## [Não publicado]
 
+### Corrigido
+
+- Visão geral: a manchete media a queda pelo alerta "servidor inacessível", que só abre na
+  2ª falha seguida (`ALERT_OFFLINE_AFTER`), e dizia "voltou ao normal sozinho em 3 min"
+  para a mesma queda que Eventos e Relatórios mostravam com 4 min. Agora usa o início e a
+  duração da queda registrada, com a mesma junção alerta ↔ queda da linha do tempo.
+
 ## [2.0.4] — 2026-10-19
 
 O volume de rede passa a vir dos contadores de bytes do servidor, exatos, e não mais das

@@ -7,7 +7,7 @@ import { html, mount } from '../core/html.js';
 import * as f from '../core/format.js';
 import {
   headline, fullestDisk, diskEta, timeline, isOffline, healthLevel, levelOf, viewOfKey, peakOf,
-  dailyTraffic, series,
+  dailyTraffic, series, outageOf,
 } from '../core/analysis.js';
 import { PERIODS } from '../core/router.js';
 import {
@@ -60,8 +60,14 @@ function narrative(state, local = {}) {
   }
   const recent = (state.alerts?.all || []).find((a) => a.status === 'resolved' && Date.now() - Date.parse(a.ts) < 48 * 3600e3);
   if (recent) {
-    const dur = recent.resolvedAt ? f.duration((Date.parse(recent.resolvedAt) - Date.parse(recent.ts)) / 1000) : null;
-    parts.push(html` ${recent.message} ${f.ago(recent.ts)}${dur ? ` e voltou ao normal sozinho em ${dur}` : ''}.`);
+    // Servidor inacessível: início e duração da queda (desde a 1ª falha), como em Eventos e
+    // Relatórios; o alerta só abre depois do debounce e mediria 1 coleta a menos.
+    const out = outageOf(recent, state.outages?.outages);
+    const since = out ? out.from : recent.ts;
+    const durSec = out && !out.ongoing && Number.isFinite(out.durationSec) ? out.durationSec
+      : recent.resolvedAt ? (Date.parse(recent.resolvedAt) - Date.parse(recent.ts)) / 1000 : null;
+    const dur = durSec === null ? null : f.duration(durSec);
+    parts.push(html` ${recent.message} ${f.ago(since)}${dur ? ` e voltou ao normal sozinho em ${dur}` : ''}.`);
   }
   return parts;
 }
