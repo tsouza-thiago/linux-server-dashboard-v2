@@ -1,6 +1,8 @@
 // Agregação por balde (ADR 0005). Duas formas, as duas preservando picos (corrige B8):
 // - `aggregate()`: baldes compactos { t, n, m: { métrica: [mín, máx, média] } } — formato dos
-//   rollups de 5 min e da resposta `formato=baldes` de /api/history;
+//   rollups de 5 min e da resposta `formato=baldes` de /api/history. Quando só parte das n
+//   amostras tem a métrica, vai um 4º item com quantas têm ([mín, máx, média, c], 2.0.4):
+//   média × c é a soma certa (o volume da rede), e quem lê só 3 itens continua lendo;
 // - `downsample()`: amostras no formato original (resposta padrão de /api/history, usada por
 //   scripts e pelo export), em que cada ponto reduzido carrega o PIOR valor do grupo
 //   (máximo de uso, mínimo de folga). As telas usam os baldes.
@@ -32,7 +34,11 @@ export function flatten(s) {
     if (isNum(s.ram.used) && isNum(s.ram.total) && s.ram.total > 0) put('ramPct', (s.ram.used / s.ram.total) * 100);
   }
   put('tempC', s.tempC);
-  if (s.net) { put('rxMbps', s.net.rxMbps); put('txMbps', s.net.txMbps); }
+  if (s.net) {
+    put('rxMbps', s.net.rxMbps); put('txMbps', s.net.txMbps);
+    // Bytes por coleta (2.0.4): média × amostras do balde = volume exato do balde.
+    put('rxDeltaBytes', s.net.rxDeltaBytes); put('txDeltaBytes', s.net.txDeltaBytes);
+  }
   for (const d of s.disks || []) {
     if (!d || !d.mount) continue;
     put(`disk:${d.mount}:pct`, d.pct);
@@ -70,10 +76,16 @@ function addToAcc(acc, flat) {
   }
 }
 
-/** Fecha o balde: { t, n, m: { métrica: [mín, máx, média] } }, arredondado. */
+/**
+ * Fecha o balde: { t, n, m: { métrica: [mín, máx, média] } }, arredondado, com o 4º item
+ * (amostras com a métrica) só quando ele difere de n, para não engordar o rollup à toa.
+ */
 function finishAcc(acc) {
   const m = {};
-  for (const [k, a] of acc.m) m[k] = [roundValue(a.min), roundValue(a.max), roundValue(a.sum / a.c)];
+  for (const [k, a] of acc.m) {
+    m[k] = [roundValue(a.min), roundValue(a.max), roundValue(a.sum / a.c)];
+    if (a.c !== acc.n) m[k].push(a.c);
+  }
   return { t: acc.t, n: acc.n, m };
 }
 
@@ -96,7 +108,7 @@ export function aggregate(samples, step) {
 
 /**
  * Junta baldes menores (ex.: rollups de 5 min) em baldes de `step` ms. A média é ponderada
- * pelo número de amostras de cada balde.
+ * pelo número de amostras de cada balde que têm a métrica (4º item; sem ele, todas).
  */
 export function mergeBuckets(buckets, step) {
   const out = new Map();
@@ -105,14 +117,14 @@ export function mergeBuckets(buckets, step) {
     let acc = out.get(t);
     if (!acc) { acc = { t, n: 0, m: new Map() }; out.set(t, acc); }
     acc.n += b.n;
-    for (const [k, [min, max, avg]] of Object.entries(b.m || {})) {
+    for (const [k, [min, max, avg, count = b.n]] of Object.entries(b.m || {})) {
       const cur = acc.m.get(k);
-      if (!cur) acc.m.set(k, { min, max, sum: avg * b.n, c: b.n });
+      if (!cur) acc.m.set(k, { min, max, sum: avg * count, c: count });
       else {
         if (min < cur.min) cur.min = min;
         if (max > cur.max) cur.max = max;
-        cur.sum += avg * b.n;
-        cur.c += b.n;
+        cur.sum += avg * count;
+        cur.c += count;
       }
     }
   }
@@ -130,6 +142,12 @@ const minOf = (list, get) => {
   let best = null;
   for (const x of list) { const v = get(x); if (isNum(v) && (best === null || v < best)) best = v; }
   return best;
+};
+// Soma de um campo no grupo; sem nenhum valor, continua sem dado (I5).
+const sumOf = (list, get) => {
+  let total = null;
+  for (const x of list) { const v = get(x); if (isNum(v)) total = (total ?? 0) + v; }
+  return total;
 };
 const byKey = (list, field, key) => (list || []).find((x) => x && x[field] === key);
 
@@ -150,7 +168,16 @@ export function worstOf(group) {
     };
   }
   if ('tempC' in last) out.tempC = maxOf(group, (s) => s.tempC);
-  if (last.net) out.net = { ...last.net, rxMbps: maxOf(group, (s) => s.net?.rxMbps), txMbps: maxOf(group, (s) => s.net?.txMbps) };
+  if (last.net) {
+    // Taxa: o pico do grupo. Volume: a soma do grupo (o ponto reduzido cobre todas as coletas).
+    out.net = {
+      ...last.net,
+      rxMbps: maxOf(group, (s) => s.net?.rxMbps),
+      txMbps: maxOf(group, (s) => s.net?.txMbps),
+      rxDeltaBytes: sumOf(group, (s) => s.net?.rxDeltaBytes),
+      txDeltaBytes: sumOf(group, (s) => s.net?.txDeltaBytes),
+    };
+  }
   if (Array.isArray(last.disks)) {
     out.disks = last.disks.map((d) => {
       const same = (s) => byKey(s.disks, 'mount', d.mount);

@@ -8,6 +8,9 @@ const AVG = 2;
 const MIN = 0;
 const MAX = 1;
 const STAT = { min: MIN, max: MAX, avg: AVG };
+// 4º item, opcional (2.0.4): quantas amostras do balde têm a métrica, quando nem todas têm.
+const COUNT = 3;
+const countOf = (b, v) => (isNum(v[COUNT]) ? v[COUNT] : b.n || 1);
 
 /** Valores de uma métrica alinhados aos baldes (null onde não há dado: buraco no gráfico). */
 export function series(buckets, key, stat = 'avg') {
@@ -211,14 +214,24 @@ export function dayStatuses({ days = 90, nowMs = Date.now(), sinceMs = null, out
   return out;
 }
 
-/** Bytes trafegados estimados a partir da média por balde × coletas × intervalo. */
+/**
+ * Bytes trafegados no balde. Desde a 2.0.4, pelos bytes por coleta (contadores exatos):
+ * média × coletas que têm o dado. Baldes gravados antes disso só têm a taxa arredondada, e o
+ * volume é estimado por ela: média × coletas × intervalo.
+ */
 export function trafficOf(bucket, pollMs = 60e3) {
   const n = bucket.n || 1;
-  const bytes = (key) => {
+  const metric = (key) => {
     const v = bucket.m?.[key];
-    return Array.isArray(v) && isNum(v[AVG]) ? (v[AVG] * 1e6 / 8) * n * (pollMs / 1000) : 0;
+    return Array.isArray(v) && isNum(v[AVG]) ? v : null;
   };
-  return { rx: bytes('rxMbps'), tx: bytes('txMbps') };
+  const bytes = (deltaKey, rateKey) => {
+    const d = metric(deltaKey);
+    if (d) return d[AVG] * countOf(bucket, d);
+    const r = metric(rateKey);
+    return r ? (r[AVG] * 1e6 / 8) * n * (pollMs / 1000) : 0;
+  };
+  return { rx: bytes('rxDeltaBytes', 'rxMbps'), tx: bytes('txDeltaBytes', 'txMbps') };
 }
 
 /** Tráfego por dia local: [{ day, rx, tx }] do mais antigo ao mais novo. */
@@ -246,13 +259,13 @@ export function peakOf(buckets, key) {
   return best;
 }
 
-/** Média ponderada pelo nº de coletas de cada balde. */
+/** Média ponderada pelo nº de coletas de cada balde que têm a métrica. */
 export function meanOf(buckets, key) {
   let sum = 0;
   let w = 0;
   for (const b of buckets || []) {
     const v = b.m?.[key];
-    if (Array.isArray(v) && isNum(v[AVG])) { sum += v[AVG] * (b.n || 1); w += b.n || 1; }
+    if (Array.isArray(v) && isNum(v[AVG])) { const c = countOf(b, v); sum += v[AVG] * c; w += c; }
   }
   return w ? sum / w : null;
 }

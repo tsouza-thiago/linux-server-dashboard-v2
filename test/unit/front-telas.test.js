@@ -245,3 +245,19 @@ test('rede (2.0.3): o painel "Volume por dia" não fixa a unidade em GB', async 
   assert.doesNotMatch(page(), />GB</);
   assert.match(text('#rd-week'), /439 KB/);
 });
+
+test('rede (2.0.4): volume pelos bytes por coleta; baldes antigos usam as taxas', () => {
+  // Servidor ocioso em baldes de 20 min: a média da taxa arredondada chega como 0, mas os
+  // bytes por coleta (37,5 KB em média, 20 coletas) somam 750 KB.
+  const quiet = b(Date.parse('2026-10-07T12:00:00Z'), { rxMbps: [0, 0.01, 0], txMbps: [0, 0, 0], rxDeltaBytes: [20_000, 60_000, 37_500], txDeltaBytes: [100, 300, 200] }, 20);
+  assert.deepEqual(trafficOf(quiet, 60e3), { rx: 750_000, tx: 4_000 });
+  const old = b(Date.parse('2026-10-06T12:00:00Z'), { rxMbps: [0, 10, 8], txMbps: [0, 2, 1] }, 60);
+  assert.deepEqual(trafficOf(old, 60e3), { rx: 8e6 / 8 * 3600, tx: 1e6 / 8 * 3600 }, 'antes da 2.0.4: estimativa pelas taxas');
+  // 4º item: 1 das 20 coletas veio sem o volume (ex.: a 1ª depois de um reboot).
+  const partial = b(quiet.t, { rxDeltaBytes: [20_000, 60_000, 37_500, 19] }, 20);
+  assert.equal(trafficOf(partial, 60e3).rx, 712_500, 'média × 19, não × 20');
+  assert.equal(meanOf([partial, b(0, { rxDeltaBytes: [0, 0, 0] }, 1)], 'rxDeltaBytes'), 712_500 / 20);
+  const days = dailyTraffic([quiet, { ...quiet, t: quiet.t + 20 * MIN }]);
+  assert.equal(days.length, 1);
+  assert.equal(days[0].rx, 1_500_000, 'dia de tráfego baixo não vira 0');
+});

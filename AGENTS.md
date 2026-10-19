@@ -331,7 +331,9 @@ echo '===FIM==='
 
 `schemaVersion: 2`, gerada por `server/collector/parser.js`. Dado ausente é `null`, nunca
 zero inventado. Taxas (`cpu`, `rxMbps`, `readMBps`, `utilPct`…) são `null` na 1ª coleta,
-depois de um reboot ou com contador que voltou. Exemplo (listas encurtadas):
+depois de um reboot ou com contador que voltou. `rxDeltaBytes`/`txDeltaBytes` são os bytes
+trafegados desde a coleta anterior, exatos pelos contadores (o volume por dia sai deles); são
+`null` nos mesmos casos e também com mais de 2 h entre as coletas. Exemplo (listas encurtadas):
 
 ```json
 {
@@ -357,7 +359,8 @@ depois de um reboot ou com contador que voltou. Exemplo (listas encurtadas):
   ],
   "missingMounts": [],
   "net": { "iface": "enp0s7", "rxBytes": 1752505, "rxErrors": 0, "rxDrops": 0,
-           "txBytes": 771648, "txErrors": 0, "txDrops": 0, "rxMbps": 0.02, "txMbps": 0.01 },
+           "txBytes": 771648, "txErrors": 0, "txDrops": 0, "rxMbps": 0.02, "txMbps": 0.01,
+           "rxDeltaBytes": 150124, "txDeltaBytes": 74980 },
   "io": [ { "dev": "sda", "readIos": 15783, "sectorsRead": 1156426, "readTicksMs": 136971,
             "writeIos": 3699, "sectorsWrite": 118552, "writeTicksMs": 19880,
             "ioTicksMs": 91540, "readMBps": 0.0, "writeMBps": 0.01, "utilPct": 0.4,
@@ -384,7 +387,7 @@ Tudo fica no disco local. Nada é gravado no servidor.
 | Caminho | O que guarda |
 |---|---|
 | `data/history/AAAA-MM-DD.ndjson` | Amostras brutas, 1 linha por coleta, só acréscimo (fila assíncrona), 1 arquivo por dia (UTC). Retenção de 72 h; linha cortada por queda é ignorada. ~3,7 KB por coleta (~16 MB em 72 h). Em memória, só a amostra mais recente guarda `topProcs` (as antigas ficam compactas, `compactSample`); o arquivo guarda tudo e é lido em blocos de 1 MB ao reiniciar |
-| `data/rollup/AAAA-MM-DD.ndjson` | Agregados de 5 min `{ t, n, m: { métrica: [mín, máx, média] } }` por 90 dias. Fechar de novo não duplica; o boot fecha os pendentes. ~1,2 KB a cada 5 min (~29 MB em 90 dias) |
+| `data/rollup/AAAA-MM-DD.ndjson` | Agregados de 5 min `{ t, n, m: { métrica: [mín, máx, média] } }` por 90 dias. Quando só parte das `n` amostras tem a métrica, um 4º item diz quantas (`[mín, máx, média, c]`; média × c = soma). Fechar de novo não duplica; o boot fecha os pendentes. ~1,2 KB a cada 5 min (~29 MB em 90 dias) |
 | `data/alerts.json` | Alertas com ciclo de vida `new` → `ack` → `resolved` (até 500) |
 | `data/annotations.json` | Anotações (texto, rótulo, instante) |
 | `data/outages.ndjson` | Quedas do servidor (`off`/`on`), 90 dias, separadas dos alertas (B9) |
@@ -477,7 +480,7 @@ Definido no plano da V2. O limite de RAM foi revisto em 16/10/2026, depois de me
 |---|---|---|---|
 | Tempo do comando no servidor | ≤ 1,5 s | 1,26–1,31 s (servidor real, 1 núcleo) | faixa de status e `./dashboard diagnosticar` |
 | Tamanho da resposta | ≤ 16 KB | 2,9 KB (servidor real) | idem; acima de 1 MB a conexão é cortada |
-| Página inicial | ≤ 300 KB transferidos | 286 KB (com gzip) | `test/e2e/telas.test.js` |
+| Página inicial | ≤ 300 KB transferidos | 289 KB (com gzip) | `test/e2e/telas.test.js` |
 | RAM do Node com 72 h em memória | ≤ 110 MB | 102,6–105,6 MB (painel reiniciado com 72 h) | `npm run soak` |
 | Memória depois que a janela de 72 h enche | sem crescer (≤ +4 MB) | +1,1 a +1,8 MB em 11 h a mais | `npm run soak` |
 

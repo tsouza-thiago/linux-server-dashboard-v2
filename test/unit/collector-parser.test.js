@@ -49,6 +49,7 @@ test('golden: amostra derivada da coleta V1 real (kernel sem PSI)', () => {
 
   assert.deepEqual(s.net, {
     iface: 'enp0s7', rxBytes: 1752505, rxErrors: 0, rxDrops: 0, txBytes: 771648, txErrors: 0, txDrops: 0, rxMbps: null, txMbps: null,
+    rxDeltaBytes: null, txDeltaBytes: null,
   });
   assert.deepEqual(s.io.map((d) => d.dev), ['sda', 'sdb', 'sdc']);
   assert.deepEqual(s.io[0], {
