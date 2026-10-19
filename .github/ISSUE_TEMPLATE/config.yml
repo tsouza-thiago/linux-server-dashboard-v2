@@ -1,0 +1,9 @@
+# Sem issue em branco (ADR 0016): cada issue vem de um formulário; vulnerabilidade e dúvida têm canal próprio.
+blank_issues_enabled: false
+contact_links:
+  - name: Reportar uma vulnerabilidade (privado)
+    url: https://github.com/tsouza-thiago/linux-server-dashboard-v2/security/advisories/new
+    about: Nunca em issue pública. O reporte privado só é visto pelo mantenedor.
+  - name: Dúvidas e ideias
+    url: https://github.com/tsouza-thiago/linux-server-dashboard-v2/discussions
+    about: Perguntas de uso e ideias ainda em aberto. O que for decidido vira issue.

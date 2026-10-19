@@ -1,0 +1,40 @@
+# Formulário de tarefa (ADR 0016): manutenção, documentação, CI e o que não é bug nem funcionalidade.
+name: Tarefa
+description: Manutenção, documentação, CI, investigação ou outra tarefa interna.
+title: "[tarefa] "
+labels: ["tipo:tarefa"]
+body:
+  - type: textarea
+    id: oque
+    attributes:
+      label: O quê
+    validations:
+      required: true
+  - type: textarea
+    id: porque
+    attributes:
+      label: Por quê
+    validations:
+      required: true
+  - type: textarea
+    id: pronto
+    attributes:
+      label: Pronto quando
+      description: Como saber que a tarefa terminou (teste, comando, documento).
+    validations:
+      required: true
+  - type: dropdown
+    id: area
+    attributes:
+      label: Área
+      options:
+        - Coleta (SSH e script)
+        - Histórico e agregados
+        - Telas
+        - Alertas e saúde
+        - Instalação e atualização
+        - Comando ./dashboard
+        - CI e segurança
+        - Documentação
+    validations:
+      required: true

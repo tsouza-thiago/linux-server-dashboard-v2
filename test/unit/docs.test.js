@@ -328,3 +328,30 @@ test('docs: o README continua enxuto (detalhes técnicos ficam no AGENTS)', () =
   const lines = read('README.md').split('\n').length;
   assert.ok(lines <= 220, `README com ${lines} linhas`);
 });
+
+// ---------------------------------------------------------------- arquivos do GitHub
+
+test('github: formulários de issue, template de PR e CODEOWNERS seguem a ADR 0016', () => {
+  const dir = '.github/ISSUE_TEMPLATE';
+  const forms = fs.readdirSync(path.join(ROOT, dir)).filter((f) => f.endsWith('.yml') && f !== 'config.yml').sort();
+  assert.deepEqual(forms, ['bug.yml', 'funcionalidade.yml', 'tarefa.yml']);
+  // Rótulo de formulário que não existe na ADR seria aplicado sem família nenhuma.
+  const adr = read('docs/adr/0016-fluxo-no-github-issue-primeiro.md');
+  for (const f of forms) {
+    const y = read(`${dir}/${f}`);
+    for (const key of ['name', 'description', 'labels', 'body']) assert.match(y, new RegExp(`^${key}:`, 'm'), `${f}: ${key}`);
+    const labels = [...(y.match(/^labels: \[(.*)\]$/m)?.[1] || '').matchAll(/"([^"]+)"/g)].map((m) => m[1]);
+    assert.ok(labels.length, `${f}: sem rótulo`);
+    for (const l of labels) assert.ok(adr.includes(`\`${l}\``), `${f}: rótulo ${l} não está na ADR 0016`);
+    assert.doesNotMatch(y, /\t/, `${f}: YAML não aceita TAB`);
+  }
+  const config = read(`${dir}/config.yml`);
+  assert.match(config, /^blank_issues_enabled: false$/m, 'sem issue em branco');
+  assert.match(config, /security\/advisories\/new/, 'vulnerabilidade vai para o reporte privado');
+  const pr = read('.github/pull_request_template.md');
+  for (const t of ['Closes #', 'npm run check', 'npm run test:e2e', 'npm run soak', 'npm run seguranca', 'CHANGELOG']) {
+    assert.ok(pr.includes(t), `template de PR sem "${t}"`);
+  }
+  assert.match(read('.github/CODEOWNERS'), /^\* @tsouza-thiago$/m);
+  assert.match(read('SECURITY.md'), /security\/advisories\/new/, 'SECURITY aponta o reporte privado');
+});

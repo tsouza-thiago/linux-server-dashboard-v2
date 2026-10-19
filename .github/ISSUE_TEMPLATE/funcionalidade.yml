@@ -1,0 +1,46 @@
+# Formulário de funcionalidade (ADR 0016): sai como pré-versão da próxima MINOR (ADR 0015).
+name: Funcionalidade
+description: Uma ideia nova para o painel. Ideias ainda em aberto vão antes para Discussions.
+title: "[funcionalidade] "
+labels: ["tipo:funcionalidade"]
+body:
+  - type: textarea
+    id: problema
+    attributes:
+      label: Problema
+      description: Que necessidade a funcionalidade resolve.
+    validations:
+      required: true
+  - type: textarea
+    id: proposta
+    attributes:
+      label: Proposta
+      description: Como deveria funcionar, do ponto de vista de quem usa.
+    validations:
+      required: true
+  - type: textarea
+    id: alternativas
+    attributes:
+      label: Alternativas consideradas
+  - type: dropdown
+    id: area
+    attributes:
+      label: Área
+      options:
+        - Coleta (SSH e script)
+        - Histórico e agregados
+        - Telas
+        - Alertas e saúde
+        - Instalação e atualização
+        - Comando ./dashboard
+        - CI e segurança
+        - Documentação
+    validations:
+      required: true
+  - type: checkboxes
+    id: regras
+    attributes:
+      label: Regras do projeto (AGENTS.md)
+      options:
+        - label: A ideia mantém 1 SSH por coleta, o servidor só leitura e nada instalado nele.
+          required: true

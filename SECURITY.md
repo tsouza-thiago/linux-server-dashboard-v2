@@ -6,7 +6,9 @@ Este projeto monitora servidores pessoais em redes locais. Uma issue pública po
 detalhes da infraestrutura de quem usa. Por isso, **não abra issue pública** para
 vulnerabilidade. Reporte em particular:
 
-- pelo GitHub, em **Security → Report a vulnerability** (se estiver disponível); ou
+- pelo reporte privado do GitHub, em **Security → Report a vulnerability**
+  ([abrir um reporte](https://github.com/tsouza-thiago/linux-server-dashboard-v2/security/advisories/new));
+  é o caminho preferido (ADR 0016); ou
 - por e-mail ao mantenedor (o endereço está no perfil do GitHub do repositório).
 
 Inclua: o passo a passo para reproduzir, o impacto estimado e a versão afetada

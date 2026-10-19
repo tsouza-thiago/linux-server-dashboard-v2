@@ -15,6 +15,10 @@ diante: `PATCH` corrige, `MINOR` acrescenta sem quebrar e `MAJOR` quebra.
   numa issue, com rótulos, milestone da versão e quadro no Projects; o PR fecha a issue;
   dúvidas vão para Discussions e vulnerabilidades, só para o reporte privado. Só
   documentação: nada muda no painel.
+- Arquivos do GitHub para esse fluxo: formulários de issue (bug, funcionalidade, tarefa)
+  sem issue em branco, template de PR com o checklist de cada entrega, `CODEOWNERS`,
+  `CONTRIBUTING.md` e o `SECURITY.md` apontando o reporte privado. Um teste em
+  `test/unit/docs.test.js` confere esses arquivos.
 
 ## [2.0.5] — 2026-10-19
 
