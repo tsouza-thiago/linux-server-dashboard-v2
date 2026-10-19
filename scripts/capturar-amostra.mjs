@@ -6,7 +6,8 @@
 //
 // Grava em data/ (0700, fora do git), ou na PASTA indicada:
 //   data/amostra-bruta.txt    — saída original (NÃO compartilhe)
-//   data/amostra-anonima.txt  — hostname, IPs, MACs e usuários trocados por marcadores
+//   data/amostra-anonima.txt  — hostname, IPs, MACs, usuários, processos e versão do kernel
+//                               trocados por marcadores
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -16,6 +17,19 @@ import { runSSH } from '../server/collector/index.js';
 
 const KEEP_USERS = new Set(['root', 'daemon', 'nobody', 'systemd+', 'message+', 'avahi', 'polkitd', 'syslog', '_rpc', 'statd']);
 
+// Programas que existem em quase todo servidor e não dizem nada sobre ele. Os outros
+// processos revelam o que a máquina roda (contêineres, VPN, painéis), e os argumentos
+// revelam caminhos e portas: viram /usr/bin/processoN, sem argumentos (CWE-497).
+export const KEEP_PROGRAMS = new Set([
+  'init', 'systemd', 'systemd-journald', 'systemd-logind', 'systemd-udevd', 'systemd-networkd',
+  'systemd-resolved', 'systemd-timesyncd', 'sshd', 'cron', 'rsyslogd', 'dbus-daemon', 'agetty',
+  'smbd', 'nmbd',
+]);
+
+/** Versão do kernel sem o patch nem a ABI ("6.12.48+deb13-amd64" → "6.12.0+deb13-amd64"):
+ * o patch diz até que dia o servidor foi atualizado. */
+export const anonymizeKernel = (k) => k.replace(/^(\d+\.\d+)\.\d+(-\d+)?/, (_, mm, abi) => `${mm}.0${abi ? '-0' : ''}`);
+
 /**
  * Troca dados que identificam a rede/servidor por marcadores estáveis.
  * Mantém estrutura, números de métricas e nomes de dispositivos (sda, enp3s0),
@@ -23,7 +37,7 @@ const KEEP_USERS = new Set(['root', 'daemon', 'nobody', 'systemd+', 'message+', 
  */
 export function anonymize(raw, { sshHost = '' } = {}) {
   const map = new Map();
-  const counters = { ip: 0, mac: 0, user: 0 };
+  const counters = { ip: 0, mac: 0, user: 0, proc: 0 };
   const swap = (value, make) => {
     if (!map.has(value)) map.set(value, make());
     return map.get(value);
@@ -54,6 +68,32 @@ export function anonymize(raw, { sshHost = '' } = {}) {
       return swap(`user:${user}`, () => `usuario${++counters.user}`);
     }))
     .join('\n'));
+
+  // Comando de cada processo: a última coluna do cabeçalho do ps marca onde ele começa
+  // (7 colunas no ps -eo da V2, 11 no ps aux da V1). Programa conhecido fica sem os
+  // argumentos; o resto vira um marcador estável por programa.
+  out = out.replace(/(===PS===\r?\n)([\s\S]*?)(?=\r?\n===|$)/, (_, head, body) => {
+    const [header, ...rest] = body.split('\n');
+    const names = header.trim().split(/\s+/);
+    // Cabeçalho desconhecido: sem saber onde o comando começa, a linha fica como está.
+    if (names.length < 2 || !['COMMAND', 'CMD', 'ARGS'].includes(names.at(-1))) return head + body;
+    return head + [header, ...rest.map((line) => {
+      const cmd = [...line.matchAll(/\S+/g)][names.length - 1];
+      if (!cmd) return line; // linha curta: não tem comando
+      const pre = line.slice(0, cmd.index);
+      const name = cmd[0].split('/').pop().replace(/:$/, '');
+      // Marcador de uma anonimização anterior fica como está: rodar de novo não muda nada.
+      if (KEEP_PROGRAMS.has(name) || /^processo\d+$/.test(name)) return pre + cmd[0];
+      return pre + swap(`proc:${name}`, () => `/usr/bin/processo${++counters.proc}`);
+    })].join('\n');
+  });
+
+  // 1ª linha da seção OS: a saída do uname -r.
+  out = out.replace(/(===OS===\r?\n)([^\r\n]+)/, (_, head, kernel) => {
+    const k = anonymizeKernel(kernel);
+    if (k !== kernel) swap(`kernel:${kernel}`, () => k);
+    return head + k;
+  });
 
   return { text: out, replaced: map.size };
 }

@@ -32,6 +32,13 @@ diante: `PATCH` corrige, `MINOR` acrescenta sem quebrar e `MAJOR` quebra.
   semanal e a cada push no `main`, com o resultado no code scanning, e Dependabot de versões
   para as actions e o npm (semanal, agrupado, 14 dias de espera por versão nova, SHAs
   fixos). `test/seguranca/cadeia-suprimentos.test.js` confere as regras novas.
+- Fixtures e amostra do AGENTS sem dados do servidor real (#31): `npm run capturar-amostra`
+  passa a deixar só o `major.minor` da versão do kernel e a trocar os processos fora de uma
+  lista de programas genéricos por `/usr/bin/processoN`, sem argumentos. As fixtures de coleta
+  e a amostra JSON do AGENTS foram refeitas assim, com discos de tamanho e ocupação
+  sintéticos. A fixture da V1, que nenhum teste lia, saiu. Um teste em
+  `test/seguranca/segredos-osint.test.js` confere que a anonimização não mudaria mais nada.
+  Só testes e ferramenta de desenvolvimento: nada muda no painel.
 
 ## [2.0.5] — 2026-10-19
 

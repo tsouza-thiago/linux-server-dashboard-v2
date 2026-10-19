@@ -1,4 +1,4 @@
-// Parser da amostra v2 contra saídas reais anonimizadas (golden) e casos-limite.
+// Parser da amostra v2 contra saídas reais anonimizadas e com valores sintéticos (golden) e casos-limite.
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
@@ -25,7 +25,7 @@ test('golden: amostra derivada da coleta V1 real (kernel sem PSI)', () => {
   assert.equal(s.schemaVersion, SCHEMA_VERSION);
   assert.deepEqual(s.collector, { version: 2, hash: '73cebb436c7c', mode: 'smart', complete: true, expectedVersion: 2 });
   assert.equal(s.host, 'servidor-exemplo');
-  assert.deepEqual(s.os, { kernel: '6.12.111+deb13-amd64', name: 'Debian GNU/Linux 13 (trixie)' });
+  assert.deepEqual(s.os, { kernel: '6.12.0+deb13-amd64', name: 'Debian GNU/Linux 13 (trixie)' });
   assert.equal(s.cores, 1);
   assert.equal(s.uptimeSec, 12937.03);
   assert.equal(s.bootAt, new Date(Date.parse(TS) - 12937030).toISOString());
@@ -36,15 +36,15 @@ test('golden: amostra derivada da coleta V1 real (kernel sem PSI)', () => {
 
   assert.equal(s.disks.length, 4);
   assert.deepEqual(s.disks[0], {
-    mount: '/', source: '/dev/sda2', dev: 'sda', size: '145G', used: '2.5G', avail: '135G', pct: 2,
-    sizeBytes: 155475050496, usedBytes: 2626056192, availBytes: 144876724224, inodesPct: 3,
+    mount: '/', source: '/dev/sda2', dev: 'sda', size: '100G', used: '1.5G', avail: '94G', pct: 2,
+    sizeBytes: 107374182400, usedBytes: 1610612736, availBytes: 100394860544, inodesPct: 3,
   });
   assert.deepEqual(s.disks.map((d) => [d.mount, d.dev, d.size, d.used, d.avail, d.pct]), [
-    ['/', 'sda', '145G', '2.5G', '135G', 2],
-    ['/mnt/sdb1', 'sdb', '1.8T', '472G', '1.3T', 28],
-    ['/mnt/sdc1', 'sdc', '1.8T', '472G', '1.3T', 28],
-    ['/mnt/sdc2', 'sdc', '3.6T', '5.4G', '3.4T', 1],
-  ], 'tamanhos legíveis iguais aos do df -h real');
+    ['/', 'sda', '100G', '1.5G', '94G', 2],
+    ['/mnt/sdb1', 'sdb', '1T', '300G', '724G', 30],
+    ['/mnt/sdc1', 'sdc', '1T', '150G', '874G', 15],
+    ['/mnt/sdc2', 'sdc', '2T', '5G', '2T', 1],
+  ], 'tamanhos legíveis no formato do df -h');
   assert.deepEqual(s.missingMounts, []);
 
   assert.deepEqual(s.net, {
@@ -66,7 +66,7 @@ test('golden: amostra derivada da coleta V1 real (kernel sem PSI)', () => {
   assert.equal(s.topProcs.length, 7);
   assert.deepEqual(s.topProcs[0], {
     user: 'root', pid: 990, cpu: 0, mem: 11.4, rssKB: 98520, etimesSec: 12880,
-    cmd: '/usr/bin/dockerd -H fd:// --containerd=/run/containerd/containerd.sock',
+    cmd: '/usr/bin/processo1',
   });
 });
 
@@ -81,8 +81,8 @@ test('golden: 1ª coleta V2 real (Debian 13, 1 núcleo, logo após boot, modo sm
   assert.deepEqual(s.ram, { total: 840, used: 382, free: 64, cache: 528, avail: 458, swapTotal: 886, swapUsed: 0, dirty: 0, writeback: 0 });
   assert.deepEqual(s.disks.map((d) => [d.mount, d.source, d.dev, d.pct, d.inodesPct]), [
     ['/', '/dev/sda2', 'sda', 2, 1],
-    ['/mnt/sdb1', '/dev/sdb1', 'sdb', 28, 1],
-    ['/mnt/sdc1', '/dev/sdc1', 'sdc', 28, 1],
+    ['/mnt/sdb1', '/dev/sdb1', 'sdb', 30, 1],
+    ['/mnt/sdc1', '/dev/sdc1', 'sdc', 15, 1],
     ['/mnt/sdc2', '/dev/sdc2', 'sdc', 1, 1],
   ]);
   assert.deepEqual(s.missingMounts, []);
@@ -102,7 +102,7 @@ test('golden: 1ª coleta V2 real (Debian 13, 1 núcleo, logo após boot, modo sm
   assert.equal(s.topProcs.length, 8, 'cabeçalho real do ps -eo (user:32, ELAPSED) ignorado');
   assert.deepEqual(s.topProcs[0], {
     user: 'root', pid: 934, cpu: 1.7, mem: 11.5, rssKB: 99044, etimesSec: 64,
-    cmd: '/usr/bin/dockerd -H fd:// --containerd=/run/containerd/containerd.sock',
+    cmd: '/usr/bin/processo1',
   });
 });
 

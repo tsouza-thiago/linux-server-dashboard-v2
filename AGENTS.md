@@ -361,7 +361,7 @@ trafegados desde a coleta anterior, exatos pelos contadores (o volume por dia sa
   "collector": { "version": 2, "hash": "73cebb436c7c", "mode": "smart", "complete": true,
                  "expectedVersion": 2, "durationMs": 1290, "outputBytes": 2949 },
   "host": "servidor-exemplo",
-  "os": { "kernel": "6.12.111+deb13-amd64", "name": "Debian GNU/Linux 13 (trixie)" },
+  "os": { "kernel": "6.12.0+deb13-amd64", "name": "Debian GNU/Linux 13 (trixie)" },
   "cores": 1,
   "uptimeSec": 12937.03,
   "bootAt": "2026-10-07T10:15:22.970Z",
@@ -372,9 +372,9 @@ trafegados desde a coleta anterior, exatos pelos contadores (o volume por dia sa
   "ram": { "total": 840, "used": 406, "free": 120, "cache": 479, "avail": 434,
            "swapTotal": 885, "swapUsed": 24, "dirty": 0, "writeback": 0 },
   "disks": [
-    { "mount": "/", "source": "/dev/sda2", "dev": "sda", "size": "145G", "used": "2.5G",
-      "avail": "135G", "pct": 2, "sizeBytes": 155475050496, "usedBytes": 2626056192,
-      "availBytes": 144876724224, "inodesPct": 3 }
+    { "mount": "/", "source": "/dev/sda2", "dev": "sda", "size": "100G", "used": "1.5G",
+      "avail": "94G", "pct": 2, "sizeBytes": 107374182400, "usedBytes": 1610612736,
+      "availBytes": 100394860544, "inodesPct": 3 }
   ],
   "missingMounts": [],
   "net": { "iface": "enp0s7", "rxBytes": 1752505, "rxErrors": 0, "rxDrops": 0,
@@ -392,7 +392,7 @@ trafegados desde a coleta anterior, exatos pelos contadores (o volume por dia sa
   "smartAt": "2026-10-07T13:51:00.000Z",
   "services": { "smbd": "active" },
   "topProcs": [ { "user": "root", "pid": 990, "cpu": 0.0, "mem": 11.4, "rssKB": 98520,
-                  "etimesSec": 12880, "cmd": "/usr/bin/dockerd -H fd://" } ]
+                  "etimesSec": 12880, "cmd": "/usr/sbin/sshd" } ]
 }
 ```
 

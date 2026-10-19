@@ -6,6 +6,7 @@
 //   - chave privada, token de serviço conhecido ou senha atribuída em texto (CWE-798)
 //   - IP privado da rede local, MAC ou caminho da pasta pessoal de quem desenvolve (CWE-200)
 //   - e-mail que não seja de exemplo ou noreply
+//   - fixture do servidor real com processos, argumentos ou versão do kernel reais (CWE-497)
 //   - arquivo que nunca deve ir para o git (.env, data/, chaves, relatórios de segurança)
 // O histórico inteiro é varrido pelo Gitleaks em `npm run seguranca`.
 // Referências: OWASP Top 10:2025 A04 (falhas criptográficas: segredo exposto) e A02.
@@ -16,6 +17,7 @@ import os from 'node:os';
 import path from 'node:path';
 import { ROOT } from '../../test-support/rotas.js';
 import { arquivosRastreados } from '../../test-support/fonte.js';
+import { anonymize, anonymizeKernel, KEEP_PROGRAMS } from '../../scripts/capturar-amostra.mjs';
 
 const ARQUIVOS = arquivosRastreados();
 // Binários (fontes) ficam de fora: só texto é varrido.
@@ -91,6 +93,32 @@ test('CWE-200: e-mail só de exemplo ou noreply (nunca um endereço pessoal)', (
     || /\.(?:service|socket|target|timer)$/.test(dominio); // unidades do systemd (getty@tty1.service)
   const ruins = achados(TEXTO, re, (m) => !permitido(m.split('@')[1]));
   assert.deepEqual(ruins, []);
+});
+
+// As fixtures que vieram do servidor real (test/fixtures/README.md). Processos e versão do
+// kernel dizem o que a máquina roda e até quando foi atualizada: reconhecimento para um
+// ataque direcionado (OWASP WSTG-INFO). Por isso elas passam pela anonimização completa.
+const FIXTURES_REAIS = ['test/fixtures/coleta-v2/debian13-real.txt', 'test/fixtures/coleta-v2/debian13-derivada-v1.txt'];
+const programaGenerico = (cmd) => {
+  const nome = cmd.split(/\s+/)[0].split('/').pop();
+  return KEEP_PROGRAMS.has(nome) || /^processo\d+$/.test(nome);
+};
+
+test('CWE-497: fixture do servidor real já passou pela anonimização completa', () => {
+  for (const f of FIXTURES_REAIS) {
+    const texto = ler(f);
+    assert.equal(anonymize(texto).text, texto, `${f}: o npm run capturar-amostra ainda mudaria este arquivo`);
+  }
+});
+
+test('CWE-497: a amostra do AGENTS não traz processo nem versão do kernel reais', () => {
+  const agents = ler('AGENTS.md');
+  const inicio = agents.indexOf('```json\n', agents.indexOf('## Formato da amostra')) + '```json\n'.length;
+  const amostra = JSON.parse(agents.slice(inicio, agents.indexOf('\n```', inicio)));
+  assert.equal(amostra.os.kernel, anonymizeKernel(amostra.os.kernel), 'kernel só com major.minor');
+  for (const p of amostra.topProcs) {
+    assert.ok(programaGenerico(p.cmd) && !/\s/.test(p.cmd), `processo fora da lista genérica ou com argumentos: ${p.cmd}`);
+  }
 });
 
 test('CWE-200: nenhum caminho da pasta pessoal de quem desenvolve', () => {
