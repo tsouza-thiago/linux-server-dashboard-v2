@@ -149,7 +149,8 @@ O teste `test/unit/docs.test.js` confere esta documentação contra o código.
   e fica como registro histórico na
   [tag v2.0.0](https://github.com/tsouza-thiago/linux-server-dashboard-v2/blob/v2.0.0/docs/PLANO_V2.md).
 - **Antes de todo commit:** `npm run check` (sintaxe JS e shell, `.env`/`data/` fora do git,
-  testes + cobertura com `test/seguranca/`, `npm audit`). Nenhum commit vermelho.
+  testes + cobertura com `test/seguranca/`, `npm audit`). Nenhum commit vermelho. Se um teste
+  falhar, o relatório diz o nome dele e a saída completa fica em `.check/ultima-falha.log`.
 - **Mudou código de segurança, removeu código ou terminou uma etapa?** Rode também
   `npm run seguranca` (precisa de Docker; sem ele, as ferramentas externas são puladas e a
   mutação roda assim mesmo).

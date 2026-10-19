@@ -52,9 +52,12 @@ export function request(port, { method = 'GET', path = '/', headers = {}, body }
 
 /**
  * Lê o SSE até chegarem `until` eventos (blocos separados por linha em branco) ou o tempo
- * acabar; então corta a conexão. No tempo esgotado devolve { timeout: true }.
+ * acabar; então corta a conexão. No tempo esgotado devolve { timeout: true }. `signal`
+ * (AbortSignal) corta a conexão na hora certa do teste, sem depender de um tempo fixo que a
+ * máquina carregada pode estourar (#25). O teto padrão é folgado (10 s): a leitura termina
+ * assim que os eventos chegam, e o teto só conta quando algo deu errado.
  */
-export function readSSE(port, { path = '/api/stream', headers = {}, until = 2, timeoutMs = 2000 } = {}) {
+export function readSSE(port, { path = '/api/stream', headers = {}, until = 2, timeoutMs = 10000, signal = null } = {}) {
   return new Promise((resolve, reject) => {
     let settled = false;
     const req = http.request({
@@ -77,6 +80,7 @@ export function readSSE(port, { path = '/api/stream', headers = {}, until = 2, t
       });
       res.on('end', done);
       res.on('error', done);
+      if (signal) signal.addEventListener('abort', done, { once: true });
     });
     req.on('error', reject);
     req.end();

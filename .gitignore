@@ -35,5 +35,8 @@ id_ed25519*
 # Relatórios brutos do npm run seguranca (podem citar trechos do código e do histórico)
 .seguranca/
 
+# Saída completa da última suíte vermelha do npm run check (cita caminhos da máquina)
+.check/
+
 # Worktrees e configuração local do Claude Code
 .claude/
