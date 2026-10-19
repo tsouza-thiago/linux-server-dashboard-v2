@@ -13,8 +13,6 @@ export const sub = (state) => (state.sample?.net ? `Interface ${state.sample.net
 // Dias da semana para os rótulos dos gráficos de barras.
 const WEEKDAY = ['dom', 'seg', 'ter', 'qua', 'qui', 'sex', 'sáb'];
 const WEEKDAY_LONG = ['domingo', 'segunda', 'terça', 'quarta', 'quinta', 'sexta', 'sábado'];
-// GB com 1 casa abaixo de 10 GB.
-const gb = (bytes) => f.num(bytes / 1024 ** 3, bytes < 10 * 1024 ** 3 ? 1 : 0);
 
 /** Cartões: download, upload, volume do dia e erros/descartes. */
 function cards(ctx) {
@@ -26,23 +24,24 @@ function cards(ctx) {
   const today = (ctx.local.week ? dailyTraffic(ctx.local.week, state.meta?.pollIntervalMs) : []).find((d) => d.day === dayOf(Date.now()));
   const errs = n ? (n.rxErrors ?? 0) + (n.txErrors ?? 0) : null;
   const drops = n ? (n.rxDrops ?? 0) + (n.txDrops ?? 0) : null;
+  // Volume com a unidade do tamanho dele (KB, MB, GB): pouco tráfego não vira "0,0 GB".
+  const vol = today ? f.bytesParts(today.rx + today.tx) : null;
   const peakNote = (p) => (p ? `pico ${state.period} ${f.mbps(p.value)} às ${f.time(p.t)}` : 'sem pico no período');
-  const rate = (v) => f.num(v, Number.isFinite(v) && v < 10 ? 1 : 0);
   return html`
     <article class="card stale">
       <span class="card-label"><span class="swatch c-s1"></span>Download agora</span>
-      ${big(n ? rate(n.rxMbps) : '—', ' Mbps')}
+      ${big(n ? f.mbpsNum(n.rxMbps) : '—', ' Mbps')}
       <span class="note mono">${peakNote(rxPeak)}</span>
     </article>
     <article class="card stale">
       <span class="card-label"><span class="swatch c-s4"></span>Upload agora</span>
-      ${big(n ? rate(n.txMbps) : '—', ' Mbps')}
+      ${big(n ? f.mbpsNum(n.txMbps) : '—', ' Mbps')}
       <span class="note mono">${peakNote(txPeak)}</span>
     </article>
     <article class="card stale">
       <span class="card-label">Trafegado hoje</span>
-      ${big(today ? gb(today.rx + today.tx) : '—', ' GB')}
-      <span class="note mono">${today ? `↓ ${gb(today.rx)} GB · ↑ ${gb(today.tx)} GB` : 'calculado do histórico do dia'}</span>
+      ${big(vol ? vol.value : '—', vol ? ` ${vol.unit}` : '')}
+      <span class="note mono">${today ? `↓ ${f.bytes(today.rx)} · ↑ ${f.bytes(today.tx)}` : 'calculado do histórico do dia'}</span>
     </article>
     <article class="card stale">
       <div class="card-top"><span class="card-label">Erros e descartes</span>${n ? (errs || drops ? pill('warn', 'com perdas') : pill('ok', 'limpo')) : ''}</div>
@@ -68,12 +67,12 @@ function weekBars(ctx) {
   const top = list.reduce((a, b) => (b.rx + b.tx > a.rx + a.tx ? b : a));
   return html`
     <div class="week-bars" role="img" aria-label="Volume trafegado por dia nos últimos 7 dias">
-      ${list.map((d) => html`<div class="week-col" title="${d.label}: ↓ ${gb(d.rx)} GB · ↑ ${gb(d.tx)} GB">
+      ${list.map((d) => html`<div class="week-col" title="${d.label}: ↓ ${f.bytes(d.rx)} · ↑ ${f.bytes(d.tx)}">
         <span class="bar c-s1${d === top && d.rx > 0 ? ' hot' : ''}" data-h="${(d.rx / max) * 100}"></span><span class="bar c-s4" data-h="${(d.tx / max) * 100}"></span>
       </div>`)}
     </div>
     <div class="week-labels">${list.map((d) => html`<span>${d.label}</span>`)}</div>
-    <span class="note">${top.rx + top.tx > 0 ? `maior dia: ${top.label === 'hoje' ? 'hoje' : top.long} · ${gb(top.rx + top.tx)} GB (↓ ${gb(top.rx)} · ↑ ${gb(top.tx)})` : 'sem tráfego registrado nos últimos 7 dias'}</span>`;
+    <span class="note">${top.rx + top.tx > 0 ? `maior dia: ${top.label === 'hoje' ? 'hoje' : top.long} · ${f.bytes(top.rx + top.tx)} (↓ ${f.bytes(top.rx)} · ↑ ${f.bytes(top.tx)})` : 'sem tráfego registrado nos últimos 7 dias'}</span>`;
 }
 
 /** Os maiores picos de tráfego do período. */
@@ -119,7 +118,7 @@ export function update(ctx) {
   mount($('#rd-week', ctx.el), weekBars(ctx));
   mount($('#rd-peaks', ctx.el), peaksTable(ctx.state));
   drawCharts(ctx, ctx.el, [{
-    id: 'rd-traffic', height: 260, format: f.mbps, axisFormat: (v) => f.num(v, v > 0 && v < 10 ? 1 : 0), series: [
+    id: 'rd-traffic', height: 260, format: f.mbps, axisFormat: (v, marks) => (v === 0 ? '0' : f.num(v, f.axisDigits(marks))), series: [
       { label: 'download', key: 'rxMbps', color: 's1', fill: 0.18 },
       { label: 'upload', key: 'txMbps', color: 's4' }],
   }]);

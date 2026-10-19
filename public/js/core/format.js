@@ -14,23 +14,56 @@ export const pct = (v, digits = 0) => (isNum(v) ? `${num(v, digits)}%` : DASH);
 /** Nome curto do processo: só o programa, sem caminho nem argumentos ("/usr/bin/dockerd -H" → "dockerd"). */
 export const cmdName = (cmd = '') => (cmd.split(/\s+/)[0] || '').split('/').pop() || cmd;
 
-/** Bytes em base 1024, como o `df -h`: "145 GB", "1,8 TB". */
-export function bytes(v, digits) {
-  if (!isNum(v)) return DASH;
+/**
+ * Bytes em base 1024 separados em número e unidade ({ value: "293", unit: "KB" }), para o
+ * `big()` mostrar a unidade menor. A unidade acompanha o tamanho: um volume pequeno não
+ * vira "0,0 GB".
+ */
+export function bytesParts(v, digits) {
+  if (!isNum(v)) return { value: DASH, unit: '' };
   const units = ['B', 'KB', 'MB', 'GB', 'TB', 'PB'];
   let i = 0;
   let x = Math.abs(v);
   while (x >= 1024 && i < units.length - 1) { x /= 1024; i += 1; }
   const d = digits ?? (x < 10 && i > 0 ? 1 : 0);
-  return `${v < 0 ? '-' : ''}${num(x, d)} ${units[i]}`;
+  return { value: `${v < 0 ? '-' : ''}${num(x, d)}`, unit: units[i] };
+}
+
+/** Bytes em base 1024, como o `df -h`: "145 GB", "1,8 TB". */
+export function bytes(v, digits) {
+  if (!isNum(v)) return DASH;
+  const { value, unit } = bytesParts(v, digits);
+  return `${value} ${unit}`;
 }
 
 // Unidades: MB (vindo do /proc/meminfo), Mbps, °C e ms; casas decimais só quando o
 // número é pequeno.
 export const mb = (v) => (isNum(v) ? bytes(v * 1024 * 1024) : DASH);
-export const mbps = (v) => (isNum(v) ? `${num(v, v < 10 ? 2 : 1)} Mbps` : DASH);
+// Mbps com 2 casas abaixo de 10: o tráfego de um servidor ocioso (0,01 Mbps) não vira "0,0".
+export const mbpsNum = (v) => num(v, isNum(v) && v < 10 ? 2 : 1);
+export const mbps = (v) => (isNum(v) ? `${mbpsNum(v)} Mbps` : DASH);
 export const celsius = (v) => (isNum(v) ? `${num(v, 1)} °C` : DASH);
 export const ms = (v) => (isNum(v) ? `${num(v, v < 10 ? 1 : 0)} ms` : DASH);
+
+/**
+ * Casas decimais que mostram o passo entre as marcas de um eixo (0,002 → 3; 0,25 → 2;
+ * 0,5 → 1; 20 → 0), até 4. Sem isso, marcas pequenas saem todas iguais ("0,0").
+ */
+export function axisDigits(vals) {
+  const marks = (vals || []).filter(isNum);
+  let step = Infinity;
+  for (let i = 1; i < marks.length; i += 1) {
+    const d = Math.abs(marks[i] - marks[i - 1]);
+    if (d > 0 && d < step) step = d;
+  }
+  if (!Number.isFinite(step)) return 0;
+  // Tolerância relativa: 0,1 + 0,2 = 0,30000000000000004 continua pedindo 1 casa.
+  for (let d = 0; d < 4; d += 1) {
+    const x = step * 10 ** d;
+    if (Math.round(x) >= 1 && Math.abs(x - Math.round(x)) < 1e-6 * x) return d;
+  }
+  return 4;
+}
 
 /** "2 d 3 h", "5 h 12 min", "8 min", "40 s". */
 export function duration(sec) {

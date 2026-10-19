@@ -9,12 +9,28 @@ diante: `PATCH` corrige, `MINOR` acrescenta sem quebrar e `MAJOR` quebra.
 
 ## [Não publicado]
 
+## [2.0.2] — 2026-10-19
+
+Primeira versão pequena pela política nova (ADR 0015): corrige a Rede com pouco tráfego,
+que aparecia zerada na tela. Nada muda na configuração, no formato de `data/` nem no acesso
+ao servidor: atualize com `./dashboard atualizar`.
+
 ### Alterado
 
 - Política de versões escrita no repositório (ADR 0015 e AGENTS, "Desenvolvimento"): um
   PR pequeno por mudança lógica; correção sai como PATCH e funcionalidade como pré-versão
   da próxima MINOR (`-rc.N`), que a MINOR estável consolida. Merge com merge commit, sem
   squash nem reescrita do histórico. Só documentação: nada muda no painel.
+
+### Corrigido
+
+- Rede com pouco tráfego aparecia zerada na tela. "Trafegado hoje", "Volume por dia" e o
+  cartão e a tabela da Rede nos Relatórios mostravam "0,0 GB" para centenas de KB: agora o
+  volume usa a unidade do tamanho dele (KB, MB, GB). A vazão "agora" (Rede e Visão geral)
+  mostra 2 casas abaixo de 10 Mbps, e não "0,0" para 0,01 Mbps. O eixo do gráfico de
+  tráfego escolhe as casas pelo passo entre as marcas (0,002, 0,004…), em vez de repetir
+  "0,0". Só a tela muda: o volume de períodos longos ainda sai das taxas arredondadas e é
+  corrigido na próxima versão.
 
 ### Segurança
 
@@ -652,7 +668,8 @@ Documentados no plano da V2 (seção 2.2, B1–B12), entre eles: alerta SMART fa
 rede zerada com contadores grandes, alerta duplicado a cada coleta e reescrita completa do
 histórico a cada minuto.
 
-[Não publicado]: https://github.com/tsouza-thiago/linux-server-dashboard-v2/compare/v2.0.1...HEAD
+[Não publicado]: https://github.com/tsouza-thiago/linux-server-dashboard-v2/compare/v2.0.2...HEAD
+[2.0.2]: https://github.com/tsouza-thiago/linux-server-dashboard-v2/compare/v2.0.1...v2.0.2
 [2.0.1]: https://github.com/tsouza-thiago/linux-server-dashboard-v2/compare/v2.0.0...v2.0.1
 [2.0.0]: https://github.com/tsouza-thiago/linux-server-dashboard-v2/compare/v2.0.0-beta.2...v2.0.0
 [2.0.0-beta.2]: https://github.com/tsouza-thiago/linux-server-dashboard-v2/compare/v2.0.0-beta.1...v2.0.0-beta.2

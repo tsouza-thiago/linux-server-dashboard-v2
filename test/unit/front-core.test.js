@@ -37,6 +37,16 @@ test('format: PT-BR e dado ausente vira "—" (I5)', () => {
   assert.equal(fmt.bytes(512), '512 B');
   assert.equal(fmt.mb(840), '840 MB');
   assert.equal(fmt.mbps(0.02), '0,02 Mbps');
+  assert.deepEqual(fmt.bytesParts(300000), { value: '293', unit: 'KB' });
+  assert.deepEqual(fmt.bytesParts(null), { value: '—', unit: '' }, 'dado ausente não vira "0 B"');
+  assert.equal(fmt.mbpsNum(0.01), '0,01');
+  assert.equal(fmt.mbpsNum(12.34), '12,3');
+  assert.equal(fmt.mbpsNum(null), '—');
+  assert.equal(fmt.axisDigits([0, 0.002, 0.004]), 3);
+  assert.equal(fmt.axisDigits([0, 0.25, 0.5]), 2);
+  assert.equal(fmt.axisDigits([0, 20, 40]), 0);
+  assert.equal(fmt.axisDigits([5]), 0, 'uma marca só: sem passo, sem casas');
+  assert.equal(fmt.axisDigits([0, 1e-7]), 4, 'no máximo 4 casas');
   assert.equal(fmt.celsius(32), '32,0 °C');
   assert.equal(fmt.ms(6.13), '6,1 ms');
   for (const f of [fmt.num, fmt.pct, fmt.bytes, fmt.mb, fmt.mbps, fmt.celsius, fmt.ms, fmt.duration, fmt.days]) {

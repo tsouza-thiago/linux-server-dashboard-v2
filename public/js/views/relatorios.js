@@ -51,9 +51,6 @@ function range() {
   return { from: to - view.days * DAY, to };
 }
 
-// GB com 1 casa abaixo de 10 GB.
-const gb = (b) => `${f.num(b / 1024 ** 3, b < 10 * 1024 ** 3 ? 1 : 0)}`;
-
 /** Cartões de resumo do período (disponibilidade, médias, picos). */
 function cards(ctx) {
   const b = ctx.local.buckets;
@@ -76,7 +73,7 @@ function cards(ctx) {
     ${card('CPU média', f.pct(meanOf(b, 'cpu')), cpuPeak ? `pico ${f.pct(cpuPeak.value)} · ${when(cpuPeak)}` : 'sem dados')}
     ${card('Memória média', f.pct(meanOf(b, 'ramPct')), ramPeak ? `pico ${f.pct(ramPeak.value)}` : 'sem dados')}
     ${card(disk ? disk.mount : 'Disco', grew === null ? '—' : `${grew >= 0 ? '+' : '−'}${f.bytes(Math.abs(grew))}`, pk.length > 1 ? `${f.pct(pk[0])} → ${f.pct(pk[pk.length - 1])} no período` : 'sem dados no período')}
-    ${card('Rede', `${gb(traffic.rx + traffic.tx)} GB`, `↓ ${gb(traffic.rx)} · ↑ ${gb(traffic.tx)}`)}`;
+    ${card('Rede', f.bytes(traffic.rx + traffic.tx), `↓ ${f.bytes(traffic.rx)} · ↑ ${f.bytes(traffic.tx)}`)}`;
 }
 
 /** Tabela por dia (fuso local) com médias, picos e eventos. */
@@ -109,7 +106,7 @@ function table(ctx) {
         <td class="num mono">${mm(d.m, 'cpu')}</td>
         <td class="num mono">${mm(d.m, 'ramPct')}</td>
         <td class="num mono${hot ? ' ink-warn' : ''}">${d.m.tempC ? `${f.num(d.m.tempC.max)} °C${hot ? ' ▲' : ''}` : '—'}</td>
-        <td class="num mono">${tr ? `${gb(tr.rx)} / ${gb(tr.tx)} GB` : '—'}</td>
+        <td class="num mono">${tr ? `${f.bytes(tr.rx)} / ${f.bytes(tr.tx)}` : '—'}</td>
         <td class="num">${crit ? html`<span class="pill is-crit">${crit} ${crit > 1 ? 'críticos' : 'crítico'}</span>` : ''}${warn ? html` <span class="pill is-warn">${warn} atenção</span>` : ''}${crit || warn ? '' : html`<span class="ink-3">—</span>`}</td>
       </tr>`;
   })}</tbody></table></div>`;
