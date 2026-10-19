@@ -41,6 +41,11 @@ diante: `PATCH` corrige, `MINOR` acrescenta sem quebrar e `MAJOR` quebra.
   sintéticos. A fixture da V1, que nenhum teste lia, saiu. Um teste em
   `test/seguranca/segredos-osint.test.js` confere que a anonimização não mudaria mais nada.
   Só testes e ferramenta de desenvolvimento: nada muda no painel.
+- Alertas do OpenSSF Scorecard analisados (#36, `docs/seguranca/2026-10-19-scorecard.md`):
+  o `main` passa a exigir o PR atualizado com ele antes do merge; os alertas que dependem de
+  um 2º mantenedor (Code-Review e o resto do Branch-Protection), o Fuzzing (o fuzz próprio já
+  existe) e o selo Best Practices ficam descartados com o motivo. Só configuração e
+  documentação: nada muda no painel.
 
 ## [2.0.5] — 2026-10-19
 
