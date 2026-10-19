@@ -136,6 +136,10 @@ O teste `test/unit/docs.test.js` confere esta documentação contra o código.
      (`.github/workflows/scorecard.yml`, resultado no code scanning), Dependabot de versões
      para as actions e o npm (`.github/dependabot.yml`, semanal, com 14 dias de espera por
      versão nova), alertas do Dependabot e secret scanning com push protection.
+  5. Superfície pública mínima (ADR 0017): o GitHub só aceita actions do GitHub e a
+     `ossf/scorecard-action`, presas por SHA; PR de fora só roda o CI com aprovação; logs e
+     artefatos ficam 30 dias; a Wiki só é editada por colaboradores; o quadro do Projects é
+     privado.
 
 ## Desenvolvimento (obrigatório)
 

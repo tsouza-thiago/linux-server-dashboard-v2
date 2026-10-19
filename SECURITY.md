@@ -110,7 +110,9 @@ Inclua: o passo a passo para reproduzir, o impacto estimado e a versão afetada
   `docs/allowed_signers`. O `gpg.ssh.program` é fixado: nada da configuração do git da
   pessoa muda o resultado. No `./dashboard atualizar`, a versão nova é conferida com a
   lista de chaves da versão **já instalada** (copiada antes do checkout). uPlot, fontes e o
-  Node baixado são conferidos por SHA-256.
+  Node baixado são conferidos por SHA-256. A Wiki só é editada por colaboradores, para que
+  ninguém publique nela um comando de instalação com o endereço de outro repositório
+  (ADR 0017).
 - **Verificado por:** `test/integration/assinatura.test.js`,
   `test/integration/cli-manutencao.test.js`, `test/integration/dashboard-cli.test.js` e
   `test/unit/vendor.test.js`.
@@ -240,7 +242,8 @@ Inclua: o passo a passo para reproduzir, o impacto estimado e a versão afetada
   assinadas (ameaça 7); ferramentas de segurança em imagens presas por digest; actions do
   CI presas por SHA, só leitura e sem segredos (ADR 0014); hash dourado do script de
   coleta; Dependency Review em todo PR, OpenSSF Scorecard e Dependabot com 14 dias de espera
-  por versão nova (ADR 0016).
+  por versão nova (ADR 0016); o GitHub só aceita actions do GitHub e do Scorecard, presas
+  por SHA, e PR de fora só roda o CI com aprovação (ADR 0017).
 - **Verificado por:** `test/seguranca/cadeia-suprimentos.test.js`, `test/unit/vendor.test.js`
   e `test/integration/assinatura.test.js`.
 
