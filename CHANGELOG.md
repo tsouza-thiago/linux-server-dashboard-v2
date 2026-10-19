@@ -9,6 +9,19 @@ diante: `PATCH` corrige, `MINOR` acrescenta sem quebrar e `MAJOR` quebra.
 
 ## [Não publicado]
 
+## [2.0.5] — 2026-10-19
+
+A Visão geral passa a dar a mesma duração de queda que Eventos e Relatórios. É a última
+correção da fila antes das funcionalidades da 2.1.0. Nada muda na configuração, no formato
+de `data/` nem no acesso ao servidor: atualize com `./dashboard atualizar`.
+
+### Corrigido
+
+- Visão geral: a manchete media a queda pelo alerta "servidor inacessível", que só abre na
+  2ª falha seguida (`ALERT_OFFLINE_AFTER`), e dizia "voltou ao normal sozinho em 3 min"
+  para a mesma queda que Eventos e Relatórios mostravam com 4 min. Agora usa o início e a
+  duração da queda registrada, com a mesma junção alerta ↔ queda da linha do tempo.
+
 ## [2.0.4] — 2026-10-19
 
 O volume de rede passa a vir dos contadores de bytes do servidor, exatos, e não mais das
@@ -702,7 +715,8 @@ Documentados no plano da V2 (seção 2.2, B1–B12), entre eles: alerta SMART fa
 rede zerada com contadores grandes, alerta duplicado a cada coleta e reescrita completa do
 histórico a cada minuto.
 
-[Não publicado]: https://github.com/tsouza-thiago/linux-server-dashboard-v2/compare/v2.0.4...HEAD
+[Não publicado]: https://github.com/tsouza-thiago/linux-server-dashboard-v2/compare/v2.0.5...HEAD
+[2.0.5]: https://github.com/tsouza-thiago/linux-server-dashboard-v2/compare/v2.0.4...v2.0.5
 [2.0.4]: https://github.com/tsouza-thiago/linux-server-dashboard-v2/compare/v2.0.3...v2.0.4
 [2.0.3]: https://github.com/tsouza-thiago/linux-server-dashboard-v2/compare/v2.0.2...v2.0.3
 [2.0.2]: https://github.com/tsouza-thiago/linux-server-dashboard-v2/compare/v2.0.1...v2.0.2

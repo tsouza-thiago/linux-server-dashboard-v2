@@ -3,7 +3,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {
   timeline, levelOf, viewOfKey, offlineMsIn, outagesIn, uptimeIn, dayStatuses, trafficOf, dailyTraffic,
-  peakOf, meanOf, trendOf, topPeaks, diskEta, diskForecast, healthLevel,
+  peakOf, meanOf, trendOf, topPeaks, diskEta, diskForecast, healthLevel, outageOf,
 } from '../../public/js/core/analysis.js';
 import { applyDataStyles, html, mount } from '../../public/js/core/html.js';
 import { alpha, autoRange, evenTicks } from '../../public/js/charts/timeseries.js';
@@ -151,17 +151,20 @@ test('gráficos: cor com alfa, faixa automática do eixo e régua de tempo', () 
 
 // ---------------------------------------------------------------- telas montadas no Node
 
-// Monta uma tela sem navegador: cada seletor vira um nó falso que guarda o HTML e só
-// `#rl-custom` (o formulário de datas fechado) não existe. O uPlot falso guarda as opções
-// do gráfico para conferir o eixo.
+// Monta uma tela sem navegador: cada seletor vira um nó falso que guarda o HTML. O uPlot
+// falso guarda as opções do gráfico para conferir o eixo.
 function fakeScreen() {
   const nodes = new Map();
+  // Nó falso: guarda o HTML; os filhos (data-slot dos cartões) são nós descartáveis.
+  const node = () => ({ innerHTML: '', clientWidth: 600, querySelectorAll: () => [], querySelector: () => node() });
   const el = {
     innerHTML: '',
     querySelectorAll: () => [],
+    addEventListener: () => {},
     querySelector: (sel) => {
-      if (sel === '#rl-custom') return null;
-      if (!nodes.has(sel)) nodes.set(sel, { innerHTML: '', clientWidth: 600, querySelectorAll: () => [] });
+      // Sem o formulário de datas fechado nem as faixas de telemetria (pedem o DOM de verdade).
+      if (sel === '#rl-custom' || sel.startsWith('[data-strips')) return null;
+      if (!nodes.has(sel)) nodes.set(sel, node());
       return nodes.get(sel);
     },
   };
@@ -260,4 +263,31 @@ test('rede (2.0.4): volume pelos bytes por coleta; baldes antigos usam as taxas'
   const days = dailyTraffic([quiet, { ...quiet, t: quiet.t + 20 * MIN }]);
   assert.equal(days.length, 1);
   assert.equal(days[0].rx, 1_500_000, 'dia de tráfego baixo não vira 0');
+});
+
+test('visão geral (2.0.5): a manchete mede a queda pela queda, não pelo alerta', async () => {
+  const visaoGeral = await import('../../public/js/views/visao-geral.js');
+  const { el, text } = fakeScreen();
+  // A queda real de 16/10: começou na 1ª falha e durou 252 s; o alerta só abriu na 2ª falha
+  // (ALERT_OFFLINE_AFTER=2), 1 min depois, e durou 193 s. Eventos e Relatórios dizem 4 min.
+  const from = Date.now() - (4 * H + MIN);
+  const outage = { from: new Date(from).toISOString(), to: new Date(from + 252e3).toISOString(), durationSec: 252, ongoing: false, reason: 'SSH falhou (exit 255)' };
+  const alert = {
+    id: 'a1', key: 'servidor-inacessivel', level: 'critical', status: 'resolved', message: 'Servidor inacessível',
+    ts: new Date(from + MIN).toISOString(), resolvedAt: new Date(from + 253e3).toISOString(),
+  };
+  visaoGeral.update({
+    el, charts: new Map(), local: {}, api: { buckets: () => new Promise(() => {}) },
+    state: {
+      period: '24h', buckets: [], annotations: [], health: { score: 100, level: 'ok', parts: [] },
+      meta: { online: true, pollIntervalMs: 60e3 }, alerts: { active: [], all: [alert] },
+      outages: { outages: [outage], uptime: { uptimePct: 99.9 } },
+    },
+  });
+  const hero = text('#vg-hero');
+  assert.match(hero, /Servidor inacessível há 4 h 1 min e voltou ao normal sozinho em 4 min/);
+  // Alerta sem queda correspondente (ex.: quedas fora do período pedido): fica como antes.
+  assert.equal(outageOf(alert, []), null);
+  assert.equal(outageOf({ ...alert, key: 'ram:usage' }, [outage]), null, 'só o alerta de servidor inacessível vira queda');
+  assert.equal(outageOf(alert, [outage]), outage);
 });

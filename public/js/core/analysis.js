@@ -110,6 +110,20 @@ export function fullestDisk(sample) {
 const OFFLINE_KEY = 'servidor-inacessivel';
 const QUEDA_MATCH_MS = 10 * 60e3;
 
+// O alerta abre na N-ésima falha seguida (ALERT_OFFLINE_AFTER); a queda, na 1ª. Os dois
+// são o mesmo acontecimento quando começam a até QUEDA_MATCH_MS um do outro.
+const sameOutage = (alert, outage) => Math.abs(Date.parse(alert.ts) - Date.parse(outage.from)) <= QUEDA_MATCH_MS;
+
+/**
+ * Queda registrada que corresponde ao alerta "servidor inacessível" (null para outro alerta
+ * ou sem queda perto). A duração certa é a da queda: ela começa na 1ª falha, o alerta só
+ * depois do debounce (2.0.5).
+ */
+export function outageOf(alert, outages = []) {
+  if (alert?.key !== OFFLINE_KEY) return null;
+  return (outages || []).find((o) => sameOutage(alert, o)) || null;
+}
+
 /**
  * Linha do tempo única: alertas, anotações e quedas, do mais recente ao mais antigo. O alerta
  * "servidor inacessível" e a queda registrada são o mesmo acontecimento: viram um item só
@@ -119,8 +133,7 @@ export function timeline({ alerts = [], annotations = [], outages = [] }) {
   const offAlerts = alerts.filter((a) => a.key === OFFLINE_KEY);
   const used = new Set();
   const quedas = outages.map((o) => {
-    const t = Date.parse(o.from);
-    const a = offAlerts.find((x) => !used.has(x.id) && Math.abs(Date.parse(x.ts) - t) <= QUEDA_MATCH_MS);
+    const a = offAlerts.find((x) => !used.has(x.id) && sameOutage(x, o));
     if (a) used.add(a.id);
     return { kind: 'queda', ts: o.from, until: o.to, durationSec: o.durationSec, ongoing: o.ongoing, text: o.reason || '',
       ...(a ? { id: a.id, status: a.status, key: a.key, level: a.level } : {}) };
