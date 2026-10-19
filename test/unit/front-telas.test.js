@@ -148,3 +148,76 @@ test('gráficos: cor com alfa, faixa automática do eixo e régua de tempo', () 
     if (tz === undefined) delete process.env.TZ; else process.env.TZ = tz;
   }
 });
+
+// ---------------------------------------------------------------- telas montadas no Node
+
+// Monta uma tela sem navegador: cada seletor vira um nó falso que guarda o HTML e só
+// `#rl-custom` (o formulário de datas fechado) não existe. O uPlot falso guarda as opções
+// do gráfico para conferir o eixo.
+function fakeScreen() {
+  const nodes = new Map();
+  const el = {
+    querySelector: (sel) => {
+      if (sel === '#rl-custom') return null;
+      if (!nodes.has(sel)) nodes.set(sel, { innerHTML: '', clientWidth: 600, querySelectorAll: () => [] });
+      return nodes.get(sel);
+    },
+  };
+  const text = (sel) => (nodes.get(sel)?.innerHTML || '').replace(/<[^>]*>/g, '').replace(/\s+/g, ' ');
+  return { el, text };
+}
+
+// Tráfego baixo e real de um servidor ocioso: médias de 0,004 e 0,002 Mbps em 10 coletas
+// de 1 min = 300.000 + 150.000 bytes (≈ 439 KB no dia), bem abaixo de 0,1 GB.
+const quietBucket = () => b(Date.now(), { rxMbps: [0, 0.01, 0.004], txMbps: [0, 0.01, 0.002] }, 10);
+
+test('rede (2.0.2): vazão e volume pequenos legíveis, não "0,0" nem "0,0 GB"', async () => {
+  const rede = await import('../../public/js/views/rede.js');
+  const { el, text } = fakeScreen();
+  const ctx = {
+    el, charts: new Map(), local: { week: [quietBucket()] },
+    state: { period: '24h', buckets: [], meta: { pollIntervalMs: 60e3 }, sample: { uptimeSec: 100, net: { iface: 'eth0', rxMbps: 0.01, txMbps: 0, rxErrors: 0, txErrors: 0, rxDrops: 0, txDrops: 0 } } },
+  };
+  rede.update(ctx);
+  const cards = text('#rd-cards');
+  assert.match(cards, /Download agora 0,01 Mbps/, '0,01 Mbps agora não vira "0,0"');
+  assert.match(cards, /Trafegado hoje 439 KB ↓ 293 KB · ↑ 146 KB/);
+  assert.doesNotMatch(cards, /GB/);
+  const week = text('#rd-week');
+  assert.match(week, /maior dia: hoje · 439 KB \(↓ 293 KB · ↑ 146 KB\)/);
+  assert.doesNotMatch(week, /GB/);
+});
+
+test('rede (2.0.2): eixo do tráfego com as casas que o passo entre as marcas pede', async () => {
+  const rede = await import('../../public/js/views/rede.js');
+  const { el } = fakeScreen();
+  let opts = null;
+  globalThis.uPlot = class { constructor(o) { opts = o; } setData() {} setScale() {} };
+  try {
+    rede.update({ el, charts: new Map(), local: {}, state: { period: '24h', buckets: [], meta: {} } });
+  } finally {
+    delete globalThis.uPlot;
+  }
+  assert.ok(opts, 'o gráfico de tráfego foi criado');
+  const axis = (vals) => opts.axes[1].values(null, vals);
+  assert.deepEqual(axis([0, 0.002, 0.004, 0.006]), ['0', '0,002', '0,004', '0,006'], 'pico de 0,01 Mbps');
+  assert.deepEqual(axis([0, 0.25, 0.5, 0.75]), ['0', '0,25', '0,50', '0,75']);
+  assert.deepEqual(axis([0, 0.5, 1, 1.5]), ['0', '0,5', '1,0', '1,5']);
+  assert.deepEqual(axis([0, 20, 40]), ['0', '20', '40']);
+  assert.deepEqual(axis([0.1 + 0.2, 0.6]), ['0,3', '0,6'], 'erro de ponto flutuante não vira casas a mais');
+});
+
+test('relatórios (2.0.2): cartão e tabela da Rede com unidade automática', async () => {
+  const relatorios = await import('../../public/js/views/relatorios.js');
+  const { el, text } = fakeScreen();
+  relatorios.update({
+    el, charts: new Map(), local: { custom: false, buckets: [quietBucket()] },
+    state: { meta: { pollIntervalMs: 60e3 } }, api: { exportUrl: () => '/api/export' },
+  });
+  const cards = text('#rl-cards');
+  assert.match(cards, /Rede\s*439 KB\s*↓ 293 KB · ↑ 146 KB/);
+  assert.doesNotMatch(cards, /GB/);
+  const table = text('#rl-table');
+  assert.match(table, /293 KB \/ 146 KB/);
+  assert.doesNotMatch(table, /GB/);
+});

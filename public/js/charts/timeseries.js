@@ -230,6 +230,7 @@ export function renderTip(tip, xSec, rows) {
  * @param {{label: string, color?: 's1'|'s2'|'s3'|'s4', dash?: boolean, fill?: 'gradient'|number,
  *   width?: number, glow?: boolean, format?: Function}[]} o.series
  * @param {(v: number) => string} o.format formato dos valores (eixo y e dica)
+ * @param {(v: number, marks: number[]) => string} [o.axisFormat] formato do eixo y, com todas as marcas
  * @param {number} [o.height]
  * @param {[number, number]} [o.range] faixa fixa do eixo y (ex.: 0–100 para %)
  * @param {boolean} [o.axes] eixos visíveis (falso nas faixas e mini-gráficos)
@@ -252,7 +253,8 @@ export function timeChart(el, o) {
   // Cores, formatos e plugins conforme o tipo do gráfico (completo, faixa ou mini).
   const c = themeColors();
   const fmt = (v) => (v === null || v === undefined ? '—' : format(v));
-  const axisFmt = (v) => (v === null || v === undefined ? '' : (o.axisFormat || format)(v));
+  // O formato do eixo recebe também todas as marcas, para escolher as casas pelo passo.
+  const axisFmt = (v, vals) => (v === null || v === undefined ? '' : o.axisFormat ? o.axisFormat(v, vals) : format(v));
   const thresholdValues = () => ((typeof thresholds === 'function' ? thresholds() : thresholds) || []).map((t) => t.value);
   const colorOf = (s, i) => c[s.color] || c[`s${(i % 4) + 1}`];
   const seriesColors = series.map(colorOf);
@@ -279,7 +281,7 @@ export function timeChart(el, o) {
       { stroke: c.text, font: '11px "Geist Mono", monospace', grid: { show: false }, ticks: { show: false }, size: 28,
         values: (u, splits) => timeTicks(splits, u.scales.x.max - u.scales.x.min) },
       { stroke: c.text, font: '11px "Geist Mono", monospace', grid: { stroke: c.grid, width: 1 }, ticks: { show: false },
-        size: 56, gap: 8, values: (u, vals) => vals.map(axisFmt) },
+        size: 56, gap: 8, values: (u, vals) => vals.map((v) => axisFmt(v, vals)) },
     ] : [{ show: false }, { show: false }],
     series: [
       {},

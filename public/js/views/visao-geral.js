@@ -173,7 +173,7 @@ function cardContent(ctx) {
     net: {
       label: s?.net ? `Rede · ${s.net.iface}` : 'Rede',
       pill: html`<span class="note mono">Mbps</span>`,
-      value: big(s?.net ? f.num(s.net.rxMbps, s.net.rxMbps < 10 ? 1 : 0) : '—', ' ↓'),
+      value: big(s?.net ? f.mbpsNum(s.net.rxMbps) : '—', ' ↓'),
       note: s?.net ? `↑ ${f.mbps(s.net.txMbps)}${coversToday && todayBytes > 0 ? ` · ${f.bytes(todayBytes)} hoje` : ''}` : 'interface não configurada (NET_IF)',
       viz: netBars(state.buckets),
     },
@@ -205,7 +205,7 @@ function telemetryRows(state) {
       thresholds: [{ value: t.tempC, level: 'warn' }], fill: 0 });
   }
   if (dev) rows.push({ id: 'vg-t-io', label: `I/O ${dev}`, sub: '% ocupado', key: `io:${dev}:util`, color: 's3', range: [0, 100], format: (v) => f.pct(v), fill: 0 });
-  if (s?.net) rows.push({ id: 'vg-t-net', label: 'Rede ↓', sub: 'Mbps', key: 'rxMbps', color: 's1', format: f.mbps, valueFormat: (v) => f.num(v, v < 10 ? 1 : 0), fill: 0 });
+  if (s?.net) rows.push({ id: 'vg-t-net', label: 'Rede ↓', sub: 'Mbps', key: 'rxMbps', color: 's1', format: f.mbps, valueFormat: f.mbpsNum, fill: 0 });
   return rows;
 }
 

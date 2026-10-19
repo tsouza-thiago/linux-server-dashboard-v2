@@ -16,6 +16,16 @@ diante: `PATCH` corrige, `MINOR` acrescenta sem quebrar e `MAJOR` quebra.
   da próxima MINOR (`-rc.N`), que a MINOR estável consolida. Merge com merge commit, sem
   squash nem reescrita do histórico. Só documentação: nada muda no painel.
 
+### Corrigido
+
+- Rede com pouco tráfego aparecia zerada na tela. "Trafegado hoje", "Volume por dia" e o
+  cartão e a tabela da Rede nos Relatórios mostravam "0,0 GB" para centenas de KB: agora o
+  volume usa a unidade do tamanho dele (KB, MB, GB). A vazão "agora" (Rede e Visão geral)
+  mostra 2 casas abaixo de 10 Mbps, e não "0,0" para 0,01 Mbps. O eixo do gráfico de
+  tráfego escolhe as casas pelo passo entre as marcas (0,002, 0,004…), em vez de repetir
+  "0,0". Só a tela muda: o volume de períodos longos ainda sai das taxas arredondadas e é
+  corrigido na próxima versão.
+
 ### Segurança
 
 - Alerta 8 do CodeQL (`js/file-access-to-http`, em `test-support/request.js`) analisado e
