@@ -157,6 +157,8 @@ test('gráficos: cor com alfa, faixa automática do eixo e régua de tempo', () 
 function fakeScreen() {
   const nodes = new Map();
   const el = {
+    innerHTML: '',
+    querySelectorAll: () => [],
     querySelector: (sel) => {
       if (sel === '#rl-custom') return null;
       if (!nodes.has(sel)) nodes.set(sel, { innerHTML: '', clientWidth: 600, querySelectorAll: () => [] });
@@ -171,7 +173,8 @@ function fakeScreen() {
     for (let prev = null; prev !== s;) { prev = s; s = s.replace(/<[^>]*>/g, ''); }
     return s.replace(/\s+/g, ' ');
   };
-  return { el, text };
+  const page = () => el.innerHTML.replace(/\s+/g, ' ');
+  return { el, text, page };
 }
 
 // Tráfego baixo e real de um servidor ocioso: médias de 0,004 e 0,002 Mbps em 10 coletas
@@ -227,4 +230,18 @@ test('relatórios (2.0.2): cartão e tabela da Rede com unidade automática', as
   const table = text('#rl-table');
   assert.match(table, /293 KB \/ 146 KB/);
   assert.doesNotMatch(table, /GB/);
+});
+
+test('rede (2.0.3): o painel "Volume por dia" não fixa a unidade em GB', async () => {
+  const rede = await import('../../public/js/views/rede.js');
+  const { el, page, text } = fakeScreen();
+  rede.render({
+    el, charts: new Map(), local: {}, api: { buckets: () => Promise.resolve({ buckets: [quietBucket()] }) },
+    state: { period: '24h', buckets: [], meta: { pollIntervalMs: 60e3 } },
+  });
+  await new Promise((ok) => setImmediate(ok));
+  // Cada barra e a nota trazem a própria unidade (2.0.2); o "GB" fixo no título contradizia "439 KB".
+  assert.match(page(), /Volume por dia · 7 dias/);
+  assert.doesNotMatch(page(), />GB</);
+  assert.match(text('#rd-week'), /439 KB/);
 });

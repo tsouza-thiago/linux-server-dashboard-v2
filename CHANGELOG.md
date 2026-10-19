@@ -9,6 +9,11 @@ diante: `PATCH` corrige, `MINOR` acrescenta sem quebrar e `MAJOR` quebra.
 
 ## [Não publicado]
 
+### Corrigido
+
+- Rede, painel "Volume por dia": o título não fixa mais "GB". Desde a 2.0.2 cada valor traz
+  a própria unidade (KB, MB, GB), e o "GB" do título contradizia um "1,8 MB" logo abaixo.
+
 ## [2.0.2] — 2026-10-19
 
 Primeira versão pequena pela política nova (ADR 0015): corrige a Rede com pouco tráfego,

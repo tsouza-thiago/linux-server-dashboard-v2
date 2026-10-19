@@ -96,7 +96,7 @@ export function render(ctx) {
     </section>
     <div class="grid-2">
       <section class="panel stale" aria-label="Volume por dia">
-        ${panelHead('Volume por dia · 7 dias', '', html`<span class="page-note">GB</span>`)}
+        ${panelHead('Volume por dia · 7 dias')}
         <div id="rd-week"></div>
       </section>
       <section class="panel stale" aria-label="Maiores picos">
