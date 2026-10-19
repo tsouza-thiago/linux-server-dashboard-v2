@@ -6,6 +6,7 @@ import os from 'node:os';
 import path from 'node:path';
 import { createApp } from '../../server/index.js';
 import { listen, close, request, readSSE } from '../../test-support/request.js';
+import { esperarAte } from '../../test-support/esperar.js';
 import { formatEvent, lastEventId, sampleId, SseHub } from '../../server/http/sse.js';
 
 const BASE = Date.UTC(2026, 9, 7, 12, 0);
@@ -35,10 +36,12 @@ const events = (data) => data.split('\n\n').filter((b) => b.includes('event: '))
 
 test('SSE: cada amostra ao vivo sai com id = instante dela', async (t) => {
   const s = await start(t);
-  const live = readSSE(s.port, { until: 4, timeoutMs: 3000 });
+  // Teto folgado: a leitura termina assim que os 4 eventos chegam, e um teto curto (3 s)
+  // podia vencer antes deles com a máquina carregada (#25).
+  const live = readSSE(s.port, { until: 4, timeoutMs: 15000 });
   // Só coleta depois que a conexão SSE está registrada no hub. Uma espera fixa (50 ms)
   // perdia a amostra com a máquina carregada (ex.: suíte com cobertura).
-  for (let i = 0; i < 200 && s.sse.size < 1; i++) await new Promise((r) => setTimeout(r, 10));
+  await esperarAte(() => s.sse.size >= 1);
   assert.equal(s.sse.size, 1, 'a conexão SSE entrou no hub');
   s.queue.push({ ok: true, sample: { ts: at(0), host: 'srv', disks: [] } });
   await s.runPoll();
@@ -70,14 +73,18 @@ test('SSE: sem Last-Event-ID (1ª conexão) ou com valor inválido não há back
 
 test('SSE: limite de conexões simultâneas responde 503', async (t) => {
   const s = await start(t, { sseMaxClients: 1 });
-  const first = readSSE(s.port, { until: 99, timeoutMs: 1500 });
+  // A 1ª conexão fica aberta até o teste a cortar. Antes ela fechava sozinha em 1,5 s: com a
+  // máquina carregada, a 2ª chegava depois disso e recebia 200 em vez de 503 (#25).
+  const fim = new AbortController();
+  const first = readSSE(s.port, { until: 99, timeoutMs: 15000, signal: fim.signal });
   // A 1ª conexão precisa estar no hub antes da 2ª (espera fixa falhava com a máquina carregada).
-  for (let i = 0; i < 100 && s.sse.size < 1; i++) await new Promise((r) => setTimeout(r, 10));
+  await esperarAte(() => s.sse.size >= 1);
   assert.equal(s.sse.size, 1, 'a 1ª conexão SSE entrou no hub');
   const second = await request(s.port, { path: '/api/stream' });
+  fim.abort();
   assert.equal(second.status, 503);
   assert.match(second.json.error, /conexões demais/);
-  await first;
+  assert.equal((await first).timeout, undefined, 'a 1ª conexão foi cortada pelo teste, não pelo tempo');
 });
 
 test('sse.js: formato do evento e leitura do Last-Event-ID', () => {

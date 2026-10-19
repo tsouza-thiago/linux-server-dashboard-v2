@@ -134,12 +134,12 @@ test('CWE-200: nenhum caminho da pasta pessoal de quem desenvolve', () => {
 });
 
 test('git: nada de .env, data/, chave privada, Node baixado ou relatório de segurança no repositório', () => {
-  const proibidos = ARQUIVOS.filter((f) => /^(?:\.env(?!\.example$)|data\/|\.runtime\/|\.backups\/|\.seguranca\/|\.claude\/|node_modules\/)/.test(f)
+  const proibidos = ARQUIVOS.filter((f) => /^(?:\.env(?!\.example$)|data\/|\.runtime\/|\.backups\/|\.seguranca\/|\.check\/|\.claude\/|node_modules\/)/.test(f)
     || /(?:^|\/)(?:id_(?:rsa|ed25519|ecdsa)(?!\.pub)|[^/]+\.(?:pem|key|p12|pfx|kdbx))$/.test(f));
   assert.deepEqual(proibidos, []);
   // E o .gitignore continua protegendo o que importa.
   const ignore = ler('.gitignore');
-  for (const p of ['.env', 'data/', '.runtime/', '.backups/', '.seguranca/', '*.pem', '*.key']) {
+  for (const p of ['.env', 'data/', '.runtime/', '.backups/', '.seguranca/', '.check/', '*.pem', '*.key']) {
     assert.ok(ignore.split('\n').includes(p), `.gitignore sem ${p}`);
   }
 });

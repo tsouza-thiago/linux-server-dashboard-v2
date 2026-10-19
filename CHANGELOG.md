@@ -25,6 +25,16 @@ diante: `PATCH` corrige, `MINOR` acrescenta sem quebrar e `MAJOR` quebra.
   30 dias; o quadro do Projects e o repositório da V1 ficam privados; o histórico não é
   reescrito. Só configuração e documentação: nada muda no painel.
 
+### Corrigido
+
+- Teste instável do `npm run check` (#25). Em 40 rodadas seguidas (10 com a CPU ocupada) a
+  falha não voltou, mas a análise achou uma corrida no teste do limite de conexões do SSE:
+  a 1ª conexão fechava sozinha em 1,5 s, e com a máquina lenta a 2ª recebia 200 em vez de
+  503. Agora o teste corta a conexão na hora certa, e as leituras de SSE dos testes têm teto
+  folgado. Se um teste falhar, o `npm run check` diz o nome dele e guarda a saída completa
+  em `.check/ultima-falha.log` (fora do git). Só testes e ferramenta de desenvolvimento:
+  nada muda no painel.
+
 ### Segurança
 
 - Imagens base do e2e de instalação (`debian:12` e `ubuntu:24.04`) presas por digest, como as
