@@ -9,6 +9,12 @@ diante: `PATCH` corrige, `MINOR` acrescenta sem quebrar e `MAJOR` quebra.
 
 ## [Não publicado]
 
+## [2.0.2] — 2026-10-19
+
+Primeira versão pequena pela política nova (ADR 0015): corrige a Rede com pouco tráfego,
+que aparecia zerada na tela. Nada muda na configuração, no formato de `data/` nem no acesso
+ao servidor: atualize com `./dashboard atualizar`.
+
 ### Alterado
 
 - Política de versões escrita no repositório (ADR 0015 e AGENTS, "Desenvolvimento"): um
@@ -662,7 +668,8 @@ Documentados no plano da V2 (seção 2.2, B1–B12), entre eles: alerta SMART fa
 rede zerada com contadores grandes, alerta duplicado a cada coleta e reescrita completa do
 histórico a cada minuto.
 
-[Não publicado]: https://github.com/tsouza-thiago/linux-server-dashboard-v2/compare/v2.0.1...HEAD
+[Não publicado]: https://github.com/tsouza-thiago/linux-server-dashboard-v2/compare/v2.0.2...HEAD
+[2.0.2]: https://github.com/tsouza-thiago/linux-server-dashboard-v2/compare/v2.0.1...v2.0.2
 [2.0.1]: https://github.com/tsouza-thiago/linux-server-dashboard-v2/compare/v2.0.0...v2.0.1
 [2.0.0]: https://github.com/tsouza-thiago/linux-server-dashboard-v2/compare/v2.0.0-beta.2...v2.0.0
 [2.0.0-beta.2]: https://github.com/tsouza-thiago/linux-server-dashboard-v2/compare/v2.0.0-beta.1...v2.0.0-beta.2
