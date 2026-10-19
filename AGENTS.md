@@ -147,8 +147,9 @@ O teste `test/unit/docs.test.js` confere esta documentação contra o código.
 - **Commits:** Conventional Commits em PT-BR (`feat(escopo):`, `fix:`, `test:`, `docs:`,
   `refactor:`, `style:`, `perf:`, `chore:`, `security:`), uma mudança lógica por commit.
 - **CHANGELOG.md** atualizado no mesmo commit da mudança (Keep a Changelog).
-- **Bug conhecido** ainda sem correção entra como teste `todo` no arquivo de testes da área;
-  o commit que corrige tira o `todo` e o teste vira regressão. Os 12 bugs da V1 (B1–B12),
+- **Bug conhecido** ainda sem correção entra como issue e como teste `todo` no arquivo de
+  testes da área, com o número da issue no nome; o commit que corrige tira o `todo` e o
+  teste vira regressão. Os 12 bugs da V1 (B1–B12),
   todos corrigidos na V2, são regressões em `test/unit/bugs-v1.test.js`.
 - **Versões:** SemVer a partir da `v2.0.0`: `PATCH` corrige, `MINOR` acrescenta sem quebrar,
   `MAJOR` quebra (configuração, formato de `data/` ou acesso ao servidor). Pré-versões
@@ -162,6 +163,13 @@ O teste `test/unit/docs.test.js` confere esta documentação contra o código.
   correção urgente durante as pré-versões sai de um ramo `manutencao/X.Y` criado da última
   tag e volta ao `main` por merge. Merge com merge commit, sem squash nem reescrita do
   `main`. Documentação sem código não gera versão: sai nas notas da próxima.
+- **Issue primeiro** (ADR 0016): toda mudança começa numa issue aberta pelo formulário do
+  tipo (bug, funcionalidade, tarefa), com rótulos de tipo, área, prioridade e semver, no
+  milestone da versão em que deve sair e no quadro do Projects. O PR fecha a issue
+  (`Closes #N`) e segue o template; o merge exige os checks obrigatórios e o "pode publicar"
+  do mantenedor. Dúvidas e ideias vão para Discussions; vulnerabilidade, só pelo reporte
+  privado do GitHub, nunca em issue pública. Exceções: PRs do Dependabot e o commit de
+  versão.
 - **Orçamento de desempenho:** veja [Orçamento de desempenho](#orçamento-de-desempenho).
   Mudou coleta, histórico ou frontend? Rode `npm run soak` e `npm run test:e2e`.
 - **Node.js 24** é a versão mínima (ADR 0002).
@@ -172,7 +180,7 @@ O teste `test/unit/docs.test.js` confere esta documentação contra o código.
 ### Publicar uma versão (ADR 0012)
 
 1. PR no `main` com o CI verde, a seção `[X.Y.Z] — data` no CHANGELOG e a versão no
-   `package.json` e no `package-lock.json`.
+   `package.json` e no `package-lock.json`. As issues da versão estão no milestone dela.
 2. Depois do merge, na máquina do mantenedor, com a chave listada em `docs/allowed_signers`:
 
    ```bash
@@ -183,8 +191,8 @@ O teste `test/unit/docs.test.js` confere esta documentação contra o código.
    ```
 
 3. Release no GitHub **escolhendo a tag que já existe** (`gh release create vX.Y.Z
-   --verify-tag`), com as notas do CHANGELOG. A interface do GitHub cria tags leves, sem
-   assinatura, que o instalador ignora.
+   --verify-tag`), com as notas do CHANGELOG e as issues fechadas. A interface do GitHub
+   cria tags leves, sem assinatura, que o instalador ignora. Depois, feche o milestone.
 
 Trocar a chave exige um commit em `docs/allowed_signers` **antes** da tag nova: quem já tem
 o painel instalado só aceita a versão nova se a chave dela estiver na lista da versão

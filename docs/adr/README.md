@@ -20,3 +20,4 @@ Uma ADR aceita não é editada; se a decisão mudar, uma nova ADR a substitui.
 | [0013](0013-somente-linux-na-maquina-local.md) | Somente Linux na máquina local | Aceita |
 | [0014](0014-verificacao-de-seguranca-continua.md) | Verificação de segurança contínua (local e no GitHub) | Aceita |
 | [0015](0015-entregas-incrementais-e-consolidacao-em-versoes-minor.md) | Entregas incrementais e consolidação em versões MINOR | Aceita |
+| [0016](0016-fluxo-no-github-issue-primeiro.md) | Fluxo no GitHub: issue primeiro e as ferramentas gratuitas da plataforma | Aceita |
