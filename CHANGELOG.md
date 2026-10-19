@@ -9,6 +9,12 @@ diante: `PATCH` corrige, `MINOR` acrescenta sem quebrar e `MAJOR` quebra.
 
 ## [Não publicado]
 
+## [2.0.3] — 2026-10-19
+
+Dois textos da tela corrigidos, achados ao conferir a 2.0.2 na instalação real. Nada muda na
+configuração, no formato de `data/` nem no acesso ao servidor: atualize com
+`./dashboard atualizar`.
+
 ### Corrigido
 
 - Rede, painel "Volume por dia": o título não fixa mais "GB". Desde a 2.0.2 cada valor traz
@@ -676,7 +682,8 @@ Documentados no plano da V2 (seção 2.2, B1–B12), entre eles: alerta SMART fa
 rede zerada com contadores grandes, alerta duplicado a cada coleta e reescrita completa do
 histórico a cada minuto.
 
-[Não publicado]: https://github.com/tsouza-thiago/linux-server-dashboard-v2/compare/v2.0.2...HEAD
+[Não publicado]: https://github.com/tsouza-thiago/linux-server-dashboard-v2/compare/v2.0.3...HEAD
+[2.0.3]: https://github.com/tsouza-thiago/linux-server-dashboard-v2/compare/v2.0.2...v2.0.3
 [2.0.2]: https://github.com/tsouza-thiago/linux-server-dashboard-v2/compare/v2.0.1...v2.0.2
 [2.0.1]: https://github.com/tsouza-thiago/linux-server-dashboard-v2/compare/v2.0.0...v2.0.1
 [2.0.0]: https://github.com/tsouza-thiago/linux-server-dashboard-v2/compare/v2.0.0-beta.2...v2.0.0
