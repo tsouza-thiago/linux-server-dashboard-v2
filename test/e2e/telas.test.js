@@ -36,7 +36,7 @@ function sample(ts, i) {
     io: [{ dev: 'sda', readMBps: 1 + wave, writeMBps: 0.5, utilPct: 10 + wave * 5, latencyMs: 6 }],
     psi: { cpu: { some10: 4 }, memory: { some10: 0.1 }, io: { some10: 5 } },
     smart: [{ dev: 'sda', status: 'PASSED' }], smartAt: new Date(ts).toISOString(), services: { smbd: 'active' },
-    topProcs: [{ user: 'root', pid: 934, cpu: 1.7, mem: 11.5, rssKB: 99044, etimesSec: 64, cmd: '/usr/bin/dockerd -H fd://' }],
+    topProcs: [{ user: 'root', pid: 934, cpu: 1.7, mem: 11.5, rssKB: 99044, etimesSec: 64, cmd: '/usr/sbin/sshd -D' }],
   };
 }
 

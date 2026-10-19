@@ -2,12 +2,16 @@
 
 Saídas do comando de coleta usadas pelos testes do parser. Nunca versione saída real crua:
 todo arquivo aqui passou por `npm run capturar-amostra` (anonimização) e por revisão humana.
+A anonimização troca hostname, IPs, MACs e usuários, deixa só o `major.minor` da versão do
+kernel e troca os processos fora de uma lista de programas genéricos por `/usr/bin/processoN`,
+sem argumentos. Tamanhos e ocupação dos discos são trocados à mão por valores sintéticos.
+`test/seguranca/segredos-osint.test.js` confere que rodar a anonimização de novo não muda as
+fixtures que vieram do servidor real.
 
 | Arquivo | Origem | Comando |
 |---|---|---|
-| `coleta-v1/debian13-1nucleo.txt` | servidor real do mantenedor, anonimizado (07/10/2026) | V1 (`free`, `df -h`, `grep` no `/proc/net/dev`) |
-| `coleta-v2/debian13-real.txt` | servidor real do mantenedor, anonimizado (07/10/2026), modo `smart`, ~2 min após boot; 901 ms ida e volta | V2 (`server/collector/`) |
-| `coleta-v2/debian13-derivada-v1.txt` | derivada da amostra V1 acima, convertida à mão para o formato V2 (sem PSI) | V2 |
+| `coleta-v2/debian13-real.txt` | coleta real anonimizada (07/10/2026), modo `smart`, ~2 min após boot; discos com valores sintéticos | V2 (`server/collector/`) |
+| `coleta-v2/debian13-derivada-v1.txt` | derivada de uma coleta V1 anonimizada, convertida à mão para o formato V2 (sem PSI); discos com valores sintéticos | V2 |
 | `coleta-v2/casos-limite.txt` | sintética: contador colado, sem permissão, vários sensores, mount ausente | V2 |
 
 Fatos de formato confirmados pela amostra real (Debian 13, kernel 6.12):

@@ -4,7 +4,7 @@ smart
 ===HOST===
 servidor-exemplo
 ===OS===
-6.12.111+deb13-amd64
+6.12.0+deb13-amd64
 PRETTY_NAME="Debian GNU/Linux 13 (trixie)"
 NAME="Debian GNU/Linux"
 ===CPU===
@@ -28,10 +28,10 @@ Writeback:             0 kB
 SReclaimable:      34232 kB
 ===DF===
 Filesystem     Mounted on     1B-blocks         Used         Avail Use% IUse%
-/dev/sda2      /           155475050496   2626097152  144876683264   2%    1%
-/dev/sdb1      /mnt/sdb1  1967845998592 506180972544 1361628360704  28%    1%
-/dev/sdc1      /mnt/sdc1  1967845998592 506180608000 1361628725248  28%    1%
-/dev/sdc2      /mnt/sdc2  3936809369600   5708095488 3731045715968   1%    1%
+/dev/sda2      /            107374182400   1610612736   100394860544   2%    1%
+/dev/sdb1      /mnt/sdb1   1099511627776 322122547200   777389080576  30%    1%
+/dev/sdc1      /mnt/sdc1   1099511627776 161061273600   938450354176  15%    1%
+/dev/sdc2      /mnt/sdc2   2199023255552   5368709120  2193654546432   1%    1%
 ===NET===
 enp0s7:  297197     562    0    0    0     0          0       100   129584     616    0    0    0     0       0          0
 ===IO===
@@ -52,12 +52,12 @@ sdc PASSED
 smbd active
 ===PS===
 USER                                 PID %CPU %MEM   RSS ELAPSED COMMAND
-root                                 934  1.7 11.5 99044      64 /usr/bin/dockerd -H fd:// --containerd=/run/containerd/containerd.sock
-root                                1250  1.5 10.0 86048      53 /portainer
-root                                 816  0.6  6.0 51860      80 /usr/bin/containerd
-root                                 805  0.9  5.9 50944      80 /usr/sbin/tailscaled --state=/var/lib/tailscale/tailscaled.state --socket=/run/tailscale/tailscaled.sock --port=41641
-root                                 883  0.2  3.0 26300      67 /usr/sbin/smbd --foreground --no-process-group
-root                                1360  0.9  2.7 23760      15 /usr/libexec/samba/rpcd_lsad --configfile=/etc/samba/smb.conf --worker-group=6 --worker-index=5 --debuglevel=0
-root                                1362  0.9  2.7 23572      15 /usr/libexec/samba/rpcd_lsad --configfile=/etc/samba/smb.conf --worker-group=6 --worker-index=6 --debuglevel=0
-root                                 870  0.2  2.5 22276      70 /usr/sbin/winbindd --foreground --no-process-group
+root                                 934  1.7 11.5 99044      64 /usr/bin/processo1
+root                                1250  1.5 10.0 86048      53 /usr/bin/processo2
+root                                 816  0.6  6.0 51860      80 /usr/bin/processo3
+root                                 805  0.9  5.9 50944      80 /usr/bin/processo4
+root                                 883  0.2  3.0 26300      67 /usr/sbin/smbd
+root                                1360  0.9  2.7 23760      15 /usr/bin/processo5
+root                                1362  0.9  2.7 23572      15 /usr/bin/processo5
+root                                 870  0.2  2.5 22276      70 /usr/bin/processo6
 ===FIM===
