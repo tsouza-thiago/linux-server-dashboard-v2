@@ -99,6 +99,24 @@ test('docs: subcomandos e opções do ./dashboard existem', () => {
   assert.deepEqual(problems, []);
 });
 
+test('telas: comandos citados na interface existem', () => {
+  // O que a pessoa lê na tela (login, Ajuda, assistente) segue os comandos de verdade: um
+  // script que não existe mais (o ./install.sh da V1) deixa quem perdeu o token sem saída.
+  const problems = [];
+  const files = ['public/index.html', 'public/configurar.html', ...fs.readdirSync(path.join(ROOT, 'public', 'js'), { recursive: true })
+    .filter((f) => f.endsWith('.js')).map((f) => `public/js/${f}`)];
+  for (const file of files) {
+    // Sem as tags do HTML; caminhos de import ('./x.js', ../x.js, ./core/…) não são comandos.
+    const text = read(file).replace(/<[^>]*>/g, '');
+    for (const [, name, sub] of text.matchAll(/(?<![.\w'"`])\.\/([A-Za-z][A-Za-z0-9_.-]*)(?![\w/])(?:[ \t]+([a-z][a-z0-9-]*))?/g)) {
+      if (name === 'dashboard') {
+        if (sub && !COMMAND_NAMES.includes(sub)) problems.push(`${file}: ./dashboard ${sub}`);
+      } else if (!fs.existsSync(path.join(ROOT, name))) problems.push(`${file}: ./${name}`);
+    }
+  }
+  assert.deepEqual(problems, []);
+});
+
 test('docs: scripts do npm citados existem no package.json', () => {
   const scripts = JSON.parse(read('package.json')).scripts;
   const problems = [];

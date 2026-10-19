@@ -13,6 +13,9 @@ diante: `PATCH` corrige, `MINOR` acrescenta sem quebrar e `MAJOR` quebra.
 
 - Rede, painel "Volume por dia": o título não fixa mais "GB". Desde a 2.0.2 cada valor traz
   a própria unidade (KB, MB, GB), e o "GB" do título contradizia um "1,8 MB" logo abaixo.
+- Login: a ajuda "Onde encontro o token?" citava o `./install.sh` da V1, que não existe na
+  V2. Agora aponta o `./dashboard instalar` e ensina a entrar sem digitar, com o
+  `./dashboard abrir`. Um teste novo confere que todo comando citado nas telas existe.
 
 ## [2.0.2] — 2026-10-19
 
