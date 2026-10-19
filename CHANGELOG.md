@@ -9,6 +9,13 @@ diante: `PATCH` corrige, `MINOR` acrescenta sem quebrar e `MAJOR` quebra.
 
 ## [Não publicado]
 
+## [2.0.4] — 2026-10-19
+
+O volume de rede passa a vir dos contadores de bytes do servidor, exatos, e não mais das
+taxas arredondadas: dias de pouco tráfego deixam de aparecer zerados. O script de coleta não
+muda e a chave restrita continua valendo; o formato de `data/` só ganha campos, e as versões
+anteriores continuam lendo os arquivos: atualize com `./dashboard atualizar`.
+
 ### Corrigido
 
 - Volume de rede zerado em períodos longos com pouco tráfego ("sem tráfego registrado", "0 B"
@@ -695,7 +702,8 @@ Documentados no plano da V2 (seção 2.2, B1–B12), entre eles: alerta SMART fa
 rede zerada com contadores grandes, alerta duplicado a cada coleta e reescrita completa do
 histórico a cada minuto.
 
-[Não publicado]: https://github.com/tsouza-thiago/linux-server-dashboard-v2/compare/v2.0.3...HEAD
+[Não publicado]: https://github.com/tsouza-thiago/linux-server-dashboard-v2/compare/v2.0.4...HEAD
+[2.0.4]: https://github.com/tsouza-thiago/linux-server-dashboard-v2/compare/v2.0.3...v2.0.4
 [2.0.3]: https://github.com/tsouza-thiago/linux-server-dashboard-v2/compare/v2.0.2...v2.0.3
 [2.0.2]: https://github.com/tsouza-thiago/linux-server-dashboard-v2/compare/v2.0.1...v2.0.2
 [2.0.1]: https://github.com/tsouza-thiago/linux-server-dashboard-v2/compare/v2.0.0...v2.0.1
