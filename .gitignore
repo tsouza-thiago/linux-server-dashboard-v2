@@ -19,11 +19,6 @@ id_ed25519*
 *.bak
 *.orig
 
-# Documentos internos de planejamento — nunca versionar
-UI_DESIGN_SYSTEM.md
-UI_RESTYLE_PROMPT.md
-PROMPT_DOCUMENTAR_E_PUBLICAR.md
-
 # Automação local do agente — não versionar. De .github/ só entra o que for liberado aqui,
 # um a um: os workflows do CI (ADR 0014) e os arquivos do fluxo de issues e PRs (ADR 0016).
 .github/*
