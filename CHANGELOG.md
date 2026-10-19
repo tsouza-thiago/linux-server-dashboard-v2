@@ -22,6 +22,8 @@ diante: `PATCH` corrige, `MINOR` acrescenta sem quebrar e `MAJOR` quebra.
 
 ### Segurança
 
+- O `.gitignore` deixa de citar nomes de documentos internos de planejamento (#32), que
+  nunca foram versionados: eles passam para o ignore global da máquina de quem desenvolve.
 - CI com as verificações gratuitas do GitHub (ADR 0016): Dependency Review em todo PR
   (reprova vulnerabilidade moderada ou pior e licença incompatível), OpenSSF Scorecard
   semanal e a cada push no `main`, com o resultado no code scanning, e Dependabot de versões
