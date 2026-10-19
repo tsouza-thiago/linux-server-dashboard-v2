@@ -110,3 +110,28 @@ test('A03: toda action do CI presa por SHA de commit, permissões mínimas e sem
     if (/actions\/checkout@/.test(y)) assert.match(y, /persist-credentials:\s*false/, `${f}: checkout sem persistir o token`);
   }
 });
+
+test('A03: Dependabot, Dependency Review e Scorecard seguem a ADR 0016', () => {
+  const ler = (f) => fs.readFileSync(path.join(ROOT, f), 'utf8').replace(/(^|\s)#.*$/gm, '$1');
+  // Dependabot: os dois ecossistemas, com espera por versão nova (versão recém-publicada
+  // é o vetor dos ataques de cadeia de suprimentos).
+  const dep = ler('.github/dependabot.yml');
+  for (const eco of ['github-actions', 'npm']) assert.match(dep, new RegExp(`package-ecosystem: ${eco}\\b`), `Dependabot sem ${eco}`);
+  const esperas = [...dep.matchAll(/default-days:\s*(\d+)/g)].map((m) => Number(m[1]));
+  assert.equal(esperas.length, 2, 'cooldown nos dois ecossistemas');
+  for (const d of esperas) assert.ok(d >= 14, `cooldown de ${d} dias: no mínimo 14`);
+  // Dependency Review: só em PR e reprovando a partir de "moderada".
+  const rev = ler('.github/workflows/dependencias.yml');
+  assert.match(rev, /^on:\s*\n\s+pull_request:\s*$/m, 'Dependency Review roda em todo PR');
+  assert.match(rev, /actions\/dependency-review-action@[0-9a-f]{40}/);
+  assert.match(rev, /fail-on-severity:\s*moderate/);
+  // Scorecard: as regras de publicação (sem env/defaults, id-token só no job dele) e o
+  // resultado no code scanning.
+  const sc = ler('.github/workflows/scorecard.yml');
+  assert.doesNotMatch(sc, /^\s*(?:env|defaults):/m, 'Scorecard: sem env nem defaults');
+  assert.equal([...sc.matchAll(/id-token:\s*write/g)].length, 1, 'id-token só no job do Scorecard');
+  assert.match(sc, /ossf\/scorecard-action@[0-9a-f]{40}/);
+  assert.match(sc, /publish_results:\s*true/);
+  assert.match(sc, /github\/codeql-action\/upload-sarif@[0-9a-f]{40}/);
+  assert.match(sc, /runs-on:\s*ubuntu-/, 'runner Ubuntu hospedado');
+});

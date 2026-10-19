@@ -20,6 +20,14 @@ diante: `PATCH` corrige, `MINOR` acrescenta sem quebrar e `MAJOR` quebra.
   `CONTRIBUTING.md` e o `SECURITY.md` apontando o reporte privado. Um teste em
   `test/unit/docs.test.js` confere esses arquivos.
 
+### Segurança
+
+- CI com as verificações gratuitas do GitHub (ADR 0016): Dependency Review em todo PR
+  (reprova vulnerabilidade moderada ou pior e licença incompatível), OpenSSF Scorecard
+  semanal e a cada push no `main`, com o resultado no code scanning, e Dependabot de versões
+  para as actions e o npm (semanal, agrupado, 14 dias de espera por versão nova, SHAs
+  fixos). `test/seguranca/cadeia-suprimentos.test.js` confere as regras novas.
+
 ## [2.0.5] — 2026-10-19
 
 A Visão geral passa a dar a mesma duração de queda que Eventos e Relatórios. É a última

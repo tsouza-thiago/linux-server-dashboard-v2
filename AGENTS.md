@@ -130,6 +130,12 @@ O teste `test/unit/docs.test.js` confere esta documentação contra o código.
      a cada PR: `npm run check`, `npm run test:e2e` com `E2E_OBRIGATORIO=1` (sem
      navegador, falha em vez de pular) e `npm run seguranca`. Actions presas por SHA,
      permissão só de leitura, sem segredos.
+  4. Ferramentas gratuitas do GitHub (ADR 0016): Dependency Review em todo PR
+     (`.github/workflows/dependencias.yml`: reprova vulnerabilidade moderada ou pior e
+     licença incompatível), OpenSSF Scorecard a cada push no `main` e toda segunda
+     (`.github/workflows/scorecard.yml`, resultado no code scanning), Dependabot de versões
+     para as actions e o npm (`.github/dependabot.yml`, semanal, com 14 dias de espera por
+     versão nova), alertas do Dependabot e secret scanning com push protection.
 
 ## Desenvolvimento (obrigatório)
 
@@ -505,7 +511,8 @@ linux-server-dashboard-v2/
 ├── dashboard               comando único: garante o Node 24 (scripts/node-runtime.sh) e chama server/cli/
 ├── package.json            sem dependências de runtime; devDependency: playwright-core (e2e)
 ├── .env.example            modelo do .env (sem valores reais)
-├── .github/                workflows/seguranca.yml: CI a cada push no main e PR (ADR 0014);
+├── .github/                workflows/: seguranca.yml (CI, ADR 0014), dependencias.yml e
+│                           scorecard.yml; dependabot.yml (ADR 0016);
 │                           ISSUE_TEMPLATE/ (bug, funcionalidade, tarefa), template de PR e
 │                           CODEOWNERS (ADR 0016)
 ├── docs/                   adr/, seguranca/ (análises e excecoes.json) e allowed_signers

@@ -1,0 +1,25 @@
+# Revisão de dependências (ADR 0016): em todo PR, compara as dependências do ramo com as do
+# main e reprova se entrar pacote ou action com vulnerabilidade conhecida (moderada ou pior)
+# ou com licença incompatível com a MIT do projeto. Gratuito em repositório público.
+#
+# Mesmo endurecimento do verificação (ADR 0014): action presa por SHA, só leitura, sem
+# segredo, só pull_request (nunca pull_request_target).
+# test/seguranca/cadeia-suprimentos.test.js confere essas regras.
+name: dependências
+
+on:
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  revisao:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - name: Revisão das dependências novas ou alteradas
+        uses: actions/dependency-review-action@a1d282b36b6f3519aa1f3fc636f609c47dddb294 # v5.0.0
+        with:
+          fail-on-severity: moderate
+          deny-licenses: GPL-2.0-only, GPL-3.0-only, AGPL-3.0-only, AGPL-3.0-or-later
