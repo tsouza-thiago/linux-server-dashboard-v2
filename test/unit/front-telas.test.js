@@ -163,7 +163,14 @@ function fakeScreen() {
       return nodes.get(sel);
     },
   };
-  const text = (sel) => (nodes.get(sel)?.innerHTML || '').replace(/<[^>]*>/g, '').replace(/\s+/g, ' ');
+  // Texto visível do nó: tira as tags até não sobrar nenhuma. Uma passada só deixaria
+  // restos como "<<b>script>" virarem tag de novo (alerta do CodeQL, js/incomplete-
+  // multi-character-sanitization); aqui não há HTML de fora, mas o auxiliar fica correto.
+  const text = (sel) => {
+    let s = nodes.get(sel)?.innerHTML || '';
+    for (let prev = null; prev !== s;) { prev = s; s = s.replace(/<[^>]*>/g, ''); }
+    return s.replace(/\s+/g, ' ');
+  };
   return { el, text };
 }
 
