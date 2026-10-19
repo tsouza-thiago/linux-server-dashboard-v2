@@ -45,7 +45,8 @@ CTX="$OUT/contexto"
 mkdir -p "$CTX"
 cp "$HERE"/*.Dockerfile "$CTX/"
 if [ -n "${E2E_CA:-}" ]; then cp "$E2E_CA" "$CTX/ca.crt"; else : > "$CTX/ca.crt"; fi
-for base in debian:12 ubuntu:24.04; do
+# Imagens presas por digest (A03); para atualizar: docker buildx imagetools inspect <imagem>.
+for base in debian:12@sha256:2c037a04925515fdd6ea85ea14a682d0e79931f5e9f5d07b6dbfc6ba12f9e858 ubuntu:24.04@sha256:68ee22004a9109b44973313b02ff7b1de250f1de0f5ecb628d73f579aaff33ac; do
   t="${base%%:*}"
   # Já construída? Reaproveita (E2E_RECONSTRUIR=1 força), poupando o limite do Docker Hub.
   for papel in servidor cliente; do

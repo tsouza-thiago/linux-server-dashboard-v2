@@ -1,6 +1,8 @@
 # Computador "limpo" (Debian ou Ubuntu) sem Node.js: só o que um desktop recém-instalado
 # já traz (wget, openssh-client, python3) mais o git do comando de 1 linha do README.
-ARG BASE=debian:12
+# Imagem presa por digest (A03): a tag pode mudar de imagem, o digest não. Para atualizar:
+#   docker buildx imagetools inspect debian:12   (linha Digest)
+ARG BASE=debian:12@sha256:2c037a04925515fdd6ea85ea14a682d0e79931f5e9f5d07b6dbfc6ba12f9e858
 FROM ${BASE}
 ARG PROXY=""
 COPY ca.crt /tmp/ca.crt

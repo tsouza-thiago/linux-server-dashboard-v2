@@ -84,6 +84,24 @@ test('A03: as ferramentas de segurança rodam em imagens presas por digest sha25
   assert.doesNotMatch(src, /:latest\b/);
 });
 
+// As imagens base do e2e de instalação também: uma tag (debian:12) pode passar a apontar para
+// outra imagem; o digest não muda (Scorecard Pinned-Dependencies, alertas #14 e #15).
+test('A03: as imagens base do e2e de instalação são presas por digest sha256', () => {
+  const digest = /^[a-z0-9./-]+:[\w.-]+@sha256:[0-9a-f]{64}$/;
+  const imagens = [];
+  for (const f of ['scripts/e2e-instalacao/servidor.Dockerfile', 'scripts/e2e-instalacao/cliente.Dockerfile']) {
+    const src = ler(f);
+    for (const m of src.matchAll(/^ARG BASE=(\S+)$/gm)) imagens.push([f, m[1]]);
+    // FROM só com a variável do ARG acima ou com digest.
+    for (const m of src.matchAll(/^FROM (\S+)/gm)) if (m[1] !== '${BASE}') imagens.push([f, m[1]]);
+  }
+  const lista = ler('scripts/e2e-instalacao/rodar.sh').match(/^for base in ([^;]+); do$/m);
+  assert.ok(lista, 'rodar.sh sem a lista "for base in …; do"');
+  for (const img of lista[1].trim().split(/\s+/)) imagens.push(['scripts/e2e-instalacao/rodar.sh', img]);
+  assert.ok(imagens.length >= 4, `imagens: ${imagens.length}`);
+  for (const [f, img] of imagens) assert.match(img, digest, `${f}: ${img} sem digest`);
+});
+
 test('exceções de segurança: cada achado aceito tem motivo e um teste que o confere', () => {
   const { excecoes } = JSON.parse(ler('docs/seguranca/excecoes.json'));
   assert.ok(Array.isArray(excecoes));

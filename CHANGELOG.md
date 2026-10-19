@@ -27,6 +27,10 @@ diante: `PATCH` corrige, `MINOR` acrescenta sem quebrar e `MAJOR` quebra.
 
 ### Segurança
 
+- Imagens base do e2e de instalação (`debian:12` e `ubuntu:24.04`) presas por digest, como as
+  ferramentas do `npm run seguranca` (#35, alertas #14 e #15 do Scorecard). Um teste em
+  `test/seguranca/cadeia-suprimentos.test.js` confere. Só ferramenta de desenvolvimento: nada
+  muda no painel.
 - O `.gitignore` deixa de citar nomes de documentos internos de planejamento (#32), que
   nunca foram versionados: eles passam para o ignore global da máquina de quem desenvolve.
 - CI com as verificações gratuitas do GitHub (ADR 0016): Dependency Review em todo PR
