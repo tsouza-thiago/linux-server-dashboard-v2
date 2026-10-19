@@ -18,6 +18,11 @@ function rebooted(sample, prev) {
     && sample.uptimeSec < prev.uptimeSec;
 }
 
+// Lacuna máxima para contar o volume da rede: acima dela (painel ou servidor fora por horas)
+// o tráfego da lacuna inteira cairia num dia só. 2 h cobre 1 coleta perdida com o maior
+// POLL_INTERVAL (1 h).
+const MAX_VOLUME_GAP_SEC = 2 * 3600;
+
 // Quanto o contador andou; contador que voltou ou ausente vira null (nunca negativo).
 const delta = (cur, old) => (cur === null || old === null || old === undefined || cur < old ? null : cur - old);
 
@@ -43,7 +48,12 @@ export function computeCpu(sample, prev) {
   };
 }
 
-/** Download e upload em Mbps (preenche `sample.net`); troca de interface não vira taxa. */
+/**
+ * Download e upload em Mbps e os bytes trafegados desde a coleta anterior (preenche
+ * `sample.net`); troca de interface não vira taxa. Os bytes saem exatos dos contadores, sem
+ * arredondar: com tráfego baixo a taxa de 2 casas vira 0, e o volume do dia somado das taxas
+ * também (2.0.4).
+ */
 export function computeNet(sample, prev) {
   const sec = elapsedSec(sample, prev);
   if (!sample.net || !prev || !prev.net || !sec || rebooted(sample, prev)) return;
@@ -52,6 +62,9 @@ export function computeNet(sample, prev) {
   const tx = delta(sample.net.txBytes, prev.net.txBytes);
   sample.net.rxMbps = rx === null ? null : round(rx * 8 / sec / 1e6);
   sample.net.txMbps = tx === null ? null : round(tx * 8 / sec / 1e6);
+  const fits = sec <= MAX_VOLUME_GAP_SEC;
+  sample.net.rxDeltaBytes = fits ? rx : null;
+  sample.net.txDeltaBytes = fits ? tx : null;
 }
 
 /**

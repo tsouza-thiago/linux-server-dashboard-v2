@@ -46,7 +46,8 @@ test('aggregate: baldes alinhados com mín/máx/média; buraco não vira balde',
 test('aggregate: média só entre amostras que têm a métrica', () => {
   const b = aggregate([sample(0, { tempC: 40 }), sample(1, { tempC: null }), sample(2, { tempC: 50 })], 5 * MIN);
   assert.equal(b[0].n, 3);
-  assert.deepEqual(b[0].m.tempC, [40, 50, 45]);
+  // Média de 2 amostras, e o 4º item diz quantas (2.0.4): reagregar pondera por 2, não por 3.
+  assert.deepEqual(b[0].m.tempC, [40, 50, 45, 2]);
 });
 
 test('mergeBuckets: junta baldes de 5 min em 1 h, média ponderada pelo nº de amostras', () => {
@@ -112,4 +113,30 @@ test('worstOf: dado ausente continua ausente (I5) e grupo de 1 é a própria amo
   const v1 = worstOf([{ ts: at(0), host: 'x' }, { ts: at(1), host: 'x' }]);
   assert.equal(v1.host, 'x', 'amostra sem os blocos opcionais não quebra');
   assert.ok(!('tempC' in v1));
+});
+
+test('volume (2.0.4): bytes por coleta somam certo nos baldes e na redução de pontos', () => {
+  const vol = (min, rx, tx) => sample(min, { net: { iface: 'eth0', rxMbps: 0, txMbps: 0, rxDeltaBytes: rx, txDeltaBytes: tx } });
+  const list = [vol(0, 37_500, 100), vol(1, 40_000, 200), vol(2, null, null), vol(3, 22_500, 300)];
+  assert.equal(flatten(list[0]).rxDeltaBytes, 37_500);
+  assert.equal(flatten(list[2]).rxDeltaBytes, undefined, 'sem dado fica de fora (I5)');
+  const five = aggregate(list, 5 * MIN);
+  assert.equal(five.length, 1);
+  const [, , avg] = five[0].m.rxDeltaBytes;
+  // A média gravada perde só a fração de byte (roundValue): ± meio byte por amostra.
+  const near = (got, want, n) => assert.ok(Math.abs(got - want) <= n / 2, `${got} ≈ ${want}`);
+  near(avg * 3, 100_000, 3);
+  assert.equal(five[0].n, 4);
+  assert.equal(five[0].m.rxDeltaBytes[3], 3, '4º item: só 3 das 4 coletas têm o volume');
+  assert.equal(five[0].m.cpu.length, 3, 'métrica presente em todas: sem 4º item (rollup do mesmo tamanho)');
+  // Reagregar (5 min → 20 min) mantém o total: a média é ponderada pelo nº de amostras.
+  const more = aggregate([vol(5, 10_000, 0), vol(6, 10_000, 0)], 5 * MIN);
+  const merged = mergeBuckets([...five, ...more], 20 * MIN);
+  assert.equal(merged.length, 1);
+  near(merged[0].m.rxDeltaBytes[2] * 5, 120_000, 5);
+  // Redução de pontos (/api/history padrão): o ponto do grupo soma o volume do grupo.
+  const reduced = worstOf(list);
+  assert.equal(reduced.net.rxDeltaBytes, 100_000);
+  assert.equal(reduced.net.txDeltaBytes, 600);
+  assert.equal(worstOf([vol(0, null, null), vol(1, null, null)]).net.rxDeltaBytes, null, 'grupo sem dado continua sem dado');
 });

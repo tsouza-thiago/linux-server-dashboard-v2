@@ -174,6 +174,7 @@ const parsers = {
         rxBytes: f[0], rxErrors: f[2], rxDrops: f[3],
         txBytes: f[8], txErrors: f[10], txDrops: f[11],
         rxMbps: null, txMbps: null,
+        rxDeltaBytes: null, txDeltaBytes: null,
       };
       return;
     }

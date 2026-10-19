@@ -15,7 +15,7 @@ const disk = (o) => ({
   dev: 'sda', readIos: 0, sectorsRead: 0, readTicksMs: 0, writeIos: 0, sectorsWrite: 0, writeTicksMs: 0, ioTicksMs: 0,
   readMBps: null, writeMBps: null, utilPct: null, latencyMs: null, ...o,
 });
-const net = (o) => ({ iface: 'enp0s7', rxBytes: 0, txBytes: 0, rxMbps: null, txMbps: null, ...o });
+const net = (o) => ({ iface: 'enp0s7', rxBytes: 0, txBytes: 0, rxMbps: null, txMbps: null, rxDeltaBytes: null, txDeltaBytes: null, ...o });
 
 test('CPU %: usuário, sistema, espera de disco e roubo a partir dos ticks', () => {
   const prev = { ts: T0, uptimeSec: 100, cpuTicks: ticks({ user: 1000, system: 500, idle: 8000, iowait: 500 }) };
@@ -77,4 +77,35 @@ test('computeRates preenche tudo e respeita ordem de tempo invertida (delta ≤ 
   computeRates(cur, prev);
   assert.equal(cur.net.rxMbps, null);
   assert.equal(cur.io[0].readMBps, null);
+});
+
+test('rede (2.0.4): bytes trafegados desde a coleta anterior, exatos, pelos contadores', () => {
+  const prev = { ts: T0, uptimeSec: 100, net: net({ rxBytes: 1_000_000, txBytes: 500_000 }) };
+  // 37,5 KB em 1 min = 0,005 Mbps: a taxa arredonda para 0,01 ou 0, os bytes não.
+  const cur = { ts: T1, uptimeSec: 160, net: net({ rxBytes: 1_037_500, txBytes: 500_123 }) };
+  computeNet(cur, prev);
+  assert.equal(cur.net.rxDeltaBytes, 37_500);
+  assert.equal(cur.net.txDeltaBytes, 123);
+
+  const first = { ts: T1, uptimeSec: 160, net: net({ rxBytes: 5 }) };
+  computeNet(first, null);
+  assert.equal(first.net.rxDeltaBytes, null, '1ª coleta: sem anterior, sem volume');
+  const reset = { ts: T1, uptimeSec: 160, net: net({ rxBytes: 10, txBytes: 10 }) };
+  computeNet(reset, prev);
+  assert.equal(reset.net.rxDeltaBytes, null, 'contador andou para trás: sem dado, não 0');
+  const reboot = { ts: T1, uptimeSec: 30, net: net({ rxBytes: 2_000_000, txBytes: 600_000 }) };
+  computeNet(reboot, prev);
+  assert.equal(reboot.net.rxDeltaBytes, null, 'reboot no meio: o que passou antes dele é desconhecido');
+  const other = { ts: T1, uptimeSec: 160, net: net({ iface: 'eth1', rxBytes: 99e9 }) };
+  computeNet(other, prev);
+  assert.equal(other.net.rxDeltaBytes, null, 'troca de interface');
+
+  // Lacuna longa (painel ou servidor fora por horas): o volume dela iria todo para um dia só.
+  const late = { ts: '2026-10-07T16:51:00.000Z', uptimeSec: 100 + 3 * 3600 + 60, net: net({ rxBytes: 9_000_000, txBytes: 900_000 }) };
+  computeNet(late, prev);
+  assert.equal(late.net.rxDeltaBytes, null, 'mais de 2 h entre as coletas: volume sem dado');
+  assert.ok(late.net.rxMbps > 0, 'a taxa média continua como antes');
+  const twoHours = { ts: '2026-10-07T15:50:00.000Z', uptimeSec: 100 + 7200, net: net({ rxBytes: 2_000_000, txBytes: 500_000 }) };
+  computeNet(twoHours, prev);
+  assert.equal(twoHours.net.rxDeltaBytes, 1_000_000, '2 h em ponto ainda vale (1 coleta perdida com POLL_INTERVAL de 1 h)');
 });

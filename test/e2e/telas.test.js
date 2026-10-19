@@ -32,7 +32,7 @@ function sample(ts, i) {
     ram: { total: 840, used: 400 + wave * 50, free: 100, cache: 300, avail: 440 - wave * 50, swapTotal: 885, swapUsed: 24, dirty: 1, writeback: 0 },
     tempC: 40 + wave * 3, tempSensor: 'acpitz',
     disks: [{ mount: '/', source: '/dev/sda2', dev: 'sda', pct: 30, usedBytes: 3e10, sizeBytes: 1e11, availBytes: 7e10 - i * 1e6, inodesPct: 2 }],
-    net: { iface: 'enp0s7', rxBytes: 1e6 + i, txBytes: 5e5 + i, rxErrors: 0, rxDrops: 0, txErrors: 0, txDrops: 0, rxMbps: 2 + wave, txMbps: 1 },
+    net: { iface: 'enp0s7', rxBytes: 1e6 + i, txBytes: 5e5 + i, rxErrors: 0, rxDrops: 0, txErrors: 0, txDrops: 0, rxMbps: 2 + wave, txMbps: 1, rxDeltaBytes: 15e6 + i * 997, txDeltaBytes: 7.5e6 + i * 499 },
     io: [{ dev: 'sda', readMBps: 1 + wave, writeMBps: 0.5, utilPct: 10 + wave * 5, latencyMs: 6 }],
     psi: { cpu: { some10: 4 }, memory: { some10: 0.1 }, io: { some10: 5 } },
     smart: [{ dev: 'sda', status: 'PASSED' }], smartAt: new Date(ts).toISOString(), services: { smbd: 'active' },

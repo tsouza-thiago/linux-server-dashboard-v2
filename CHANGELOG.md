@@ -9,6 +9,19 @@ diante: `PATCH` corrige, `MINOR` acrescenta sem quebrar e `MAJOR` quebra.
 
 ## [Não publicado]
 
+### Corrigido
+
+- Volume de rede zerado em períodos longos com pouco tráfego ("sem tráfego registrado", "0 B"
+  por dia nos Relatórios). O volume era estimado pelas taxas arredondadas a 0,01 Mbps, e a
+  média de um balde de 20 min ou mais caía para 0. Agora cada coleta guarda os bytes
+  trafegados desde a anterior, exatos pelos contadores (`rxDeltaBytes`/`txDeltaBytes`), e o
+  volume é a soma deles. Lacunas de mais de 2 h, reboot e contador que voltou ficam sem dado.
+  O script de coleta não muda (a chave restrita continua valendo). O que já foi gravado
+  continua estimado pelas taxas: o passado não é recuperado.
+- Agregados: a média de um balde em que só parte das amostras tinha a métrica era
+  reagregada como se todas tivessem. O balde passa a guardar quantas têm (4º item, só quando
+  difere de `n`); arquivos antigos continuam válidos, e versões antigas leem os novos.
+
 ## [2.0.3] — 2026-10-19
 
 Dois textos da tela corrigidos, achados ao conferir a 2.0.2 na instalação real. Nada muda na
