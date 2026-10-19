@@ -9,6 +9,13 @@ diante: `PATCH` corrige, `MINOR` acrescenta sem quebrar e `MAJOR` quebra.
 
 ## [Não publicado]
 
+### Alterado
+
+- Fluxo de trabalho no GitHub (ADR 0016 e AGENTS, "Desenvolvimento"): toda mudança começa
+  numa issue, com rótulos, milestone da versão e quadro no Projects; o PR fecha a issue;
+  dúvidas vão para Discussions e vulnerabilidades, só para o reporte privado. Só
+  documentação: nada muda no painel.
+
 ## [2.0.5] — 2026-10-19
 
 A Visão geral passa a dar a mesma duração de queda que Eventos e Relatórios. É a última
