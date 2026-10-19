@@ -139,7 +139,8 @@ O teste `test/unit/docs.test.js` confere esta documentação contra o código.
   5. Superfície pública mínima (ADR 0017): o GitHub só aceita actions do GitHub e a
      `ossf/scorecard-action`, presas por SHA; PR de fora só roda o CI com aprovação; logs e
      artefatos ficam 30 dias; a Wiki só é editada por colaboradores; o quadro do Projects é
-     privado.
+     privado; o PR só entra no `main` atualizado com ele. Alertas do Scorecard sem correção:
+     análise em `docs/seguranca/2026-10-19-scorecard.md`.
 
 ## Desenvolvimento (obrigatório)
 
