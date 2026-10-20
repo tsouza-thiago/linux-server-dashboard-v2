@@ -9,6 +9,32 @@ diante: `PATCH` corrige, `MINOR` acrescenta sem quebrar e `MAJOR` quebra.
 
 ## [Não publicado]
 
+## [2.1.0] — 2026-10-20
+
+Versão estável que consolida as pré-versões `2.1.0-rc.1`, `rc.2` e `rc.3` (ADR 0015): a
+disponibilidade passa a contar só o tempo em que o painel estava medindo, e a tela ganha
+várias correções. Validada pela bateria completa no navegador nos 4 cenários do painel de
+teste (`docs/testes-no-navegador.md`), pelo soak acelerado (RAM de 91,3 MB com 72 h em
+memória) e pelo `npm run seguranca`. Nada muda na configuração, no formato de `data/` nem no
+acesso ao servidor: atualize com `./dashboard atualizar`. As seções abaixo listam só o que
+mudou desde a `2.1.0-rc.3`; cada pré-versão tem a sua seção.
+
+### Resumo da 2.1 em relação à 2.0.6
+
+- **Disponibilidade só sobre o tempo medido** (#24, ADR 0018): o tempo em que nenhum painel
+  estava coletando não conta mais como "no ar". Sem tempo medido, a disponibilidade é "sem
+  dados", nunca 100%. Visão geral, Eventos e Relatórios usam a mesma conta; em Eventos, o dia
+  sem coleta fica cinza.
+- **Relatórios com todos os dias do período** (#43): o dia inteiro em queda mostra 0% e fica
+  vermelho; o dia sem coleta diz "sem dados".
+- **A versão nova vale logo depois de atualizar** (#44): os arquivos da tela saem com
+  `no-cache` e `ETag`, sem 1 h de cache sem conferir.
+- **Detalhes da tela:** o selo do processador não diz "tranquilo" com a CPU a 100% (#47); sem
+  dado, os cartões mostram só "—", sem a unidade colada (#48); o eixo da temperatura não
+  repete o rótulo (#53); o cartão Rede dos Relatórios diz "sem dados" sem dado (#54).
+- **Testes no navegador no fluxo** (#46, ADR 0019): `npm run painel-teste` e a bateria
+  completa antes de cada versão. Só ferramenta de desenvolvimento.
+
 ### Corrigido
 
 - Recursos: o eixo do gráfico "Temperatura" não repete mais o rótulo ("30°, 29°, 29°") com a
@@ -848,7 +874,8 @@ Documentados no plano da V2 (seção 2.2, B1–B12), entre eles: alerta SMART fa
 rede zerada com contadores grandes, alerta duplicado a cada coleta e reescrita completa do
 histórico a cada minuto.
 
-[Não publicado]: https://github.com/tsouza-thiago/linux-server-dashboard-v2/compare/v2.1.0-rc.3...HEAD
+[Não publicado]: https://github.com/tsouza-thiago/linux-server-dashboard-v2/compare/v2.1.0...HEAD
+[2.1.0]: https://github.com/tsouza-thiago/linux-server-dashboard-v2/compare/v2.1.0-rc.3...v2.1.0
 [2.1.0-rc.3]: https://github.com/tsouza-thiago/linux-server-dashboard-v2/compare/v2.1.0-rc.2...v2.1.0-rc.3
 [2.1.0-rc.2]: https://github.com/tsouza-thiago/linux-server-dashboard-v2/compare/v2.1.0-rc.1...v2.1.0-rc.2
 [2.1.0-rc.1]: https://github.com/tsouza-thiago/linux-server-dashboard-v2/compare/v2.0.6...v2.1.0-rc.1
