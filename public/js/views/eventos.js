@@ -50,20 +50,22 @@ function uptime(state) {
   const outs = o?.outages || [];
   const svcDown = (state.alerts?.all || []).filter((a) => (a.key || '').startsWith('service:')).length;
   const offMs = offlineMsIn(outs, Date.now() - 90 * 86400e3, Date.now());
-  const days = dayStatuses({ days: 90, sinceMs: since, outages: outs, alerts: state.alerts?.all });
+  // Dia sem nenhum tempo medido fica "sem dados" (ADR 0018), não verde.
+  const days = dayStatuses({ days: 90, sinceMs: since, outages: outs, alerts: state.alerts?.all, monitored: o?.monitored });
   const word = { ok: 'sem problemas', warn: 'alerta de atenção', crit: 'queda ou crítico', none: 'sem dados' };
   const lbl = (i) => { const d = new Date(days[i].from); return i === days.length - 1 ? 'hoje' : d.toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' }); };
   return html`
     <div class="panel-head">
       <div class="uptime-head">
         <h2>Disponibilidade · 90 dias</h2>
-        <span class="big md">${f.pct(u?.uptimePct, 2)}</span>
+        <span class="big md">${u && u.uptimePct === null ? 'sem dados' : f.pct(u?.uptimePct, 2)}</span>
         <span class="note">${outs.length} queda${outs.length === 1 ? '' : 's'} · ${svcDown} serviço${svcDown === 1 ? '' : 's'} parado${svcDown === 1 ? '' : 's'} · ${f.duration(offMs / 1000)} fora no total</span>
       </div>
       <div class="legend small">
         <span><span class="swatch" data-bg="ok"></span>sem problemas</span>
         <span><span class="swatch" data-bg="warn"></span>alerta de atenção</span>
         <span><span class="swatch" data-bg="crit"></span>queda ou crítico</span>
+        <span><span class="swatch" data-bg="surface-3"></span>sem dados</span>
       </div>
     </div>
     <div class="day-bars" role="img" aria-label="Disponibilidade por dia nos últimos 90 dias">

@@ -58,7 +58,8 @@ function cards(ctx) {
   const { from, to } = range();
   const outs = outagesIn(ctx.state.outages?.outages, from, to);
   const since = ctx.state.outages?.uptime?.from ? Date.parse(ctx.state.outages.uptime.from) : -Infinity;
-  const up = uptimeIn(ctx.state.outages?.outages, from, to, { sinceMs: since });
+  const monitored = ctx.state.outages?.monitored;
+  const up = uptimeIn(ctx.state.outages?.outages, from, to, { sinceMs: since, monitored });
   const cpuPeak = peakOf(b, 'cpu');
   const ramPeak = peakOf(b, 'ramPct');
   const disk = fullestDisk(ctx.state.sample);
@@ -69,7 +70,7 @@ function cards(ctx) {
   const when = (p) => (p ? `${WEEKDAY[new Date(p.t).getDay()]} ${f.time(p.t)}` : '');
   const card = (label, value, note) => html`<article class="card"><span class="card-label">${label}</span><span class="big md">${value}</span><span class="note">${note}</span></article>`;
   return html`
-    ${card('Disponibilidade', f.pct(up, 2), outs.count ? `${outs.count} queda${outs.count > 1 ? 's' : ''} · ${f.duration(outs.offlineSec)} fora` : 'nenhuma queda')}
+    ${card('Disponibilidade', up === null ? 'sem dados' : f.pct(up, 2), outs.count ? `${outs.count} queda${outs.count > 1 ? 's' : ''} · ${f.duration(outs.offlineSec)} fora` : 'nenhuma queda')}
     ${card('CPU média', f.pct(meanOf(b, 'cpu')), cpuPeak ? `pico ${f.pct(cpuPeak.value)} · ${when(cpuPeak)}` : 'sem dados')}
     ${card('Memória média', f.pct(meanOf(b, 'ramPct')), ramPeak ? `pico ${f.pct(ramPeak.value)}` : 'sem dados')}
     ${card(disk ? disk.mount : 'Disco', grew === null ? '—' : `${grew >= 0 ? '+' : '−'}${f.bytes(Math.abs(grew))}`, pk.length > 1 ? `${f.pct(pk[0])} → ${f.pct(pk[pk.length - 1])} no período` : 'sem dados no período')}
@@ -93,7 +94,7 @@ function table(ctx) {
       <th scope="col" class="num">RAM méd / máx</th><th scope="col" class="num">Temp máx</th><th scope="col" class="num">Rede ↓ / ↑</th><th scope="col" class="num">Eventos</th></tr></thead>
     <tbody>${daily.map((d) => {
     const start = new Date(`${d.day}T00:00:00`).getTime();
-    const up = uptimeIn(ctx.state.outages?.outages, start, start + DAY, { sinceMs: since });
+    const up = uptimeIn(ctx.state.outages?.outages, start, start + DAY, { sinceMs: since, monitored: ctx.state.outages?.monitored });
     const ev = events.filter((e) => f.localDay(e.ts) === d.day);
     const crit = ev.filter((e) => e.kind === 'queda' || levelOf(e) === 'crit').length;
     const warn = ev.filter((e) => e.kind === 'alerta' && levelOf(e) === 'warn').length;
@@ -102,7 +103,7 @@ function table(ctx) {
     const label = `${d.day === today ? 'hoje' : WEEKDAY[new Date(start).getDay()]} · ${d.day.slice(8)}/${d.day.slice(5, 7)}`;
     return html`<tr class="${crit ? 'row-crit' : warn ? 'row-warn' : ''}">
         <td>${label}</td>
-        <td class="num mono${up !== null && up < 100 ? ' ink-crit' : ''}">${up === null ? '—' : `${f.num(up, up < 100 ? 2 : 0)}%${up < 100 ? ' ▼' : ''}`}</td>
+        <td class="num mono${up !== null && up < 100 ? ' ink-crit' : ''}">${up === null ? 'sem dados' : `${f.num(up, up < 100 ? 2 : 0)}%${up < 100 ? ' ▼' : ''}`}</td>
         <td class="num mono">${mm(d.m, 'cpu')}</td>
         <td class="num mono">${mm(d.m, 'ramPct')}</td>
         <td class="num mono${hot ? ' ink-warn' : ''}">${d.m.tempC ? `${f.num(d.m.tempC.max)} °C${hot ? ' ▲' : ''}` : '—'}</td>

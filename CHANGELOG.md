@@ -9,6 +9,16 @@ diante: `PATCH` corrige, `MINOR` acrescenta sem quebrar e `MAJOR` quebra.
 
 ## [Não publicado]
 
+### Alterado
+
+- Disponibilidade só sobre o tempo medido (#24, ADR 0018, que substitui a regra da ADR 0006).
+  O tempo em que nenhum painel estava coletando deixa de contar como "no ar": a conta usa só
+  as faixas de 5 min com amostra e as quedas registradas. Sem tempo medido, a disponibilidade
+  é "sem dados", nunca 100%. Em Eventos, o dia sem nenhuma coleta fica cinza, com a legenda
+  "sem dados"; nos Relatórios, a coluna Disponível diz "sem dados". Visão geral, Eventos e
+  Relatórios usam a mesma conta. `/api/outages` ganha `monitored` (os intervalos medidos) e
+  `uptime.monitoredMs`. Nada muda em `data/`.
+
 ## [2.0.6] — 2026-10-20
 
 O painel usa menos RAM com 72 h de histórico (de ~103 para ~91 MB no soak), e a suíte de

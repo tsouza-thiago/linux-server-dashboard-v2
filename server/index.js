@@ -14,6 +14,7 @@ import { History, RAW_RETENTION_MS, ROLLUP_DAYS } from './storage/index.js';
 import { migrateV1 } from './storage/migrate-v1.js';
 import { AlertsStore, AnnotationsStore } from './stores.js';
 import { OutageLog } from './storage/outages.js';
+import { spansToIso } from './storage/coverage.js';
 import { AlertEngine } from './alerts/engine.js';
 import { collect, configTargets } from './poller.js';
 import { VERSION } from './version.js';
@@ -290,16 +291,20 @@ export function createApp(deps = {}) {
     });
   });
 
-  // Quedas e disponibilidade (ADR 0006): ?days=1..90 (padrão 30).
+  // Quedas e disponibilidade (ADR 0006 e 0018): ?days=1..90 (padrão 30).
   app.get('/api/outages', (req, res) => {
     const days = Math.min(Math.max(parseInt(req.query.days, 10) || 30, 1), 90);
     const toMs = Date.now();
     const fromMs = toMs - days * 24 * HOUR_MS;
-    const since = typeof store.firstMs === 'function' ? store.firstMs() : null;
+    // Tempo medido (ADR 0018): faixas com amostra + quedas. A disponibilidade conta só ele.
+    // Um store injetado sem monitored() (testes antigos) mede só pelas quedas.
+    const quedas = outages.spans({ fromMs, toMs });
+    const monitored = typeof store.monitored === 'function' ? store.monitored(fromMs, toMs, quedas) : quedas;
     res.json({
       days,
       outages: outages.list({ fromMs, toMs }),
-      uptime: outages.uptime({ fromMs, toMs, sinceMs: since ?? toMs }),
+      monitored: spansToIso(monitored),
+      uptime: outages.uptime({ fromMs, toMs, monitored }),
     });
   });
 

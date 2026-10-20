@@ -170,7 +170,7 @@ O painel tem 8 telas, listadas na coluna esquerda (ou nas teclas `1` a `8`).
 | **3 Armazenamento** | Espaço e inodes por ponto de montagem, **previsão de lotação** com as datas do alerta e de "cheio", atividade de cada disco (ocupação, leitura/gravação, latência) e saúde SMART |
 | **4 Rede** | Download e upload agora com o pico do período, volume do dia, erros e descartes, tráfego no período, volume por dia (7 dias) e maiores picos |
 | **5 Processos & serviços** | Cada serviço com o histórico de quedas, os processos que mais usam memória (busca e ordenação) e "para onde vai a memória" |
-| **6 Eventos** | Disponibilidade de 90 dias dia a dia; linha do tempo única de alertas, quedas e anotações, agrupada por dia; filtros; reconhecer; anotar; notificações do navegador |
+| **6 Eventos** | Disponibilidade de 90 dias dia a dia (conta só o tempo em que o painel estava medindo; dia sem coleta fica cinza, "sem dados"); linha do tempo única de alertas, quedas e anotações, agrupada por dia; filtros; reconhecer; anotar; notificações do navegador |
 | **7 Relatórios** | Resumo de 7, 30, 90 dias ou de datas escolhidas, tabela por dia (fuso local) com disponibilidade e eventos; exportação CSV/JSON; impressão/PDF |
 | **8 Ajuda** | O que fazer em cada alerta, como ler o painel, atalhos, configuração ativa (só leitura), acesso ao servidor (linha do sudoers para copiar), versões e sessão |
 

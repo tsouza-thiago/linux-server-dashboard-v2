@@ -7,6 +7,7 @@ import fsp from 'node:fs/promises';
 import path from 'node:path';
 import { aggregate } from './buckets.js';
 import { readNdjson, listDays, dayOf, DAY_MS } from './ndjson.js';
+import { mergeSpans, clipSpans } from './coverage.js';
 
 /** Tamanho de um balde agregado: 5 min. */
 export const ROLLUP_STEP_MS = 5 * 60000;
@@ -26,6 +27,46 @@ export class RollupStore {
     this._torn = new Set();
     // Início do último balde já gravado: tudo até ele está fechado.
     this.lastT = this._readLastT();
+    // Faixas de 5 min com amostra (ADR 0018), lidas do disco no 1º pedido (coverage()).
+    this._coverage = null;
+  }
+
+  /**
+   * Faixas de 5 min com pelo menos 1 amostra guardadas nos agregados (ADR 0018), juntadas
+   * em intervalos [início, fim) em ms. Ler os 90 dias com JSON.parse custaria ~29 MB de
+   * objetos a cada pedido; aqui o disco é lido 1 vez, só o `t` e o `n` de cada linha, e a
+   * lista curta que sobra fica em memória, atualizada a cada balde fechado.
+   */
+  coverage() {
+    if (!this._coverage) this._coverage = mergeSpans(this._scanCoverage());
+    return this._coverage;
+  }
+
+  /** Lê `t` e `n` de cada balde do disco (cada linha começa com {"t":…,"n":…). */
+  _scanCoverage() {
+    const spans = [];
+    for (const day of listDays(this.dir)) {
+      let text;
+      try { text = fs.readFileSync(this.fileFor(day), 'utf8'); } catch { continue; }
+      for (const line of text.split('\n')) {
+        const m = /^\{"t":(\d+),"n":(\d+)[,}]/.exec(line);
+        let t = m ? Number(m[1]) : NaN;
+        let n = m ? Number(m[2]) : 0;
+        // Linha em outra ordem (gravada à mão ou por versão futura): lê o JSON inteiro.
+        if (!m && line.trim()) {
+          try { const b = JSON.parse(line); if (validBucket(b)) { t = b.t; n = b.n; } } catch { /* linha inválida */ }
+        }
+        if (n > 0 && Number.isFinite(t)) spans.push([t, t + ROLLUP_STEP_MS]);
+      }
+    }
+    return spans;
+  }
+
+  /** Acrescenta à cobertura em memória os baldes que acabaram de fechar. */
+  _addCoverage(buckets) {
+    if (!this._coverage) return;
+    const fresh = buckets.filter((b) => b.n > 0).map((b) => [b.t, b.t + ROLLUP_STEP_MS]);
+    this._coverage = mergeSpans([...this._coverage, ...fresh]);
   }
 
   /** Caminho do arquivo NDJSON de um dia. */
@@ -65,6 +106,7 @@ export class RollupStore {
     if (!pending.length) return this._queue;
     const buckets = aggregate(pending, ROLLUP_STEP_MS);
     this.lastT = buckets[buckets.length - 1].t;
+    this._addCoverage(buckets);
     // Agrupa as linhas por arquivo diário para gravar cada dia de uma vez.
     const byDay = new Map();
     for (const b of buckets) {
@@ -92,6 +134,9 @@ export class RollupStore {
       if (day >= firstKeep) break;
       await fsp.rm(this.fileFor(day), { force: true });
     }
+    // A cobertura em memória perde o mesmo que o disco (o dia mais antigo que ficou começa
+    // à meia-noite UTC de firstKeep).
+    if (this._coverage) this._coverage = clipSpans(this._coverage, Date.parse(`${firstKeep}T00:00:00.000Z`), Infinity);
   }
 
   /** Início (ms) do balde mais antigo guardado, ou null. */
@@ -133,6 +178,8 @@ export class RollupStore {
       writeFile(this.fileFor(day), `${lines}\n`);
     }
     for (const b of buckets) if (b.t > this.lastT) this.lastT = b.t;
+    // Baldes gravados no meio do que já existia: a cobertura é relida no próximo pedido.
+    this._coverage = null;
   }
 
   /** Espera as gravações pendentes. */

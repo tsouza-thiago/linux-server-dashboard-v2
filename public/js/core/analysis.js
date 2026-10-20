@@ -198,8 +198,32 @@ export function outagesIn(outages, fromMs, toMs, nowMs = Date.now()) {
   return { count: inside.length, offlineSec: Math.round(offlineMsIn(inside, fromMs, toMs, nowMs) / 1000) };
 }
 
-/** Disponibilidade (%) num intervalo; null antes do início do monitoramento. */
-export function uptimeIn(outages, fromMs, toMs, { sinceMs = -Infinity, nowMs = Date.now() } = {}) {
+/**
+ * Tempo medido (ms) dentro de [fromMs, toMs] (ADR 0018), pela lista `monitored` que vem de
+ * /api/outages: intervalos { from, to } em que o painel estava coletando.
+ */
+export function monitoredMsIn(monitored, fromMs, toMs) {
+  let ms = 0;
+  for (const m of monitored || []) {
+    const a = Math.max(Date.parse(m.from), fromMs);
+    const b = Math.min(Date.parse(m.to), toMs);
+    if (Number.isFinite(a) && Number.isFinite(b) && b > a) ms += b - a;
+  }
+  return ms;
+}
+
+/**
+ * Disponibilidade (%) num intervalo. Com `monitored` (ADR 0018), conta só o tempo medido:
+ * sem tempo medido, é null ("sem dados"), nunca 100%. Sem ele (servidor antigo), a janela
+ * começa em `sinceMs`, o início do monitoramento.
+ */
+export function uptimeIn(outages, fromMs, toMs, { sinceMs = -Infinity, nowMs = Date.now(), monitored = null } = {}) {
+  if (Array.isArray(monitored)) {
+    const end = Math.min(toMs, nowMs);
+    const measured = monitoredMsIn(monitored, fromMs, end);
+    if (!(measured > 0)) return null;
+    return Math.max(0, 100 - (offlineMsIn(outages, fromMs, end, nowMs) / measured) * 100);
+  }
   const start = Math.max(fromMs, sinceMs);
   const end = Math.min(toMs, nowMs);
   if (!(end > start)) return null;
@@ -209,16 +233,18 @@ export function uptimeIn(outages, fromMs, toMs, { sinceMs = -Infinity, nowMs = D
 /**
  * Um quadradinho por dia LOCAL (mais antigo → hoje) para a faixa de disponibilidade:
  * 'crit' = queda ou alerta crítico, 'warn' = alerta de atenção, 'ok' = dia monitorado sem
- * problema, 'none' = antes do monitoramento começar.
+ * problema, 'none' = sem dados. Com `monitored` (ADR 0018), 'none' é o dia sem nenhum tempo
+ * medido; sem ele (servidor antigo), é o dia antes de o monitoramento começar.
  */
-export function dayStatuses({ days = 90, nowMs = Date.now(), sinceMs = null, outages = [], alerts = [] } = {}) {
+export function dayStatuses({ days = 90, nowMs = Date.now(), sinceMs = null, outages = [], alerts = [], monitored = null } = {}) {
   const today = startOfLocalDay(nowMs);
   const out = [];
   for (let i = days - 1; i >= 0; i -= 1) {
     const from = startOfLocalDay(today - i * DAY_MS + DAY_MS / 2);
     const to = from + DAY_MS;
     const hit = (ts) => { const t = Date.parse(ts); return t >= from && t < to; };
-    let status = sinceMs === null || to <= sinceMs ? 'none' : 'ok';
+    const semDados = Array.isArray(monitored) ? monitoredMsIn(monitored, from, to) === 0 : sinceMs === null || to <= sinceMs;
+    let status = semDados ? 'none' : 'ok';
     const dayAlerts = (alerts || []).filter((a) => hit(a.ts));
     if (status !== 'none' && dayAlerts.some((a) => levelOf(a) === 'warn')) status = 'warn';
     if (offlineMsIn(outages, from, to, nowMs) > 0 || dayAlerts.some((a) => levelOf(a) === 'crit')) status = 'crit';
