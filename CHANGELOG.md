@@ -9,6 +9,11 @@ diante: `PATCH` corrige, `MINOR` acrescenta sem quebrar e `MAJOR` quebra.
 
 ## [Não publicado]
 
+### Corrigido
+
+- Relatórios: sem nenhum dado de rede no período, o cartão "Rede" mostra "—" e "sem dados",
+  como os outros cartões, e não mais "0 B" e "↓ 0 B · ↑ 0 B" (#54).
+
 ## [2.1.0-rc.3] — 2026-10-20
 
 3ª pré-versão da 2.1.0: corrige 3 detalhes da tela e o cache dos arquivos da tela depois de

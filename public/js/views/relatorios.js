@@ -67,6 +67,9 @@ function cards(ctx) {
   const pk = disk ? b.map((x) => x.m?.[`disk:${disk.mount}:pct`]?.[2]).filter(Number.isFinite) : [];
   const grew = dk.length > 1 ? dk[0] - dk[dk.length - 1] : null;
   const traffic = dailyTraffic(b, ctx.state.meta?.pollIntervalMs).reduce((a, d) => ({ rx: a.rx + d.rx, tx: a.tx + d.tx }), { rx: 0, tx: 0 });
+  // Sem nenhuma métrica de rede no período (sem amostra ou sem NET_IF), a soma daria "0 B"
+  // inventado (#54, I5): o cartão diz "sem dados", como os outros.
+  const hasNet = ['rxDeltaBytes', 'txDeltaBytes', 'rxMbps', 'txMbps'].some((k) => meanOf(b, k) !== null);
   const when = (p) => (p ? `${WEEKDAY[new Date(p.t).getDay()]} ${f.time(p.t)}` : '');
   const card = (label, value, note) => html`<article class="card"><span class="card-label">${label}</span><span class="big md">${value}</span><span class="note">${note}</span></article>`;
   return html`
@@ -74,7 +77,7 @@ function cards(ctx) {
     ${card('CPU média', f.pct(meanOf(b, 'cpu')), cpuPeak ? `pico ${f.pct(cpuPeak.value)} · ${when(cpuPeak)}` : 'sem dados')}
     ${card('Memória média', f.pct(meanOf(b, 'ramPct')), ramPeak ? `pico ${f.pct(ramPeak.value)}` : 'sem dados')}
     ${card(disk ? disk.mount : 'Disco', grew === null ? '—' : `${grew >= 0 ? '+' : '−'}${f.bytes(Math.abs(grew))}`, pk.length > 1 ? `${f.pct(pk[0])} → ${f.pct(pk[pk.length - 1])} no período` : 'sem dados no período')}
-    ${card('Rede', f.bytes(traffic.rx + traffic.tx), `↓ ${f.bytes(traffic.rx)} · ↑ ${f.bytes(traffic.tx)}`)}`;
+    ${card('Rede', hasNet ? f.bytes(traffic.rx + traffic.tx) : '—', hasNet ? `↓ ${f.bytes(traffic.rx)} · ↑ ${f.bytes(traffic.tx)}` : 'sem dados')}`;
 }
 
 /** Tabela por dia (fuso local) com médias, picos e eventos. */
