@@ -3,7 +3,7 @@
 import { html, mount } from '../core/html.js';
 import * as f from '../core/format.js';
 import {
-  dailySummary, dailyTraffic, outagesIn, uptimeIn, meanOf, peakOf, timeline, levelOf, fullestDisk,
+  reportDays, dailyTraffic, outagesIn, offlineMsIn, uptimeIn, meanOf, peakOf, timeline, levelOf, fullestDisk,
 } from '../core/analysis.js';
 import { $, icon, panelHead, onClick } from './common.js';
 
@@ -81,8 +81,10 @@ function cards(ctx) {
 function table(ctx) {
   const b = ctx.local.buckets;
   if (!b) return html`<p class="empty">Carregando resumo…</p>`;
-  const daily = dailySummary(b, KEYS);
-  if (!daily.length) return html`<p class="empty">Sem dados neste período.</p>`;
+  // Todos os dias do período, com ou sem amostra (#43): o dia só de queda mostra 0% e o dia
+  // sem coleta, "sem dados", como na faixa de Eventos.
+  const { from, to } = range();
+  const daily = reportDays(b, KEYS, from, to);
   const traffic = new Map(dailyTraffic(b, ctx.state.meta?.pollIntervalMs).map((d) => [d.day, d]));
   const events = timeline({ alerts: ctx.state.alerts?.all, outages: ctx.state.outages?.outages });
   const since = ctx.state.outages?.uptime?.from ? Date.parse(ctx.state.outages.uptime.from) : -Infinity;
@@ -98,10 +100,12 @@ function table(ctx) {
     const ev = events.filter((e) => f.localDay(e.ts) === d.day);
     const crit = ev.filter((e) => e.kind === 'queda' || levelOf(e) === 'crit').length;
     const warn = ev.filter((e) => e.kind === 'alerta' && levelOf(e) === 'warn').length;
+    // Dia com tempo fora do ar fica vermelho mesmo se a queda começou antes (como em Eventos).
+    const down = offlineMsIn(ctx.state.outages?.outages, start, start + DAY) > 0;
     const hot = d.m.tempC && t.tempC && d.m.tempC.max >= t.tempC;
     const tr = traffic.get(d.day);
     const label = `${d.day === today ? 'hoje' : WEEKDAY[new Date(start).getDay()]} · ${d.day.slice(8)}/${d.day.slice(5, 7)}`;
-    return html`<tr class="${crit ? 'row-crit' : warn ? 'row-warn' : ''}">
+    return html`<tr class="${crit || down ? 'row-crit' : warn ? 'row-warn' : ''}">
         <td>${label}</td>
         <td class="num mono${up !== null && up < 100 ? ' ink-crit' : ''}">${up === null ? 'sem dados' : `${f.num(up, up < 100 ? 2 : 0)}%${up < 100 ? ' ▼' : ''}`}</td>
         <td class="num mono">${mm(d.m, 'cpu')}</td>

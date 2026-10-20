@@ -2,7 +2,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {
-  timeline, levelOf, viewOfKey, offlineMsIn, outagesIn, uptimeIn, dayStatuses, trafficOf, dailyTraffic, monitoredMsIn,
+  timeline, levelOf, viewOfKey, offlineMsIn, outagesIn, uptimeIn, dayStatuses, trafficOf, dailyTraffic, monitoredMsIn, reportDays,
   peakOf, meanOf, trendOf, topPeaks, diskEta, diskForecast, healthLevel, outageOf,
 } from '../../public/js/core/analysis.js';
 import { applyDataStyles, html, mount } from '../../public/js/core/html.js';
@@ -99,6 +99,32 @@ test('disponibilidade: só o tempo medido; dia sem nenhuma coleta é "sem dados"
     assert.deepEqual(days.map((d) => [d.day, d.status]), [
       ['2026-10-04', 'none'], ['2026-10-05', 'crit'], ['2026-10-06', 'none'], ['2026-10-07', 'ok'],
     ], 'o dia 06, sem coleta, fica cinza (antes ficava verde)');
+  } finally {
+    if (tz === undefined) delete process.env.TZ; else process.env.TZ = tz;
+  }
+});
+
+// #43: a tabela por dia dos Relatórios lista todos os dias do período, como a faixa de Eventos.
+test('relatórios: um dia por linha, com o dia em queda e o dia sem coleta (n = 0)', () => {
+  const tz = process.env.TZ;
+  process.env.TZ = 'America/Sao_Paulo';
+  try {
+    const at = (s) => Date.parse(s);
+    // Baldes só nos dias 16 e 19; 17 e 18 sem amostra (um deles inteiro em queda).
+    const buckets = [
+      { t: at('2026-10-16T10:00:00-03:00'), n: 60, m: { cpu: [1, 9, 4] } },
+      { t: at('2026-10-19T10:00:00-03:00'), n: 30, m: { cpu: [2, 6, 3] } },
+    ];
+    const days = reportDays(buckets, ['cpu'], at('2026-10-16T08:00:00-03:00'), at('2026-10-19T15:00:00-03:00'));
+    assert.deepEqual(days.map((d) => [d.day, d.n]), [['2026-10-19', 30], ['2026-10-18', 0], ['2026-10-17', 0], ['2026-10-16', 60]]);
+    assert.deepEqual(days[1].m, {}, 'dia sem amostra não inventa métrica');
+    assert.equal(days[0].m.cpu.max, 6);
+    assert.deepEqual(reportDays(undefined, [], at('2026-10-19T08:00:00-03:00'), at('2026-10-19T09:00:00-03:00')).map((d) => d.day), ['2026-10-19']);
+    // Troca do horário de verão no meio do período (Nova York, 08/03/2026): o dia de 23 h
+    // não faz o passo pular nem repetir dia.
+    process.env.TZ = 'America/New_York';
+    const dst = reportDays([], [], at('2026-03-06T12:00:00-05:00'), at('2026-03-10T12:00:00-04:00')).map((d) => d.day);
+    assert.deepEqual(dst, ['2026-03-10', '2026-03-09', '2026-03-08', '2026-03-07', '2026-03-06']);
   } finally {
     if (tz === undefined) delete process.env.TZ; else process.env.TZ = tz;
   }
