@@ -20,6 +20,11 @@ diante: `PATCH` corrige, `MINOR` acrescenta sem quebrar e `MAJOR` quebra.
 
 ### Corrigido
 
+- Sem dado, os cartões mostram só o traço "—", sem a unidade colada ("—%", "—°C",
+  "— Mbps"), em Visão geral, Recursos e Rede (#48).
+- Visão geral: o selo do processador não diz mais "tranquilo" ao lado da CPU a 100% (#47).
+  Regra nova, sobre a mesma coleta do número: carga acima de 1,5 × núcleos →
+  "sobrecarregado"; senão, CPU ≥ 90% → "ocupado"; senão, "tranquilo".
 - Depois de `./dashboard atualizar`, a tela usa logo os arquivos da versão nova (#44). JS,
   CSS e fontes saíam com 1 h de cache sem conferir; agora todos os arquivos da tela saem com
   `no-cache` e `ETag`: o navegador confere a cada uso e recebe um 304, sem corpo, quando
