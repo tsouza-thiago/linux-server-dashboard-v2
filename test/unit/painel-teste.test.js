@@ -5,9 +5,10 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import { semear, CENARIOS } from '../../scripts/painel-teste.mjs';
+import { semear, criarPainel, CENARIOS } from '../../scripts/painel-teste.mjs';
 import { History } from '../../server/storage/index.js';
 import { OutageLog } from '../../server/storage/outages.js';
+import { listen, close, request } from '../../test-support/request.js';
 
 const MIN = 60000;
 const DAY = 1440 * MIN;
@@ -58,4 +59,16 @@ test('painel de teste: offline termina 10 min antes de agora; vazio não grava n
   const vazio = pasta(t);
   await semear(vazio, 'vazio', { agora: AGORA });
   assert.equal(abrir(vazio).h.length, 0);
+});
+
+test('painel de teste: /api/config tem os discos com SMART, como a instalação sem SMART_DEVS (#57)', async (t) => {
+  const dir = pasta(t);
+  const { coletar } = await semear(dir, 'vazio', { agora: AGORA });
+  const { app, shutdown } = criarPainel(dir, 'vazio', coletar);
+  const { server, port } = await listen(app);
+  t.after(async () => { await close(server); await shutdown(); });
+  const r = await request(port, { path: '/api/config' });
+  assert.equal(r.status, 200);
+  // Sem smartDevs, a Ajuda diria "nenhum disco em SMART_DEVS" ao lado do sudo liberado.
+  assert.deepEqual(r.json.targets.smartDevs, ['sda', 'sdb', 'sdc']);
 });

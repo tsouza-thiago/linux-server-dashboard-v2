@@ -21,6 +21,7 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { createApp } from '../server/index.js';
 import { collect } from '../server/collector/index.js';
+import { normalizeTargets } from '../server/collector/builder.js';
 import { History } from '../server/storage/index.js';
 import { OutageLog } from '../server/storage/outages.js';
 
@@ -29,7 +30,10 @@ const MIN = 60000;
 const DAY = 1440 * MIN;
 export const CENARIOS = ['normal', 'lacunas', 'offline', 'vazio'];
 // Os alvos da fixture: 4 pastas em 3 discos, rede e 1 serviço (todas as telas têm o que mostrar).
-export const ALVOS = { netIf: 'enp0s7', mounts: ['/', '/mnt/sdb1', '/mnt/sdc1', '/mnt/sdc2'], devs: ['sda', 'sdb', 'sdc'], services: ['smbd'] };
+// normalizeTargets completa o smartDevs com os discos, como a instalação sem SMART_DEVS faz
+// (configTargets); sem isso a Ajuda diria "nenhum disco em SMART_DEVS" (#57). O hash do
+// coletor não muda: SMART nos mesmos discos do I/O fica fora da conta.
+export const ALVOS = normalizeTargets({ netIf: 'enp0s7', mounts: ['/', '/mnt/sdb1', '/mnt/sdc1', '/mnt/sdc2'], devs: ['sda', 'sdb', 'sdc'], services: ['smbd'] });
 const FIXTURE = fs.readFileSync(path.join(ROOT, 'test', 'fixtures', 'coleta-v2', 'debian13-real.txt'), 'utf8');
 
 /**
@@ -96,22 +100,30 @@ const opcao = (nome, padrao) => {
   return a ? a.slice(nome.length + 3) : padrao;
 };
 
+/**
+ * O painel (createApp) sobre os dados de `dir`, sem token. `coletar` é o coletor falso de
+ * semear(); no cenário offline, toda coleta falha.
+ */
+export function criarPainel(dir, cenario, coletar) {
+  // offline: toda coleta falha (o motor abre a queda depois de 2 falhas seguidas).
+  const coleta = cenario === 'offline'
+    ? async () => ({ ok: false, error: 'teste: servidor desligado' })
+    : () => coletar(Date.now());
+  const arq = (nome) => path.join(dir, nome);
+  return createApp({
+    dataDir: dir, historyFile: arq('history.json'), alertsFile: arq('alerts.json'), annotationsFile: arq('annotations.json'),
+    outagesFile: arq('outages.ndjson'), sessionsFile: arq('sessions.json'), dashToken: '', sshHost: 'servidor',
+    targets: ALVOS, pollInterval: 60000, collect: coleta, log: () => {},
+  });
+}
+
 async function main() {
   const cenario = opcao('cenario', 'normal');
   const porta = Number(opcao('porta', '3943'));
   if (!Number.isInteger(porta) || porta < 1024 || porta > 65535) throw new Error('use --porta entre 1024 e 65535');
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'dash-painel-teste-'));
   const { coletar } = await semear(dir, cenario);
-  // offline: toda coleta falha (o motor abre a queda depois de 2 falhas seguidas).
-  const coleta = cenario === 'offline'
-    ? async () => ({ ok: false, error: 'teste: servidor desligado' })
-    : () => coletar(Date.now());
-  const arq = (nome) => path.join(dir, nome);
-  const { app, runPoll, shutdown } = createApp({
-    dataDir: dir, historyFile: arq('history.json'), alertsFile: arq('alerts.json'), annotationsFile: arq('annotations.json'),
-    outagesFile: arq('outages.ndjson'), sessionsFile: arq('sessions.json'), dashToken: '', sshHost: 'servidor',
-    targets: ALVOS, pollInterval: 60000, collect: coleta, log: () => {},
-  });
+  const { app, runPoll, shutdown } = criarPainel(dir, cenario, coletar);
   if (cenario === 'offline') { await runPoll(); await runPoll(); }
   // vazio fica sem coleta: é o estado do 1º uso, antes da 1ª amostra chegar.
   const timer = cenario === 'vazio' ? null : setInterval(runPoll, 60000);
