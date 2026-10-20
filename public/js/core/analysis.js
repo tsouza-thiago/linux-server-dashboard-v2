@@ -378,5 +378,23 @@ export function diskForecast(buckets, mount, { alertPct = 90, nowMs = Date.now()
   return { ...eta, pct, daysToAlert, fullAt: nowMs + eta.days * DAY_MS, alertAt: nowMs + daysToAlert * DAY_MS };
 }
 
+/** Uso de CPU a partir do qual o selo diz "ocupado" (#47). */
+const CPU_BUSY_PCT = 90;
+
+/**
+ * Estado do processador para o selo da Visão geral: "sobrecarregado" (load acima de 1,5 ×
+ * núcleos, a mesma regra da saúde), "ocupado" (CPU ≥ 90% na coleta) ou "tranquilo". Usa a
+ * mesma coleta do número ao lado, para nunca dizer "tranquilo" ao lado de 100% (#47). Sem
+ * CPU % (1ª coleta), não há selo (null).
+ */
+export function cpuState(sample) {
+  if (!sample?.cpu) return null;
+  const cores = sample.cores || 1;
+  const load1 = sample.load?.[0];
+  if (Number.isFinite(load1) && load1 > cores * 1.5) return 'sobrecarregado';
+  if (Number.isFinite(sample.cpu.pct) && sample.cpu.pct >= CPU_BUSY_PCT) return 'ocupado';
+  return 'tranquilo';
+}
+
 /** Status de saúde → classes visuais: ok / warn / crit. */
 export const healthLevel = (level) => (level === 'bad' ? 'crit' : level === 'warn' ? 'warn' : level === 'ok' ? 'ok' : 'neutral');

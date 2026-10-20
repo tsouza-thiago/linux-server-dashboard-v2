@@ -7,7 +7,7 @@ import { html, mount } from '../core/html.js';
 import * as f from '../core/format.js';
 import {
   headline, fullestDisk, diskEta, timeline, isOffline, healthLevel, levelOf, viewOfKey, peakOf,
-  dailyTraffic, series, outageOf,
+  dailyTraffic, series, outageOf, cpuState,
 } from '../core/analysis.js';
 import { PERIODS } from '../core/router.js';
 import {
@@ -135,13 +135,15 @@ const cardShell = (id) => html`
     <div class="card-viz" data-slot="viz">${id === 'cpu' || id === 'ram' || id === 'temp' ? chartBox(`vg-${id}`, 'spark') : ''}</div>
   </article>`;
 
+// Selo do processador: carga alta e CPU alta avisam; o resto é "tranquilo" (#47).
+const cpuPill = (state) => (!state ? '' : pill(state === 'tranquilo' ? 'ok' : 'warn', state));
+
 /** Conteúdo dos 5 indicadores (mini-gráfico, medidor ou barras). */
 function cardContent(ctx) {
   const { state } = ctx;
   const s = state.sample;
   const t = state.meta?.thresholds || state.config?.thresholds || {};
   const ramPct = s?.ram?.total ? (s.ram.used / s.ram.total) * 100 : null;
-  const cores = s?.cores || 1;
   const load1 = s?.load?.[0];
   const disk = fullestDisk(s);
   const eta = disk ? diskEta(ctx.local.disk30 || state.buckets || [], disk.mount) : null;
@@ -152,7 +154,7 @@ function cardContent(ctx) {
   return {
     cpu: {
       label: 'Processador',
-      pill: !s?.cpu ? '' : Number.isFinite(load1) && load1 > cores * 1.5 ? pill('warn', 'sobrecarregado') : pill('ok', 'tranquilo'),
+      pill: cpuPill(cpuState(s)),
       value: big(n0(s?.cpu?.pct), '%'),
       note: s?.cpu ? `iowait ${f.pct(s.cpu.iowait)} · load ${f.num(load1, 2)}` : 'CPU % a partir da 2ª coleta',
     },

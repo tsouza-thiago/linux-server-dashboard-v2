@@ -3,7 +3,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {
   timeline, levelOf, viewOfKey, offlineMsIn, outagesIn, uptimeIn, dayStatuses, trafficOf, dailyTraffic, monitoredMsIn, reportDays,
-  peakOf, meanOf, trendOf, topPeaks, diskEta, diskForecast, healthLevel, outageOf,
+  peakOf, meanOf, trendOf, topPeaks, diskEta, diskForecast, healthLevel, outageOf, cpuState,
 } from '../../public/js/core/analysis.js';
 import { applyDataStyles, html, mount } from '../../public/js/core/html.js';
 import { alpha, autoRange, evenTicks } from '../../public/js/charts/timeseries.js';
@@ -351,4 +351,19 @@ test('cartões (#48): sem dado, só o traço "—", sem a unidade colada', async
     assert.doesNotMatch(String(big(n0(null), unit)), /class="unit"/, `"—${unit}" não aparece`);
   }
   assert.match(String(big(n0(42), '%')), /42<span class="unit">%<\/span>/, 'com dado, a unidade continua');
+});
+
+test('visão geral (#47): o selo do processador não contradiz o uso de CPU ao lado', () => {
+  // O caso do relato: CPU a 100% com load 1,39 num núcleo dizia "tranquilo".
+  assert.equal(cpuState({ cpu: { pct: 100 }, load: [1.39], cores: 1 }), 'ocupado');
+  assert.equal(cpuState({ cpu: { pct: 90 }, load: [0.2], cores: 1 }), 'ocupado', 'o limite de 90% conta');
+  assert.equal(cpuState({ cpu: { pct: 89.9 }, load: [0.2], cores: 1 }), 'tranquilo');
+  // Carga acima de 1,5 × núcleos ganha da CPU (mesma regra da saúde).
+  assert.equal(cpuState({ cpu: { pct: 100 }, load: [3.1], cores: 2 }), 'sobrecarregado');
+  assert.equal(cpuState({ cpu: { pct: 10 }, load: [1.6], cores: 1 }), 'sobrecarregado');
+  // Sem CPU % (1ª coleta) não há selo; sem load, só a CPU decide (I5).
+  assert.equal(cpuState({ cpu: null, load: [5], cores: 1 }), null);
+  assert.equal(cpuState(null), null);
+  assert.equal(cpuState({ cpu: { pct: 95 }, load: [] }), 'ocupado');
+  assert.equal(cpuState({ cpu: { pct: null }, load: [0.1], cores: 1 }), 'tranquilo');
 });
