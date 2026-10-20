@@ -137,7 +137,9 @@ export function update(ctx) {
     cpuSpec(state),
     { id: 'rc-ram', height: 170, range: [0, 100], format: (v) => f.pct(v), thresholds: [{ value: t.ramPct, level: 'warn' }],
       series: [{ label: 'RAM média', key: 'ramPct', color: 's2', fill: 0.16 }, { label: 'RAM pico', key: 'ramPct', stat: 'max', color: 's2', dash: true }] },
-    { id: 'rc-temp', height: 170, format: f.celsius, axisFormat: (v) => `${f.num(v)}°`, thresholds: [{ value: t.tempC, level: 'warn' }],
+    // Casas pelo passo entre as marcas (#53), como o tráfego da Rede: com a temperatura
+    // constante, as marcas de meio grau arredondadas a 0 casas repetiam "29°".
+    { id: 'rc-temp', height: 170, format: f.celsius, axisFormat: (v, marks) => `${f.num(v, f.axisDigits(marks))}°`, thresholds: [{ value: t.tempC, level: 'warn' }],
       series: [{ label: 'média', key: 'tempC', color: 's4' }, { label: 'pico', key: 'tempC', stat: 'max', color: 's4', dash: true }] },
   ]);
   drawStrips(ctx, ctx.el, 'rc-psi', PSI_ROWS);

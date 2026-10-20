@@ -367,3 +367,23 @@ test('visão geral (#47): o selo do processador não contradiz o uso de CPU ao l
   assert.equal(cpuState({ cpu: { pct: 95 }, load: [] }), 'ocupado');
   assert.equal(cpuState({ cpu: { pct: null }, load: [0.1], cores: 1 }), 'tranquilo');
 });
+
+test('recursos (#53): eixo da temperatura com as casas que o passo entre as marcas pede', async () => {
+  const recursos = await import('../../public/js/views/recursos.js');
+  const { el } = fakeScreen();
+  // O uPlot falso guarda as opções de cada gráfico pelo nó em que foi montado.
+  const charts = new Map();
+  globalThis.uPlot = class { constructor(o, _d, target) { charts.set(target, o); } setData() {} setScale() {} };
+  try {
+    recursos.update({ el, charts: new Map(), local: {}, state: { period: '24h', buckets: [], meta: {} } });
+  } finally {
+    delete globalThis.uPlot;
+  }
+  const opts = charts.get(el.querySelector('[data-chart="rc-temp"]'));
+  assert.ok(opts, 'o gráfico de temperatura foi criado');
+  const axis = (vals) => opts.axes[1].values(null, vals);
+  // Temperatura constante em 29 °C: marcas de meio grau não podem repetir "29°".
+  assert.deepEqual(axis([28.5, 29, 29.5, 30]), ['28,5°', '29,0°', '29,5°', '30,0°']);
+  assert.deepEqual(axis([29, 29.2, 29.4]), ['29,0°', '29,2°', '29,4°']);
+  assert.deepEqual(axis([30, 40, 50]), ['30°', '40°', '50°'], 'passo inteiro continua sem casas');
+});

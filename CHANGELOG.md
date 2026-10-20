@@ -9,6 +9,12 @@ diante: `PATCH` corrige, `MINOR` acrescenta sem quebrar e `MAJOR` quebra.
 
 ## [Não publicado]
 
+### Corrigido
+
+- Recursos: o eixo do gráfico "Temperatura" não repete mais o rótulo ("30°, 29°, 29°") com a
+  temperatura constante (#53). As casas decimais seguem o passo entre as marcas ("28,5°,
+  29,0°, 29,5°"), como o eixo do tráfego da Rede.
+
 ## [2.1.0-rc.3] — 2026-10-20
 
 3ª pré-versão da 2.1.0: corrige 3 detalhes da tela e o cache dos arquivos da tela depois de
