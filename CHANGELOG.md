@@ -9,6 +9,13 @@ diante: `PATCH` corrige, `MINOR` acrescenta sem quebrar e `MAJOR` quebra.
 
 ## [Não publicado]
 
+### Corrigido
+
+- **Painel de teste com os discos do SMART** (#57): o `npm run painel-teste` passa os alvos
+  pelo `normalizeTargets`, como a instalação. A Ajuda mostra "Discos com SMART: sda sdb sdc"
+  e não diz mais "nenhum disco em SMART_DEVS" ao lado do SMART liberado. Só a ferramenta de
+  desenvolvimento muda; o painel instalado já estava certo.
+
 ## [2.1.0] — 2026-10-20
 
 Versão estável que consolida as pré-versões `2.1.0-rc.1`, `rc.2` e `rc.3` (ADR 0015): a
