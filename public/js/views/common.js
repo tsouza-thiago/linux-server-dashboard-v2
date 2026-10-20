@@ -78,7 +78,9 @@ export const smartOf = (status) => SMART[status] || { level: 'neutral', text: st
 // ---------------- Números e medidores ----------------
 /** Número grande em Geist Mono com a unidade menor e apagada ("71%", "48 °C"). */
 export function big(value, unit = '', cls = '') {
-  return html`<span class="big${cls ? ` ${cls}` : ''}">${value}${unit ? html`<span class="unit">${unit}</span>` : ''}</span>`;
+  // Sem dado, o valor é só o traço (I5): "—%" ou "— Mbps" parecem um número quebrado (#48).
+  const showUnit = unit && value !== '—';
+  return html`<span class="big${cls ? ` ${cls}` : ''}">${value}${showUnit ? html`<span class="unit">${unit}</span>` : ''}</span>`;
 }
 
 /** Número sem unidade para o `big()`: "—" quando falta dado (I5). */
