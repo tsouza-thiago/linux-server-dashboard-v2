@@ -10,6 +10,7 @@ import net from 'node:net';
 import os from 'node:os';
 import path from 'node:path';
 import { clampInt, loadEnvFile } from '../config.js';
+import { PANEL_NODE_FLAGS } from '../node-flags.js';
 
 /** Nome do serviço systemd de usuário do painel (o docs.test confere contra a documentação). */
 export const UNIT_NAME = 'server-dashboard.service';
@@ -133,7 +134,7 @@ export async function startPanel({ root, home = os.homedir(), nodeBin = process.
   fs.mkdirSync(dataDir, { recursive: true, mode: 0o700 });
   const errLog = path.join(dataDir, 'dashboard-erros.log');
   const fd = fs.openSync(errLog, 'a', 0o600);
-  const child = spawnFn(nodeBin, [serverScript(root)], { cwd: root, detached: true, stdio: ['ignore', 'ignore', fd] });
+  const child = spawnFn(nodeBin, [...PANEL_NODE_FLAGS, serverScript(root)], { cwd: root, detached: true, stdio: ['ignore', 'ignore', fd] });
   fs.closeSync(fd);
   fs.writeFileSync(pidFile(root), `${child.pid}\n`, { mode: 0o600 });
   child.unref();

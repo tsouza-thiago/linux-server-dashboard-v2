@@ -243,7 +243,7 @@ navegador. O backend só coleta, persiste e serve. O limite de 1 SSH por minuto 
 ./dashboard atualizar           # tag assinada mais nova, backup de data/, volta atrás se falhar
 ./dashboard desinstalar         # remove daqui e oferece limpar o servidor
 ./dashboard versao              # versão instalada
-npm start                       # o painel em primeiro plano (node server/index.js)
+npm start                       # o painel em primeiro plano (node --max-semi-space-size=2 server/index.js)
 npm run poll                    # 1 coleta, sem o servidor web (node server/poller.js --once)
 npm test                        # suíte de testes (node --test)
 npm run check                   # verificação completa, obrigatória antes de cada commit
@@ -495,19 +495,24 @@ Motor em `server/alerts/` (ADR 0006).
 
 ## Orçamento de desempenho
 
-Definido no plano da V2. O limite de RAM foi revisto em 16/10/2026, depois de medido.
+Definido no plano da V2. O limite de RAM foi revisto em 16/10/2026 e em 19/10/2026 (#26),
+sempre depois de medido.
 
 | Medida | Limite | Medido | Como se confere |
 |---|---|---|---|
 | Tempo do comando no servidor | ≤ 1,5 s | 1,26–1,31 s (servidor real, 1 núcleo) | faixa de status e `./dashboard diagnosticar` |
 | Tamanho da resposta | ≤ 16 KB | 2,9 KB (servidor real) | idem; acima de 1 MB a conexão é cortada |
 | Página inicial | ≤ 300 KB transferidos | 289 KB (com gzip) | `test/e2e/telas.test.js` |
-| RAM do Node com 72 h em memória | ≤ 110 MB | 102,6–105,6 MB (painel reiniciado com 72 h) | `npm run soak` |
+| RAM do Node com 72 h em memória | ≤ 95 MB | 91,1–91,3 MB (painel reiniciado com 72 h) | `npm run soak` |
 | Memória depois que a janela de 72 h enche | sem crescer (≤ +4 MB) | +1,1 a +1,8 MB em 11 h a mais | `npm run soak` |
 
-O Node 24 vazio usa ~44 MB e o painel sem histórico, ~62 MB: o resto é o histórico de
-72 h (~3,6 KB por amostra em memória). Para voltar a 80 MB, o próximo passo (previsto para
-a 2.1) é guardar em memória só os números que os gráficos usam.
+O Node 24 vazio usa ~44 MB e o painel sem histórico, ~63 MB (o `node:http` sozinho ocupa
+~16 MB). As amostras de 72 h ocupam ~12 MB de heap. O que mais pesava era a geração jovem do
+V8: ela crescia até 32 MB na carga das 72 h e não encolhia. Por isso o painel sobe com
+`--max-semi-space-size=2` (`server/node-flags.js`), nos 4 caminhos: serviço systemd, segundo
+plano, `npm start` e o soak. A opção só vale na linha de comando do Node. Guardar as amostras
+numa forma compacta foi medido em 19/10/2026: o heap cai ~5 MB, mas o RSS não melhora (a
+codificação gera lixo na carga). A meta antiga de 80 MB não é alcançável assim.
 
 ## Estrutura
 
@@ -529,7 +534,7 @@ linux-server-dashboard-v2/
 │   ├── config.js           parser único do .env, faixas, sanitizeToken/sanitizeHost
 │   ├── security.js         Host check, CSRF, cabeçalhos, token timing-safe, rate limit
 │   ├── poller.js           fachada do coletor + alertas (CLI --once)
-│   ├── csv.js · stores.js · logfile.js · version.js
+│   ├── csv.js · stores.js · logfile.js · version.js · node-flags.js (opções do Node do painel)
 │   ├── cli/                subcomandos do ./dashboard (index, servico, instalar, diagnosticar,
 │   │                       atualizar, desinstalar, importar-v1, saida)
 │   ├── setup/              instalação: acesso, deteccao, preparo, remoto, local, assinatura,

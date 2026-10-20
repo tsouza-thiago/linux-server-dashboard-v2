@@ -24,6 +24,12 @@ diante: `PATCH` corrige, `MINOR` acrescenta sem quebrar e `MAJOR` quebra.
   Scorecard, presas por SHA; PR de fora só roda o CI com aprovação; logs e artefatos ficam
   30 dias; o quadro do Projects e o repositório da V1 ficam privados; o histórico não é
   reescrito. Só configuração e documentação: nada muda no painel.
+- Menos RAM com 72 h de histórico (#26): o painel sobe com `--max-semi-space-size=2`, que
+  impede a geração jovem do V8 de crescer até 32 MB na carga do histórico. No soak, o RSS
+  caiu de ~103 para ~91 MB, sem custo de CPU por coleta. A opção vale nos 4 caminhos que
+  iniciam o painel (serviço systemd, segundo plano, `npm start` e soak) e fica num lugar só
+  (`server/node-flags.js`). O orçamento de RAM passa de 110 para 95 MB. O serviço systemd de
+  quem já tem o painel é refeito pelo `./dashboard atualizar`.
 
 ### Corrigido
 
