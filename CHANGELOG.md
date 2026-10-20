@@ -11,12 +11,16 @@ diante: `PATCH` corrige, `MINOR` acrescenta sem quebrar e `MAJOR` quebra.
 
 ### Corrigido
 
+- Recursos: o eixo do gráfico "Temperatura" não repete mais o rótulo ("30°, 29°, 29°") com a
+  temperatura constante (#53). As casas decimais seguem o passo entre as marcas ("28,5°,
+  29,0°, 29,5°"), como o eixo do tráfego da Rede.
+- CHANGELOG: a seção da 2.1.0-rc.3 dizia "3 detalhes da tela"; são 2.
 - Relatórios: sem nenhum dado de rede no período, o cartão "Rede" mostra "—" e "sem dados",
   como os outros cartões, e não mais "0 B" e "↓ 0 B · ↑ 0 B" (#54).
 
 ## [2.1.0-rc.3] — 2026-10-20
 
-3ª pré-versão da 2.1.0: corrige 3 detalhes da tela e o cache dos arquivos da tela depois de
+3ª pré-versão da 2.1.0: corrige 2 detalhes da tela e o cache dos arquivos da tela depois de
 atualizar. Traz também os testes no navegador no fluxo de trabalho. Só chega a quem já está
 numa pré-versão ou usa `--pre`. Nada muda na configuração, no formato de `data/` nem no
 acesso ao servidor.
