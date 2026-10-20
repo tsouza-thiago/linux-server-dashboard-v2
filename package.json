@@ -1,6 +1,6 @@
 {
   "name": "linux-server-dashboard",
-  "version": "2.1.0-rc.1",
+  "version": "2.1.0-rc.2",
   "description": "Server Dashboard: painel em tempo real de um servidor Linux, via 1 SSH por minuto",
   "type": "module",
   "main": "server/index.js",

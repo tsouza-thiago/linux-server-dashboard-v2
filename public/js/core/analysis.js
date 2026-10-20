@@ -254,6 +254,24 @@ export function dayStatuses({ days = 90, nowMs = Date.now(), sinceMs = null, out
 }
 
 /**
+ * Um item por dia LOCAL do período, do mais novo para o mais antigo (#43), com o resumo de
+ * dailySummary quando o dia tem baldes. O dia sem amostra também entra (n = 0, sem
+ * métricas): um dia inteiro em queda e um dia sem coleta precisam aparecer no relatório,
+ * como aparecem na faixa de Eventos (ADR 0018).
+ */
+export function reportDays(buckets, keys, fromMs, toMs) {
+  const byDay = new Map(dailySummary(buckets || [], keys).map((d) => [d.day, d]));
+  const out = [];
+  const first = startOfLocalDay(fromMs);
+  // Volta meio dia e pega o início do dia: o passo não erra na troca do horário de verão.
+  for (let d = startOfLocalDay(toMs); d >= first; d = startOfLocalDay(d - DAY_MS / 2)) {
+    const day = localDay(d);
+    out.push(byDay.get(day) || { day, n: 0, m: {} });
+  }
+  return out;
+}
+
+/**
  * Bytes trafegados no balde. Desde a 2.0.4, pelos bytes por coleta (contadores exatos):
  * média × coletas que têm o dado. Baldes gravados antes disso só têm a taxa arredondada, e o
  * volume é estimado por ela: média × coletas × intervalo.
