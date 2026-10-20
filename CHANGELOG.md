@@ -18,6 +18,11 @@ diante: `PATCH` corrige, `MINOR` acrescenta sem quebrar e `MAJOR` quebra.
   temporária (cenários `normal`, `lacunas`, `offline` e `vazio`). Só ferramenta de
   desenvolvimento e documentação: nada muda no painel.
 
+### Corrigido
+
+- Sem dado, os cartões mostram só o traço "—", sem a unidade colada ("—%", "—°C",
+  "— Mbps"), em Visão geral, Recursos e Rede (#48).
+
 ## [2.1.0-rc.2] — 2026-10-20
 
 2ª pré-versão da 2.1.0: corrige a tabela por dia dos Relatórios, que omitia os dias em queda
