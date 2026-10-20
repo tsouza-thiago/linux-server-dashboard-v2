@@ -9,6 +9,13 @@ diante: `PATCH` corrige, `MINOR` acrescenta sem quebrar e `MAJOR` quebra.
 
 ## [Não publicado]
 
+## [2.1.0-rc.1] — 2026-10-20
+
+1ª pré-versão da 2.1.0 (ADR 0015): a disponibilidade passa a contar só o tempo em que o
+painel estava medindo. Só chega a quem já está numa pré-versão ou usa `--pre`
+(`./dashboard atualizar --pre`). Nada muda na configuração, no formato de `data/` nem no
+acesso ao servidor.
+
 ### Alterado
 
 - Disponibilidade só sobre o tempo medido (#24, ADR 0018, que substitui a regra da ADR 0006).
@@ -791,7 +798,8 @@ Documentados no plano da V2 (seção 2.2, B1–B12), entre eles: alerta SMART fa
 rede zerada com contadores grandes, alerta duplicado a cada coleta e reescrita completa do
 histórico a cada minuto.
 
-[Não publicado]: https://github.com/tsouza-thiago/linux-server-dashboard-v2/compare/v2.0.6...HEAD
+[Não publicado]: https://github.com/tsouza-thiago/linux-server-dashboard-v2/compare/v2.1.0-rc.1...HEAD
+[2.1.0-rc.1]: https://github.com/tsouza-thiago/linux-server-dashboard-v2/compare/v2.0.6...v2.1.0-rc.1
 [2.0.6]: https://github.com/tsouza-thiago/linux-server-dashboard-v2/compare/v2.0.5...v2.0.6
 [2.0.5]: https://github.com/tsouza-thiago/linux-server-dashboard-v2/compare/v2.0.4...v2.0.5
 [2.0.4]: https://github.com/tsouza-thiago/linux-server-dashboard-v2/compare/v2.0.3...v2.0.4
