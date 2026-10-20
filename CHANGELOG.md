@@ -9,6 +9,13 @@ diante: `PATCH` corrige, `MINOR` acrescenta sem quebrar e `MAJOR` quebra.
 
 ## [Não publicado]
 
+## [2.1.0-rc.3] — 2026-10-20
+
+3ª pré-versão da 2.1.0: corrige 3 detalhes da tela e o cache dos arquivos da tela depois de
+atualizar. Traz também os testes no navegador no fluxo de trabalho. Só chega a quem já está
+numa pré-versão ou usa `--pre`. Nada muda na configuração, no formato de `data/` nem no
+acesso ao servidor.
+
 ### Adicionado
 
 - Testes no navegador no fluxo de trabalho (#46, ADR 0019): toda mudança de tela é conferida
@@ -25,6 +32,10 @@ diante: `PATCH` corrige, `MINOR` acrescenta sem quebrar e `MAJOR` quebra.
 - Visão geral: o selo do processador não diz mais "tranquilo" ao lado da CPU a 100% (#47).
   Regra nova, sobre a mesma coleta do número: carga acima de 1,5 × núcleos →
   "sobrecarregado"; senão, CPU ≥ 90% → "ocupado"; senão, "tranquilo".
+- Depois de `./dashboard atualizar`, a tela usa logo os arquivos da versão nova (#44). JS,
+  CSS e fontes saíam com 1 h de cache sem conferir; agora todos os arquivos da tela saem com
+  `no-cache` e `ETag`: o navegador confere a cada uso e recebe um 304, sem corpo, quando
+  nada mudou.
 
 ## [2.1.0-rc.2] — 2026-10-20
 
@@ -828,7 +839,8 @@ Documentados no plano da V2 (seção 2.2, B1–B12), entre eles: alerta SMART fa
 rede zerada com contadores grandes, alerta duplicado a cada coleta e reescrita completa do
 histórico a cada minuto.
 
-[Não publicado]: https://github.com/tsouza-thiago/linux-server-dashboard-v2/compare/v2.1.0-rc.2...HEAD
+[Não publicado]: https://github.com/tsouza-thiago/linux-server-dashboard-v2/compare/v2.1.0-rc.3...HEAD
+[2.1.0-rc.3]: https://github.com/tsouza-thiago/linux-server-dashboard-v2/compare/v2.1.0-rc.2...v2.1.0-rc.3
 [2.1.0-rc.2]: https://github.com/tsouza-thiago/linux-server-dashboard-v2/compare/v2.1.0-rc.1...v2.1.0-rc.2
 [2.1.0-rc.1]: https://github.com/tsouza-thiago/linux-server-dashboard-v2/compare/v2.0.6...v2.1.0-rc.1
 [2.0.6]: https://github.com/tsouza-thiago/linux-server-dashboard-v2/compare/v2.0.5...v2.0.6

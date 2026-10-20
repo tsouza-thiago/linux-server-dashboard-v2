@@ -403,7 +403,7 @@ export function createApp(deps = {}) {
   });
 
   // Arquivos da tela (public/), depois de todas as rotas da API.
-  app.use(serveStatic(path.join(ROOT, 'public'), { maxAge: 3600 }));
+  app.use(serveStatic(path.join(ROOT, 'public')));
 
   // Tratador de erro central: o detalhe vai para o log; a resposta é genérica, sem stack
   // nem caminho (SECURITY, ameaça 16).

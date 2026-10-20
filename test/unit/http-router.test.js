@@ -109,7 +109,7 @@ test('serveStatic: index, tipos, cache, oculto, traversal, pasta, tipo fora da l
   fs.writeFileSync(path.join(root, 'notas.md'), '# não servir');
   fs.writeFileSync(path.join(root, '..', 'fora-lsd.txt'), 'fora');
   const port = await serve(t, (app) => {
-    app.use(serveStatic(root, { maxAge: 60 }));
+    app.use(serveStatic(root));
     app.get('/js/a.js/extra', (req, res) => res.send('rota depois'));
   });
   const idx = await request(port, { path: '/' });
@@ -117,7 +117,7 @@ test('serveStatic: index, tipos, cache, oculto, traversal, pasta, tipo fora da l
   assert.equal(idx.headers['cache-control'], 'no-cache');
   const js = await request(port, { path: '/js/a.js' });
   assert.match(js.headers['content-type'], /text\/javascript/);
-  assert.equal(js.headers['cache-control'], 'public, max-age=60');
+  assert.equal(js.headers['cache-control'], 'no-cache', 'JS conferido de novo a cada uso (#44)');
   for (const p of ['/.env', '/js/', '/notas.md', '/nada.js', '/js/a.js/extra']) {
     const r = await request(port, { path: p });
     assert.ok(!r.text.includes('SEGREDO') && !r.text.includes('não servir'), p);
@@ -129,6 +129,41 @@ test('serveStatic: index, tipos, cache, oculto, traversal, pasta, tipo fora da l
   assert.equal((await request(port, { path: '/js%5c..%5c..%5cfora-lsd.txt' })).status, 400, 'barra invertida recusada');
   assert.equal((await request(port, { method: 'POST', path: '/js/a.js' })).status, 404, 'só GET/HEAD');
   fs.rmSync(path.join(root, '..', 'fora-lsd.txt'), { force: true });
+});
+
+test('estáticos (#44): sem cache cego; ETag e 304 até o arquivo mudar', async (t) => {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'lsd-etag-'));
+  t.after(() => fs.rmSync(root, { recursive: true, force: true }));
+  const file = path.join(root, 'app.js');
+  fs.writeFileSync(file, 'x=1;'.repeat(400)); // acima de 1 KB: também sai em gzip
+  const port = await serve(t, (app) => app.use(serveStatic(root)));
+  for (const encoding of ['identity', 'gzip']) {
+    const headers = { 'Accept-Encoding': encoding };
+    const first = await request(port, { path: '/app.js', headers });
+    assert.equal(first.status, 200);
+    assert.equal(first.headers['cache-control'], 'no-cache', 'nada de max-age: depois de atualizar, o JS novo vale na hora');
+    const etag = first.headers.etag;
+    assert.ok(etag, `${encoding}: ETag presente`);
+    // Nada mudou: 304, sem corpo, com a mesma validação.
+    const again = await request(port, { path: '/app.js', headers: { ...headers, 'If-None-Match': etag } });
+    assert.equal(again.status, 304);
+    assert.equal(again.text, '');
+    assert.equal(again.headers.etag, etag);
+    assert.equal(again.headers['cache-control'], 'no-cache');
+    // O arquivo mudou (./dashboard atualizar): a validação antiga não vale, volta o novo.
+    fs.writeFileSync(file, 'y=2;'.repeat(500));
+    fs.utimesSync(file, new Date(), new Date(Date.now() + 5000));
+    const changed = await request(port, { path: '/app.js', headers: { ...headers, 'If-None-Match': etag } });
+    assert.equal(changed.status, 200, `${encoding}: arquivo novo depois de atualizar`);
+    assert.notEqual(changed.headers.etag, etag);
+    fs.writeFileSync(file, 'x=1;'.repeat(400));
+  }
+  // HEAD também valida; "*" e listas de ETags seguem o HTTP (RFC 9110).
+  const { etag } = (await request(port, { path: '/app.js' })).headers;
+  assert.equal((await request(port, { method: 'HEAD', path: '/app.js', headers: { 'If-None-Match': etag } })).status, 304);
+  assert.equal((await request(port, { path: '/app.js', headers: { 'If-None-Match': `W/"outro", ${etag}` } })).status, 304);
+  assert.equal((await request(port, { path: '/app.js', headers: { 'If-None-Match': '*' } })).status, 304);
+  assert.equal((await request(port, { path: '/app.js', headers: { 'If-None-Match': 'W/"outro"' } })).status, 200);
 });
 
 test('sendFile: arquivo inexistente ou de tipo fora da lista vira 404', async (t) => {

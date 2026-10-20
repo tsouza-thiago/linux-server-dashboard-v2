@@ -90,7 +90,8 @@ O teste `test/unit/docs.test.js` confere esta documentação contra o código.
 - **Erros sem vazamento**: o error handler central devolve JSON sem stack trace.
 - **HTTP próprio** (ADR 0003): `node:http` + `server/http/` (roteador, estáticos só de
   `public/` com lista de tipos, sem arquivo oculto, pasta ou traversal; HTML, CSS, JS, JSON
-  e SVG em gzip quando o navegador aceita, só arquivos do pacote). Backend sem
+  e SVG em gzip quando o navegador aceita, só arquivos do pacote; todos com `no-cache` +
+  `ETag`, 304 sem mudança, para a versão nova valer logo depois de atualizar). Backend sem
   dependência de runtime. `test/integration/http-seguranca.test.js` é a caracterização
   caixa-preta e precisa continuar verde.
 - **SSH isolado**: `BatchMode=yes` + `ConnectTimeout=10`. Com `SSH_CONFIG`, o painel usa só
