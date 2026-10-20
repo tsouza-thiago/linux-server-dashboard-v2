@@ -9,6 +9,15 @@ diante: `PATCH` corrige, `MINOR` acrescenta sem quebrar e `MAJOR` quebra.
 
 ## [Não publicado]
 
+### Adicionado
+
+- Testes no navegador no fluxo de trabalho (#46, ADR 0019): toda mudança de tela é conferida
+  no navegador real, pela extensão Claude in Chrome, e a bateria completa roda antes de cada
+  versão, pelo roteiro de `docs/testes-no-navegador.md`. `npm run painel-teste` sobe o
+  painel em `127.0.0.1`, numa porta separada, sem token, com dados semeados numa pasta
+  temporária (cenários `normal`, `lacunas`, `offline` e `vazio`). Só ferramenta de
+  desenvolvimento e documentação: nada muda no painel.
+
 ## [2.1.0-rc.1] — 2026-10-20
 
 1ª pré-versão da 2.1.0 (ADR 0015): a disponibilidade passa a contar só o tempo em que o

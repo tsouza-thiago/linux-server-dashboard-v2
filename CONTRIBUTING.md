@@ -25,7 +25,9 @@ primeiro):
 2. **Ramo** a partir do `main`, um por issue.
 3. **Teste que falha** antes da mudança, depois a mudança. Os testes usam só `node:test`.
 4. **`npm run check`** antes de cada commit (Node 24). Conforme a mudança, rode também
-   `npm run test:e2e`, `npm run soak` ou `npm run seguranca` (veja o AGENTS).
+   `npm run test:e2e`, `npm run soak` ou `npm run seguranca` (veja o AGENTS). Mudou a tela?
+   Confira no navegador, num painel de teste (`npm run painel-teste`), pelo roteiro de
+   [docs/testes-no-navegador.md](docs/testes-no-navegador.md).
 5. **Commits** em Conventional Commits, em PT-BR, com o CHANGELOG `[Não publicado]` e a
    documentação no mesmo commit.
 6. **PR** pelo template, com `Closes #N`. O merge acontece com o CI verde, por merge

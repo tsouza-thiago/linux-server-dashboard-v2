@@ -183,6 +183,10 @@ O teste `test/unit/docs.test.js` confere esta documentação contra o código.
   do mantenedor. Dúvidas e ideias vão para Discussions; vulnerabilidade, só pelo reporte
   privado do GitHub, nunca em issue pública. Exceções: PRs do Dependabot e o commit de
   versão.
+- **Testes no navegador** (ADR 0019): toda mudança de tela é conferida no navegador real,
+  pela extensão Claude in Chrome, num painel de teste (`npm run painel-teste`). A bateria
+  completa segue [docs/testes-no-navegador.md](docs/testes-no-navegador.md) e roda antes de
+  cada versão publicada. O PR registra o resultado; cada falha nova vira uma issue de bug.
 - **Orçamento de desempenho:** veja [Orçamento de desempenho](#orçamento-de-desempenho).
   Mudou coleta, histórico ou frontend? Rode `npm run soak` e `npm run test:e2e`.
 - **Node.js 24** é a versão mínima (ADR 0002).
@@ -256,6 +260,7 @@ npm run capturar-amostra        # 1 coleta real → data/amostra-{bruta,anonima}
 npm run migrar-v1 -- --verificar  # resume o data/history.json da V1 sem gravar nada
 npm run migrar-v1               # migra a V1 agora (o painel também migra sozinho ao iniciar)
 npm run soak                    # soak acelerado: 83 h de coletas simuladas; confere RAM e vazamento
+npm run painel-teste            # painel de teste com dados semeados (--cenario=normal|lacunas|offline|vazio, --porta=3943)
 scripts/e2e-instalacao/rodar.sh # instalação de ponta a ponta em contêineres Debian/Ubuntu
 ```
 
@@ -532,9 +537,11 @@ linux-server-dashboard-v2/
 │                           scorecard.yml; dependabot.yml (ADR 0016);
 │                           ISSUE_TEMPLATE/ (bug, funcionalidade, tarefa), template de PR e
 │                           CODEOWNERS (ADR 0016)
-├── docs/                   adr/, seguranca/ (análises e excecoes.json) e allowed_signers
+├── docs/                   adr/, seguranca/ (análises e excecoes.json), allowed_signers e
+│                           testes-no-navegador.md (roteiro da bateria, ADR 0019)
 ├── scripts/                check.mjs, seguranca.mjs, mutacao-seguranca.mjs, soak-acelerado.mjs,
-│                           capturar-amostra.mjs, node-runtime.sh, askpass.sh, e2e-instalacao/
+│                           capturar-amostra.mjs, painel-teste.mjs, node-runtime.sh, askpass.sh,
+│                           e2e-instalacao/
 ├── server/
 │   ├── index.js            rotas, loop de coleta, export
 │   ├── config.js           parser único do .env, faixas, sanitizeToken/sanitizeHost
