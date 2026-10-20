@@ -9,6 +9,13 @@ diante: `PATCH` corrige, `MINOR` acrescenta sem quebrar e `MAJOR` quebra.
 
 ## [Não publicado]
 
+### Corrigido
+
+- Relatórios: a tabela por dia mostra todos os dias do período (#43). Antes, só apareciam os
+  dias com amostra: um dia inteiro em queda sumia da tabela, mas aparecia vermelho em
+  Eventos, e o dia sem coleta não aparecia como "sem dados" (ADR 0018). Agora o dia só de
+  queda mostra 0% e fica vermelho, e o dia sem coleta diz "sem dados".
+
 ## [2.1.0-rc.1] — 2026-10-20
 
 1ª pré-versão da 2.1.0 (ADR 0015): a disponibilidade passa a contar só o tempo em que o
