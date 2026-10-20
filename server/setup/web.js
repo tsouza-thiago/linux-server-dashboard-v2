@@ -137,7 +137,7 @@ export function createWizardApp({ inst, code, onFinish = () => {}, onActivity = 
     }
   });
 
-  app.use(serveStatic(PUBLIC, { maxAge: 0 }));
+  app.use(serveStatic(PUBLIC));
   app.use((err, req, res, next) => {
     const status = err.status || err.statusCode || 500;
     if (status >= 500) log(`assistente: erro: ${err.message}`);

@@ -40,21 +40,46 @@ function gzipped(file, stat) {
   return buf;
 }
 
-/** Envia um arquivo conhecido (tipo pela extensão, que precisa estar na lista). */
-export function sendFile(res, file, { cacheControl = 'no-cache', req = null } = {}) {
+// Validação do cache (#44): o ETag sai do tamanho e da data do arquivo, como nos
+// servidores comuns. O `./dashboard atualizar` regrava os arquivos, e o ETag muda. É fraco
+// (W/) porque a mesma versão sai em gzip ou não; a comparação do If-None-Match é fraca.
+const etagOf = (stat) => `W/"${stat.size.toString(16)}-${Math.floor(stat.mtimeMs).toString(16)}"`;
+const opaque = (tag) => tag.trim().replace(/^W\//, '');
+
+/** O navegador já tem esta versão? (If-None-Match: "*" ou uma lista de ETags, RFC 9110). */
+function notModified(req, etag) {
+  const header = String(req?.headers?.['if-none-match'] || '').trim();
+  if (!header) return false;
+  return header === '*' || header.split(',').some((tag) => opaque(tag) === opaque(etag));
+}
+
+/**
+ * Envia um arquivo conhecido (tipo pela extensão, que precisa estar na lista). Sempre com
+ * `no-cache` + ETag (#44): o navegador guarda o arquivo, mas confere a cada uso; sem
+ * mudança, a resposta é um 304 sem corpo. Antes, o JS ficava 1 h em cache sem conferir, e
+ * a tela misturava o HTML novo com o JS antigo depois de atualizar.
+ */
+export function sendFile(res, file, { req = null } = {}) {
   const type = MIME[path.extname(file).toLowerCase()];
   let stat;
   try { stat = fs.statSync(file); } catch { stat = null; }
   if (!type || !stat || !stat.isFile()) return res.status(404).json({ error: 'não encontrado' });
+  const etag = etagOf(stat);
+  res.setHeader('Cache-Control', 'no-cache');
+  res.setHeader('ETag', etag);
+  if (COMPRESSIBLE.test(type)) res.setHeader('Vary', 'Accept-Encoding');
+  if (notModified(req, etag)) {
+    res.statusCode = 304;
+    res.end();
+    return res;
+  }
   res.statusCode = 200;
   res.setHeader('Content-Type', type);
-  res.setHeader('Cache-Control', cacheControl);
-  if (COMPRESSIBLE.test(type)) res.setHeader('Vary', 'Accept-Encoding');
   // gzip só para texto, acima de 1 KB e quando o navegador aceita; o resto sai como está.
   const acceptsGzip = /\bgzip\b/i.test(String(req?.headers?.['accept-encoding'] || ''));
   if (acceptsGzip && COMPRESSIBLE.test(type) && stat.size >= MIN_GZIP_BYTES) {
     let body;
-    try { body = gzipped(file, stat); } catch { return res.status(404).json({ error: 'não encontrado' }); }
+    try { body = gzipped(file, stat); } catch { res.removeHeader('ETag'); return res.status(404).json({ error: 'não encontrado' }); }
     res.setHeader('Content-Encoding', 'gzip');
     res.setHeader('Content-Length', body.length);
     res.end(req.method === 'HEAD' ? undefined : body);
@@ -69,7 +94,7 @@ export function sendFile(res, file, { cacheControl = 'no-cache', req = null } = 
  * Middleware de estáticos para GET/HEAD. Devolve `next()` para caminhos que não são
  * arquivos da lista (a rota seguinte decide: normalmente 404).
  */
-export function serveStatic(root, { maxAge = 3600 } = {}) {
+export function serveStatic(root) {
   const base = path.resolve(root);
   return function staticFiles(req, res, next) {
     if (req.method !== 'GET' && req.method !== 'HEAD') return next();
@@ -92,8 +117,6 @@ export function serveStatic(root, { maxAge = 3600 } = {}) {
     let stat;
     try { stat = fs.statSync(file); } catch { return next(); }
     if (!stat.isFile()) return next();
-    // HTML sempre conferido de novo (pega a versão nova depois de atualizar); o resto, cache.
-    const cacheControl = file.endsWith('.html') ? 'no-cache' : `public, max-age=${maxAge}`;
-    return sendFile(res, file, { cacheControl, req });
+    return sendFile(res, file, { req });
   };
 }

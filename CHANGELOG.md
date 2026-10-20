@@ -18,6 +18,13 @@ diante: `PATCH` corrige, `MINOR` acrescenta sem quebrar e `MAJOR` quebra.
   temporária (cenários `normal`, `lacunas`, `offline` e `vazio`). Só ferramenta de
   desenvolvimento e documentação: nada muda no painel.
 
+### Corrigido
+
+- Depois de `./dashboard atualizar`, a tela usa logo os arquivos da versão nova (#44). JS,
+  CSS e fontes saíam com 1 h de cache sem conferir; agora todos os arquivos da tela saem com
+  `no-cache` e `ETag`: o navegador confere a cada uso e recebe um 304, sem corpo, quando
+  nada mudou.
+
 ## [2.1.0-rc.2] — 2026-10-20
 
 2ª pré-versão da 2.1.0: corrige a tabela por dia dos Relatórios, que omitia os dias em queda
