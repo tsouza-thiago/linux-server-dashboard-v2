@@ -99,6 +99,27 @@ test('API: /api/outages sem dados e com days fora da faixa', async (t) => {
   assert.equal(def.json.days, 30);
 });
 
+// #24 / ADR 0018: o tempo sem nenhum painel coletando não entra na disponibilidade.
+test('API: /api/outages conta só o tempo medido; a lacuna sem coleta fica de fora', async (t) => {
+  const s = await start(t, { results: [] });
+  const MIN = 60000;
+  const STEP = 5 * MIN;
+  // 1 h de coleta há 3 dias, e mais nada até agora: antes, isso dava ~100% em 7 dias.
+  const inicio = Math.floor((Date.now() - 3 * 1440 * MIN) / STEP) * STEP;
+  for (let i = 0; i < 60; i += 1) s.store.append({ ts: new Date(inicio + i * MIN).toISOString(), host: 'srv', disks: [] });
+  s.outages.start(inicio + 10 * MIN, 'caiu');
+  s.outages.end(inicio + 25 * MIN);
+  const r = await request(s.port, { path: '/api/outages?days=7' });
+  assert.equal(r.status, 200);
+  assert.deepEqual(r.json.monitored, [{ from: new Date(inicio).toISOString(), to: new Date(inicio + 60 * MIN).toISOString() }]);
+  assert.equal(r.json.uptime.monitoredMs, 60 * MIN);
+  assert.equal(r.json.uptime.offlineMs, 15 * MIN);
+  assert.equal(r.json.uptime.uptimePct, 75, '15 min fora em 1 h medida, não em 7 dias');
+  const vazio = await request(s.port, { path: '/api/outages?days=1' });
+  assert.deepEqual(vazio.json.monitored, [], 'no último dia ninguém mediu');
+  assert.equal(vazio.json.uptime.uptimePct, null);
+});
+
 test('API: exceção na coleta conta como falha do motor', async (t) => {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'dash-alert-'));
   const app = createApp({

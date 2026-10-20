@@ -4,6 +4,7 @@ import path from 'node:path';
 import { RawStore, HOUR_MS } from './ndjson.js';
 import { RollupStore, ROLLUP_STEP_MS } from './rollup.js';
 import { aggregate, mergeBuckets } from './buckets.js';
+import { mergeSpans, clipSpans } from './coverage.js';
 
 /** Janela das amostras brutas (1 por minuto): 72 h. */
 export const RAW_RETENTION_MS = 72 * HOUR_MS;
@@ -54,6 +55,22 @@ export class History {
     const raw = this.raw.samples.length ? Date.parse(this.raw.samples[0].ts) : null;
     const known = [rolled, raw].filter((v) => v !== null);
     return known.length ? Math.min(...known) : null;
+  }
+
+  /**
+   * Tempo medido em [fromMs, toMs] (ADR 0018): as faixas de 5 min com amostra, agregada ou
+   * bruta (as brutas cobrem o balde ainda aberto), mais os intervalos `extra` (as quedas: o
+   * painel estava rodando e tentando coletar). Devolve intervalos [início, fim) em ms.
+   */
+  monitored(fromMs, toMs, extra = []) {
+    const spans = [...this.rollup.coverage()];
+    for (const s of this.raw.samples) {
+      const ms = Date.parse(s.ts);
+      if (!(ms >= fromMs - ROLLUP_STEP_MS && ms <= toMs)) continue;
+      const t = Math.floor(ms / ROLLUP_STEP_MS) * ROLLUP_STEP_MS;
+      spans.push([t, t + ROLLUP_STEP_MS]);
+    }
+    return clipSpans(mergeSpans([...spans, ...extra]), fromMs, toMs);
   }
 
   getLatest() { return this.raw.getLatest(); }

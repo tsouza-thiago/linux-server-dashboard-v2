@@ -447,7 +447,7 @@ segurança, rate limit das mutações e error handler sem stack trace. Com `DASH
 | `/api/status` | GET | Última amostra + meta (online, lastPollAt, nextPollAt, offlineSince) + saúde + alertas ativos |
 | `/api/history` | GET | `?limit=N&from=&to=` → amostras (reduzidas a `limit`: padrão 720, máximo 2000, com o pior caso de cada grupo; `topProcs` só na mais recente). `&formato=baldes` → `{from, to, step, buckets}` com mín/máx/média, até 90 dias |
 | `/api/config` | GET | Configuração ativa para a Ajuda: versões, alvos, modo de acesso, limiares (sem segredos) |
-| `/api/outages` | GET | `?days=1..90` (padrão 30) → `{days, outages, uptime}` |
+| `/api/outages` | GET | `?days=1..90` (padrão 30) → `{days, outages, monitored, uptime}`. `monitored` são os intervalos `{from, to}` em que o painel estava medindo; `uptime` conta só esse tempo (ADR 0018) |
 | `/api/alerts` | GET | `?status=&level=&limit=` → `{active, all}` |
 | `/api/alerts/:id/ack` | POST | Reconhece o alerta |
 | `/api/alerts/:id/resolve` | POST | Resolve o alerta |
@@ -481,6 +481,12 @@ Motor em `server/alerts/` (ADR 0006).
 - **Debounce do offline**: 1 falha isolada não alerta. A queda começa no instante da 1ª
   falha. Durante a queda, os outros alertas ficam como estão (nada foi medido).
 - **Dado ausente** não cria nem resolve alerta.
+- **Disponibilidade** (ADR 0018): conta só o **tempo medido**, as faixas de 5 min com pelo
+  menos 1 amostra (bruta ou agregada) mais as quedas registradas (o painel estava rodando e
+  tentando). Fórmula: 100 − fora do ar ÷ tempo medido × 100. Sem tempo medido, é `null`
+  ("sem dados"), nunca 100%. Um dia sem nenhuma coleta fica cinza em Eventos e "sem dados"
+  nos Relatórios. Os agregados guardam a cobertura em memória (`RollupStore.coverage`), lida
+  do disco 1 vez.
 - **Saúde 0–100** (`server/alerts/health.js`): começa em 100 e perde pontos por problema,
   a partir dos mesmos limiares dos alertas:
   - RAM: −15 no limiar, −5 a partir de 15 pontos abaixo dele;
@@ -541,7 +547,8 @@ linux-server-dashboard-v2/
 │   │                       instalacao, web (assistente), tui, sem-interface
 │   ├── http/               router, static, session, sse, entrar (link de uso único)
 │   ├── collector/          builder (script), parser (amostra v2), rates (taxas), index (1 SSH)
-│   ├── storage/            ndjson (72 h), rollup (5 min/90 d), buckets, migrate-v1, outages, index
+│   ├── storage/            ndjson (72 h), rollup (5 min/90 d), buckets, migrate-v1, outages,
+│   │                       coverage (tempo medido), index
 │   └── alerts/             rules, health, engine
 ├── public/
 │   ├── index.html          casca das 8 telas, login e avisos

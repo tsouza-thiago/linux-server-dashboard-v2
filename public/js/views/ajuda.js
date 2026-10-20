@@ -32,6 +32,7 @@ function howToRead() {
     ${panelHead('Como ler o painel')}
     <div class="help-read">
       <span><b>Saúde 0–100</b> — começa em 100 e perde pontos a cada problema; o motivo aparece logo ao lado do número.</span>
+      <span><b>Disponibilidade</b> — conta só o tempo em que o painel estava medindo. Dia sem nenhuma coleta aparece cinza, como "sem dados".</span>
       <span><b>Cores fixas</b> — ${sw('s1')} ciano é processador, ${sw('s2')} violeta é memória, ${sw('s3')} magenta é disco, ${sw('s4')} azul é temperatura, em todas as telas.</span>
       <span><b>Status</b> — sempre com ícone e texto: <span class="ink-ok">${icon('check', 12, 3)} saudável</span>, <span class="ink-warn">${icon('warn', 12, 2.5)} atenção</span>, <span class="ink-crit">${icon('crit', 12, 2.5)} crítico</span>.</span>
       <span><b>Gráficos</b> — roda do mouse dá zoom, arrastar seleciona um intervalo, duplo clique volta ao período inteiro.</span>

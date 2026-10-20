@@ -118,7 +118,7 @@ function hero(ctx) {
         </div>` : ''}
       </div>
       <div class="hero-minis">
-        <div class="mini"><span class="k">Disponibilidade 90 d</span><span class="v big sm">${f.pct(uptime, 2)}</span></div>
+        <div class="mini"><span class="k">Disponibilidade 90 d</span><span class="v big sm">${uptime === null ? 'sem dados' : f.pct(uptime, 2)}</span></div>
         <div class="mini"><span class="k">Eventos 24 h</span><span class="v big sm">${ev24}</span></div>
         <div class="mini"><span class="k">Custo no servidor</span><span class="v big sm">${cost}</span></div>
       </div>

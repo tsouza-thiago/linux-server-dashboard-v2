@@ -2,7 +2,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {
-  timeline, levelOf, viewOfKey, offlineMsIn, outagesIn, uptimeIn, dayStatuses, trafficOf, dailyTraffic,
+  timeline, levelOf, viewOfKey, offlineMsIn, outagesIn, uptimeIn, dayStatuses, trafficOf, dailyTraffic, monitoredMsIn,
   peakOf, meanOf, trendOf, topPeaks, diskEta, diskForecast, healthLevel, outageOf,
 } from '../../public/js/core/analysis.js';
 import { applyDataStyles, html, mount } from '../../public/js/core/html.js';
@@ -72,6 +72,33 @@ test('disponibilidade: tempo fora, % no intervalo e quadradinhos por dia local',
     });
     assert.deepEqual(days.map((d) => d.day), ['2026-10-04', '2026-10-05', '2026-10-06', '2026-10-07']);
     assert.deepEqual(days.map((d) => d.status), ['none', 'warn', 'crit', 'ok']);
+  } finally {
+    if (tz === undefined) delete process.env.TZ; else process.env.TZ = tz;
+  }
+});
+
+// #24 / ADR 0018: com `monitored`, a conta usa só o tempo medido e o dia sem medida é cinza.
+test('disponibilidade: só o tempo medido; dia sem nenhuma coleta é "sem dados"', () => {
+  const tz = process.env.TZ;
+  process.env.TZ = 'America/Sao_Paulo';
+  try {
+    const now = Date.parse('2026-10-07T15:00:00-03:00');
+    // Medido: 1 h no dia 05 (com 15 min de queda) e as 3 últimas horas de hoje. Dia 06: nada.
+    const monitored = [
+      { from: '2026-10-05T10:00:00-03:00', to: '2026-10-05T11:00:00-03:00' },
+      { from: '2026-10-07T12:00:00-03:00', to: '2026-10-07T15:00:00-03:00' },
+    ];
+    const outages = [{ from: '2026-10-05T10:10:00-03:00', to: '2026-10-05T10:25:00-03:00' }];
+    assert.equal(monitoredMsIn(monitored, now - 3 * 24 * H, now), 4 * H);
+    assert.equal(uptimeIn(outages, now - 3 * 24 * H, now, { nowMs: now, monitored }), 100 - (15 / 240) * 100, '15 min em 4 h medidas');
+    const dia05 = Date.parse('2026-10-05T00:00:00-03:00');
+    assert.equal(uptimeIn(outages, dia05, dia05 + 24 * H, { nowMs: now, monitored }), 75, '15 min em 1 h medida no dia');
+    const dia06 = Date.parse('2026-10-06T00:00:00-03:00');
+    assert.equal(uptimeIn([], dia06, dia06 + 24 * H, { nowMs: now, monitored }), null, 'dia sem medida não vira 100%');
+    const days = dayStatuses({ days: 4, nowMs: now, sinceMs: Date.parse(monitored[0].from), outages, alerts: [], monitored });
+    assert.deepEqual(days.map((d) => [d.day, d.status]), [
+      ['2026-10-04', 'none'], ['2026-10-05', 'crit'], ['2026-10-06', 'none'], ['2026-10-07', 'ok'],
+    ], 'o dia 06, sem coleta, fica cinza (antes ficava verde)');
   } finally {
     if (tz === undefined) delete process.env.TZ; else process.env.TZ = tz;
   }

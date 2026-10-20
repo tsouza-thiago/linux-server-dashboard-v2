@@ -4,6 +4,7 @@
 import fsp from 'node:fs/promises';
 import path from 'node:path';
 import { readNdjson, writeFileAtomicSync, DAY_MS } from './ndjson.js';
+import { clipSpans, spansMs } from './coverage.js';
 
 // Evento válido: "off" (caiu) ou "on" (voltou) com instante de verdade.
 const validEvent = (e) => e && (e.ev === 'off' || e.ev === 'on') && Number.isFinite(Date.parse(e.ts));
@@ -100,11 +101,21 @@ export class OutageLog {
     return out.reverse();
   }
 
+  /** Intervalos [início, fim) em ms das quedas que tocam [fromMs, toMs] (tempo medido, ADR 0018). */
+  spans({ fromMs = -Infinity, toMs = this.now() } = {}) {
+    return this.list({ fromMs, toMs }).map((o) => [Date.parse(o.from), o.to ? Date.parse(o.to) : this.now()]);
+  }
+
   /**
-   * Disponibilidade em [fromMs, toMs]. `sinceMs` é o início do monitoramento (1º dado
-   * conhecido): antes dele não há como saber, então a janela começa ali.
+   * Disponibilidade em [fromMs, toMs].
+   *
+   * Com `monitored` (ADR 0018: intervalos [início, fim) em que o painel estava medindo), a
+   * conta usa só o tempo medido: 100 − fora do ar ÷ medido. Sem tempo medido, é null ("sem
+   * dados"), nunca 100%. Sem `monitored` (forma antiga, ADR 0006), `sinceMs` é o início do
+   * monitoramento e a janela começa ali.
    */
-  uptime({ fromMs, toMs = this.now(), sinceMs = -Infinity }) {
+  uptime({ fromMs, toMs = this.now(), sinceMs = -Infinity, monitored = null }) {
+    if (Array.isArray(monitored)) return this._uptimeMeasured({ fromMs, toMs, monitored });
     const start = Math.max(fromMs, sinceMs);
     const windowMs = Math.max(0, toMs - start);
     let offlineMs = 0;
@@ -118,6 +129,23 @@ export class OutageLog {
       from: new Date(Number.isFinite(start) ? start : toMs).toISOString(),
       to: new Date(toMs).toISOString(),
       windowMs,
+      offlineMs,
+      uptimePct: uptimePct === null ? null : Math.round(uptimePct * 1000) / 1000,
+    };
+  }
+
+  /** Disponibilidade só sobre o tempo medido (ADR 0018). */
+  _uptimeMeasured({ fromMs, toMs, monitored }) {
+    const measured = clipSpans(monitored, fromMs, toMs);
+    const monitoredMs = spansMs(measured);
+    // As quedas são tempo medido (o painel estava tentando), então o fora do ar cabe nele.
+    const offlineMs = spansMs(clipSpans(this.spans({ fromMs, toMs }), fromMs, toMs));
+    const uptimePct = monitoredMs > 0 ? Math.max(0, 100 - (offlineMs / monitoredMs) * 100) : null;
+    return {
+      from: new Date(measured.length ? measured[0][0] : toMs).toISOString(),
+      to: new Date(toMs).toISOString(),
+      windowMs: Math.max(0, toMs - fromMs),
+      monitoredMs,
       offlineMs,
       uptimePct: uptimePct === null ? null : Math.round(uptimePct * 1000) / 1000,
     };
