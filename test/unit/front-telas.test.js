@@ -344,3 +344,11 @@ test('visão geral (2.0.5): a manchete mede a queda pela queda, não pelo alerta
   assert.equal(outageOf({ ...alert, key: 'ram:usage' }, [outage]), null, 'só o alerta de servidor inacessível vira queda');
   assert.equal(outageOf(alert, [outage]), outage);
 });
+
+test('cartões (#48): sem dado, só o traço "—", sem a unidade colada', async () => {
+  const { big, n0 } = await import('../../public/js/views/common.js');
+  for (const unit of ['%', '°C', ' Mbps', ' ↓']) {
+    assert.doesNotMatch(String(big(n0(null), unit)), /class="unit"/, `"—${unit}" não aparece`);
+  }
+  assert.match(String(big(n0(42), '%')), /42<span class="unit">%<\/span>/, 'com dado, a unidade continua');
+});
