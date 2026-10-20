@@ -15,6 +15,8 @@ diante: `PATCH` corrige, `MINOR` acrescenta sem quebrar e `MAJOR` quebra.
   temperatura constante (#53). As casas decimais seguem o passo entre as marcas ("28,5°,
   29,0°, 29,5°"), como o eixo do tráfego da Rede.
 - CHANGELOG: a seção da 2.1.0-rc.3 dizia "3 detalhes da tela"; são 2.
+- Relatórios: sem nenhum dado de rede no período, o cartão "Rede" mostra "—" e "sem dados",
+  como os outros cartões, e não mais "0 B" e "↓ 0 B · ↑ 0 B" (#54).
 
 ## [2.1.0-rc.3] — 2026-10-20
 

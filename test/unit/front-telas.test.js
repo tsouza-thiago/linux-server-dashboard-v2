@@ -387,3 +387,25 @@ test('recursos (#53): eixo da temperatura com as casas que o passo entre as marc
   assert.deepEqual(axis([29, 29.2, 29.4]), ['29,0°', '29,2°', '29,4°']);
   assert.deepEqual(axis([30, 40, 50]), ['30°', '40°', '50°'], 'passo inteiro continua sem casas');
 });
+
+test('relatórios (#54): sem dado de rede, o cartão Rede diz "sem dados", não "0 B"', async () => {
+  const relatorios = await import('../../public/js/views/relatorios.js');
+  // Sem nenhuma amostra (1º uso) e com amostras sem a seção de rede (NET_IF vazio).
+  for (const buckets of [[], [b(Date.now(), { cpu: [1, 5, 3] }, 10)]]) {
+    const { el, text } = fakeScreen();
+    relatorios.update({
+      el, charts: new Map(), local: { custom: false, buckets },
+      state: { meta: { pollIntervalMs: 60e3 } }, api: { exportUrl: () => '/api/export' },
+    });
+    const cards = text('#rl-cards');
+    assert.match(cards, /Rede\s*—\s*sem dados/, `${buckets.length} balde(s)`);
+    assert.doesNotMatch(cards, /0 B/);
+  }
+  // Tráfego zero de verdade, medido, continua "0 B".
+  const { el, text } = fakeScreen();
+  relatorios.update({
+    el, charts: new Map(), local: { custom: false, buckets: [b(Date.now(), { rxDeltaBytes: [0, 0, 0], txDeltaBytes: [0, 0, 0] }, 10)] },
+    state: { meta: { pollIntervalMs: 60e3 } }, api: { exportUrl: () => '/api/export' },
+  });
+  assert.match(text('#rl-cards'), /Rede\s*0 B\s*↓ 0 B · ↑ 0 B/);
+});
