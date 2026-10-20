@@ -12,6 +12,7 @@ Closes #
 - [ ] Um teste falhava antes da mudança e passa depois.
 - [ ] `npm run check` verde.
 - [ ] Mudou a tela: `npm run test:e2e` (página inicial até 300 KB).
+- [ ] Mudou a tela: conferida no navegador num painel de teste (`docs/testes-no-navegador.md`). Versão: bateria completa.
 - [ ] Mudou a coleta ou o histórico: `npm run soak`.
 - [ ] Mudou código de segurança ou removeu código: `npm run seguranca`.
 - [ ] CHANGELOG `[Não publicado]` e documentação (AGENTS, README, TUTORIAL) no mesmo commit.
