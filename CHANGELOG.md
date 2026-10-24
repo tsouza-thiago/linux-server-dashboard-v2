@@ -9,6 +9,14 @@ diante: `PATCH` corrige, `MINOR` acrescenta sem quebrar e `MAJOR` quebra.
 
 ## [Não publicado]
 
+## [2.2.0-rc.1] — 2026-10-24
+
+1ª pré-versão da 2.2.0 (ADR 0015): a instalação passa a entrar em servidor que só aceita
+chave SSH. Só chega a quem já está numa pré-versão ou usa `--pre`
+(`./dashboard atualizar --pre`). Nada muda na configuração, no formato de `data/` nem no
+acesso do painel ao servidor: a coleta continua igual. Quem está na 2.1.0 ou anterior faz
+antes, uma vez, o passo manual das notas da 2.1.1 (a chave de assinatura mudou).
+
 ### Adicionado
 
 - Instalação em servidor que só aceita chave SSH (#61, ADR 0021). O passo 2 do assistente
@@ -950,7 +958,8 @@ Documentados no plano da V2 (seção 2.2, B1–B12), entre eles: alerta SMART fa
 rede zerada com contadores grandes, alerta duplicado a cada coleta e reescrita completa do
 histórico a cada minuto.
 
-[Não publicado]: https://github.com/tsouza-thiago/linux-server-dashboard-v2/compare/v2.1.1...HEAD
+[Não publicado]: https://github.com/tsouza-thiago/linux-server-dashboard-v2/compare/v2.2.0-rc.1...HEAD
+[2.2.0-rc.1]: https://github.com/tsouza-thiago/linux-server-dashboard-v2/compare/v2.1.1...v2.2.0-rc.1
 [2.1.1]: https://github.com/tsouza-thiago/linux-server-dashboard-v2/compare/v2.1.0...v2.1.1
 [2.1.0]: https://github.com/tsouza-thiago/linux-server-dashboard-v2/compare/v2.1.0-rc.3...v2.1.0
 [2.1.0-rc.3]: https://github.com/tsouza-thiago/linux-server-dashboard-v2/compare/v2.1.0-rc.2...v2.1.0-rc.3
