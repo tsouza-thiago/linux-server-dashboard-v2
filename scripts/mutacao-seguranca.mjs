@@ -57,6 +57,10 @@ const MUTACOES = [
   { nome: 'script de coleta com texto a mais (authorized_keys quebrado)', arquivo: 'server/collector/builder.js', de: `"echo '===FIM==='",`, para: `"echo '===FIM==='; true",` },
   { nome: 'authorized_keys regravado inteiro (apaga os outros computadores)', arquivo: 'server/setup/preparo.js', de: "        ...keepOthers(publicKey, id),\n", para: "        'rm -f authorized_keys.novo',\n", testes: ['test/unit/preparo-varios-computadores.test.js'] },
   { nome: 'nome do computador sem saneamento (injeção no sudoers)', arquivo: 'server/setup/acesso.js', de: ".toLowerCase().replace(/[^a-z0-9]+/g, '-')", para: '.toLowerCase()', testes: ['test/unit/preparo-varios-computadores.test.js'] },
+  { nome: 'admin oferecendo todas as chaves do agente (MaxAuthTries, fail2ban)', arquivo: 'server/setup/remoto.js', de: "['-i', identityFile, '-o', 'IdentitiesOnly=yes', ", para: "['-i', identityFile, ", testes: ['test/unit/setup-chave-ssh.test.js'] },
+  { nome: 'apelido com ProxyJump/ProxyCommand aceito', arquivo: 'server/setup/remoto.js', de: "    if (v && v !== 'none') {\n", para: "    if (false) {\n", testes: ['test/unit/setup-chave-ssh.test.js'] },
+  { nome: 'apelido virando opção do ssh (-oProxyCommand)', arquivo: 'server/setup/remoto.js', de: "/^[A-Za-z0-9_][A-Za-z0-9_.-]{0,63}$/.test(s)", para: "s.length > 0", testes: ['test/unit/setup-chave-ssh.test.js'] },
+  { nome: 'senha do sudo indo para a conexão SSH no modo chave', arquivo: 'server/setup/instalacao.js', de: "    if (this.acesso.modo === 'chave') senha = '';\n", para: '', testes: ['test/unit/setup-chave-ssh.test.js'] },
   { nome: 'exec com shell importado', arquivo: 'server/cli/servico.js', de: "import { spawn, spawnSync } from 'node:child_process';", para: "import { exec, spawn, spawnSync } from 'node:child_process';" },
 ];
 

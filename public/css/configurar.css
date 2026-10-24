@@ -102,6 +102,13 @@
 /* Campos */
 .wz-field { display: flex; flex-direction: column; gap: 8px; }
 .wz-field > label { font-size: 14px; font-weight: 500; }
+/* Rótulo de um grupo (a escolha senha/chave), igual ao de um campo. */
+.wz-field > .wz-label { font-size: 14px; font-weight: 500; }
+/* Campo com um botão ao lado (apelido + "Ler o apelido"); quebra em tela estreita. */
+.wz-field > .wz-seg { align-self: flex-start; }
+.wz-row-inline { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+.wz-row-inline > .wz-input { flex: 1 1 200px; min-width: 0; }
+.wz-sum > div > span:last-child { overflow-wrap: anywhere; text-align: right; }
 .wz-input { min-height: 52px; padding: 0 16px; border-radius: 12px; border: 1px solid var(--input-line); background: var(--bg); color: var(--text); font-family: var(--mono); font-size: 16px; width: 100%; }
 .wz-input:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
 .wz-input.is-ok { border-color: var(--wz-ok-line); }

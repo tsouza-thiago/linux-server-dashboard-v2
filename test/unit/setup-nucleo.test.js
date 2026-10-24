@@ -88,9 +88,9 @@ test('detecção: discos, pastas, rede e serviços do servidor de exemplo', () =
 test('preparo: o mesmo plano vira script do assistido e blocos do manual', () => {
   const targets = { mounts: ['/', '/mnt/dados'], devs: ['sda', 'sdb'], services: ['smbd'], netIf: 'enp3s0' };
   const plan = preparationPlan({ adminUser: 'maria', publicKey: PUB, computer: 'Note-Ana.lan', targets, smartDevs: ['sda', 'sdb'], from: '192.0.2.50' });
-  assert.deepEqual(plan.actions.map((a) => a.id), ['sudo', 'usuario', 'chave', 'sudoers', 'teste']);
+  assert.deepEqual(plan.actions.map((a) => a.id), ['sudo', 'sshd', 'usuario', 'chave', 'sudoers', 'teste']);
   assert.equal(plan.actions[0].detalhe, 'pede a senha de maria uma vez');
-  assert.match(plan.actions[3].detalhe, /apenas smartctl -H em sda e sdb/);
+  assert.match(plan.actions[4].detalhe, /apenas smartctl -H em sda e sdb/);
   assert.equal(sh(plan.rootScript).status, 0, sh(plan.rootScript).stderr);
   assert.match(plan.rootScript, /^set -e$/m);
   assert.match(plan.rootScript, /restrict,from="192\.0\.2\.50",command=/);
@@ -98,7 +98,7 @@ test('preparo: o mesmo plano vira script do assistido e blocos do manual', () =>
   assert.equal(plan.sudoersFile, '/etc/sudoers.d/dashboard-note-ana-lan-3ddb8334', 'sem ponto: o includedir do sudo ignora arquivo com ponto');
   assert.match(plan.rootScript, /visudo -cf \/etc\/sudoers\.d\/dashboard-note-ana-lan-3ddb8334\.novo && mv/);
   assert.ok(plan.keyLine.endsWith(` ${PUB} dashboard@note-ana-lan:3ddb8334`), 'a linha diz de qual computador e instalação ela é');
-  assert.deepEqual(completedSteps(plan.rootScript.replace(/echo '(@@ok \w+)'/g, '$1')), ['usuario', 'chave', 'sudoers']);
+  assert.deepEqual(completedSteps(plan.rootScript.replace(/echo '(@@ok \w+)'/g, '$1')), ['sshd', 'usuario', 'chave', 'sudoers']);
   assert.ok(plan.displayed.startsWith('# executado como root numa única chamada de sudo (pede a senha de maria uma vez)'));
   assert.ok(!plan.displayed.includes('@@ok'), 'só os comandos de verdade aparecem para a pessoa');
 
@@ -132,7 +132,7 @@ test('preparo: como o script chega a root (senha uma vez, conferida antes)', () 
   const withPass = assistedScript(rs, { sudo: 'senha', password: "s'x" });
   assert.equal(sh(withPass).status, 0);
   assert.match(withPass, /^P='s'\\''x'$/m);
-  assert.match(withPass, /sudo -S -k -p '' true 2>\/dev\/null \|\| \{ P=; echo '@@erro senha'; exit 9; \}/, 'senha conferida antes');
+  assert.match(withPass, /E=\$\(printf '%s\\n' "\$P" \| sudo -S -k -p '' true 2>&1 >\/dev\/null\) \|\| \{ P=; case "\$E" in \*'must have a tty'\*\) echo '@@erro tty';; \*\) echo '@@erro senha';; esac; exit 9; \}/, 'senha conferida antes (e requiretty à parte)');
   assert.match(withPass, /\| sudo -S -k -p '' \/bin\/sh -s$/m);
   assert.throws(() => assistedScript(rs, { sudo: 'senha' }), /precisa da senha/);
   assert.throws(() => assistedScript(rs, { sudo: 'nao', password: 'x' }), /precisa da senha/);

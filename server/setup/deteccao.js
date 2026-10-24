@@ -20,11 +20,17 @@ export function detectionScript({ password = '' } = {}) {
     "echo '===CLIENT==='; echo \"${SSH_CONNECTION%% *}\"",
     "echo '===OS==='; grep -E '^PRETTY_NAME=' /etc/os-release 2>/dev/null; cat /proc/sys/kernel/hostname",
     "echo '===SUDO==='",
+    // A resposta do `sudo -n` separa "pede senha" de "exige terminal" (Defaults requiretty,
+    // que quebra o sudo sem terminal do preparo assistido). Sem a senha, quem pede senha
+    // fica como `pede-senha`: o sudo só diz se aceita depois de recebê-la (passo 5).
     'if [ "$(id -u)" = 0 ]; then echo root',
     'elif ! command -v sudo >/dev/null 2>&1; then echo ausente',
-    'elif sudo -n true 2>/dev/null; then echo nopasswd',
+    'elif E=$(sudo -n true 2>&1 </dev/null); then echo nopasswd',
+    'elif case "$E" in *"must have a tty"*) true;; *) false;; esac; then echo requiretty',
     "elif [ -n \"$P\" ] && printf '%s\\n' \"$P\" | sudo -S -k -p '' true 2>/dev/null; then echo senha",
+    'elif [ -z "$P" ] && case "$E" in *"password is required"*) true;; *) false;; esac; then echo pede-senha',
     'else echo nao; fi',
+    "echo '===GRUPOS==='; id -Gn",
     // A variável da senha é apagada logo depois do uso.
     'P=',
     "echo '===SMARTCTL==='; for p in /usr/sbin/smartctl /usr/bin/smartctl /sbin/smartctl /usr/local/sbin/smartctl; do [ -x \"$p\" ] && { echo \"$p\"; break; }; done; true",
@@ -39,6 +45,17 @@ export function detectionScript({ password = '' } = {}) {
     '',
   ].join('\n');
 }
+
+/**
+ * Como o administrador vira root: `root` (já é), `nopasswd` (sudo sem senha), `senha` (o sudo
+ * aceitou a senha do SSH), `pede-senha` (entrou por chave e o sudo pede senha: ela vem no
+ * passo 5), `requiretty` (o sudo exige terminal), `nao` (sem sudo) e `ausente` (sem o sudo).
+ */
+export const SUDO_STATES = ['root', 'nopasswd', 'senha', 'pede-senha', 'requiretty', 'nao', 'ausente'];
+/** Estados em que o preparo assistido funciona (com a senha do sudo, quando pede). */
+export const SUDO_OK = ['root', 'nopasswd', 'senha', 'pede-senha'];
+// Grupos que costumam ter sudo (Debian/Ubuntu, Fedora/Arch e macOS-like).
+const ADMIN_GROUPS = ['sudo', 'wheel', 'admin'];
 
 /** Separa a saída da detecção nas seções ===NOME=== (cada uma com as suas linhas). */
 function sections(text) {
@@ -100,7 +117,9 @@ export function parseDetection(text) {
   const pretty = (s.OS || []).find((l) => l.startsWith('PRETTY_NAME='));
   const osName = pretty ? pretty.slice(12).replace(/^"|"$/g, '') : '';
   const hostname = (s.OS || []).map((l) => l.trim()).filter((l) => l && !l.startsWith('PRETTY_NAME='))[0] || '';
-  const sudo = ['root', 'nopasswd', 'senha', 'nao', 'ausente'].includes(first('SUDO')) ? first('SUDO') : 'nao';
+  const sudo = SUDO_STATES.includes(first('SUDO')) ? first('SUDO') : 'nao';
+  // Grupos de administrador: com o sudo pedindo senha, dizem se é provável que ele aceite.
+  const groups = first('GRUPOS').split(/\s+/).filter((g) => /^[a-z_][a-z0-9_.-]*$/i.test(g));
   const smartctl = first('SMARTCTL') || null;
   const sudoBin = (s.SUDOBIN || []).map((l) => l.trim()).filter(Boolean);
 
@@ -170,6 +189,7 @@ export function parseDetection(text) {
     os: osName,
     hostname,
     sudo,
+    sudoGroup: groups.some((g) => ADMIN_GROUPS.includes(g)),
     smartctl,
     // O dashmon precisa do sudo (e do visudo para validar a regra) para o teste SMART.
     smartPossible: Boolean(smartctl) && sudoBin.some((p) => p.endsWith('/sudo')) && sudoBin.some((p) => p.endsWith('/visudo')),
@@ -187,7 +207,7 @@ export function parseDetection(text) {
  * padrão e os serviços que um servidor de casa costuma servir.
  */
 export function recommendedChoices(det) {
-  const smartOk = det.smartPossible && ['root', 'nopasswd', 'senha'].includes(det.sudo);
+  const smartOk = det.smartPossible && SUDO_OK.includes(det.sudo);
   const mounts = det.mounts.filter((m) => m.recommended).map((m) => m.target);
   const usedDisks = new Set(det.mounts.filter((m) => mounts.includes(m.target)).map((m) => m.disk).filter(Boolean));
   const physical = det.disks.filter((d) => !d.virtual && usedDisks.has(d.name)).map((d) => d.name);

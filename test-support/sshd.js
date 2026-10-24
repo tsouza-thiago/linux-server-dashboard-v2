@@ -38,9 +38,10 @@ export function keygen(file, comment = 'teste') {
 
 /**
  * Sobe o sshd de teste: só chave (sem senha nem PAM), em 127.0.0.1, numa pasta temporária.
+ * `extraConfig` são linhas a mais do sshd_config (ex.: um servidor endurecido).
  * Devolve porta, usuário, linha do known_hosts, `setAuthorizedKeys(texto)` e `stop()`.
  */
-export async function startSshd() {
+export async function startSshd({ extraConfig = [] } = {}) {
   if (!hasSsh()) return null;
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'dash-sshd-'));
   const port = await freePort();
@@ -57,6 +58,7 @@ export async function startSshd() {
     'PasswordAuthentication no',
     'KbdInteractiveAuthentication no',
     `PidFile ${path.join(dir, 'sshd.pid')}`,
+    ...extraConfig,
     '',
   ].join('\n'));
   if (process.getuid() === 0) fs.mkdirSync('/run/sshd', { recursive: true, mode: 0o755 });

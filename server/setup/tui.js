@@ -103,13 +103,15 @@ export class Screen {
   }
 
   /** Mensagem com uma escolha s/n (ou só Enter para continuar). */
-  async confirm({ title, lines = [], question, yesNo = true }) {
-    this.draw([`  ${this.bold(title)}`, ...lines.map((l) => `  ${l}`), '', `  ${question}${yesNo ? ' [s/n]' : ''}`],
-      yesNo ? `${this.accent('s')} sim   ${this.accent('n')} não   ${this.accent('Esc')} voltar` : `${this.accent('Enter')} continuar   ${this.accent('Esc')} voltar`);
+  async confirm({ title, lines = [], question, yesNo = true, enter }) {
+    // `enter`: resposta do Enter numa pergunta s/n (a opção padrão); sem ela, o Enter não responde.
+    const enterHint = yesNo && enter !== undefined ? `   ${this.accent('Enter')} ${enter ? 'sim' : 'não'}` : '';
+    this.draw([`  ${this.bold(title)}`, ...lines.map((l) => `  ${l}`), '', `  ${question}${yesNo ? (enter === undefined ? ' [s/n]' : enter ? ' [S/n]' : ' [s/N]') : ''}`],
+      yesNo ? `${this.accent('s')} sim   ${this.accent('n')} não${enterHint}   ${this.accent('Esc')} voltar` : `${this.accent('Enter')} continuar   ${this.accent('Esc')} voltar`);
     for (;;) {
       const k = await this.key();
       if (k.name === 'escape') return null;
-      if (!yesNo && (k.name === 'return' || k.name === 'enter')) return true;
+      if ((k.name === 'return' || k.name === 'enter') && (!yesNo || enter !== undefined)) return yesNo ? enter : true;
       if (yesNo && /^[sy]$/i.test(k.sequence || '')) return true;
       if (yesNo && /^n$/i.test(k.sequence || '')) return false;
     }
@@ -198,9 +200,58 @@ async function step1(sc, inst) {
   if (r === null) throw new Cancelled();
 }
 
+/**
+ * Passo 2, modo chave (ADR 0021): o apelido do ~/.ssh/config, lido com `ssh -G` (não
+ * conecta); a pessoa confere endereço, porta, usuário e chave antes de seguir.
+ */
+async function step2Key(sc, inst, form) {
+  let error = '';
+  for (;;) {
+    const apelido = await sc.text({
+      title: 'Qual é o seu servidor?', label: 'Apelido do servidor no ~/.ssh/config', value: form.apelido, error,
+      lines: ['O nome depois de "Host", o mesmo que você usa em ssh meu-servidor.', 'A chave precisa estar no seu ssh-agent: o painel nunca pede a passphrase.'],
+      hint: 'lido com ssh -G, que não conecta · ProxyJump e ProxyCommand não servem',
+    });
+    if (apelido === null) return 'back';
+    form.apelido = apelido.trim();
+    sc.busy('Qual é o seu servidor?', `lendo o apelido ${form.apelido}…`);
+    let a;
+    try { a = await inst.lerApelido({ apelido: form.apelido }); } catch (err) { error = err.message; continue; }
+    const ok = await sc.confirm({
+      title: 'Qual é o seu servidor?',
+      lines: [
+        sc.bold(`O apelido ${a.apelido} diz:`), '',
+        `  Endereço (HostName)     ${a.host}`, `  Porta (Port)            ${a.port}`, `  Usuário (User)          ${a.user}`,
+        `  Chave (IdentityFile)    ${a.identityFile}`, `  Agente (IdentityAgent)  ${a.identityAgent || 'nenhum'}`, '',
+        sc.dim('Só estes valores entram na conexão; o resto do ~/.ssh/config fica de fora.'),
+      ],
+      question: 'Usar estes valores?',
+    });
+    if (ok !== true) { error = ''; continue; }
+    sc.busy('Qual é o seu servidor?', `procurando ${a.host} na rede…`);
+    try {
+      const r = await inst.definirServidor({ modo: 'chave', apelido: form.apelido });
+      Object.assign(form, { host: r.host, user: r.user, port: String(r.port), modo: 'chave' });
+      return 'next';
+    } catch (err) {
+      error = err.message;
+    }
+  }
+}
+
 /** Passo 2: endereço, usuário e porta; repete enquanto o servidor não responder. */
 async function step2(sc, inst, form) {
   sc.step = 2;
+  // Como a pessoa entra: senha é o padrão; chave SSH é para servidor que só aceita chave.
+  const chave = await sc.confirm({
+    title: 'Qual é o seu servidor?',
+    lines: ['Como você entra no servidor?', '', '  n  com senha (o mais comum, é o padrão)', '  s  com chave SSH, por um apelido do ~/.ssh/config e o ssh-agent'],
+    question: 'Entrar com chave SSH?',
+    enter: false,
+  });
+  if (chave === null) return 'back';
+  if (chave) return step2Key(sc, inst, form);
+  form.modo = 'senha';
   let error = '';
   for (;;) {
     const lines = ['Informe o endereço e um usuário que você já usa para entrar nele.', 'Não sabe o endereço? No servidor, digite hostname -I (o primeiro número).'];
@@ -247,6 +298,7 @@ async function step3(sc, inst, form) {
     question: 'Este é o meu servidor. Lembrar esta identidade e me avisar se ela mudar?',
   });
   if (ok === null || ok === false) return 'back';
+  if (form.modo === 'chave') return step3Key(sc, inst, form);
   let error = '';
   for (;;) {
     const senha = await sc.text({
@@ -261,6 +313,29 @@ async function step3(sc, inst, form) {
       return 'next';
     } catch (err) {
       error = err.message;
+    }
+  }
+}
+
+/**
+ * Passo 3, modo chave: conecta com a chave do apelido. Se ela não estiver no ssh-agent,
+ * mostra o `ssh-add` para rodar em outro terminal e tenta de novo (Enter).
+ */
+async function step3Key(sc, inst, form) {
+  for (;;) {
+    sc.busy(`Conectar a ${form.host}`, 'conectando com a chave e lendo o servidor (só leitura)…');
+    try {
+      await inst.conectar({ confirmo: true });
+      return 'next';
+    } catch (err) {
+      const cmd = err.detalhes && err.detalhes.comando;
+      const again = await sc.confirm({
+        title: `Conectar a ${form.host}`,
+        lines: [sc.crit(`✗ ${err.message}`), ...(cmd ? ['', `  ${sc.accent(cmd)}`, '', sc.dim('Rode o comando em outro terminal: a passphrase é digitada lá, nunca aqui.')] : [])],
+        question: 'Tentar de novo',
+        yesNo: false,
+      });
+      if (again === null) return 'back';
     }
   }
 }
@@ -362,22 +437,33 @@ async function step5(sc, inst, form) {
     if (r === null) return 'back';
     if (mode === 'assistido') {
       if (!plan.podeAssistido && !plan.precisaSenha) {
-        await sc.confirm({ title: 'Preparar o servidor', lines: [sc.warn(`O usuário ${form.user} não pode usar sudo neste servidor.`), 'Escolha "Prefiro fazer à mão" com um usuário que possa, ou volte e entre como root.'], question: 'Voltar', yesNo: false });
+        const lines = plan.sudo === 'requiretty'
+          ? [sc.warn('O sudo deste servidor exige um terminal (Defaults requiretty).'), 'O modo assistido roda sem terminal: escolha "Prefiro fazer à mão".']
+          : [sc.warn(`O usuário ${form.user} não pode usar sudo neste servidor.`), 'Escolha "Prefiro fazer à mão" com um usuário que possa, ou volte e entre como root.'];
+        await sc.confirm({ title: 'Preparar o servidor', lines, question: 'Voltar', yesNo: false });
         continue;
       }
       let senha;
       if (plan.precisaSenha) {
-        senha = await sc.text({ title: 'Preparar o servidor', mask: true, label: `Senha de ${form.user} para o sudo`, hint: 'usada uma vez, nesta conexão, e descartada em seguida' });
+        senha = await sc.text({
+          title: 'Preparar o servidor', mask: true, label: `Senha de ${form.user} para o sudo`,
+          hint: `usada uma vez, só pelo stdin do sudo, e descartada em seguida${form.modo === 'chave' ? ' · a senha da conta, não a passphrase da chave' : ''}`,
+        });
         if (senha === null) continue;
       }
       sc.busy('Preparar o servidor', '1 conexão · cerca de 10 segundos · não feche esta janela');
-      const res = await inst.prepararAssistido({ senha });
+      // Erro antes da conexão (ex.: a chave saiu do ssh-agent) vira um resultado como os outros.
+      const res = await inst.prepararAssistido({ senha }).catch((err) => {
+        if (!err.status) throw err;
+        return { ok: false, feitos: [], erro: err.detalhes && err.detalhes.comando ? `${err.message} ${err.detalhes.comando}` : err.message };
+      });
+      const warn = (res.avisos || []).map((a) => sc.warn(`! ${a}`));
       const marks = plan.acoes.map((a, i) => `${res.feitos.includes(a.id) ? sc.ok('✓') : sc.dim(String(i + 1))} ${a.titulo}`);
       if (res.ok) {
-        await sc.confirm({ title: 'Preparar o servidor', lines: [...marks, '', sc.ok('Servidor pronto.'), 'A conexão administrativa foi encerrada e a senha descartada.', 'Daqui em diante o painel usa só o usuário dashmon.'], question: 'Continuar', yesNo: false });
+        await sc.confirm({ title: 'Preparar o servidor', lines: [...marks, '', sc.ok('Servidor pronto.'), 'A conexão administrativa foi encerrada e a senha descartada.', 'Daqui em diante o painel usa só o usuário dashmon.', ...warn], question: 'Continuar', yesNo: false });
         return 'next';
       }
-      await sc.confirm({ title: 'Preparar o servidor', lines: [...marks, '', sc.crit(`✗ ${res.erro}`)], question: 'Voltar e tentar de novo', yesNo: false });
+      await sc.confirm({ title: 'Preparar o servidor', lines: [...marks, '', sc.crit(`✗ ${res.erro}`), ...warn], question: 'Voltar e tentar de novo', yesNo: false });
       plan = inst.planoPreparo({ from });
       continue;
     }
@@ -446,7 +532,7 @@ export async function runTui({ out, inst, input = process.stdin, output = proces
     input.resume();
   }
   const sc = new Screen({ input, output, color: out.color });
-  const form = { host: inst.servidor?.host || inst.verificarComputador().servidorAtual?.host || '', user: '', port: String(inst.verificarComputador().servidorAtual?.port || 22) };
+  const form = { host: inst.servidor?.host || inst.verificarComputador().servidorAtual?.host || '', user: '', port: String(inst.verificarComputador().servidorAtual?.port || 22), modo: 'senha', apelido: '' };
   let result = null;
   try {
     // Cada passo devolve 'next', 'back' ou, no 6º, o resultado final.

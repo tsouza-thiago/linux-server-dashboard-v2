@@ -37,7 +37,7 @@ test('passo 1–3: verificações, servidor validado, identidade antes da senha'
   await assert.rejects(() => inst.definirServidor({ host: '192.0.2.10', user: 'maria', port: 0 }), (e) => e.field === 'port');
   await assert.rejects(() => inst.definirServidor({ host: '192.0.2.99', user: 'maria' }), /Ninguém respondeu/);
   await assert.rejects(() => inst.lerIdentidade(), /servidor primeiro/);
-  assert.deepEqual(await inst.definirServidor({ host: ' 192.0.2.10 ', user: 'maria', port: '' }), { host: '192.0.2.10', user: 'maria', port: 22, ms: 3 });
+  assert.deepEqual(await inst.definirServidor({ host: ' 192.0.2.10 ', user: 'maria', port: '' }), { host: '192.0.2.10', user: 'maria', port: 22, modo: 'senha', ms: 3 });
   await assert.rejects(() => inst.conectar({ senha: 'certa', confirmo: true }), /identidade do servidor primeiro/);
   const id = await inst.lerIdentidade();
   assert.deepEqual(id.blocos.slice(0, 3), ['8oOm', '2IqG', 'GSLM']);
@@ -86,7 +86,7 @@ test('passo 5 assistido → 6: prepara, testa a coleta, grava tudo e descarta a 
   await throughStep4(inst);
   inst.definirEscolhas({ mounts: ['/', '/mnt/dados'], smart: ['sda', 'sdb'], netIf: 'enp3s0', services: ['smbd', 'nmbd'] });
   const plano = inst.planoPreparo({ from: true });
-  assert.deepEqual(plano.acoes.map((a) => a.id), ['sudo', 'usuario', 'chave', 'sudoers', 'teste']);
+  assert.deepEqual(plano.acoes.map((a) => a.id), ['sudo', 'sshd', 'usuario', 'chave', 'sudoers', 'teste']);
   assert.equal(plano.podeAssistido, true);
   assert.equal(plano.from, true);
   assert.match(plano.comandos, /restrict,from="192\.0\.2\.50"/);
@@ -94,7 +94,7 @@ test('passo 5 assistido → 6: prepara, testa a coleta, grava tudo e descarta a 
   assert.throws(() => inst.tokenReserva(), /Termine a preparação/);
   const r = await inst.prepararAssistido();
   assert.equal(r.ok, true, r.erro);
-  assert.deepEqual(r.feitos, ['sudo', 'usuario', 'chave', 'sudoers', 'teste']);
+  assert.deepEqual(r.feitos, ['sudo', 'sshd', 'usuario', 'chave', 'sudoers', 'teste']);
   assert.deepEqual(r.resumo, { duracaoMs: 910, bytes: 6200, memoriaPct: 71, discoPct: 64, discoMount: '/mnt/dados', temperaturaC: null, servicosAtivos: 2, servicosTotal: 2 });
   assert.equal(inst.temSenha, false, 'senha descartada depois do preparo');
   assert.match(srv.prepared, /sudo -S -k -p '' \/bin\/sh -s/);

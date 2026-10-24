@@ -65,7 +65,8 @@ Tema escuro e claro.
   sudo dnf install git     # Fedora
   ```
 - **O servidor:** Linux ligado e na rede, com `sshd` ativo e um usuário que possa usar
-  `sudo` (só na instalação).
+  `sudo` (só na instalação). Servidor que só aceita chave SSH também serve: o assistente
+  entra pelo apelido do seu `~/.ssh/config`, com a chave no ssh-agent.
 
 Não precisa instalar o Node.js: se faltar, o `./dashboard` baixa o Node 24 oficial para
 dentro da pasta (`.runtime/`) e confere o SHA-256. Não precisa de `npm install`.
@@ -82,7 +83,7 @@ O `./dashboard instalar` confere a versão assinada, o Node e a porta, e abre o
 **assistente no navegador** com um código de uso único. São 6 passos:
 
 1. **Boas-vindas:** o que será feito e o que nunca é feito.
-2. **Servidor:** endereço e usuário administrador.
+2. **Servidor:** como você entra (senha ou chave SSH), endereço e usuário administrador.
 3. **Conectar:** você confere a identidade do servidor **antes** de digitar a senha.
 4. **O que monitorar:** pastas, discos, rede, serviços e limites, já marcados como recomendado.
 5. **Preparar o servidor:** *assistido* (mostra os comandos exatos e roda depois do seu

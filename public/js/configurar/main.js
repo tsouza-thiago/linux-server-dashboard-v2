@@ -35,7 +35,10 @@ const st = {
   field: '',
   computer: null,
   passos: ['Boas-vindas', 'Servidor', 'Conectar', 'O que monitorar', 'Preparar servidor', 'Pronto'],
-  form: { host: '', user: '', port: '22' },
+  // modo: como o administrador entra (senha, o padrão, ou o apelido do ~/.ssh/config).
+  form: { host: '', user: '', port: '22', modo: 'senha', apelido: '' },
+  alias: null,
+  detalhes: null,
   reach: null,
   ident: null,
   confirm: false,
@@ -70,6 +73,7 @@ async function api(path, body) {
   if (!res.ok) {
     const err = new Error((data && data.error) || `erro ${res.status}`);
     err.field = data && data.field;
+    err.detalhes = data && data.detalhes;
     err.status = res.status;
     throw err;
   }
@@ -81,12 +85,14 @@ async function run(fn) {
   st.busy = true;
   st.error = '';
   st.field = '';
+  st.detalhes = null;
   render();
   try {
     await fn();
   } catch (err) {
     st.error = err.message;
     st.field = err.field || '';
+    st.detalhes = err.detalhes || null;
   } finally {
     st.busy = false;
     render();
@@ -207,19 +213,52 @@ function viewStep1() {
 }
 
 // ---------------- Passo 2 ----------------
+/** Escolha "Como você entra no servidor?": senha (padrão) ou chave SSH (ADR 0021). */
+function accessChoice() {
+  const m = st.form.modo;
+  return html`<div class="wz-field"><span class="wz-label" id="acessoLbl">Como você entra no servidor?</span>
+    <div class="wz-seg" role="group" aria-labelledby="acessoLbl">
+      <button type="button" data-act="acesso" data-acesso="senha" aria-pressed="${m === 'senha'}">Senha</button>
+      <button type="button" data-act="acesso" data-acesso="chave" aria-pressed="${m === 'chave'}">Chave SSH</button></div>
+    <span class="wz-hint">${m === 'chave' ? 'para servidor que só aceita chave: usamos um apelido do seu ~/.ssh/config e o seu ssh-agent' : 'o jeito mais comum · a senha é usada uma vez, no passo 3'}</span></div>`;
+}
+
+/** Modo chave: o apelido e, depois de lido, o que o `ssh -G` encontrou para conferir. */
+function aliasFields(inv) {
+  const a = st.alias;
+  return html`<div class="wz-field">
+      <label for="apelido">Apelido do servidor no <span class="mono">~/.ssh/config</span></label>
+      <div class="wz-row-inline"><input id="apelido" name="apelido" class="wz-input ${st.field === 'apelido' ? 'is-invalid' : a ? 'is-ok' : ''}" value="${st.form.apelido}" autocomplete="off" spellcheck="false" placeholder="meu-servidor" ${inv('apelido')}>
+        <button type="button" class="wz-mini" data-act="apelido" ${st.busy ? raw('disabled') : ''}>Ler o apelido</button></div>
+      ${st.field === 'apelido' ? html`<span class="wz-hint is-err" id="apelidoErr">${st.error}</span>`
+    : html`<span class="wz-hint">o nome depois de <span class="mono">Host</span>, o mesmo do <span class="mono">ssh meu-servidor</span> · lemos com <span class="mono">ssh -G</span>, que não conecta</span>`}
+    </div>
+    ${a ? html`<section class="wz-box tight" aria-label="O que o apelido diz"><h2>Confira o que o apelido ${a.apelido} diz</h2>
+      <div class="wz-sum">
+        <div><span>Endereço (HostName)</span><span>${a.host}</span></div>
+        <div><span>Porta (Port)</span><span>${a.port}</span></div>
+        <div><span>Usuário (User)</span><span>${a.user}</span></div>
+        <div><span>Chave (IdentityFile)</span><span>${a.identityFile}</span></div>
+        <div><span>Agente (IdentityAgent)</span><span>${a.identityAgent || 'nenhum'}</span></div>
+      </div>
+      <span class="wz-hint">${icon('lock', 13, 2.2)}só estes valores entram na conexão; o resto do ~/.ssh/config fica de fora</span></section>` : ''}`;
+}
+
 function viewStep2() {
   const f = st.form;
+  const chave = f.modo === 'chave';
   const inv = (name) => (st.field === name ? raw(`aria-invalid="true" aria-describedby="${name}Err"`) : '');
+  const reach = st.reach ? html`<span class="wz-hint is-ok">${icon('check', 13)}encontrado na rede · respondeu em ${st.reach.ms} ms · porta ${st.reach.port} aberta</span>` : '';
   return html`<div class="wz-cols">
     <main class="wz-card md">
       <div class="wz-title"><h1 class="wz-h1 sm" tabindex="-1">Qual é o seu servidor?</h1>
-        <p class="wz-lead sm">Informe o endereço e um usuário que você já usa para entrar nele. Esse usuário só serve para preparar o acesso; o painel vai usar um usuário próprio, sem poderes.</p></div>
+        <p class="wz-lead sm">${chave ? 'Informe o apelido que você já usa para entrar nele.' : 'Informe o endereço e um usuário que você já usa para entrar nele.'} Esse usuário só serve para preparar o acesso; o painel vai usar um usuário próprio, sem poderes.</p></div>
       <form class="wz-body" data-form="servidor" novalidate>
-        <div class="wz-field">
+        ${accessChoice()}
+        ${chave ? html`${aliasFields(inv)}${reach}` : html`<div class="wz-field">
           <label for="host">Endereço do servidor</label>
           <input id="host" name="host" class="wz-input ${st.reach ? 'is-ok' : st.field === 'host' ? 'is-invalid' : ''}" value="${f.host}" autocomplete="off" spellcheck="false" placeholder="192.0.2.10" ${inv('host')}>
-          ${st.field === 'host' ? html`<span class="wz-hint is-err" id="hostErr">${st.error}</span>`
-    : st.reach ? html`<span class="wz-hint is-ok">${icon('check', 13)}encontrado na rede · respondeu em ${st.reach.ms} ms · porta ${st.reach.port} aberta</span>` : ''}
+          ${st.field === 'host' ? html`<span class="wz-hint is-err" id="hostErr">${st.error}</span>` : reach}
         </div>
         <div class="wz-field">
           <label for="user">Seu usuário no servidor</label>
@@ -230,30 +269,50 @@ function viewStep2() {
           <summary>Opções avançadas · porta SSH (padrão 22)</summary>
           <div><label for="port">Porta</label><input id="port" name="port" class="wz-input sm ${st.field === 'port' ? 'is-invalid' : ''}" inputmode="numeric" value="${f.port}" ${inv('port')}>
           ${st.field === 'port' ? html`<span class="wz-hint is-err" id="portErr">${st.error}</span>` : ''}</div>
-        </details>
-        ${st.error && !['host', 'user', 'port'].includes(st.field) ? alertBox(st.error) : ''}
+        </details>`}
+        ${st.error && !['host', 'user', 'port', 'apelido'].includes(st.field) ? alertBox(st.error) : ''}
         <button type="submit" hidden></button>
       </form>
     </main>
-    <aside class="wz-aside" aria-label="Como descobrir o endereço">
+    ${chave ? html`<aside class="wz-aside" aria-label="Como funciona a entrada por chave">
+      <h2>Entrar por chave SSH</h2>
+      <div class="wz-help"><span class="wz-num">1</span><span>Use o apelido que você já usa no terminal, por exemplo <span class="mono">ssh meu-servidor</span>.</span></div>
+      <div class="wz-help"><span class="wz-num">2</span><span>A chave precisa estar no seu <span class="mono">ssh-agent</span>. O painel nunca pede nem recebe a passphrase.</span></div>
+      <div class="wz-help"><span class="wz-num">3</span><span>Se o sudo pedir senha, ela é pedida à parte, só no passo 5.</span></div>
+      <div class="wz-tip">Apelido com <span class="mono">ProxyJump</span> ou <span class="mono">ProxyCommand</span> não serve: o painel conecta direto ao servidor.</div>
+    </aside>` : html`<aside class="wz-aside" aria-label="Como descobrir o endereço">
       <h2>Não sabe o endereço?</h2>
       <div class="wz-help"><span class="wz-num">1</span><span>No próprio servidor, digite <span class="mono">hostname -I</span>. O primeiro número é o endereço.</span></div>
       <div class="wz-help"><span class="wz-num">2</span><span>Ou veja a lista de aparelhos conectados na página do seu roteador.</span></div>
       <div class="wz-help"><span class="wz-num">3</span><span>Se o servidor tem nome na rede, ele também vale, por exemplo <span class="mono">meu-servidor.local</span>.</span></div>
       <div class="wz-tip">Dica: configure no roteador um endereço fixo para o servidor. Assim ele não muda e o painel não perde a conexão.</div>
-    </aside>
+    </aside>`}
   </div>
-  <footer class="wz-foot">${back(1)}<span class="grow"></span>${next('Continuar', 'servidor')}</footer>`;
+  <footer class="wz-foot">${back(1)}<span class="grow"></span>${next('Continuar', 'servidor', { disabled: chave && !st.alias })}</footer>`;
 }
 
 // ---------------- Passo 3 ----------------
+/** Passo 3, modo chave: a chave do apelido e, se ela faltar no agente, o `ssh-add` a rodar. */
+function keyLogin() {
+  const d = st.field === 'agente' ? st.detalhes : null;
+  return html`<section class="wz-field" aria-label="Entrada por chave">
+    <span class="wz-label">Entrar com a chave do apelido <span class="mono">${st.form.apelido}</span></span>
+    <span class="wz-hint">${icon('lock', 13, 2.2)}${st.alias ? html`<span class="mono">${st.alias.identityFile}</span> · ` : ''}a passphrase fica no seu ssh-agent: o painel não pede nem recebe</span>
+    ${st.field === 'agente' ? html`${alertBox(st.error, true)}
+      ${d && d.comando ? html`<pre class="wz-code" id="agenteCmd">${d.comando}</pre>
+      <span class="wz-hint">rode no seu terminal${d.motivo === 'falta' ? ' (a chave fica no agente por 15 minutos)' : ''} e depois clique em Tentar de novo</span>
+      <div><button type="button" class="wz-mini" data-act="conectar" ${st.busy || !st.confirm ? raw('disabled') : ''}>Tentar de novo</button></div>` : ''}` : ''}
+  </section>`;
+}
+
 function viewStep3() {
   const s = st.form;
   const id = st.ident;
+  const chave = s.modo === 'chave';
   return html`<div class="wz-cols">
     <main class="wz-card md">
       <div class="wz-title"><h1 class="wz-h1 sm" tabindex="-1">Conectar a <span class="mono">${s.host}</span></h1>
-        <p class="wz-lead sm">Antes de enviar a senha, confirme que este é mesmo o seu servidor.</p></div>
+        <p class="wz-lead sm">${chave ? 'Antes de conectar' : 'Antes de enviar a senha'}, confirme que este é mesmo o seu servidor.</p></div>
       <section class="wz-ident" aria-label="Identidade do servidor">
         <div class="wz-ident-head"><span class="wz-ico accent lg">${icon('shield', 16, 2.2)}</span><h2>Identidade do servidor</h2>
           <span class="wz-hint">${id && id.conhecida ? 'já conhecida deste computador' : 'primeira conexão deste computador'}</span></div>
@@ -265,7 +324,7 @@ function viewStep3() {
         <div class="wz-confirm"><input id="confio" type="checkbox" data-act="confirm" ${st.confirm ? raw('checked') : ''} ${st.field === 'confirmo' ? raw('aria-invalid="true"') : ''}>
           <label for="confio">Este é o meu servidor. Lembrar esta identidade e me avisar se ela mudar.</label></div>
       </section>
-      <form class="wz-field" data-form="conectar">
+      ${chave ? keyLogin() : html`<form class="wz-field" data-form="conectar">
         <label for="senha">Senha de <span class="mono">${s.user}</span> no servidor</label>
         <div class="wz-pass">
           <input id="senha" class="wz-input pass ${st.field === 'senha' ? 'is-invalid' : ''}" type="${st.showPass ? 'text' : 'password'}" autocomplete="current-password" ${st.field === 'senha' ? raw('aria-invalid="true"') : ''}>
@@ -273,13 +332,14 @@ function viewStep3() {
         </div>
         <span class="wz-hint">${icon('lock', 13, 2.2)}usada só agora, direto na conexão; não fica salva em lugar nenhum</span>
         <button type="submit" hidden></button>
-      </form>
-      ${alertBox(st.error)}
+      </form>`}
+      ${st.field === 'agente' ? '' : alertBox(st.error)}
     </main>
     <aside class="wz-aside" aria-label="O que acontece ao conectar">
       <h2>Ao clicar em Conectar</h2>
       <ol class="wz-list ol"><li>Uma única conexão é aberta</li><li>Lemos quais discos, pastas, rede e serviços existem (só leitura)</li><li>Conferimos se seu usuário pode usar sudo</li><li>Nada é alterado no servidor ainda</li></ol>
-      <div class="wz-okbox"><strong>${icon('check', 13)}Já tem chave SSH para este servidor?</strong><span>Deixe a senha em branco: usamos a sua chave normalmente.</span></div>
+      ${chave ? html`<div class="wz-okbox"><strong>${icon('check', 13)}Só a chave do apelido</strong><span>O agente não oferece as suas outras chaves ao servidor (nada de esbarrar no MaxAuthTries ou no fail2ban).</span></div>`
+    : html`<div class="wz-okbox"><strong>${icon('check', 13)}Já tem chave SSH para este servidor?</strong><span>Deixe a senha em branco ou volte e escolha "Chave SSH" para usar um apelido do ~/.ssh/config.</span></div>`}
     </aside>
   </div>
   <footer class="wz-foot">${back(2)}<span class="grow"></span>${next('Conectar', 'conectar', { disabled: !id || !st.confirm })}</footer>`;
@@ -409,7 +469,7 @@ function viewAssisted(p, seg) {
       <span><strong>Aceitar a chave só deste computador <small>(${p.clientIp})</small></strong><em>Mais seguro: mesmo que a chave vaze, ela não funciona de outro lugar. Se o endereço deste computador mudar, rode <span class="mono">dashboard reconfigurar</span>.</em></span></label>` : ''}
     ${p.precisaSenha || pr.precisaSenha ? html`<div class="wz-field"><label for="sudoSenha">Senha de <span class="mono">${st.form.user}</span> para o sudo</label>
       <input id="sudoSenha" class="wz-input pass ${st.field === 'senha' ? 'is-invalid' : ''}" type="password" autocomplete="current-password">
-      <span class="wz-hint">${icon('lock', 13, 2.2)}usada uma vez, nesta conexão, e descartada em seguida</span></div>` : ''}
+      <span class="wz-hint">${icon('lock', 13, 2.2)}usada uma vez, só pelo stdin do sudo, e descartada em seguida${p.acesso === 'chave' ? ' · é a senha da conta no servidor, não a passphrase da chave' : ''}</span></div>` : ''}
     <details ${raw('open')}><summary>Ver os comandos exatos que serão executados no servidor</summary>
       <pre class="wz-pre">${shortCommands(p.comandos, p.hash)}</pre>
       <details><summary>Ver a linha completa da chave (com o comando de coleta inteiro)</summary><pre class="wz-pre">${p.linhaChave}</pre></details>
@@ -425,8 +485,9 @@ function viewAssisted(p, seg) {
     <div class="wz-title row"><div><h1 class="wz-h1 sm" tabindex="-1">Preparar o servidor</h1>
       <p class="wz-lead sm">Confira o que vai acontecer. Nada é feito antes do seu "Confirmar", e tudo pode ser desfeito depois.</p></div>${seg}</div>
     <ol class="wz-acts">${acts}</ol>
-    ${!podeAssistido ? alertBox(`O usuário ${st.form.user} não pode usar sudo neste servidor. Use "Prefiro fazer à mão" com um usuário que possa, ou volte e entre como root.`, true) : ''}
+    ${!podeAssistido ? alertBox(p.sudo === 'requiretty' ? 'O sudo deste servidor exige um terminal (Defaults requiretty), e o modo assistido roda sem terminal. Use "Prefiro fazer à mão".' : `O usuário ${st.form.user} não pode usar sudo neste servidor. Use "Prefiro fazer à mão" com um usuário que possa, ou volte e entre como root.`, true) : ''}
     ${review}
+    ${pr.avisos && pr.avisos.length ? html`<div class="wz-alert is-warn" role="status">${icon('alert', 16, 2.2)}<span><strong>O SSH do servidor pode barrar o dashmon</strong> ${pr.avisos.join(' ')} O painel não altera o sshd_config: a decisão é sua.</span></div>` : ''}
     ${alertBox(pr.error)}
   </main>
   <footer class="wz-foot">${running ? '' : back(4)}<span class="grow wz-foot-note">${running ? 'não feche esta janela' : pr.state === 'concluido' ? '' : '1 conexão · cerca de 10 segundos'}</span>${btn}</footer>`;
@@ -528,15 +589,29 @@ async function loadState() {
   render();
 }
 
+/** Modo chave: lê o apelido (`ssh -G`, sem conectar) e mostra o que ele diz. */
+async function readAlias() {
+  st.form.apelido = $('apelido').value.trim();
+  st.alias = null;
+  await run(async () => { st.alias = await api('apelido', { apelido: st.form.apelido }); });
+}
+
 /** Envia o passo 2 e já lê a identidade do servidor. */
 async function submitServer() {
   const f = st.form;
-  f.host = $('host').value.trim();
-  f.user = $('user').value.trim();
-  f.port = ($('port').value || '22').trim();
+  const chave = f.modo === 'chave';
+  if (chave) {
+    // Mudou o apelido depois de ler: lê de novo antes de seguir.
+    if (!st.alias || st.alias.apelido !== $('apelido').value.trim()) { await readAlias(); return; }
+  } else {
+    f.host = $('host').value.trim();
+    f.user = $('user').value.trim();
+    f.port = ($('port').value || '22').trim();
+  }
   await run(async () => {
     st.reach = null;
-    const r = await api('servidor', { host: f.host, user: f.user, port: f.port });
+    const r = await api('servidor', chave ? { modo: 'chave', apelido: f.apelido } : { modo: 'senha', host: f.host, user: f.user, port: f.port });
+    if (chave) Object.assign(f, { host: r.host, user: r.user, port: String(r.port) });
     st.reach = { ms: r.ms, port: r.port };
     st.ident = null;
     st.confirm = false;
@@ -548,7 +623,7 @@ async function submitServer() {
 
 /** Envia o passo 3 (confirmação + senha) e recebe a detecção. */
 async function submitConnect() {
-  const senha = $('senha').value;
+  const senha = $('senha') ? $('senha').value : '';
   await run(async () => {
     const det = await api('conectar', { senha, confirmo: st.confirm });
     st.det = det;
@@ -590,6 +665,7 @@ async function prepare() {
   try {
     const r = await api('preparar', senha ? { senha } : {});
     st.prep.feitos = r.feitos || [];
+    st.prep.avisos = r.avisos || [];
     if (r.ok) {
       st.prep.state = 'concluido';
       st.result = r.resumo;
@@ -691,6 +767,8 @@ root.addEventListener('click', (e) => {
   switch (t.dataset.act) {
     case 'pastHelp': st.pastHelp = !st.pastHelp; render(); break;
     case 'servidor': submitServer(); break;
+    case 'acesso': st.form.modo = t.dataset.acesso === 'chave' ? 'chave' : 'senha'; st.reach = null; st.error = ''; st.field = ''; render(); break;
+    case 'apelido': readAlias(); break;
     case 'conectar': submitConnect(); break;
     case 'showPass': st.showPass = !st.showPass; render(); $('senha').focus(); break;
     case 'allServices': st.allServices = true; render(); break;

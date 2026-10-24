@@ -113,6 +113,15 @@ O teste `test/unit/docs.test.js` confere esta documentação contra o código.
   askpass (variável de ambiente só daquele processo), e o `sudo -S -k` pelo stdin. Ela
   nunca vai na linha de comando e é descartada no fim do passo 5. O assistente web só abre
   com código de uso único e tem as mesmas proteções do painel.
+- **Entrada por chave** (ADR 0021): o apelido do `~/.ssh/config` é lido com `ssh -G` (não
+  conecta) e só os valores dele vão para o `runAdmin` (`server/setup/remoto.js`):
+  `-F /dev/null`, `-i <IdentityFile>`, `IdentitiesOnly=yes`, o `IdentityAgent` do apelido,
+  `BatchMode=yes` e o `known_hosts` do painel. `ProxyJump` e `ProxyCommand` são recusados. A
+  passphrase fica no ssh-agent: o painel compara o `ssh-add -L` com o `.pub` e mostra o
+  `ssh-add -t 15m <chave>` quando falta. A senha do sudo é separada da do SSH (estado
+  `pede-senha` da detecção) e vai só pelo stdin. O preparo começa por uma conferência só de
+  leitura do sshd (`sshd -T -C user=dashmon,…`) que avisa o que barraria o `dashmon`; o
+  painel nunca altera o `sshd_config`.
 - **Versões assinadas** (ADR 0012): o instalador e o `./dashboard atualizar` só aceitam
   tags assinadas por uma chave de `docs/allowed_signers`.
 - **Code scanning** (CodeQL padrão do GitHub, a cada push): todo alerta é corrigido ou
@@ -273,7 +282,9 @@ npm run painel-teste            # painel de teste com dados semeados (--cenario=
 scripts/e2e-instalacao/rodar.sh # instalação de ponta a ponta em contêineres Debian/Ubuntu
 ```
 
-Opções do modo sem perguntas: `./dashboard instalar --sem-interface --ajuda`.
+Opções do modo sem perguntas: `./dashboard instalar --sem-interface --ajuda`. Servidor que só
+aceita chave: `--chave-ssh <apelido>` no lugar de `--servidor`/`--usuario`/`--porta` (também
+no `./dashboard desinstalar --limpar-servidor`).
 
 ## Configuração
 

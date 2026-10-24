@@ -6,7 +6,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { createWizardApp } from '../../server/setup/web.js';
 import { listen, close } from '../../test-support/request.js';
-import { makeInstalacao } from '../../test-support/instalacao-fake.js';
+import { makeInstalacao, detectionWithSudo } from '../../test-support/instalacao-fake.js';
 
 let chromium = null;
 try { ({ chromium } = await import('playwright-core')); } catch { /* sem playwright-core */ }
@@ -88,11 +88,11 @@ test('assistente e2e: modo assistido do passo 1 ao "Abrir o painel"', async (t) 
   assert.equal(await s.page.locator('.wz-sum > div').nth(3).locator('span').last().textContent(), '3');
   await s.page.click('[data-act="escolhas"]');
   await s.page.waitForSelector('.wz-act');
-  assert.equal(await s.page.locator('.wz-act').count(), 5);
+  assert.equal(await s.page.locator('.wz-act').count(), 6);
   assert.match(await s.page.textContent('.wz-pre'), /command="…coleta v2 · [0-9a-f]{6}…"/);
   await s.page.click('[data-act="preparar"]');
   await s.page.waitForSelector('.wz-done');
-  assert.equal(await s.page.locator('.wz-act.is-done').count(), 5);
+  assert.equal(await s.page.locator('.wz-act.is-done').count(), 6);
   await s.page.click('[data-go="6"]');
   await s.page.waitForSelector('.wz-hero');
   assert.match(await s.page.textContent('.wz-read'), /71%/);
@@ -104,6 +104,47 @@ test('assistente e2e: modo assistido do passo 1 ao "Abrir o painel"', async (t) 
   await s.page.waitForTimeout(300);
   assert.deepEqual(s.finished, [{ iniciarComComputador: true, atalho: false }]);
   // 400 e 422 acima são os erros provocados de propósito (endereço e senha errados).
+  assert.deepEqual(s.problems.filter((p) => !/status of 4(00|22)/.test(p)), []);
+});
+
+test('assistente e2e modo chave (#61): apelido, ssh-add quando falta e a senha do sudo à parte', async (t) => {
+  const s = await setup(t, { server: { detection: detectionWithSudo('pede-senha') } });
+  if (s.skip) return t.skip(s.skip);
+  await s.page.goto(`${s.base}/configurar#codigo=ACD-347`);
+  await s.page.click('text=Começar');
+  await s.page.click('[data-acesso="chave"]');
+  assert.equal(await s.page.getAttribute('[data-acesso="chave"]', 'aria-pressed'), 'true');
+  assert.equal(await s.page.locator('#host').count(), 0, 'no modo chave, o endereço vem do apelido');
+  assert.equal(await s.page.isDisabled('[data-act="servidor"]'), true, 'Continuar só depois de ler o apelido');
+  await s.page.fill('#apelido', 'com-salto');
+  await s.page.click('[data-act="apelido"]');
+  await s.page.waitForSelector('#apelidoErr');
+  assert.match(await s.page.textContent('#apelidoErr'), /ProxyJump/);
+  await s.page.fill('#apelido', 'meu-servidor');
+  await s.page.click('[data-act="apelido"]');
+  await s.page.waitForSelector('text=Confira o que o apelido meu-servidor diz');
+  assert.match(await s.page.textContent('.wz-sum'), /192\.0\.2\.10.*2222.*maria.*\/home\/maria\/\.ssh\/chave_admin/s);
+  await s.page.click('[data-act="servidor"]');
+  await s.page.waitForSelector('.wz-fp span');
+  assert.equal(await s.page.locator('#senha').count(), 0, 'sem campo de senha no modo chave');
+  await s.page.check('#confio');
+  s.srv.agentHasKey = false;
+  await s.page.click('.wz-foot [data-act="conectar"]');
+  await s.page.waitForSelector('#agenteCmd');
+  assert.equal(await s.page.textContent('#agenteCmd'), 'ssh-add -t 15m ~/.ssh/chave_admin');
+  s.srv.agentHasKey = true;
+  await s.page.click('button:has-text("Tentar de novo")');
+  await s.page.waitForSelector('.wz-row');
+  assert.match(await s.page.textContent('#wzMeta'), /como maria · o sudo pede senha/);
+  await s.page.click('[data-act="escolhas"]');
+  await s.page.waitForSelector('#sudoSenha');
+  assert.match(await s.page.textContent('.wz-review'), /não a passphrase da chave/);
+  await s.page.fill('#sudoSenha', 'certa');
+  await s.page.click('[data-act="preparar"]');
+  await s.page.waitForSelector('.wz-done');
+  const admin = s.srv.calls.filter((c) => c.kind === 'admin');
+  assert.ok(admin.every((c) => c.password === '' && c.identityFile === '/home/maria/.ssh/chave_admin'));
+  // 400 e 422 acima são os erros provocados de propósito (apelido com salto e agente sem a chave).
   assert.deepEqual(s.problems.filter((p) => !/status of 4(00|22)/.test(p)), []);
 });
 
@@ -144,6 +185,28 @@ test('assistente e2e: tema claro e celular (390 px) sem rolagem lateral', async 
   const overflow5 = await s.page.evaluate(() => document.documentElement.scrollWidth - window.innerWidth);
   assert.ok(overflow5 <= 0, `passo 5: rolagem lateral de ${overflow5}px`);
   assert.deepEqual(s.problems, []);
+});
+
+test('assistente e2e: modo chave no celular (390 px) e tema claro, sem rolagem lateral (#61)', async (t) => {
+  const s = await setup(t, { viewport: { width: 390, height: 844 }, theme: 'light', server: { detection: detectionWithSudo('pede-senha') } });
+  if (s.skip) return t.skip(s.skip);
+  await s.page.goto(`${s.base}/configurar#codigo=ACD-347`);
+  await s.page.click('text=Começar');
+  await s.page.click('[data-acesso="chave"]');
+  await s.page.fill('#apelido', 'meu-servidor');
+  await s.page.click('[data-act="apelido"]');
+  await s.page.waitForSelector('.wz-sum');
+  const over2 = await s.page.evaluate(() => document.documentElement.scrollWidth - window.innerWidth);
+  assert.ok(over2 <= 0, `passo 2: rolagem lateral de ${over2}px`);
+  await s.page.click('[data-act="servidor"]');
+  await s.page.waitForSelector('.wz-fp span');
+  await s.page.check('#confio');
+  s.srv.agentHasKey = false;
+  await s.page.click('.wz-foot [data-act="conectar"]');
+  await s.page.waitForSelector('#agenteCmd');
+  const over3 = await s.page.evaluate(() => document.documentElement.scrollWidth - window.innerWidth);
+  assert.ok(over3 <= 0, `passo 3: rolagem lateral de ${over3}px`);
+  assert.deepEqual(s.problems.filter((p) => !/status of 422/.test(p)), []);
 });
 
 test('assistente e2e: sem o código, pede o código do terminal', async (t) => {

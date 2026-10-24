@@ -1,14 +1,19 @@
 // `./dashboard instalar --sem-interface` (ADR 0011): os mesmos passos sem perguntas, por
 // opções, para quem automatiza. A identidade do servidor precisa ser informada
 // (--identidade SHA256:…) — nada de aceitar a primeira que aparecer — e a senha, quando
-// houver, vem pelo stdin (--senha-stdin), nunca pela linha de comando.
+// houver, vem pelo stdin (--senha-stdin), nunca pela linha de comando. Com --chave-ssh, a
+// entrada é pelo apelido do ~/.ssh/config e o --senha-stdin passa a ser a senha do sudo.
 
 /** Texto de `--sem-interface --ajuda` (as opções são conferidas pelo docs.test.js). */
 export const HEADLESS_HELP = `Uso: ./dashboard instalar --sem-interface --servidor <ip> --usuario <nome> --identidade <SHA256:…> [opções]
+     ./dashboard instalar --sem-interface --chave-ssh <apelido> --identidade <SHA256:…> [opções]
 
   --porta <n>             porta SSH (padrão 22)
+  --chave-ssh <apelido>   entra pelo apelido do ~/.ssh/config (endereço, porta, usuário e chave
+                          dele), com a chave no ssh-agent; troca --servidor, --usuario e --porta
   --identidade <SHA256:…> impressão digital do servidor (ssh-keygen -lf /etc/ssh/ssh_host_ed25519_key.pub)
-  --senha-stdin           lê a senha do usuário da 1ª linha do stdin (sem ela: usa sua chave SSH)
+  --senha-stdin           lê a senha do usuário da 1ª linha do stdin (sem ela: usa sua chave SSH);
+                          com --chave-ssh, é a senha do sudo (se ele pedir)
   --pastas "<a b>"        pastas a acompanhar (padrão: as recomendadas)
   --smart "<sda sdb>"     discos com teste SMART, ou "nenhum" (padrão: os recomendados)
   --rede <interface>      interface de rede, ou "nenhuma" (padrão: a da rota padrão)
@@ -41,20 +46,25 @@ async function readLine(stream) {
 export async function runHeadless({ out, inst, flags, stdin = process.stdin }) {
   const fail = (msg, how) => { out.fail(msg); if (how) out.explain('', how); return 2; };
   if (flags.ajuda || flags.help) { out.line(HEADLESS_HELP); return 0; }
-  if (!flags.servidor || !flags.usuario) return fail('faltam --servidor e --usuario', 'veja: ./dashboard instalar --sem-interface --ajuda');
+  const chave = flags['chave-ssh'] !== undefined;
+  if (chave && (flags['chave-ssh'] === true || !String(flags['chave-ssh']).trim())) return fail('falta o apelido em --chave-ssh <apelido>', 'use o nome de um Host do seu ~/.ssh/config.');
+  if (!chave && (!flags.servidor || !flags.usuario)) return fail('faltam --servidor e --usuario (ou --chave-ssh <apelido>)', 'veja: ./dashboard instalar --sem-interface --ajuda');
   if (!flags.identidade || flags.identidade === true) {
     return fail('falta --identidade', 'confira no servidor com: ssh-keygen -lf /etc/ssh/ssh_host_ed25519_key.pub e passe o SHA256:… aqui');
   }
   try {
-    const s = await inst.definirServidor({ host: flags.servidor, user: flags.usuario, port: flags.porta || 22 });
-    out.ok(`servidor ${s.host} responde`, `${s.ms} ms · porta ${s.port}`);
+    const s = chave
+      ? await inst.definirServidor({ modo: 'chave', apelido: String(flags['chave-ssh']).trim() })
+      : await inst.definirServidor({ host: flags.servidor, user: flags.usuario, port: flags.porta || 22 });
+    out.ok(`servidor ${s.host} responde`, `${s.ms} ms · porta ${s.port}${chave ? ` · apelido ${s.apelido} · usuário ${s.user}` : ''}`);
     const id = await inst.lerIdentidade();
     if (id.fingerprint !== flags.identidade) {
       return fail(`a identidade do servidor é ${id.fingerprint}, não a informada`, 'pare e confira: pode ser outro aparelho no mesmo endereço.');
     }
     out.ok('identidade do servidor confere', id.fingerprint);
     const senha = flags['senha-stdin'] ? await readLine(stdin) : '';
-    const det = await inst.conectar({ senha, confirmo: true });
+    // Modo chave: a senha lida é a do sudo; a conexão usa só a chave do apelido.
+    const det = await inst.conectar({ senha: chave ? '' : senha, confirmo: true });
     out.ok(`conectado como ${det.usuario}`, det.sudoTexto);
     const rec = det.escolhas;
     // Só o limiar informado na linha de comando muda; os outros ficam como estão no .env
@@ -92,8 +102,9 @@ export async function runHeadless({ out, inst, flags, stdin = process.stdin }) {
         out.ok(b.titulo, 'conferido');
       }
     } else {
-      const r = await inst.prepararAssistido({});
-      if (!r.ok) return fail(r.erro, 'confira o usuário e a senha, ou use --modo manual.');
+      const r = await inst.prepararAssistido(chave && senha ? { senha } : {});
+      for (const a of r.avisos || []) out.warn('SSH do servidor', a);
+      if (!r.ok) return fail(r.erro, r.precisaSenha && chave ? 'passe a senha do sudo com --senha-stdin, ou use --modo manual.' : 'confira o usuário e a senha, ou use --modo manual.');
       out.ok('servidor preparado', `usuário dashmon · chave restrita${plan.temSmart ? ' · sudo só para smartctl -H' : ''}`);
     }
     const t = inst.resumoTeste();
@@ -106,7 +117,7 @@ export async function runHeadless({ out, inst, flags, stdin = process.stdin }) {
     return 0;
   } catch (err) {
     inst.esquecerSenha();
-    if (err.status) return fail(err.message);
+    if (err.status) return fail(err.message, err.detalhes && err.detalhes.comando ? `rode no seu terminal: ${err.detalhes.comando}` : undefined);
     throw err;
   }
 }

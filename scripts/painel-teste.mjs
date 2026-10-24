@@ -14,6 +14,12 @@
 //   offline  24 h de amostras e o servidor caindo agora (queda em andamento)
 //   vazio    nenhum dado e nenhuma coleta (o 1º uso, antes da 1ª coleta)
 //
+//   npm run painel-teste -- --assistente --porta=3947
+// sobe o assistente de instalação com servidor, ssh e systemd falsos
+// (test-support/instalacao-fake.js), código ACD-347. Modo senha: usuário maria, senha
+// "certa". Modo chave: apelido meu-servidor; a 1ª conferência do ssh-agent diz que a chave
+// falta (para ver o ssh-add) e as seguintes acham a chave. O sudo pede senha ("certa").
+//
 // Ctrl+C encerra o painel e apaga a pasta temporária.
 import fs from 'node:fs';
 import os from 'node:os';
@@ -24,6 +30,8 @@ import { collect } from '../server/collector/index.js';
 import { normalizeTargets } from '../server/collector/builder.js';
 import { History } from '../server/storage/index.js';
 import { OutageLog } from '../server/storage/outages.js';
+import { createWizardApp } from '../server/setup/web.js';
+import { makeInstalacao, detectionWithSudo } from '../test-support/instalacao-fake.js';
 
 const ROOT = path.join(path.dirname(fileURLToPath(import.meta.url)), '..');
 const MIN = 60000;
@@ -117,10 +125,36 @@ export function criarPainel(dir, cenario, coletar) {
   });
 }
 
+/** O assistente com a instalação falsa: nada sai desta máquina (ver o cabeçalho). */
+export function criarAssistente() {
+  const fake = makeInstalacao({ detection: detectionWithSudo('pede-senha') });
+  // A chave "falta" no agente só na 1ª conferência: assim dá para ver o ssh-add e o Tentar de novo.
+  fake.srv.agentHasKey = false;
+  const conferir = fake.inst.deps.checkAgentKey;
+  fake.inst.deps.checkAgentKey = async (o) => {
+    const r = await conferir(o);
+    fake.srv.agentHasKey = true;
+    return r;
+  };
+  const app = createWizardApp({ inst: fake.inst, code: 'ACD347', onFinish: () => {}, log: (m) => console.log(m) });
+  return { app, cleanup: fake.cleanup };
+}
+
 async function main() {
   const cenario = opcao('cenario', 'normal');
-  const porta = Number(opcao('porta', '3943'));
+  const porta = Number(opcao('porta', process.argv.includes('--assistente') ? '3947' : '3943'));
   if (!Number.isInteger(porta) || porta < 1024 || porta > 65535) throw new Error('use --porta entre 1024 e 65535');
+  if (process.argv.includes('--assistente')) {
+    const { app, cleanup } = criarAssistente();
+    const server = app.listen(porta, '127.0.0.1', () => {
+      console.log(`assistente de teste em http://127.0.0.1:${porta}/configurar#codigo=ACD-347`);
+      console.log('Ctrl+C encerra e apaga os dados de teste.');
+    });
+    const sair = () => { server.close(); cleanup(); process.exit(0); };
+    process.on('SIGINT', sair);
+    process.on('SIGTERM', sair);
+    return;
+  }
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'dash-painel-teste-'));
   const { coletar } = await semear(dir, cenario);
   const { app, runPoll, shutdown } = criarPainel(dir, cenario, coletar);

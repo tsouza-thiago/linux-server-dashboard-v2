@@ -85,6 +85,20 @@ Inclua: o passo a passo para reproduzir, o impacto estimado e a versão afetada
   verdade num servidor simulado), `test/integration/ssh-restrito.test.js` (dois computadores
   coletam do mesmo sshd) e `test/integration/cli-manutencao.test.js`.
 
+### 3b. Servidor que só aceita chave (ADR 0021)
+- **Ameaça:** para entrar num servidor endurecido, o painel lê o `~/.ssh/config` inteiro
+  (`ProxyCommand`, `Match exec`, outro `known_hosts`), recebe a passphrase da chave da pessoa
+  ou oferece todas as chaves do agente ao servidor (banimento por `MaxAuthTries`/fail2ban).
+- **Mitigação:** o apelido é lido com `ssh -G` (não conecta) e só os valores dele vão para a
+  conexão, com `-F /dev/null`, `IdentitiesOnly=yes`, o `IdentityAgent` do apelido e o
+  `known_hosts` do painel. `ProxyJump` e `ProxyCommand` são recusados; caminho com `%` ou `$`
+  também. A passphrase fica no ssh-agent: o painel só compara o `ssh-add -L` com o `.pub`. A
+  senha do sudo é separada e vai só pelo stdin do `sudo -S -k`. A conferência do sshd só lê
+  (`sshd -T`) e nunca altera o `sshd_config`.
+- **Verificado por:** `test/unit/setup-chave-ssh.test.js` (`ssh -G` e agente falsos, sudo com
+  senha separada, ProxyJump recusado) e `test/integration/ssh-chave.test.js` (sshd real só
+  com chave, `MaxAuthTries 1`, chave com passphrase no ssh-agent).
+
 ### 4. Identidade do servidor falsa (ataque no meio do SSH)
 - **Ameaça:** outro aparelho se passa pelo servidor e recebe a senha do administrador ou
   devolve dados falsos.

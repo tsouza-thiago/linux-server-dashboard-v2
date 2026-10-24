@@ -4,6 +4,8 @@
 //
 // A senha do administrador fica só na memória deste objeto, do passo 3 até o fim do
 // passo 5 (ou até o assistente fechar), e é descartada em seguida. Nunca é gravada.
+// Servidor que só aceita chave (ADR 0021): a pessoa entra pelo apelido do ~/.ssh/config, a
+// passphrase fica no ssh-agent dela e só a senha do sudo (se ele pedir) passa por aqui.
 import { spawnSync } from 'node:child_process';
 import fs from 'node:fs';
 import os from 'node:os';
@@ -12,9 +14,11 @@ import { alertThresholds, loadEnvFile } from '../config.js';
 import { collect as collectV2, runSSH } from '../collector/index.js';
 import { normalizeTargets } from '../collector/builder.js';
 import { SSH_ALIAS, validHost, validIp, validPort, validUser } from './acesso.js';
-import { detectionScript, parseDetection, recommendedChoices, estimateCost } from './deteccao.js';
-import { preparationPlan, assistedScript, completedSteps } from './preparo.js';
-import { probePort, scanHostKeys, fingerprintBlocks, runAdmin, describeAdminError, hostKeyAlgorithms } from './remoto.js';
+import { detectionScript, parseDetection, recommendedChoices, estimateCost, SUDO_OK } from './deteccao.js';
+import { preparationPlan, assistedScript, completedSteps, sshdWarnings, sshdCheckCommand } from './preparo.js';
+import {
+  probePort, scanHostKeys, fingerprintBlocks, runAdmin, describeAdminError, hostKeyAlgorithms, resolveAlias, checkAgentKey,
+} from './remoto.js';
 import {
   ensureDataDirs, ensureKey, writeKnownHosts, writeSshConfig, updateEnv, ensureToken, installService, installShortcut, removeShortcut,
 } from './local.js';
@@ -33,10 +37,12 @@ const THRESHOLD_LIMITS = { diskPct: [50, 99, 90], ramPct: [50, 99, 90], tempC: [
  * com o status HTTP e o campo do formulário a destacar.
  */
 export class InstallError extends Error {
-  constructor(message, { status = 400, field } = {}) {
+  constructor(message, { status = 400, field, detalhes } = {}) {
     super(message);
     this.status = status;
     this.field = field;
+    // Dados a mais para a tela (ex.: o `ssh-add` que falta rodar); nunca um segredo.
+    this.detalhes = detalhes;
   }
 }
 
@@ -55,13 +61,24 @@ export function currentServer(root) {
   }
 }
 
+/** Caminho com a pasta pessoal como ~ (o que a tela mostra). */
+const tilde = (file, home) => (file.startsWith(`${home}/`) ? `~/${file.slice(home.length + 1)}` : file);
+
+/** Texto da tela para cada motivo de a chave não estar pronta (ver checkAgentKey). */
+const AGENT_TEXT = {
+  falta: 'A chave do apelido não está no ssh-agent. Rode o comando abaixo no seu terminal (ele pede a passphrase lá, não aqui) e clique em "Tentar de novo".',
+  'sem-agente': 'Não achei um ssh-agent rodando para este terminal. Abra o agente (ou o do seu chaveiro), rode o comando abaixo e clique em "Tentar de novo".',
+  'sem-pub': 'Falta o arquivo .pub ao lado da chave (o painel compara com o que está no agente). Rode o comando abaixo e clique em "Tentar de novo".',
+  'chave-invalida': 'O caminho da chave do apelido não pode ser usado (tem %, $ ou caractere de controle).',
+};
+
 /** O estado de uma instalação em andamento (um objeto por assistente aberto). */
 export class Instalacao {
   constructor({ root, home = os.homedir(), deps = {} } = {}) {
     this.root = root;
     this.home = home;
     this.deps = {
-      probePort, scanHostKeys, runAdmin, collect: collectV2, runSSH, ensureKey, installService, installShortcut,
+      probePort, scanHostKeys, runAdmin, resolveAlias, checkAgentKey, collect: collectV2, runSSH, ensureKey, installService, installShortcut,
       startPanel, hasSystemdUser, versionStatus: () => currentVersionStatus(root), spawnSync, hostname: os.hostname,
       ...deps,
     };
@@ -71,6 +88,8 @@ export class Instalacao {
   /** Volta ao começo: esquece servidor, identidade, detecção, escolhas, plano e senha. */
   reset() {
     this.servidor = null;
+    // Como o administrador entra: senha (padrão, igual às versões anteriores) ou chave.
+    this.acesso = { modo: 'senha' };
     this.identidades = [];
     this.identidade = null;
     this.deteccao = null;
@@ -81,17 +100,31 @@ export class Instalacao {
     this.preparo = { feitos: [], concluido: false, modo: 'assistido', from: true, testes: {} };
     this.teste = null;
     this.tokenMostrado = false;
-    this.#senha = '';
+    this.esquecerSenha();
   }
 
-  // Campo privado: nada fora desta classe lê a senha (nem a tela, nem o log).
-  #senha = '';
+  // Campos privados: nada fora desta classe lê as senhas (nem a tela, nem o log). A do SSH
+  // só existe no modo senha; a do sudo é a mesma no modo senha e pedida à parte no modo chave.
+  #senhaSsh = '';
+  #senhaSudo = '';
 
-  /** Descarta a senha do administrador (fim do passo 5, cancelamento ou tempo esgotado). */
-  esquecerSenha() { this.#senha = ''; }
+  /** Descarta as senhas do administrador (fim do passo 5, cancelamento ou tempo esgotado). */
+  esquecerSenha() { this.#senhaSsh = ''; this.#senhaSudo = ''; }
 
-  /** Há uma senha guardada? (a tela usa para saber se precisa pedir de novo) */
-  get temSenha() { return Boolean(this.#senha); }
+  /** Há uma senha do sudo guardada? (a tela usa para saber se precisa pedir de novo) */
+  get temSenha() { return Boolean(this.#senhaSudo); }
+
+  /** Como o sudo pede a senha: `senha` (a do SSH serviu) ou `pede-senha` (entrou sem senha). */
+  #sudoPedeSenha() { return ['senha', 'pede-senha'].includes(this.deteccao?.sudo); }
+
+  /** Opções da conexão do administrador: senha do SSH, ou a chave e o agente do apelido. */
+  #conexaoAdmin() {
+    const chave = this.acesso.modo === 'chave' ? { identityFile: this.acesso.identityFile, identityAgent: this.acesso.identityAgent } : {};
+    return {
+      host: this.servidor.host, port: this.servidor.port, user: this.servidor.user, password: this.#senhaSsh, ...chave,
+      knownHosts: path.join(this.root, 'data', 'ssh', 'known_hosts'), hostKeyType: this.identidade?.type,
+    };
+  }
 
   // ---- Passo 1: verificações deste computador --------------------------------------------
 
@@ -118,10 +151,33 @@ export class Instalacao {
   // ---- Passo 2: servidor -----------------------------------------------------------------
 
   /**
-   * Passo 2: valida o endereço, o usuário e a porta, e confere se a porta do SSH responde.
-   * Trocar de servidor apaga a identidade, a detecção e a senha do servidor anterior.
+   * Passo 2, modo chave: lê o apelido do ~/.ssh/config com `ssh -G` (não conecta) e devolve o
+   * que a tela mostra para a pessoa conferir: endereço, porta, usuário, chave e agente.
    */
-  async definirServidor({ host, user, port = 22 } = {}) {
+  async lerApelido({ apelido } = {}) {
+    const r = await this.deps.resolveAlias(String(apelido ?? '').trim(), { home: this.home });
+    if (!r.ok) fail(r.erro, { field: 'apelido' });
+    return {
+      apelido: r.alias, host: r.host, port: r.port, user: r.user,
+      identityFile: tilde(r.identityFile, this.home), identityAgent: r.identityAgent === 'none' ? '' : tilde(r.identityAgent, this.home),
+      resolvido: r,
+    };
+  }
+
+  /**
+   * Passo 2: valida o endereço, o usuário e a porta, e confere se a porta do SSH responde.
+   * No modo chave, os três vêm do apelido. Trocar de servidor apaga a identidade, a
+   * detecção e a senha do servidor anterior.
+   */
+  async definirServidor({ modo = 'senha', apelido, host, user, port = 22 } = {}) {
+    let acesso = { modo: 'senha' };
+    if (modo === 'chave') {
+      const { resolvido: r } = await this.lerApelido({ apelido });
+      ({ host, user, port } = r);
+      acesso = { modo: 'chave', apelido: r.alias, identityFile: r.identityFile, identityAgent: r.identityAgent };
+    } else if (modo !== 'senha') {
+      fail('Escolha como você entra no servidor: senha ou chave SSH.', { field: 'modo' });
+    }
     host = String(host ?? '').trim();
     user = String(user ?? '').trim();
     port = String(port ?? '22').trim() || '22';
@@ -139,9 +195,12 @@ export class Instalacao {
       fail(msg, { field: 'host' });
     }
     const changed = !this.servidor || this.servidor.host !== host || this.servidor.port !== Number(port);
-    if (changed) { this.identidades = []; this.identidade = null; this.deteccao = null; this.esquecerSenha(); }
+    if (changed) { this.identidades = []; this.identidade = null; this.deteccao = null; }
+    // Outro servidor, outro usuário ou outra forma de entrar: a senha guardada não vale mais.
+    if (changed || this.servidor.user !== user || this.acesso.modo !== acesso.modo) this.esquecerSenha();
     this.servidor = { host, user, port: Number(port) };
-    return { ...this.servidor, ms: alcance.ms };
+    this.acesso = acesso;
+    return { ...this.servidor, modo: acesso.modo, ...(acesso.apelido ? { apelido: acesso.apelido } : {}), ms: alcance.ms };
   }
 
   // ---- Passo 3: conectar -----------------------------------------------------------------
@@ -166,26 +225,42 @@ export class Instalacao {
   }
 
   /**
+   * Modo chave: a chave do apelido está no ssh-agent (ou não tem passphrase)? Se não estiver,
+   * o erro traz o `ssh-add` para a pessoa rodar no terminal dela; a passphrase nunca vem aqui.
+   */
+  async conferirAgente() {
+    if (this.acesso.modo !== 'chave') return { ok: true, via: 'senha' };
+    const r = await this.deps.checkAgentKey({ identityFile: this.acesso.identityFile, identityAgent: this.acesso.identityAgent, home: this.home });
+    if (!r.ok) fail(AGENT_TEXT[r.motivo] || AGENT_TEXT.falta, { field: 'agente', status: 422, detalhes: { motivo: r.motivo, comando: r.comando || '' } });
+    return r;
+  }
+
+  /**
    * Confirma a identidade (a pessoa comparou), grava no known_hosts do painel e abre a
-   * única conexão de leitura: detecta discos, pastas, rede, serviços e o sudo.
+   * única conexão de leitura: detecta discos, pastas, rede, serviços e o sudo. No modo chave
+   * não há senha: a conexão usa só a chave do apelido, pelo agente.
    */
   async conectar({ senha = '', confirmo = false } = {}) {
     if (!this.servidor || !this.identidades.length) fail('Leia a identidade do servidor primeiro.');
-    if (!confirmo) fail('Confirme que este é o seu servidor antes de enviar a senha.', { field: 'confirmo' });
+    if (!confirmo) fail('Confirme que este é o seu servidor antes de conectar.', { field: 'confirmo' });
     if (typeof senha !== 'string' || /[\r\n\0]/.test(senha) || senha.length > 1024) fail('Senha inválida.', { field: 'senha' });
+    if (this.acesso.modo === 'chave') senha = '';
+    await this.conferirAgente();
     const k = this.identidades[0];
     ensureDataDirs(this.root);
-    const knownHosts = writeKnownHosts(this.root, { host: this.servidor.host, port: this.servidor.port, type: k.type, key: k.key });
+    writeKnownHosts(this.root, { host: this.servidor.host, port: this.servidor.port, type: k.type, key: k.key });
     this.identidade = k;
-    const r = await this.deps.runAdmin({
-      host: this.servidor.host, port: this.servidor.port, user: this.servidor.user, password: senha,
-      knownHosts, hostKeyType: k.type, script: detectionScript({ password: senha }), timeoutMs: 60000,
-    });
-    if (r.code !== 0) fail(describeAdminError(r), { field: senha ? 'senha' : undefined, status: 422 });
+    this.#senhaSsh = senha;
+    const r = await this.deps.runAdmin({ ...this.#conexaoAdmin(), script: detectionScript({ password: senha }), timeoutMs: 60000 });
+    if (r.code !== 0) {
+      this.esquecerSenha();
+      fail(describeAdminError(r), { field: senha ? 'senha' : this.acesso.modo === 'chave' ? 'agente' : undefined, status: 422 });
+    }
     let det;
-    try { det = parseDetection(r.stdout); } catch (err) { fail(`A leitura do servidor veio incompleta: ${err.message}`, { status: 422 }); }
+    try { det = parseDetection(r.stdout); } catch (err) { this.esquecerSenha(); fail(`A leitura do servidor veio incompleta: ${err.message}`, { status: 422 }); }
     this.deteccao = det;
-    this.#senha = senha;
+    // No modo senha, a senha do SSH também serve ao sudo (como sempre foi).
+    this.#senhaSudo = senha;
     const rec = recommendedChoices(det);
     // Limiares do .env (reconfigurar) com as faixas do painel: valor que o painel recusaria
     // vira o padrão aqui também, em vez de travar o passo 4 com "fora da faixa".
@@ -205,8 +280,17 @@ export class Instalacao {
       servidor: this.servidor,
       usuario: d.user,
       sudo: d.sudo,
-      sudoTexto: { root: 'entrando como root', nopasswd: 'sudo disponível', senha: 'sudo disponível', nao: 'sem sudo para este usuário', ausente: 'sudo não instalado' }[d.sudo],
-      podePreparar: ['root', 'nopasswd', 'senha'].includes(d.sudo),
+      sudoTexto: {
+        root: 'entrando como root',
+        nopasswd: 'sudo disponível',
+        senha: 'sudo disponível',
+        'pede-senha': 'o sudo pede senha: ela é pedida no passo 5',
+        requiretty: 'o sudo exige um terminal (Defaults requiretty): no passo 5, use "Prefiro fazer à mão"',
+        nao: 'sem sudo para este usuário',
+        ausente: 'sudo não instalado',
+      }[d.sudo],
+      podePreparar: SUDO_OK.includes(d.sudo),
+      acesso: this.acesso.modo,
       smartPossivel: d.smartPossible,
       smartMotivo: d.smartPossible ? '' : (!d.smartctl ? 'o smartctl não está instalado no servidor' : 'o sudo não está instalado no servidor'),
       os: d.os,
@@ -290,6 +374,7 @@ export class Instalacao {
       smartDevs: this.escolhas.smart,
       from: this.preparo.from ? ip : '',
       smartctl: d.smartctl || '/usr/sbin/smartctl',
+      checkIp: ip,
     });
     return {
       acoes: this.plano.actions,
@@ -301,9 +386,11 @@ export class Instalacao {
       blocos: this.plano.manualBlocks,
       from: this.preparo.from,
       clientIp: ip,
-      podeAssistido: ['root', 'nopasswd', 'senha'].includes(d.sudo) && (d.sudo !== 'senha' || this.temSenha),
-      precisaSenha: d.sudo === 'senha' && !this.temSenha,
+      podeAssistido: SUDO_OK.includes(d.sudo) && (!this.#sudoPedeSenha() || this.temSenha),
+      precisaSenha: this.#sudoPedeSenha() && !this.temSenha,
       sudo: d.sudo,
+      acesso: this.acesso.modo,
+      conferirSshd: ip ? sshdCheckCommand(ip) : '',
     };
   }
 
@@ -372,35 +459,41 @@ export class Instalacao {
     };
   }
 
-  /** Modo assistido: 1 conexão administrativa, comandos exibidos antes, depois a coleta. */
+  /**
+   * Modo assistido: 1 conexão administrativa, comandos exibidos antes, depois a coleta. A
+   * `senha` aqui é a do sudo (campo próprio da tela); ela vai só pelo stdin (`sudo -S -k`).
+   */
   async prepararAssistido({ senha } = {}) {
     if (!this.plano) fail('Revise o plano primeiro.');
     const d = this.deteccao;
-    if (typeof senha === 'string' && senha && !/[\r\n\0]/.test(senha)) this.#senha = senha;
-    if (d.sudo === 'senha' && !this.#senha) fail('Digite a senha para o sudo.', { field: 'senha' });
-    if (!['root', 'nopasswd', 'senha'].includes(d.sudo)) fail('Este usuário não pode usar sudo: use o modo "Prefiro fazer à mão" com um usuário que possa.');
-    const script = assistedScript(this.plano.rootScript, { sudo: d.sudo, password: this.#senha });
-    const r = await this.deps.runAdmin({
-      host: this.servidor.host, port: this.servidor.port, user: this.servidor.user, password: this.#senha,
-      knownHosts: path.join(this.root, 'data', 'ssh', 'known_hosts'), hostKeyType: this.identidade.type, script, timeoutMs: 120000,
-    });
+    if (typeof senha === 'string' && senha && !/[\r\n\0]/.test(senha) && senha.length <= 1024) this.#senhaSudo = senha;
+    if (d.sudo === 'requiretty') fail('O sudo deste servidor exige um terminal (Defaults requiretty): use o modo "Prefiro fazer à mão".');
+    if (!SUDO_OK.includes(d.sudo)) fail('Este usuário não pode usar sudo: use o modo "Prefiro fazer à mão" com um usuário que possa.');
+    if (this.#sudoPedeSenha() && !this.#senhaSudo) fail('Digite a senha para o sudo.', { field: 'senha' });
+    if (this.acesso.modo === 'chave') await this.conferirAgente();
+    const script = assistedScript(this.plano.rootScript, { sudo: this.#sudoPedeSenha() ? 'senha' : d.sudo, password: this.#senhaSudo });
+    const r = await this.deps.runAdmin({ ...this.#conexaoAdmin(), script, timeoutMs: 120000 });
     const feitos = completedSteps(r.stdout);
+    const sshd = sshdWarnings(r.stdout, { ip: validIp(d.clientIp) ? d.clientIp : '' });
     if (r.code !== 0 || !feitos.includes('chave') || !feitos.includes('sudoers')) {
       const senhaRecusada = /^@@erro senha$/m.test(r.stdout);
-      this.preparo.feitos = senhaRecusada ? [] : ['sudo', ...feitos];
-      if (senhaRecusada) this.esquecerSenha();
+      const semTerminal = /^@@erro tty$/m.test(r.stdout);
+      this.preparo.feitos = senhaRecusada || semTerminal ? [] : ['sudo', ...feitos];
+      if (senhaRecusada) this.#senhaSudo = '';
       const onde = this.plano.actions.find((a) => !this.preparo.feitos.includes(a.id));
-      const motivo = senhaRecusada ? 'o sudo recusou a senha' : describeAdminError(r);
-      return { ok: false, feitos: this.preparo.feitos, precisaSenha: senhaRecusada, erro: `Parou em "${onde ? onde.titulo : 'preparar'}": ${motivo}.` };
+      const motivo = senhaRecusada ? `o sudo recusou a senha${d.sudo === 'pede-senha' && !d.sudoGroup ? ' (ou este usuário não pode usar sudo)' : ''}`
+        : semTerminal ? 'o sudo deste servidor exige um terminal (Defaults requiretty): use o modo "Prefiro fazer à mão"' : describeAdminError(r);
+      return { ok: false, feitos: this.preparo.feitos, precisaSenha: senhaRecusada, avisos: sshd.avisos, erro: `Parou em "${onde ? onde.titulo : 'preparar'}": ${motivo}.` };
     }
     this.preparo.feitos = ['sudo', ...feitos];
     this.esquecerSenha();
     const teste = await this.testarColeta({ smart: true });
-    if (!teste.ok) return { ok: false, feitos: this.preparo.feitos, erro: teste.erro };
+    // A coleta falhou e o sshd tem uma regra que barra o dashmon: o aviso explica o porquê.
+    if (!teste.ok) return { ok: false, feitos: this.preparo.feitos, avisos: sshd.avisos, erro: sshd.avisos.length ? `${teste.erro} ${sshd.avisos.join(' ')} O painel não altera o sshd_config.` : teste.erro };
     this.preparo.feitos.push('teste');
     this.preparo.concluido = true;
     this.preparo.modo = 'assistido';
-    return { ok: true, feitos: this.preparo.feitos, resumo: teste.resumo };
+    return { ok: true, feitos: this.preparo.feitos, avisos: sshd.avisos, resumo: teste.resumo };
   }
 
   /** Modo manual: o botão Testar de cada bloco confere sem mudar nada. */
@@ -409,8 +502,7 @@ export class Instalacao {
     let res;
     if (id === 'usuario') {
       const r = await this.deps.runAdmin({
-        host: this.servidor.host, port: this.servidor.port, user: this.servidor.user, password: this.#senha,
-        knownHosts: path.join(this.root, 'data', 'ssh', 'known_hosts'), hostKeyType: this.identidade.type,
+        ...this.#conexaoAdmin(),
         script: "id -u dashmon >/dev/null 2>&1 && echo '@@ok usuario'; getent passwd dashmon | cut -d: -f7\n", timeoutMs: 30000,
       });
       if (r.code !== 0) res = { ok: false, erro: describeAdminError(r) };
@@ -418,6 +510,9 @@ export class Instalacao {
       else res = { ok: true };
     } else if (id === 'chave' || id === 'pronto') {
       res = await this.testarColeta({ smart: false });
+      // O servidor recusou o dashmon: pode ser o sshd (AllowUsers…). O comando confere só lendo.
+      const ip = validIp(this.deteccao.clientIp) ? this.deteccao.clientIp : '';
+      if (!res.ok && ip) res = { ...res, erro: `${res.erro} Se o servidor recusa o dashmon, confira o sshd (só leitura): ${sshdCheckCommand(ip)}` };
     } else if (id === 'sudoers') {
       res = this.escolhas.smart.length ? await this.testarColeta({ smart: true }) : { ok: true };
     } else {

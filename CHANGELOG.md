@@ -9,6 +9,29 @@ diante: `PATCH` corrige, `MINOR` acrescenta sem quebrar e `MAJOR` quebra.
 
 ## [Não publicado]
 
+### Adicionado
+
+- Instalação em servidor que só aceita chave SSH (#61, ADR 0021). O passo 2 do assistente
+  pergunta "Como você entra no servidor?": **Senha** (o padrão, igual a antes) ou **Chave
+  SSH**, por um apelido do `~/.ssh/config`. O painel lê o apelido com `ssh -G` (não
+  conecta), mostra endereço, porta, usuário e chave para conferir e conecta só com aquela
+  chave (`IdentitiesOnly`), pelo agente do apelido. `ProxyJump` e `ProxyCommand` são
+  recusados. A passphrase fica no ssh-agent: se a chave faltar, a tela mostra o
+  `ssh-add -t 15m <chave>` e "Tentar de novo". A TUI faz o mesmo, e o modo sem perguntas e o
+  `./dashboard desinstalar` aceitam `--chave-ssh <apelido>`.
+- Conferência só de leitura do sshd no preparo (`sshd -T -C user=dashmon,…`): avisa se
+  `AllowUsers`, `AllowGroups`, `DenyUsers`, `DenyGroups`, `AuthenticationMethods`,
+  `PubkeyAuthentication`, `MaxAuthTries` ou `AuthorizedKeysFile` vão barrar o `dashmon`. O
+  painel não altera o `sshd_config`.
+
+### Mudado
+
+- A senha do sudo é separada da senha do SSH. Quem entra sem senha (chave) e tem um sudo que
+  pede senha vê "o sudo pede senha" no lugar de "sem sudo para este usuário", e a senha do
+  sudo é pedida num campo próprio do passo 5, só pelo stdin do `sudo -S -k`.
+- `Defaults requiretty` no servidor é reconhecido: a tela indica o modo "Prefiro fazer à
+  mão", em vez de dizer que a senha está errada.
+
 ## [2.1.1] — 2026-10-24
 
 Correção para quem monitora o mesmo servidor de mais de um computador. Nada muda na

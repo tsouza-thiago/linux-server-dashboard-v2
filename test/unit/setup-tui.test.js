@@ -7,7 +7,7 @@ import { Readable } from 'node:stream';
 import { runTui, Screen } from '../../server/setup/tui.js';
 import { runHeadless, HEADLESS_HELP } from '../../server/setup/sem-interface.js';
 import { makeOutput } from '../../server/cli/saida.js';
-import { makeInstalacao } from '../../test-support/instalacao-fake.js';
+import { makeInstalacao, detectionWithSudo } from '../../test-support/instalacao-fake.js';
 import { esperarAte } from '../../test-support/esperar.js';
 import { loadEnvFile } from '../../server/config.js';
 import fs from 'node:fs';
@@ -45,6 +45,7 @@ test('TUI: os 6 passos no terminal até o painel ligado, sem cores', async (t) =
   const running = runTui({ out: o.out, inst: fake.inst, input: term.input, output: term.output });
   term.keys(
     'Enter', // 1 boas-vindas
+    'Enter', // 2 entra com senha (o padrão)
     '192.0.2.10', 'Enter', 'maria', 'Enter', 'Enter', // 2 servidor (porta 22 padrão)
     's', 'certa', 'Enter', // 3 identidade confirmada + senha
     'Enter', 'Enter', // 4 recomendado + resumo
@@ -78,7 +79,7 @@ test('TUI: desmarcar "Iniciar com o computador" vale (o serviço não é habilit
   const o = memOut();
   const running = runTui({ out: o.out, inst: fake.inst, input: term.input, output: term.output });
   term.keys(
-    'Enter', '192.0.2.10', 'Enter', 'maria', 'Enter', 'Enter', 's', 'certa', 'Enter',
+    'Enter', 'Enter', '192.0.2.10', 'Enter', 'maria', 'Enter', 'Enter', 's', 'certa', 'Enter',
     'Enter', 'Enter', 'Enter', 'Enter',
     'space', 'Enter', // 6: desmarca a 1ª caixa (iniciar com o computador) e conclui
   );
@@ -90,13 +91,39 @@ test('TUI: desmarcar "Iniciar com o computador" vale (o serviço não é habilit
   assert.match(o.text(), /painel rodando em segundo plano/);
 });
 
+test('TUI modo chave (#61): apelido conferido, ssh-add quando falta e a senha do sudo à parte', async (t) => {
+  const fake = makeInstalacao({ detection: detectionWithSudo('pede-senha') });
+  t.after(fake.cleanup);
+  fake.srv.agentHasKey = false;
+  const term = terminal();
+  const o = memOut();
+  const running = runTui({ out: o.out, inst: fake.inst, input: term.input, output: term.output });
+  term.keys('Enter', 's', 'meu-servidor', 'Enter');
+  await esperarAte(() => /O apelido meu-servidor diz:/.test(term.last()));
+  assert.match(term.last(), /Chave \(IdentityFile\) +\/home\/maria\/\.ssh\/chave_admin/);
+  term.keys('s', 's');
+  await esperarAte(() => /ssh-add -t 15m ~\/\.ssh\/chave_admin/.test(term.last()));
+  assert.match(term.last(), /a passphrase é digitada lá, nunca aqui/);
+  fake.srv.agentHasKey = true;
+  term.keys('Enter'); // tentar de novo
+  await esperarAte(() => /O que monitorar/.test(term.last()));
+  term.keys('Enter', 'Enter', 'Enter');
+  await esperarAte(() => /Senha de maria para o sudo/.test(term.last()));
+  assert.match(term.last(), /não a passphrase da chave/);
+  term.keys('certa', 'Enter', 'Enter', 't', 'Enter');
+  assert.equal(await running, 0, o.text());
+  const admin = fake.srv.calls.filter((c) => c.kind === 'admin');
+  assert.ok(admin.every((c) => c.password === '' && c.identityFile === '/home/maria/.ssh/chave_admin'), 'só a chave do apelido');
+  assert.match(admin.at(-1).script, /^P='certa'$/m, 'a senha do sudo foi no script');
+});
+
 test('TUI: Esc volta um passo, erro aparece na tela e Ctrl+C cancela sem gravar', async (t) => {
   const fake = makeInstalacao();
   t.after(fake.cleanup);
   const term = terminal();
   const o = memOut();
   const running = runTui({ out: o.out, inst: fake.inst, input: term.input, output: term.output });
-  term.keys('Enter', '192.0.2.99', 'Enter', 'maria', 'Enter', 'Enter');
+  term.keys('Enter', 'Enter', '192.0.2.99', 'Enter', 'maria', 'Enter', 'Enter');
   await esperarAte(() => /✗ Ninguém respondeu nesse endereço/.test(term.last()));
   assert.match(term.last(), /✗ Ninguém respondeu nesse endereço/);
   term.keys('Esc');
@@ -113,7 +140,7 @@ test('TUI: modo manual testa bloco por bloco; sem terminal interativo, explica',
   const term = terminal();
   const o = memOut();
   const running = runTui({ out: o.out, inst: fake.inst, input: term.input, output: term.output });
-  term.keys('Enter', '192.0.2.10', 'Enter', 'maria', 'Enter', 'Enter', 's', 'certa', 'Enter', 'Enter', 'Enter');
+  term.keys('Enter', 'Enter', '192.0.2.10', 'Enter', 'maria', 'Enter', 'Enter', 's', 'certa', 'Enter', 'Enter', 'Enter');
   // passo 5: desce até "Prefiro fazer à mão", marca e confirma
   term.keys('down', 'space', 'Enter');
   await esperarAte(() => /Preparar o servidor à mão · Criar o usuário dashmon/.test(term.last()));
@@ -176,6 +203,27 @@ test('sem interface: exige identidade conferida, lê a senha do stdin e conclui'
   assert.match(c.text(), /SMART sda · rede — · serviços smbd/);
   assert.match(c.text(), /✓ servidor preparado \(usuário dashmon · chave restrita · sudo só para smartctl -H\)/);
   assert.match(c.text(), /link de entrada \(uso único, 2 min\): http:\/\/127\.0\.0\.1:3999\/entrar\?codigo=/);
+});
+
+test('sem interface --chave-ssh (#61): apelido, ssh-add quando falta e --senha-stdin vira a senha do sudo', async (t) => {
+  const fake = makeInstalacao({ detection: detectionWithSudo('pede-senha') });
+  t.after(fake.cleanup);
+  const flags = { 'chave-ssh': 'meu-servidor', identidade: 'SHA256:8oOm2IqGGSLMQ94IC6SBJJ/EIGqCSF6BhAsYUkBWlXw', 'senha-stdin': true, smart: 'nenhum', 'sem-atalho': true };
+  const salto = memOut();
+  assert.equal(await runHeadless({ out: salto.out, inst: fake.inst, flags: { ...flags, 'chave-ssh': 'com-salto' } }), 2);
+  assert.match(salto.text(), /ProxyJump/);
+  fake.srv.agentHasKey = false;
+  const sem = memOut();
+  assert.equal(await runHeadless({ out: sem.out, inst: fake.inst, stdin: Readable.from(['certa\n']), flags }), 2);
+  assert.match(sem.text(), /rode no seu terminal: ssh-add -t 15m ~\/\.ssh\/chave_admin/);
+  fake.srv.agentHasKey = true;
+  const ok = memOut();
+  assert.equal(await runHeadless({ out: ok.out, inst: fake.inst, stdin: Readable.from(['certa\n']), flags }), 0, ok.text());
+  assert.match(ok.text(), /porta 2222 · apelido meu-servidor · usuário maria/);
+  const admin = fake.srv.calls.filter((c) => c.kind === 'admin');
+  assert.ok(admin.every((c) => c.password === ''), 'a senha lida nunca vai para a conexão SSH');
+  assert.match(admin.at(-1).script, /^P='certa'$/m);
+  assert.match(HEADLESS_HELP, /--chave-ssh <apelido>/);
 });
 
 test('sem interface: sem --disco/--memoria/--temperatura, mantém os limiares do .env', async (t) => {
