@@ -16,6 +16,7 @@ import { preparationPlan, assistedScript, completedSteps, removalScript } from '
 import {
   fingerprint, fingerprintBlocks, describeAdminError, runAdmin, hostKeyAlgorithms, probePort, scanHostKeys, ASKPASS,
 } from '../../server/setup/remoto.js';
+import { installId } from '../../server/setup/acesso.js';
 import {
   ensureDataDirs, ensureKey, writeKnownHosts, writeSshConfig, updateEnv, ensureToken, unitText, installService, removeService,
   desktopEntryText, installShortcut, removeShortcut, serviceNode,
@@ -86,14 +87,17 @@ test('detecção: discos, pastas, rede e serviços do servidor de exemplo', () =
 
 test('preparo: o mesmo plano vira script do assistido e blocos do manual', () => {
   const targets = { mounts: ['/', '/mnt/dados'], devs: ['sda', 'sdb'], services: ['smbd'], netIf: 'enp3s0' };
-  const plan = preparationPlan({ adminUser: 'maria', publicKey: PUB, targets, smartDevs: ['sda', 'sdb'], from: '192.0.2.50' });
+  const plan = preparationPlan({ adminUser: 'maria', publicKey: PUB, computer: 'Note-Ana.lan', targets, smartDevs: ['sda', 'sdb'], from: '192.0.2.50' });
   assert.deepEqual(plan.actions.map((a) => a.id), ['sudo', 'usuario', 'chave', 'sudoers', 'teste']);
   assert.equal(plan.actions[0].detalhe, 'pede a senha de maria uma vez');
   assert.match(plan.actions[3].detalhe, /apenas smartctl -H em sda e sdb/);
   assert.equal(sh(plan.rootScript).status, 0, sh(plan.rootScript).stderr);
   assert.match(plan.rootScript, /^set -e$/m);
   assert.match(plan.rootScript, /restrict,from="192\.0\.2\.50",command=/);
-  assert.match(plan.rootScript, /visudo -cf \/etc\/sudoers\.d\/dashboard\.novo && mv/);
+  assert.equal(plan.installId, '3ddb8334', 'o ID sai da chave pública');
+  assert.equal(plan.sudoersFile, '/etc/sudoers.d/dashboard-note-ana-lan-3ddb8334', 'sem ponto: o includedir do sudo ignora arquivo com ponto');
+  assert.match(plan.rootScript, /visudo -cf \/etc\/sudoers\.d\/dashboard-note-ana-lan-3ddb8334\.novo && mv/);
+  assert.ok(plan.keyLine.endsWith(` ${PUB} dashboard@note-ana-lan:3ddb8334`), 'a linha diz de qual computador e instalação ela é');
   assert.deepEqual(completedSteps(plan.rootScript.replace(/echo '(@@ok \w+)'/g, '$1')), ['usuario', 'chave', 'sudoers']);
   assert.ok(plan.displayed.startsWith('# executado como root numa única chamada de sudo (pede a senha de maria uma vez)'));
   assert.ok(!plan.displayed.includes('@@ok'), 'só os comandos de verdade aparecem para a pessoa');
@@ -101,19 +105,24 @@ test('preparo: o mesmo plano vira script do assistido e blocos do manual', () =>
   const blocks = Object.fromEntries(plan.manualBlocks.map((b) => [b.id, b.codigo]));
   assert.deepEqual(Object.keys(blocks), ['usuario', 'chave', 'sudoers', 'pronto']);
   assert.equal(blocks.usuario, 'sudo id dashmon >/dev/null 2>&1 || sudo useradd --system --create-home --shell /bin/sh dashmon\nsudo passwd --lock dashmon >/dev/null');
-  assert.match(blocks.chave, /^sudo install -m 600 -o dashmon -g dashmon \/dev\/stdin ~dashmon\/\.ssh\/authorized_keys <<'FIM_DA_CHAVE'\nrestrict,/m);
-  assert.doesNotMatch(blocks.chave, /\nsudo restrict/, 'a linha dentro do heredoc não ganha sudo');
+  assert.match(blocks.chave, /^sudo sh -s <<'FIM_DO_PASSO'\n/m, 'as redireções rodam como root também no modo manual');
+  assert.match(blocks.chave, /<<'FIM_DA_CHAVE'\nrestrict,/);
+  assert.doesNotMatch(blocks.chave, /\nsudo (restrict|set|cd|cat|mv)/, 'nada dentro dos heredocs ganha sudo');
+  assert.doesNotMatch(blocks.chave, /install -m 600 \/dev\/stdin ~dashmon\/\.ssh\/authorized_keys/, 'nunca regrava o arquivo inteiro (#60)');
   assert.match(blocks.sudoers, /^dashmon ALL=\(root\) NOPASSWD: \/usr\/sbin\/smartctl -H \/dev\/sda, \/usr\/sbin\/smartctl -H \/dev\/sdb$/m);
-  assert.match(blocks.sudoers, /sudo visudo -cf \/etc\/sudoers\.d\/dashboard\.novo && sudo mv/);
+  assert.match(blocks.sudoers, /sudo visudo -cf \/etc\/sudoers\.d\/dashboard-note-ana-lan-3ddb8334\.novo && sudo mv/);
+  assert.match(blocks.sudoers, /^sudo find \/etc\/sudoers\.d -maxdepth 1 -name 'dashboard-\*-3ddb8334\*' ! -name 'dashboard-note-ana-lan-3ddb8334' -delete$/m, 'o curinga é do find (root), não do shell da pessoa');
   for (const code of Object.values(blocks)) assert.equal(sh(code).status, 0, code);
 
-  const root = preparationPlan({ adminUser: 'root', publicKey: PUB, targets, smartDevs: [] });
+  const root = preparationPlan({ adminUser: 'root', publicKey: PUB, computer: 'x', targets, smartDevs: [] });
   assert.equal(root.actions[0].titulo, 'Entrar como administrador');
-  assert.match(root.rootScript, /rm -f \/etc\/sudoers\.d\/dashboard/, 'sem SMART: a regra antiga sai');
+  assert.match(root.rootScript, /find \/etc\/sudoers\.d -maxdepth 1 -name 'dashboard-\*-3ddb8334\*' -delete/, 'sem SMART: a regra deste computador sai');
+  assert.equal(root.sudoersFile, '');
   assert.ok(!root.manualBlocks.some((b) => b.codigo.includes('sudo ')), 'root não precisa de sudo');
   assert.match(root.keyLine, /^restrict,command=/, 'sem from=');
-  assert.match(removalScript(), /userdel -r dashmon/);
-  assert.equal(sh(removalScript()).status, 0);
+  assert.match(removalScript({ publicKey: PUB }), /userdel -r dashmon/);
+  assert.equal(sh(removalScript({ publicKey: PUB })).status, 0);
+  assert.throws(() => removalScript({}), /chave pública/, 'sem a chave não dá para saber qual linha é desta instalação');
 });
 
 test('preparo: como o script chega a root (senha uma vez, conferida antes)', () => {
@@ -245,18 +254,29 @@ test('local: .env mesclado (0600), token, chave dedicada e arquivos SSH do paine
   assert.equal(loadEnvFile(path.join(r2, '.env')).SSH_HOST, 'servidor');
 
   const home = tmp(t, 'dash-home-');
-  const k1 = ensureKey({ home });
-  assert.equal(k1.file, path.join(home, '.ssh', 'dashboard_ed25519'));
+  const k1 = ensureKey({ home, server: 'Servidor.Casa' });
+  assert.match(k1.file, /\/\.ssh\/dashboard-servidor-casa-[0-9a-f]{8}$/, 'nome do servidor + ID da instalação');
+  assert.equal(path.basename(k1.file).slice(-8), installId(k1.publicKey), 'o ID do nome é o da chave');
   assert.equal(k1.created, true);
   assert.match(k1.publicKey, /^ssh-ed25519 [A-Za-z0-9+/]+$/);
   assert.equal(fs.statSync(k1.file).mode & 0o777, 0o600);
   assert.equal(fs.statSync(path.join(home, '.ssh')).mode & 0o777, 0o700);
-  assert.deepEqual(ensureKey({ home }), { ...k1, created: false }, 'reaproveita a chave do painel');
+  assert.deepEqual(fs.readdirSync(path.join(home, '.ssh')).sort(), [path.basename(k1.file), `${path.basename(k1.file)}.pub`], 'nada provisório fica para trás');
+  assert.deepEqual(ensureKey({ home, current: k1.file }), { ...k1, created: false }, 'reconfigurar continua com a chave desta pasta');
+  const k3 = ensureKey({ home, server: 'Servidor.Casa' });
+  assert.notEqual(k3.file, k1.file, 'outra instalação no mesmo computador ganha chave própria (#60)');
+  // Chave das versões até a 2.1.0 (~/.ssh/dashboard_ed25519) continua valendo se a pasta a usa.
+  const legacy = path.join(home, '.ssh', 'dashboard_ed25519');
+  spawnSync('ssh-keygen', ['-q', '-t', 'ed25519', '-N', '', '-C', 'server-dashboard', '-f', legacy]);
+  assert.equal(ensureKey({ home, current: legacy }).file, legacy);
   const home2 = tmp(t, 'dash-home-');
   fs.mkdirSync(path.join(home2, '.ssh'));
-  spawnSync('ssh-keygen', ['-q', '-t', 'ed25519', '-N', '', '-C', 'linux-server-dashboard', '-f', path.join(home2, '.ssh', 'dashboard_ed25519')]);
-  const k2 = ensureKey({ home: home2 });
-  assert.equal(k2.file, path.join(home2, '.ssh', 'dashboard_v2_ed25519'), 'a chave da V1 (acesso completo) não é reaproveitada');
+  const v1 = path.join(home2, '.ssh', 'dashboard_ed25519');
+  spawnSync('ssh-keygen', ['-q', '-t', 'ed25519', '-N', '', '-C', 'linux-server-dashboard', '-f', v1]);
+  assert.notEqual(ensureKey({ home: home2, current: v1 }).file, v1, 'a chave da V1 (acesso completo) não é reaproveitada');
+  const pessoal = path.join(home2, '.ssh', 'id_ed25519');
+  spawnSync('ssh-keygen', ['-q', '-t', 'ed25519', '-N', '', '-C', 'server-dashboard', '-f', pessoal]);
+  assert.notEqual(ensureKey({ home: home2, current: pessoal }).file, pessoal, 'só chave com nome dashboard*');
   assert.throws(() => ensureKey({ home: tmp(t, 'dash-home-'), run: () => ({ status: 1 }) }), /não consegui criar a chave/);
 
   const dirs = ensureDataDirs(root);

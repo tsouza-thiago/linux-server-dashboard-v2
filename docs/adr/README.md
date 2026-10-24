@@ -24,3 +24,4 @@ Uma ADR aceita não é editada; se a decisão mudar, uma nova ADR a substitui.
 | [0017](0017-superficie-publica-minima-no-github.md) | Superfície pública mínima no GitHub | Aceita |
 | [0018](0018-disponibilidade-so-sobre-o-tempo-medido.md) | Disponibilidade só sobre o tempo medido | Aceita |
 | [0019](0019-testes-no-navegador.md) | Testes no navegador no fluxo de trabalho | Aceita |
+| [0020](0020-varios-computadores-no-mesmo-servidor.md) | Vários computadores no mesmo servidor: uma chave, uma linha e um sudoers por instalação | Aceita |

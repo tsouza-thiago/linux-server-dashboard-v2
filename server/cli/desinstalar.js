@@ -1,15 +1,16 @@
 // `dashboard desinstalar`: remove o serviço, o atalho e os arquivos locais e
-// oferece limpar o servidor (usuário dashmon, chave e regra de sudo) — com os comandos
-// exibidos antes e a senha usada uma vez, como no assistente.
+// oferece limpar o servidor — só a parte desta instalação (a linha da chave e a regra de
+// sudo dela; o usuário dashmon sai só se nenhum outro computador o usar, ADR 0020) — com
+// os comandos exibidos antes e a senha usada uma vez, como no assistente.
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import readline from 'node:readline';
-import { removalScript, assistedScript, completedSteps, SUDOERS } from '../setup/preparo.js';
+import { removalScript, remainingLines, assistedScript, completedSteps } from '../setup/preparo.js';
 import { runAdmin, describeAdminError } from '../setup/remoto.js';
 import { removeService, removeShortcut } from '../setup/local.js';
 import { currentServer } from '../setup/instalacao.js';
-import { validUser, PANEL_USER } from '../setup/acesso.js';
+import { validUser, installId, validPublicKey, NAME_PREFIX, PANEL_USER } from '../setup/acesso.js';
 import { stopPanel } from './servico.js';
 import { keyFileFromConfig } from './diagnosticar.js';
 import { parseFlags } from './instalar.js';
@@ -24,6 +25,16 @@ export function ask(question, { secret = false, input = process.stdin, output = 
     }
     rl.question(question, (answer) => { rl.close(); if (!input.isTTY || secret) output.write('\n'); resolve(answer); });
   });
+}
+
+/** Chave pública ("ssh-ed25519 AAAA…") do .pub ao lado da chave do painel, ou null. */
+function publicKeyOf(key) {
+  try {
+    const pub = fs.readFileSync(`${key}.pub`, 'utf8').trim().split(/\s+/).slice(0, 2).join(' ');
+    return validPublicKey(pub) ? pub : null;
+  } catch {
+    return null;
+  }
 }
 
 // "s", "sim", "y" ou "yes" (sem diferenciar maiúsculas) contam como sim.
@@ -48,14 +59,24 @@ export async function desinstalar({ out, root, args = [], home = os.homedir(), d
     return 0;
   }
 
-  // 1. Servidor primeiro: depois que a chave e o known_hosts saem, não dá mais para conferir a identidade.
+  // 1. Servidor primeiro: depois que a chave e o known_hosts saem, não dá mais para conferir a
+  // identidade nem saber qual linha é desta instalação.
   const server = currentServer(root);
   const knownHosts = path.join(root, 'data', 'ssh', 'known_hosts');
-  if (server && fs.existsSync(knownHosts)) {
+  const key = keyFileFromConfig(root);
+  const publicKey = publicKeyOf(key);
+  if (server && fs.existsSync(knownHosts) && !publicKey) {
     out.line();
-    out.line(`No servidor ficaram: o usuário ${PANEL_USER} (com a chave restrita) e a regra de sudo do smartctl.`);
+    out.warn('o servidor não foi alterado', `não achei a chave pública deste painel (${key ? `${key}.pub` : 'sem IdentityFile no data/ssh/config'})`);
+    out.line(out.c.dim(`Confira à mão as linhas de ~${PANEL_USER}/.ssh/authorized_keys no servidor: cada uma termina com o computador e o ID.`));
+  } else if (server && fs.existsSync(knownHosts)) {
+    const id = installId(publicKey);
+    out.line();
+    out.line(`No servidor ficaram: a linha deste computador no authorized_keys do ${PANEL_USER} (ID ${id}) e a regra de sudo dele.`);
     out.line(out.c.dim('Para remover à mão, rode no servidor:'));
-    out.line(out.c.dim(`  sudo userdel -r ${PANEL_USER}; sudo rm -f ${SUDOERS}`));
+    out.line(out.c.dim(`  sudo sed -i -e '\\# ${publicKey.split(' ')[1]} #d' -e '\\# ${NAME_PREFIX}@[a-z0-9-]*:${id}$#d' ~${PANEL_USER}/.ssh/authorized_keys`));
+    out.line(out.c.dim(`  sudo find /etc/sudoers.d -maxdepth 1 -name '${NAME_PREFIX}-*-${id}*' -delete`));
+    out.line(out.c.dim(`  e, se o authorized_keys ficar vazio (nenhum outro computador): sudo userdel -r ${PANEL_USER}`));
     const want = flags['limpar-servidor'] || (interactive && !flags.sim && yes(await askFn(`Quer que eu faça isso agora em ${server.host}? Precisa de um usuário com sudo. [s/N] `)));
     if (want) {
       const user = String(flags.usuario || (interactive ? await askFn('Usuário administrador no servidor: ') : '')).trim();
@@ -67,10 +88,12 @@ export async function desinstalar({ out, root, args = [], home = os.homedir(), d
         const sudo = user === 'root' ? 'root' : senha ? 'senha' : 'nopasswd';
         const r = await (deps.runAdmin ?? runAdmin)({
           host: server.host, port: server.port, user, password: senha, knownHosts,
-          script: assistedScript(removalScript(), { sudo, password: senha }), timeoutMs: 60000,
+          script: assistedScript(removalScript({ publicKey }), { sudo, password: senha }), timeoutMs: 60000,
         });
-        if (r.code === 0 && completedSteps(r.stdout).includes('removido')) out.ok('servidor limpo', `usuário ${PANEL_USER} e regra de sudo removidos`);
-        else out.fail('não consegui limpar o servidor', /^@@erro senha$/m.test(r.stdout) ? 'o sudo recusou a senha' : describeAdminError(r));
+        if (r.code === 0 && completedSteps(r.stdout).includes('removido')) {
+          const rest = remainingLines(r.stdout);
+          out.ok('servidor limpo', rest ? `linha e regra de sudo deste computador removidas; o usuário ${PANEL_USER} fica para ${rest === 1 ? 'a outra linha' : `as outras ${rest} linhas`}` : `usuário ${PANEL_USER} e regra de sudo removidos`);
+        } else out.fail('não consegui limpar o servidor', /^@@erro senha$/m.test(r.stdout) ? 'o sudo recusou a senha' : describeAdminError(r));
       }
     } else {
       out.warn('o servidor não foi alterado', 'use os comandos acima quando quiser');
@@ -82,7 +105,6 @@ export async function desinstalar({ out, root, args = [], home = os.homedir(), d
   out.ok('painel parado');
   if ((deps.removeService ?? removeService)({ home })) out.ok('serviço de usuário removido');
   if (removeShortcut({ home })) out.ok('atalho do menu removido');
-  const key = keyFileFromConfig(root);
   // Só apaga a chave se ela for do painel (nome dashboard*): nunca a chave pessoal de alguém.
   if (key && path.basename(key).startsWith('dashboard') && fs.existsSync(key)) {
     fs.rmSync(key, { force: true });

@@ -11,6 +11,17 @@ diante: `PATCH` corrige, `MINOR` acrescenta sem quebrar e `MAJOR` quebra.
 
 ### Corrigido
 
+- **Vários computadores no mesmo servidor** (#60, ADR 0020): instalar o painel em outro
+  computador não apaga mais a chave nem o SMART do primeiro. Cada instalação tem um ID
+  (tirado da chave pública) e troca só a sua linha do `authorized_keys` do `dashmon` e o seu
+  arquivo do sudoers. Os nomes dizem de quem é cada parte: a chave
+  `~/.ssh/dashboard-<servidor>-<id>`, o comentário `dashboard@<computador>:<id>` e a regra
+  `/etc/sudoers.d/dashboard-<computador>-<id>`. O `./dashboard desinstalar` tira só a parte
+  deste computador e apaga o `dashmon` só quando nenhum outro computador o usa. A dica do
+  `./dashboard diagnosticar` para a chave recusada explica a causa. Instalações antigas
+  continuam funcionando; a linha e a regra antigas são trocadas no próximo
+  `./dashboard reconfigurar` de cada computador.
+
 - **Painel de teste com os discos do SMART** (#57): o `npm run painel-teste` passa os alvos
   pelo `normalizeTargets`, como a instalação. A Ajuda mostra "Discos com SMART: sda sdb sdc"
   e não diz mais "nenhum disco em SMART_DEVS" ao lado do SMART liberado. Só a ferramenta de

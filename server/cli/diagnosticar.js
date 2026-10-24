@@ -81,7 +81,7 @@ export function explainFailure(error) {
   }
   if (/timeout|não respondeu/i.test(error)) return ['o servidor não respondeu a tempo.', 'confira se ele está ligado e na mesma rede; o painel tenta de novo sozinho a cada minuto.'];
   if (/exit 255|recusou|Permission denied/i.test(error)) {
-    return ['o servidor recusou a chave do painel.', 'rode dashboard reconfigurar: a linha da chave pode ter sumido do servidor, ou o endereço deste computador mudou (opção "só deste computador").'];
+    return ['o servidor recusou a chave do painel.', 'a linha deste computador sumiu do servidor ou o endereço dele mudou (opção "só deste computador"). Até a 2.1.0, instalar o painel em outro computador apagava a linha dos anteriores: rode dashboard reconfigurar aqui, com a 2.1.1 ou mais nova, e um computador não apaga mais o outro.'];
   }
   return [error, 'rode dashboard reconfigurar; se continuar, veja data/dashboard.log.'];
 }
