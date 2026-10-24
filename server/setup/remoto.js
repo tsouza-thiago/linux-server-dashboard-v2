@@ -5,9 +5,15 @@
 // A senha do administrador nunca vai para disco, log ou linha de comando: o ssh a pede ao
 // ajudante scripts/askpass.sh, que a lê de uma variável de ambiente só deste processo; o
 // sudo a recebe pelo stdin do script remoto (ver deteccao.js e preparo.js).
+//
+// Servidor que só aceita chave (ADR 0021): o apelido do ~/.ssh/config é lido com `ssh -G`
+// (não conecta) e só os valores dele entram na conexão, sempre com `-F /dev/null`. A
+// passphrase da chave fica no ssh-agent: o painel só confere se a chave está carregada.
 import { spawn } from 'node:child_process';
 import crypto from 'node:crypto';
+import fs from 'node:fs';
 import net from 'node:net';
+import os from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { validHost, validPort, validUser } from './acesso.js';
@@ -91,14 +97,105 @@ export async function scanHostKeys(host, port = 22, opts = {}) {
   return keys;
 }
 
+// ---- Apelido do ~/.ssh/config (modo chave) ------------------------------------------------
+
+/** Apelido aceito: o nome de um `Host` comum (nada que o ssh leia como opção). */
+export const validAlias = (s) => typeof s === 'string' && /^[A-Za-z0-9_][A-Za-z0-9_.-]{0,63}$/.test(s);
+
+/**
+ * Caminho de chave ou de agente que pode ir para o ssh: absoluto, sem caractere de controle e
+ * sem `%` nem `$` (o ssh expandiria de novo como token ou variável).
+ */
+export const validKeyPath = (s) => typeof s === 'string' && s.length < 4096 && s.startsWith('/') && !/[\0-\x1f\x7f%$]/.test(s);
+
+/** `~/…` e os tokens %d (pasta pessoal) e %u (usuário local) de um IdentityFile do `ssh -G`. */
+function expandIdentity(file, home, localUser) {
+  const t = (file.startsWith('~/') ? path.join(home, file.slice(2)) : file).replace(/%d/g, home).replace(/%u/g, localUser);
+  // Outro token (%h, %r…): o arquivo depende da conexão; não serve aqui.
+  return t.includes('%') ? '' : t;
+}
+
+/**
+ * Lê o apelido com `ssh -G` (só calcula a configuração, não conecta) e devolve o que a
+ * conexão do administrador usa: endereço, porta, usuário, chave e agente. Recusa
+ * ProxyJump e ProxyCommand: a coleta conecta direto, então a instalação também.
+ * `configFile` só existe para os testes (o ssh lê o ~/.ssh/config da conta, não o $HOME).
+ */
+export async function resolveAlias(alias, { configFile = '', home = os.homedir(), env = process.env, spawnFn } = {}) {
+  if (!validAlias(alias)) return { ok: false, erro: 'Apelido inválido: use o nome de um "Host" do seu ~/.ssh/config (letras, números, ponto, _ e -).' };
+  const r = await runProcess('ssh', [...(configFile ? ['-F', configFile] : []), '-G', '--', alias], { timeoutMs: 10000, spawnFn });
+  if (r.error) return { ok: false, erro: r.error };
+  if (r.code !== 0) return { ok: false, erro: `O ssh não conseguiu ler o apelido ${alias}: ${r.stderr.trim().split('\n').pop() || `código ${r.code}`}` };
+  const opts = new Map();
+  const files = [];
+  for (const line of r.stdout.split('\n')) {
+    const m = /^([a-z]+) (.+)$/.exec(line.trim());
+    if (!m) continue;
+    if (m[1] === 'identityfile') files.push(m[2]);
+    else if (!opts.has(m[1])) opts.set(m[1], m[2]);
+  }
+  for (const k of ['proxyjump', 'proxycommand']) {
+    const v = opts.get(k);
+    if (v && v !== 'none') {
+      return { ok: false, erro: `O apelido ${alias} usa ${k === 'proxyjump' ? 'ProxyJump' : 'ProxyCommand'} (entra por outra máquina). O painel conecta direto ao servidor: use um apelido sem salto, com o endereço do próprio servidor.` };
+    }
+  }
+  const host = opts.get('hostname') || '';
+  const port = Number(opts.get('port') || 22);
+  const user = opts.get('user') || '';
+  if (!validHost(host)) return { ok: false, erro: `O apelido ${alias} não tem um HostName válido (achei "${host.slice(0, 80)}").` };
+  if (!validPort(port)) return { ok: false, erro: `O apelido ${alias} tem uma porta inválida.` };
+  if (!validUser(user)) return { ok: false, erro: `O apelido ${alias} não tem um User válido.` };
+  // A 1ª chave que existe, na ordem do ssh (sem IdentityFile, o ssh -G lista as padrão).
+  const localUser = os.userInfo().username;
+  const identityFile = files.map((f) => expandIdentity(f, home, localUser)).find((f) => validKeyPath(f) && fs.existsSync(f)) || '';
+  if (!identityFile) return { ok: false, erro: `Não achei a chave do apelido ${alias} neste computador. Confira o IdentityFile dele no ~/.ssh/config.` };
+  // Agente: o IdentityAgent do apelido; sem ele, o SSH_AUTH_SOCK deste terminal.
+  const raw = opts.get('identityagent') || 'SSH_AUTH_SOCK';
+  let identityAgent = raw === 'none' ? 'none' : raw === 'SSH_AUTH_SOCK' ? env.SSH_AUTH_SOCK || '' : raw.startsWith('$') ? env[raw.slice(1)] || '' : raw;
+  if (identityAgent !== 'none' && !validKeyPath(identityAgent)) identityAgent = '';
+  return { ok: true, alias, host, port, user, identityFile, identityAgent: identityAgent || 'none' };
+}
+
+/** "ssh-ed25519 AAAA…" sem o comentário (o que o agente lista e o authorized_keys usa). */
+const keyBlob = (line) => String(line).trim().split(/\s+/)[1] || '';
+
+/**
+ * A chave do apelido está pronta para uma conexão sem perguntas? Ou ela está no agente
+ * (`ssh-add -L` traz o mesmo .pub), ou ela não tem passphrase. O painel nunca recebe a
+ * passphrase: se faltar, a tela mostra o `ssh-add` para a pessoa rodar no terminal dela.
+ * Resposta: { ok, via: 'agente'|'sem-passphrase' } ou { ok: false, motivo, comando }.
+ */
+export async function checkAgentKey({ identityFile, identityAgent = 'none', home = os.homedir(), spawnFn } = {}) {
+  if (!validKeyPath(identityFile)) return { ok: false, motivo: 'chave-invalida' };
+  const shown = identityFile.startsWith(`${home}/`) ? `~/${identityFile.slice(home.length + 1)}` : identityFile;
+  const comando = `ssh-add -t 15m ${shown}`;
+  // Sem passphrase, o ssh-keygen tira a parte pública com a passphrase vazia.
+  const plain = await runProcess('ssh-keygen', ['-y', '-P', '', '-f', identityFile], { timeoutMs: 10000, spawnFn });
+  if (plain.code === 0 && keyBlob(plain.stdout)) return { ok: true, via: 'sem-passphrase' };
+  let pub = '';
+  try { pub = keyBlob(fs.readFileSync(`${identityFile}.pub`, 'utf8')); } catch { /* sem .pub */ }
+  if (!pub) return { ok: false, motivo: 'sem-pub', comando: `ssh-keygen -y -f ${shown} > ${shown}.pub` };
+  if (identityAgent === 'none' || !validKeyPath(identityAgent)) return { ok: false, motivo: 'sem-agente', comando };
+  const env = { ...process.env, SSH_AUTH_SOCK: identityAgent };
+  const r = await runProcess('ssh-add', ['-L'], { env, timeoutMs: 10000, spawnFn });
+  // Código 2: não achou o agente; 1: o agente está vazio.
+  if (r.error || r.code === 2) return { ok: false, motivo: 'sem-agente', comando };
+  if (r.code === 0 && r.stdout.split('\n').some((l) => keyBlob(l) === pub)) return { ok: true, via: 'agente' };
+  return { ok: false, motivo: 'falta', comando };
+}
+
 /**
  * Executa um script no servidor como o administrador (`/bin/sh -s`, script no stdin).
- * Com senha, autentica só por senha (via askpass); sem senha, usa as chaves de sempre da
- * pessoa (~/.ssh/id_*, agente) em modo não interativo. Identidade conferida no
- * known_hosts do painel (StrictHostKeyChecking yes) e nenhum ~/.ssh/config lido (-F /dev/null).
+ * Com senha, autentica só por senha (via askpass). Com `identityFile` (apelido do modo
+ * chave), só aquela chave, pelo agente do apelido. Sem nenhum dos dois, as chaves de
+ * sempre da pessoa (~/.ssh/id_*, agente). Sempre em modo não interativo quando não há
+ * senha, com a identidade conferida no known_hosts do painel (StrictHostKeyChecking yes)
+ * e nenhum ~/.ssh/config lido (-F /dev/null).
  */
-export function runAdmin({ host, port = 22, user, password = '', knownHosts, hostKeyType, script, timeoutMs = 120000, spawnFn }) {
+export function runAdmin({ host, port = 22, user, password = '', identityFile = '', identityAgent = 'none', knownHosts, hostKeyType, script, timeoutMs = 120000, spawnFn }) {
   if (!validHost(host) || !validPort(port) || !validUser(user)) throw new Error('servidor ou usuário inválido');
+  if (identityFile && (!validKeyPath(identityFile) || (identityAgent !== 'none' && !validKeyPath(identityAgent)))) throw new Error('chave ou agente inválido');
   const args = [
     '-F', '/dev/null',
     '-p', String(port),
@@ -114,6 +211,10 @@ export function runAdmin({ host, port = 22, user, password = '', knownHosts, hos
     ...(password
       ? ['-o', 'PubkeyAuthentication=no', '-o', 'PreferredAuthentications=keyboard-interactive,password']
       : ['-o', 'BatchMode=yes']),
+    // Só a chave do apelido: o agente não oferece as outras (MaxAuthTries, fail2ban).
+    ...(identityFile && !password
+      ? ['-i', identityFile, '-o', 'IdentitiesOnly=yes', '-o', `IdentityAgent=${identityAgent}`, '-o', 'PreferredAuthentications=publickey']
+      : []),
     '-T', '--', host, '/bin/sh -s',
   ];
   // Ambiente limpo: nenhum askpass de fora; a senha só entra por esta variável, só neste
@@ -132,6 +233,8 @@ export function describeAdminError({ code, stderr = '', timedOut, error }) {
   if (/Host key verification failed|REMOTE HOST IDENTIFICATION HAS CHANGED|host key .* not in list/i.test(stderr)) {
     return 'a identidade do servidor não é a que você confirmou: pare e confira (pode ser outro aparelho no mesmo endereço)';
   }
+  if (/must have a tty|requiretty/i.test(stderr)) return 'o sudo do servidor exige um terminal (Defaults requiretty): use o modo "Prefiro fazer à mão"';
+  if (/Permission denied \(publickey\)/i.test(stderr)) return 'o servidor recusou a chave: confira o usuário e se a chave está no ssh-agent';
   if (/Permission denied/i.test(stderr)) return 'o servidor recusou a entrada: confira o usuário e a senha';
   if (/Connection refused/i.test(stderr)) return 'a porta do SSH está fechada no servidor';
   if (/timed out|No route to host|Network is unreachable/i.test(stderr)) return 'o servidor não respondeu (está ligado e na mesma rede?)';

@@ -1,13 +1,15 @@
 // `dashboard desinstalar`: remove o serviço, o atalho e os arquivos locais e
 // oferece limpar o servidor — só a parte desta instalação (a linha da chave e a regra de
 // sudo dela; o usuário dashmon sai só se nenhum outro computador o usar, ADR 0020) — com
-// os comandos exibidos antes e a senha usada uma vez, como no assistente.
+// os comandos exibidos antes e a senha usada uma vez, como no assistente. Servidor que só
+// aceita chave (ADR 0021): --chave-ssh <apelido> entra pela chave do apelido, no ssh-agent, e
+// a senha pedida passa a ser só a do sudo.
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import readline from 'node:readline';
 import { removalScript, remainingLines, assistedScript, completedSteps } from '../setup/preparo.js';
-import { runAdmin, describeAdminError } from '../setup/remoto.js';
+import { runAdmin, describeAdminError, resolveAlias, checkAgentKey } from '../setup/remoto.js';
 import { removeService, removeShortcut } from '../setup/local.js';
 import { currentServer } from '../setup/instalacao.js';
 import { validUser, installId, validPublicKey, NAME_PREFIX, PANEL_USER } from '../setup/acesso.js';
@@ -37,13 +39,56 @@ function publicKeyOf(key) {
   }
 }
 
+/**
+ * Entra no servidor como administrador e roda o removalScript: com usuário e senha (a mesma
+ * senha serve ao sudo, como no assistente) ou com o apelido do ~/.ssh/config (a chave dele no
+ * ssh-agent, e a senha só para o sudo). A identidade do servidor é a do known_hosts do painel.
+ */
+async function limparServidor({ out, flags, interactive, askFn, deps, home, server, knownHosts, publicKey }) {
+  const flagAlias = typeof flags['chave-ssh'] === 'string' ? flags['chave-ssh'].trim() : '';
+  const alias = flagAlias || (interactive && !flags.usuario
+    ? String(await askFn('Apelido do ~/.ssh/config para entrar por chave SSH (em branco = usuário e senha): ')).trim() : '');
+  let conn = { host: server.host, port: server.port, knownHosts };
+  let user;
+  let senha;
+  if (alias) {
+    const a = await (deps.resolveAlias ?? resolveAlias)(alias, { home });
+    if (!a.ok) { out.fail('não consegui usar o apelido: o servidor não foi alterado', a.erro); return; }
+    const ag = await (deps.checkAgentKey ?? checkAgentKey)({ identityFile: a.identityFile, identityAgent: a.identityAgent, home });
+    if (!ag.ok) { out.fail('a chave do apelido não está pronta: o servidor não foi alterado', ag.comando ? `rode no seu terminal: ${ag.comando} e tente de novo` : ag.motivo); return; }
+    // O endereço continua o do painel (é o que o known_hosts conferiu); o apelido dá a chave.
+    if (a.host !== server.host || a.port !== server.port) out.warn(`o apelido aponta para ${a.host}:${a.port}`, `uso o servidor do painel, ${server.host}:${server.port}`);
+    user = a.user;
+    conn = { ...conn, identityFile: a.identityFile, identityAgent: a.identityAgent };
+    senha = flags['senha-stdin'] || interactive ? String(await askFn(`Senha do sudo de ${user} (em branco = sudo sem senha): `, { secret: true })) : '';
+  } else {
+    user = String(flags.usuario || (interactive ? await askFn('Usuário administrador no servidor: ') : '')).trim();
+    if (!validUser(user)) { out.fail('usuário inválido: o servidor não foi alterado'); return; }
+    senha = flags['senha-stdin'] || interactive ? String(await askFn(`Senha de ${user} (em branco = sua chave SSH): `, { secret: true })) : '';
+  }
+  // Como o script vai virar root: já é root, sudo com a senha ou sudo sem senha.
+  const sudo = user === 'root' ? 'root' : senha ? 'senha' : 'nopasswd';
+  const r = await (deps.runAdmin ?? runAdmin)({
+    ...conn, user, password: alias ? '' : senha,
+    script: assistedScript(removalScript({ publicKey }), { sudo, password: senha }), timeoutMs: 60000,
+  });
+  if (r.code === 0 && completedSteps(r.stdout).includes('removido')) {
+    const rest = remainingLines(r.stdout);
+    out.ok('servidor limpo', rest ? `linha e regra de sudo deste computador removidas; o usuário ${PANEL_USER} fica para ${rest === 1 ? 'a outra linha' : `as outras ${rest} linhas`}` : `usuário ${PANEL_USER} e regra de sudo removidos`);
+  } else {
+    const why = /^@@erro senha$/m.test(r.stdout) ? 'o sudo recusou a senha'
+      : /^@@erro tty$/m.test(r.stdout) ? 'o sudo do servidor exige um terminal (Defaults requiretty): use os comandos acima' : describeAdminError(r);
+    out.fail('não consegui limpar o servidor', why);
+  }
+}
+
 // "s", "sim", "y" ou "yes" (sem diferenciar maiúsculas) contam como sim.
 const yes = (a) => /^(s|sim|y|yes)$/i.test(String(a || '').trim());
 
 /**
  * `./dashboard desinstalar`: pede confirmação (ou --sim), oferece limpar o servidor, remove o
  * serviço, o atalho, a chave e a configuração local, e pergunta se apaga o histórico.
- * Opções: --sim, --limpar-servidor, --usuario, --senha-stdin, --apagar-historico.
+ * Opções: --sim, --limpar-servidor, --usuario, --chave-ssh, --senha-stdin, --apagar-historico.
  */
 export async function desinstalar({ out, root, args = [], home = os.homedir(), deps = {} }) {
   const flags = parseFlags(args);
@@ -79,22 +124,7 @@ export async function desinstalar({ out, root, args = [], home = os.homedir(), d
     out.line(out.c.dim(`  e, se o authorized_keys ficar vazio (nenhum outro computador): sudo userdel -r ${PANEL_USER}`));
     const want = flags['limpar-servidor'] || (interactive && !flags.sim && yes(await askFn(`Quer que eu faça isso agora em ${server.host}? Precisa de um usuário com sudo. [s/N] `)));
     if (want) {
-      const user = String(flags.usuario || (interactive ? await askFn('Usuário administrador no servidor: ') : '')).trim();
-      if (!validUser(user)) {
-        out.fail('usuário inválido: o servidor não foi alterado');
-      } else {
-        const senha = flags['senha-stdin'] || interactive ? String(await askFn(`Senha de ${user} (em branco = sua chave SSH): `, { secret: true })) : '';
-        // Como o script vai virar root: já é root, sudo com a senha ou sudo sem senha.
-        const sudo = user === 'root' ? 'root' : senha ? 'senha' : 'nopasswd';
-        const r = await (deps.runAdmin ?? runAdmin)({
-          host: server.host, port: server.port, user, password: senha, knownHosts,
-          script: assistedScript(removalScript({ publicKey }), { sudo, password: senha }), timeoutMs: 60000,
-        });
-        if (r.code === 0 && completedSteps(r.stdout).includes('removido')) {
-          const rest = remainingLines(r.stdout);
-          out.ok('servidor limpo', rest ? `linha e regra de sudo deste computador removidas; o usuário ${PANEL_USER} fica para ${rest === 1 ? 'a outra linha' : `as outras ${rest} linhas`}` : `usuário ${PANEL_USER} e regra de sudo removidos`);
-        } else out.fail('não consegui limpar o servidor', /^@@erro senha$/m.test(r.stdout) ? 'o sudo recusou a senha' : describeAdminError(r));
-      }
+      await limparServidor({ out, flags, interactive, askFn, deps, home, server, knownHosts, publicKey });
     } else {
       out.warn('o servidor não foi alterado', 'use os comandos acima quando quiser');
     }

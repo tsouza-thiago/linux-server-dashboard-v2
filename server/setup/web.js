@@ -98,7 +98,7 @@ export function createWizardApp({ inst, code, onFinish = () => {}, onActivity = 
     try {
       res.json(await fn(req.body || {}, req));
     } catch (err) {
-      if (err instanceof InstallError) return res.status(err.status).json({ error: err.message, field: err.field });
+      if (err instanceof InstallError) return res.status(err.status).json({ error: err.message, field: err.field, detalhes: err.detalhes });
       log(`assistente: erro inesperado: ${err.stack || err.message}`);
       return res.status(500).json({ error: 'Algo deu errado aqui. Veja o terminal.' });
     }
@@ -108,12 +108,20 @@ export function createWizardApp({ inst, code, onFinish = () => {}, onActivity = 
     passos: STEPS,
     computador: inst.verificarComputador(),
     servidor: inst.servidor,
+    acesso: { modo: inst.acesso.modo, apelido: inst.acesso.apelido || '' },
     identidade: inst.identidade ? { type: inst.identidade.type, fingerprint: inst.identidade.fingerprint } : null,
     conectado: Boolean(inst.deteccao),
     preparo: { concluido: inst.preparo.concluido, modo: inst.preparo.modo },
     teste: inst.resumoTeste(),
   })));
-  app.post('/api/configurar/servidor', handle((b) => inst.definirServidor({ host: b.host, user: b.user, port: b.port })));
+  app.post('/api/configurar/apelido', handle(async (b) => {
+    const { resolvido, ...tela } = await inst.lerApelido({ apelido: b.apelido });
+    return tela;
+  }));
+  app.post('/api/configurar/servidor', handle((b) => inst.definirServidor({
+    modo: b.modo === 'chave' ? 'chave' : 'senha', apelido: b.apelido, host: b.host, user: b.user, port: b.port,
+  })));
+  app.post('/api/configurar/agente', handle(() => inst.conferirAgente()));
   app.post('/api/configurar/identidade', handle(() => inst.lerIdentidade()));
   app.post('/api/configurar/conectar', handle((b) => inst.conectar({ senha: b.senha ?? '', confirmo: b.confirmo === true })));
   app.get('/api/configurar/deteccao', handle(() => inst.resumoDeteccao()));

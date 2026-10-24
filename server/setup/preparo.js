@@ -8,7 +8,7 @@
 // Vários computadores podem monitorar o mesmo servidor (ADR 0020): cada instalação troca só
 // a SUA linha do authorized_keys e o SEU arquivo do sudoers, achados pelo ID da instalação.
 import {
-  authorizedKeysLine, sudoersLine, installId, installNames, validInstallId, validLabel, validPublicKey, KEY_COMMENT, NAME_PREFIX, PANEL_USER,
+  authorizedKeysLine, sudoersLine, installId, installNames, validInstallId, validIp, validLabel, validPublicKey, KEY_COMMENT, NAME_PREFIX, PANEL_USER,
 } from './acesso.js';
 import { shQuote } from './deteccao.js';
 
@@ -51,6 +51,109 @@ function keepOthers(publicKey, id) {
 // pode depender dela para o SMART.
 const DROP_LEGACY_SUDOERS = `grep -qs ' ${KEY_COMMENT}$' ~${PANEL_USER}/.ssh/authorized_keys || rm -f ${SUDOERS} ${SUDOERS}.novo`;
 
+// Opções do sshd que decidem se o dashmon entra (o `sshd -T` as imprime em minúsculas).
+const SSHD_KEYS = ['allowusers', 'allowgroups', 'denyusers', 'denygroups', 'authenticationmethods', 'pubkeyauthentication', 'maxauthtries', 'authorizedkeysfile'];
+
+/**
+ * Conferência só de leitura do sshd (ADR 0021): `sshd -T -C` imprime a configuração que
+ * valeria para o dashmon vindo deste computador, com os `Match` já aplicados. Roda como
+ * root (o sshd -T lê as chaves do servidor) e nunca para o preparo: o resultado vira aviso.
+ */
+export function sshdCheckLines(ip) {
+  if (!validIp(ip)) return ["# sem o IP deste computador: a conferência do sshd fica de fora", "echo '@@sshd fim'"];
+  return [
+    'for b in /usr/sbin/sshd /usr/bin/sshd /sbin/sshd; do [ -x "$b" ] && break; done',
+    `"$b" -T -C user=${PANEL_USER},host=${ip},addr=${ip} 2>/dev/null | grep -E '^(${SSHD_KEYS.join('|')}) ' | sed 's/^/@@sshd /' || true`,
+    "echo '@@sshd fim'",
+  ];
+}
+
+/** Comando que a pessoa roda no servidor para conferir o sshd à mão (modo manual). */
+export const sshdCheckCommand = (ip) => `sudo sshd -T -C user=${PANEL_USER},host=${ip},addr=${ip} | grep -E '^(${SSHD_KEYS.join('|')}) '`;
+
+/**
+ * O texto cabe no padrão do sshd (`*` e `?`)? Sem expressão regular: o padrão vem do
+ * servidor. Dois ponteiros, voltando ao último `*` quando não casa (sem explosão de tempo).
+ */
+function glob(pattern, text) {
+  let p = 0;
+  let t = 0;
+  let star = -1;
+  let mark = 0;
+  while (t < text.length) {
+    if (p < pattern.length && (pattern[p] === '?' || pattern[p] === text[t])) {
+      p += 1;
+      t += 1;
+    } else if (p < pattern.length && pattern[p] === '*') {
+      star = p;
+      mark = t;
+      p += 1;
+    } else if (star >= 0) {
+      p = star + 1;
+      mark += 1;
+      t = mark;
+    } else {
+      return false;
+    }
+  }
+  while (pattern[p] === '*') p += 1;
+  return p === pattern.length;
+}
+
+/** O IP cabe no padrão de máquina do sshd (curinga ou CIDR IPv4; outro CIDR conta como sim). */
+function hostMatches(pattern, ip) {
+  const cidr = /^(\d+\.\d+\.\d+\.\d+)\/(\d+)$/.exec(pattern);
+  if (!cidr) return pattern.includes('/') || glob(pattern, ip);
+  const num = (a) => a.split('.').reduce((n, x) => n * 256 + Number(x), 0);
+  if (!/^\d+\.\d+\.\d+\.\d+$/.test(ip)) return false;
+  // Mesmo prefixo de `bits` bits: divide pelos bits de máquina (sem operador de bits, que é 32 com sinal).
+  const step = 2 ** (32 - Math.min(32, Number(cidr[2])));
+  return Math.floor(num(ip) / step) === Math.floor(num(cidr[1]) / step);
+}
+
+/** O nome (e o IP, em `usuario@maquina`) cabe em algum padrão da lista? */
+const listMatches = (list, name, ip) => list.some((p) => {
+  const [who, where] = p.split('@');
+  return glob(who, name) && (where === undefined || hostMatches(where, ip));
+});
+
+/**
+ * Avisos da conferência do sshd: o que faria o servidor recusar o dashmon. O painel não muda
+ * o sshd_config; a pessoa decide. Devolve { conferido, avisos }.
+ */
+export function sshdWarnings(stdout, { ip = '' } = {}) {
+  const opts = new Map();
+  let fim = false;
+  for (const m of String(stdout).matchAll(/^@@sshd ([a-z]+)(?: (.*))?$/gm)) {
+    if (m[1] === 'fim') { fim = true; continue; }
+    if (!SSHD_KEYS.includes(m[1])) continue;
+    opts.set(m[1], [...(opts.get(m[1]) || []), ...String(m[2] || '').trim().split(/\s+/).filter(Boolean)]);
+  }
+  if (!fim || !opts.size) return { conferido: false, avisos: [] };
+  const u = PANEL_USER;
+  const one = (k) => (opts.get(k) || [])[0] || '';
+  const avisos = [];
+  const allowU = opts.get('allowusers') || [];
+  if (allowU.length && !listMatches(allowU, u, ip)) avisos.push(`O AllowUsers do sshd não inclui o ${u}: acrescente ${u}${ip ? `@${ip}` : ''} a ele.`);
+  // O dashmon é criado com um grupo próprio, de mesmo nome.
+  const allowG = opts.get('allowgroups') || [];
+  if (allowG.length && !listMatches(allowG, u, ip)) avisos.push(`O AllowGroups do sshd não inclui o grupo ${u}: acrescente ${u} a ele.`);
+  if (listMatches(opts.get('denyusers') || [], u, ip)) avisos.push(`O DenyUsers do sshd bloqueia o ${u}.`);
+  if (listMatches(opts.get('denygroups') || [], u, ip)) avisos.push(`O DenyGroups do sshd bloqueia o grupo ${u}.`);
+  if (one('pubkeyauthentication') === 'no') avisos.push(`O sshd está com PubkeyAuthentication no, e o ${u} entra só por chave.`);
+  const methods = opts.get('authenticationmethods') || [];
+  if (methods.length && !methods.includes('any') && !methods.some((l) => l.split(',').every((x) => x === 'publickey'))) {
+    avisos.push(`O AuthenticationMethods do sshd (${methods.join(' ')}) exige mais que a chave, e o ${u} entra só por chave: libere "publickey" para ele num "Match User ${u}".`);
+  }
+  // O painel oferece uma chave só (IdentitiesOnly), então 1 tentativa basta.
+  if (opts.has('maxauthtries') && !(Number(one('maxauthtries')) >= 1)) avisos.push('O MaxAuthTries do sshd não deixa nenhuma tentativa de entrada.');
+  const akf = opts.get('authorizedkeysfile') || [];
+  if (akf.length && !akf.some((f) => /^(?:(?:%h|~)\/)?\.ssh\/authorized_keys$/.test(f))) {
+    avisos.push(`O sshd procura as chaves em ${akf.join(' ')}, e o painel grava em ~${u}/.ssh/authorized_keys.`);
+  }
+  return { conferido: true, avisos };
+}
+
 /**
  * Plano de preparação a partir das escolhas do passo 4.
  * @param {object} p
@@ -61,8 +164,9 @@ const DROP_LEGACY_SUDOERS = `grep -qs ' ${KEY_COMMENT}$' ~${PANEL_USER}/.ssh/aut
  * @param {string[]} p.smartDevs discos com teste SMART liberado no sudoers
  * @param {string} [p.from] IP deste computador para a opção from= (vazio = qualquer origem)
  * @param {string} [p.smartctl] caminho do smartctl no servidor
+ * @param {string} [p.checkIp] IP deste computador visto pelo servidor, para conferir o sshd
  */
-export function preparationPlan({ adminUser, publicKey, computer, targets, smartDevs = [], from = '', smartctl = '/usr/sbin/smartctl' }) {
+export function preparationPlan({ adminUser, publicKey, computer, targets, smartDevs = [], from = '', smartctl = '/usr/sbin/smartctl', checkIp = '' }) {
   const { id, label, comment } = installNames({ publicKey, computer });
   const { line: keyLine, hash } = authorizedKeysLine({ publicKey, targets: { ...targets, smartDevs }, from, comment });
   const rule = sudoersLine({ devs: smartDevs, smartctl });
@@ -150,9 +254,13 @@ export function preparationPlan({ adminUser, publicKey, computer, targets, smart
 
   // Script que roda como root no modo assistido: marca cada passo concluído (@@ok <id>)
   // para a tela mostrar o progresso e onde parou se algo falhar.
+  // Antes de mudar qualquer coisa, a conferência só de leitura do sshd.
+  const sshdCheck = ['# conferência só de leitura: o sshd deixa o dashmon entrar? (nada é alterado)', ...sshdCheckLines(checkIp)].join('\n');
   const rootScript = [
     'set -e',
     'umask 077',
+    sshdCheck,
+    "echo '@@ok sshd'",
     ...steps.flatMap((st) => [`# ${st.comentario}`, render(st), `echo '@@ok ${st.id}'`]),
     '',
   ].join('\n');
@@ -161,6 +269,7 @@ export function preparationPlan({ adminUser, publicKey, computer, targets, smart
   const isRoot = adminUser === 'root';
   const actions = [
     { id: 'sudo', titulo: isRoot ? 'Entrar como administrador' : 'Confirmar que você pode usar sudo', detalhe: isRoot ? `você entra como root: nada de sudo` : `pede a senha de ${adminUser} uma vez` },
+    { id: 'sshd', titulo: 'Conferir o SSH do servidor', detalhe: `só leitura: o sshd vai deixar o ${u} entrar? Nada muda no sshd_config` },
     ...steps.map(({ id, titulo, detalhe }) => ({ id, titulo, detalhe })),
     { id: 'teste', titulo: 'Testar uma coleta de verdade', detalhe: `com o usuário ${u}, do jeito que vai funcionar todo minuto` },
   ];
@@ -177,7 +286,7 @@ export function preparationPlan({ adminUser, publicKey, computer, targets, smart
   return {
     actions,
     rootScript,
-    displayed: `${header}\n${steps.map((st) => `# ${st.comentario}\n${render(st)}`).join('\n')}`,
+    displayed: `${header}\n${sshdCheck}\n${steps.map((st) => `# ${st.comentario}\n${render(st)}`).join('\n')}`,
     manualBlocks,
     keyLine,
     sudoersLine: rule,
@@ -189,7 +298,8 @@ export function preparationPlan({ adminUser, publicKey, computer, targets, smart
 
 /**
  * Script para `/bin/sh -s` no servidor que executa o rootScript como root.
- * @param {'root'|'nopasswd'|'senha'} sudo como o administrador vira root (detecção)
+ * @param {'root'|'nopasswd'|'senha'} sudo como o administrador vira root (detecção; o
+ *   `pede-senha` da detecção chega aqui como `senha`, já com a senha do sudo)
  */
 export function assistedScript(rootScript, { sudo, password = '' }) {
   // O marcador do heredoc não pode aparecer dentro do script (fecharia o heredoc antes).
@@ -204,7 +314,8 @@ export function assistedScript(rootScript, { sudo, password = '' }) {
   // o resto para o sh como script.
   return [
     `P=${shQuote(password)}`,
-    "printf '%s\\n' \"$P\" | sudo -S -k -p '' true 2>/dev/null || { P=; echo '@@erro senha'; exit 9; }",
+    // Defaults requiretty recusa qualquer senha sem terminal: a tela diz isso, não "senha errada".
+    "E=$(printf '%s\\n' \"$P\" | sudo -S -k -p '' true 2>&1 >/dev/null) || { P=; case \"$E\" in *'must have a tty'*) echo '@@erro tty';; *) echo '@@erro senha';; esac; exit 9; }",
     `{ printf '%s\\n' "$P"; P=; ${doc}`,
     "} | sudo -S -k -p '' /bin/sh -s",
     '',

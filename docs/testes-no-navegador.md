@@ -24,6 +24,13 @@ pessoa vê: números iguais entre as telas, legendas, estados e textos.
 
    Cada um usa dados semeados numa pasta temporária, sem token e sem SSH (a coleta usa a
    fixture anonimizada). Ctrl+C encerra e apaga os dados.
+
+   Mudou a tela do assistente de instalação? Suba também o assistente de teste, com servidor,
+   ssh e systemd falsos (código `ACD-347`):
+
+   ```bash
+   npm run painel-teste -- --assistente --porta=3947
+   ```
 2. Abra cada endereço numa aba nova. Feche as abas no fim.
 3. O painel real (`http://127.0.0.1:3000`) só entra para conferir uma versão instalada, e só
    para leitura: nada de digitar o token, reconhecer alertas ou criar anotações.
@@ -57,6 +64,15 @@ Por cenário:
 - **`vazio`:** nenhuma tela quebra; aparecem os textos de "sem dados" e de 1º uso.
 - **Ao vivo (`normal`):** em até 1 min chega uma amostra nova pelo tempo real (SSE), sem
   recarregar a página.
+
+No assistente (`--assistente`), nos 2 temas e a 390 px de largura:
+
+- **Senha:** endereço `192.0.2.10`, usuário `maria`, senha `certa`; os 6 passos até
+  "Abrir o painel", no modo assistido e no modo à mão.
+- **Chave SSH:** apelido `com-salto` mostra o erro do ProxyJump; `meu-servidor` mostra
+  endereço, porta, usuário, chave e agente. No passo 3 não há campo de senha; o 1º
+  Conectar mostra o `ssh-add -t 15m …` e "Tentar de novo"; o 2º conecta. No passo 5 aparece
+  o campo "Senha de maria para o sudo" (`certa`), com a nota de que não é a passphrase.
 
 ## Como registrar
 

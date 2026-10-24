@@ -89,20 +89,31 @@ o fim do assistente.
 ### Os 6 passos
 
 1. **Boas-vindas** — o que será feito e o que nunca é feito. Clique em **Começar**.
-2. **Servidor** — o endereço (ex.: `192.0.2.10`; no servidor, `hostname -I` mostra) e o
-   seu usuário dele. O assistente confere se o servidor responde.
+2. **Servidor** — escolha como você entra no servidor. Com **Senha** (o comum), informe o
+   endereço (ex.: `192.0.2.10`; no servidor, `hostname -I` mostra) e o seu usuário dele.
+   Com **Chave SSH** (servidor que só aceita chave), informe o apelido que você usa no
+   terminal (o de `ssh meu-servidor`) e clique em **Ler o apelido**: confira o endereço, a
+   porta, o usuário e a chave. O assistente confere se o servidor responde.
 3. **Conectar** — aparece a **identidade do servidor** em blocos de letras. Se quiser
    conferir, rode no servidor `ssh-keygen -lf /etc/ssh/ssh_host_ed25519_key.pub`: as letras
    devem ser iguais. Marque "Este é o meu servidor", digite a senha e clique em
-   **Conectar** (1 conexão só de leitura; nada muda no servidor ainda). Já tem chave SSH
-   para o servidor? Deixe a senha em branco.
+   **Conectar** (1 conexão só de leitura; nada muda no servidor ainda). Escolheu **Chave
+   SSH**? Não há senha aqui: a chave precisa estar no seu ssh-agent. Se ela faltar, o
+   assistente mostra o comando (ex.: `ssh-add -t 15m ~/.ssh/minha_chave`); rode no seu
+   terminal, digite a passphrase lá e clique em **Tentar de novo**. O painel nunca pede a
+   passphrase. Apelido com `ProxyJump` não serve: o painel conecta direto ao servidor.
 4. **O que monitorar** — discos, pastas, rede e serviços que o assistente encontrou, já
    marcados como recomendado, e os limites de aviso. O resumo ao lado mostra o custo
    estimado no servidor (cerca de 1 segundo por coleta, num servidor de 1 núcleo).
 5. **Preparar o servidor** — confira os comandos exatos e clique em **Confirmar e
    preparar** (*assistido*), ou escolha **Prefiro fazer à mão** e cole os blocos no
    servidor, clicando em **Testar** depois de cada um. Isso cria o usuário `dashmon`, sem
-   senha, com uma chave que só roda a coleta, e libera o teste de saúde dos discos.
+   senha, com uma chave que só roda a coleta, e libera o teste de saúde dos discos. Se o
+   `sudo` pedir senha e você entrou por chave, digite a senha da sua conta no servidor (não a
+   passphrase). Antes de mudar algo, o assistente confere (só lendo) se o SSH do servidor
+   vai aceitar o `dashmon` e avisa o que ajustar, como o `AllowUsers`; ele nunca muda o
+   `sshd_config`. Se o servidor tem `Defaults requiretty` no sudo, use **Prefiro fazer à
+   mão**.
 6. **Pronto** — a primeira leitura real do servidor. Escolha "iniciar com o computador",
    o atalho no menu e os avisos do navegador, e clique em **Abrir o painel**: o assistente
    se desliga e o painel abre já logado.

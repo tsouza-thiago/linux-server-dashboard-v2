@@ -134,3 +134,29 @@ test('assistente: erro inesperado vira mensagem genérica (sem detalhes internos
   assert.ok(!r.text.includes('segredo'));
   assert.ok(s.logs.some((l) => l.includes('segredo')), 'o detalhe vai só para o terminal');
 });
+
+test('assistente modo chave (#61): apelido conferido, ssh-add quando falta, sem passphrase na rede', async (t) => {
+  const s = await start(t);
+  await s.login();
+  const salto = await s.post('apelido', { apelido: 'com-salto' });
+  assert.equal(salto.status, 400);
+  assert.equal(salto.json.field, 'apelido');
+  const a = await s.post('apelido', { apelido: 'meu-servidor' });
+  assert.equal(a.status, 200);
+  assert.deepEqual([a.json.host, a.json.port, a.json.user, a.json.identityFile], ['192.0.2.10', 2222, 'maria', '/home/maria/.ssh/chave_admin']);
+  assert.equal(a.json.resolvido, undefined, 'só o que a tela mostra');
+  const srv = await s.post('servidor', { modo: 'chave', apelido: 'meu-servidor' });
+  assert.equal(srv.status, 200);
+  assert.equal(srv.json.modo, 'chave');
+  assert.equal((await s.get('estado')).json.acesso.modo, 'chave');
+  await s.post('identidade', {});
+  s.srv.agentHasKey = false;
+  const falta = await s.post('agente', {});
+  assert.equal(falta.status, 422);
+  assert.deepEqual([falta.json.field, falta.json.detalhes.comando], ['agente', 'ssh-add -t 15m ~/.ssh/chave_admin']);
+  assert.equal((await s.post('conectar', { confirmo: true })).json.field, 'agente');
+  s.srv.agentHasKey = true;
+  const ok = await s.post('conectar', { confirmo: true });
+  assert.equal(ok.status, 200, ok.text);
+  assert.equal(ok.json.acesso, 'chave');
+});

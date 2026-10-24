@@ -340,7 +340,8 @@ test('desinstalar: limpa só a parte desta instalação no servidor e remove os 
   const id = installId('ssh-ed25519 AAAA');
   fs.writeFileSync(path.join(root, 'data', 'ssh', 'config'), `Host servidor\n  HostName 192.0.2.10\n  Port 22\n  IdentityFile "${key}"\n`, { mode: 0o600 });
   fs.mkdirSync(path.join(root, 'data', 'history'));
-  const answers = ['s', 's', 'maria', 'certa', 'n'];
+  // confirma, limpa o servidor, sem apelido (usuário e senha), usuário, senha, mantém o histórico
+  const answers = ['s', 's', '', 'maria', 'certa', 'n'];
   const admin = [];
   const o = memOut();
   const code = await desinstalar({
@@ -374,6 +375,33 @@ test('desinstalar: limpa só a parte desta instalação no servidor e remove os 
   const all = memOut();
   assert.equal(await desinstalar({ out: all.out, root, home, args: ['--sim', '--apagar-historico'], deps: { interactive: false, stopPanel: async () => ({}), removeService: () => false } }), 0);
   assert.equal(fs.existsSync(path.join(root, 'data')), false);
+
+  // Servidor que só aceita chave (#61): o apelido dá o usuário e a chave; a senha é só a do sudo.
+  const chave = installedRoot(t);
+  fs.writeFileSync(`${chave.key}.pub`, 'ssh-ed25519 AAAA server-dashboard');
+  fs.writeFileSync(path.join(chave.root, 'data', 'ssh', 'config'), `Host servidor\n  HostName 192.0.2.10\n  Port 22\n  IdentityFile "${chave.key}"\n`, { mode: 0o600 });
+  const kc = [];
+  const agente = { ok: false, motivo: 'falta', comando: 'ssh-add -t 15m ~/.ssh/chave_admin' };
+  const kdeps = {
+    interactive: false, ask: async () => 'certa', stopPanel: async () => ({}), removeService: () => false,
+    resolveAlias: async (alias) => ({ ok: true, alias, host: '192.0.2.10', port: 22, user: 'maria', identityFile: '/home/maria/.ssh/chave_admin', identityAgent: '/tmp/agente.sock' }),
+    checkAgentKey: async () => agente,
+    runAdmin: async (o2) => { kc.push(o2); return { code: 0, stdout: '@@restam 0\n@@ok removido\n', stderr: '' }; },
+  };
+  const kArgs = ['--sim', '--limpar-servidor', '--chave-ssh', 'meu-servidor', '--senha-stdin'];
+  const k1 = memOut();
+  assert.equal(await desinstalar({ out: k1.out, root: chave.root, home: chave.home, args: kArgs, deps: kdeps }), 0);
+  assert.equal(kc.length, 0, 'sem a chave no agente, nenhuma conexão');
+  assert.match(k1.text(), /rode no seu terminal: ssh-add -t 15m ~\/\.ssh\/chave_admin/);
+  const chave2 = installedRoot(t);
+  fs.writeFileSync(`${chave2.key}.pub`, 'ssh-ed25519 AAAA server-dashboard');
+  fs.writeFileSync(path.join(chave2.root, 'data', 'ssh', 'config'), `Host servidor\n  HostName 192.0.2.10\n  Port 22\n  IdentityFile "${chave2.key}"\n`, { mode: 0o600 });
+  Object.assign(agente, { ok: true, via: 'agente' });
+  const k2 = memOut();
+  assert.equal(await desinstalar({ out: k2.out, root: chave2.root, home: chave2.home, args: kArgs, deps: kdeps }), 0);
+  assert.deepEqual([kc[0].user, kc[0].password, kc[0].identityFile, kc[0].identityAgent], ['maria', '', '/home/maria/.ssh/chave_admin', '/tmp/agente.sock']);
+  assert.match(kc[0].script, /^P='certa'$/m, 'a senha lida é a do sudo, pelo stdin do sudo');
+  assert.match(k2.text(), /✓ servidor limpo \(usuário dashmon e regra de sudo removidos\)/);
 
   // Sem o .pub não dá para saber qual linha é deste computador: o servidor fica como está.
   const semPub = installedRoot(t);
