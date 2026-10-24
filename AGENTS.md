@@ -209,7 +209,7 @@ O teste `test/unit/docs.test.js` confere esta documentação contra o código.
 
    ```bash
    git fetch origin && git checkout --detach origin/main
-   git -c gpg.format=ssh -c user.signingkey=~/.ssh/id_ed25519.pub tag -s vX.Y.Z -m "vX.Y.Z"
+   git -c gpg.format=ssh -c user.signingkey=~/.ssh/thiago-assinatura-releases-linux-server-dashboard-v2_ed25519.pub tag -s vX.Y.Z -m "vX.Y.Z"
    git -c gpg.format=ssh -c gpg.ssh.allowedSignersFile=docs/allowed_signers verify-tag vX.Y.Z
    git push origin vX.Y.Z
    ```
@@ -220,7 +220,9 @@ O teste `test/unit/docs.test.js` confere esta documentação contra o código.
 
 Trocar a chave exige um commit em `docs/allowed_signers` **antes** da tag nova: quem já tem
 o painel instalado só aceita a versão nova se a chave dela estiver na lista da versão
-instalada.
+instalada. Sem a chave antiga (troca da 2.1.1, #64), quem está numa versão anterior precisa
+de um passo manual uma vez, descrito nas notas da versão: conferir a impressão digital da
+chave nova no `verify-tag` e fazer o checkout da tag.
 
 ## Arquitetura
 

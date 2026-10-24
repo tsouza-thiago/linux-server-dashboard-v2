@@ -17,6 +17,33 @@ computador e rode `./dashboard reconfigurar` em cada um, para trocar a linha e a
 antigas pelas da instalação. Até lá, as antigas continuam valendo. O assistente ainda não
 entra em servidor que só aceita chave SSH; isso vem na 2.2.0 (#61).
 
+**Chave de assinatura nova** (#64): a 2.1.1 é assinada por uma chave nova
+(`SHA256:+lhwOq4NRayHFtM7CY5IXXAeN+6wnijpjd7UWHhL2SU`). Quem está na 2.1.0 ou anterior não vê
+a 2.1.1 no `./dashboard atualizar`, porque a lista de chaves da versão instalada só tem a
+antiga. Faça uma vez, na pasta do painel:
+
+```bash
+git fetch --tags origin
+git -c gpg.format=ssh -c gpg.ssh.allowedSignersFile=/dev/null verify-tag v2.1.1
+```
+
+Confira se a linha `Good "git" signature … ED25519 key SHA256:…` mostra exatamente a
+impressão digital acima (o aviso "No principal matched" é esperado). Se bater:
+
+```bash
+git -c advice.detachedHead=false checkout --detach v2.1.1
+./dashboard parar && ./dashboard iniciar
+```
+
+Se não bater, pare e abra um reporte privado de segurança. Depois disso, o
+`./dashboard atualizar` volta a funcionar sozinho.
+
+### Segurança
+
+- **Chave de assinatura das versões trocada** (#64): a chave antiga foi apagada pelo
+  mantenedor (não vazou). O `docs/allowed_signers` passa a ter as 2 chaves; a antiga fica só
+  para conferir as tags até a 2.1.0.
+
 ### Corrigido
 
 - **Vários computadores no mesmo servidor** (#60, ADR 0020): instalar o painel em outro
