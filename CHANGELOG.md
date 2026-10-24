@@ -9,6 +9,14 @@ diante: `PATCH` corrige, `MINOR` acrescenta sem quebrar e `MAJOR` quebra.
 
 ## [Não publicado]
 
+## [2.1.1] — 2026-10-24
+
+Correção para quem monitora o mesmo servidor de mais de um computador. Nada muda na
+configuração nem no formato de `data/`: atualize com `./dashboard atualizar` em cada
+computador e rode `./dashboard reconfigurar` em cada um, para trocar a linha e a regra
+antigas pelas da instalação. Até lá, as antigas continuam valendo. O assistente ainda não
+entra em servidor que só aceita chave SSH; isso vem na 2.2.0 (#61).
+
 ### Corrigido
 
 - **Vários computadores no mesmo servidor** (#60, ADR 0020): instalar o painel em outro
@@ -892,7 +900,8 @@ Documentados no plano da V2 (seção 2.2, B1–B12), entre eles: alerta SMART fa
 rede zerada com contadores grandes, alerta duplicado a cada coleta e reescrita completa do
 histórico a cada minuto.
 
-[Não publicado]: https://github.com/tsouza-thiago/linux-server-dashboard-v2/compare/v2.1.0...HEAD
+[Não publicado]: https://github.com/tsouza-thiago/linux-server-dashboard-v2/compare/v2.1.1...HEAD
+[2.1.1]: https://github.com/tsouza-thiago/linux-server-dashboard-v2/compare/v2.1.0...v2.1.1
 [2.1.0]: https://github.com/tsouza-thiago/linux-server-dashboard-v2/compare/v2.1.0-rc.3...v2.1.0
 [2.1.0-rc.3]: https://github.com/tsouza-thiago/linux-server-dashboard-v2/compare/v2.1.0-rc.2...v2.1.0-rc.3
 [2.1.0-rc.2]: https://github.com/tsouza-thiago/linux-server-dashboard-v2/compare/v2.1.0-rc.1...v2.1.0-rc.2
