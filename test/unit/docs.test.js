@@ -257,13 +257,15 @@ test('docs: versões citadas são as do pacote', () => {
 test('docs: nome do serviço systemd e arquivo do sudoers são os do código', () => {
   const unit = UNIT_NAME.replace(/\.service$/, '');
   const units = new Set([unit, V1_UNIT.replace(/\.service$/, '')]);
-  const sudoers = read('server/setup/preparo.js').match(/const SUDOERS = '([^']+)'/)[1];
+  // A regra única das versões até a 2.1.0 e o arquivo por instalação (ADR 0020).
+  const legado = read('server/setup/preparo.js').match(/const SUDOERS = '([^']+)'/)[1];
+  const sudoers = new Set([legado, `${legado}-<computador>-<id>`]);
   for (const file of [...MAIN_DOCS, 'public/js/views/ajuda.js']) {
     const text = read(file);
     for (const [, name] of text.matchAll(/(?:systemctl --user [a-z-]+(?: --now)?|journalctl --user -u) ([a-z][a-z0-9-]*)/g)) {
       assert.ok(units.has(name), `${file}: serviço ${name}`);
     }
-    for (const [p] of text.matchAll(/\/etc\/sudoers\.d\/[a-z0-9_-]+/g)) assert.equal(p, sudoers, `${file}: ${p}`);
+    for (const [p] of text.matchAll(/\/etc\/sudoers\.d\/[a-z0-9_-]+(?:<computador>-<id>)?/g)) assert.ok(sudoers.has(p), `${file}: ${p}`);
   }
 });
 

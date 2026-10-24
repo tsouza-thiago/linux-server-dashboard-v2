@@ -108,7 +108,7 @@ test('assistente: os 6 passos pela rede até o link de entrada do painel', async
   assert.deepEqual(ch.json.limiares, { diskPct: 85, ramPct: 90, tempC: 60 });
   const plan = await s.post('plano', { from: true });
   assert.equal(plan.json.from, true);
-  assert.equal(plan.json.chave, '~/.ssh/dashboard_ed25519');
+  assert.match(plan.json.chave, /^~\/\.ssh\/dashboard-[a-z0-9-]+-[0-9a-f]{8}$/);
   assert.match(plan.json.linhaChave, /^restrict,from="192\.0\.2\.50",command="/);
   assert.equal(plan.json.temSmart, true);
   assert.equal((await s.post('concluir', {})).status, 400, 'não conclui antes de preparar');

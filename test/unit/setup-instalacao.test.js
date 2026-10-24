@@ -90,7 +90,7 @@ test('passo 5 assistido → 6: prepara, testa a coleta, grava tudo e descarta a 
   assert.equal(plano.podeAssistido, true);
   assert.equal(plano.from, true);
   assert.match(plano.comandos, /restrict,from="192\.0\.2\.50"/);
-  assert.ok(fs.existsSync(path.join(home, '.ssh', 'dashboard_ed25519')), 'chave criada');
+  assert.ok(fs.readdirSync(path.join(home, '.ssh')).some((f) => /^dashboard-[a-z0-9-]+-[0-9a-f]{8}$/.test(f)), 'chave criada');
   assert.throws(() => inst.tokenReserva(), /Termine a preparação/);
   const r = await inst.prepararAssistido();
   assert.equal(r.ok, true, r.erro);

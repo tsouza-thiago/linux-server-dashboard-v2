@@ -15,6 +15,8 @@ import { buildForcedScript } from '../../server/collector/builder.js';
 import { collect, runSSH } from '../../server/collector/index.js';
 import { sshAccess, sshConfigFile, ROOT } from '../../server/config.js';
 import { startSshd, keygen } from '../../test-support/sshd.js';
+import { simulatedServer } from '../../test-support/servidor-simulado.js';
+import { preparationPlan } from '../../server/setup/preparo.js';
 
 const PUB = `ssh-ed25519 ${'A'.repeat(68)}`;
 const FULL = { netIf: 'lo', mounts: ['/', '/tmp'], devs: ['sda', 'nvme0n1'], services: ['ssh', 'cron'] };
@@ -156,4 +158,32 @@ test('sshd de verdade: chave restrita só roda a coleta, from= e identidade do s
   const spoofed = await collect({ host: SSH_ALIAS, targets, runner, access: 'restrito' });
   assert.equal(spoofed.ok, false, 'identidade do servidor diferente: não conecta');
   assert.match(spoofed.error, /identidade do servidor/);
+});
+
+test('sshd de verdade: dois computadores no mesmo dashmon coletam, cada um com a sua linha (#60)', async (t) => {
+  const sshd = await startSshd();
+  if (!sshd) return t.skip('OpenSSH (ssh/sshd) não disponível');
+  const srv = simulatedServer();
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'dash-dois-'));
+  t.after(() => { sshd.stop(); srv.stop(); fs.rmSync(dir, { recursive: true, force: true }); });
+  const knownHosts = path.join(dir, 'known_hosts');
+  fs.writeFileSync(knownHosts, `${sshd.knownHostsLine}\n`);
+  const targets = { mounts: ['/'], devs: [], services: [], netIf: 'lo' };
+  // O preparo de cada computador roda no servidor simulado; o arquivo que sobra vai para o sshd.
+  const computers = ['note-a', 'note-b'].map((name) => {
+    const keyFile = path.join(dir, name);
+    const publicKey = keygen(keyFile).split(' ').slice(0, 2).join(' ');
+    const configFile = path.join(dir, `${name}.config`);
+    fs.writeFileSync(configFile, sshConfigText({ host: '127.0.0.1', port: sshd.port, user: sshd.user, keyFile, knownHosts }));
+    const r = srv.run(preparationPlan({ adminUser: 'maria', publicKey, computer: name, targets, from: '127.0.0.1' }).rootScript);
+    assert.equal(r.status, 0, r.stderr);
+    return { name, runner: (h, c) => runSSH(h, c, 15000, { configFile }) };
+  });
+  assert.equal(srv.keys().length, 2, 'o segundo preparo não apagou o primeiro');
+  sshd.setAuthorizedKeys(srv.keys().join('\n'));
+  for (const c of computers) {
+    const r = await collect({ host: SSH_ALIAS, targets, runner: c.runner, access: 'restrito' });
+    assert.equal(r.ok, true, `${c.name}: ${r.error} ${sshd.log()}`);
+    assert.equal(r.sample.collector.hashMismatch, false, `${c.name}: a linha dele está em dia`);
+  }
 });

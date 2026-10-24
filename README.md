@@ -106,7 +106,7 @@ Na pasta do projeto:
 | `./dashboard diagnosticar` | Testa tudo e explica cada problema |
 | `./dashboard reconfigurar` | Reabre o assistente (outro servidor, disco novo, outro serviço) |
 | `./dashboard atualizar` | Instala a versão assinada mais nova, com backup; volta atrás se falhar |
-| `./dashboard desinstalar` | Remove o painel deste computador e oferece limpar o servidor |
+| `./dashboard desinstalar` | Remove o painel deste computador e oferece limpar a parte dele no servidor |
 | `./dashboard versao` | Mostra a versão |
 
 Depois de instalado, o painel inicia com o computador (serviço systemd **de usuário**) e

@@ -50,8 +50,8 @@ Inclua: o passo a passo para reproduzir, o impacto estimado e a versão afetada
   `test/unit/collector-builder.test.js` e `test/unit/setup-nucleo.test.js`.
 
 ### 2. Chave do painel vazada (ADR 0008)
-- **Ameaça:** alguém copia a chave do painel (`~/.ssh/dashboard_ed25519`) e tenta usar o
-  servidor.
+- **Ameaça:** alguém copia a chave do painel (`~/.ssh/dashboard-<servidor>-<id>`) e tenta
+  usar o servidor.
 - **Mitigação:** a chave pertence ao usuário `dashmon` (sem senha e sem poderes). A linha
   dela no `authorized_keys` é `restrict,from="<IP deste computador>",command="<coleta>"`:
   sem terminal, sem encaminhamentos e só a coleta. Por padrão, só a partir desta máquina
@@ -62,12 +62,28 @@ Inclua: o passo a passo para reproduzir, o impacto estimado e a versão afetada
 
 ### 3. Escalada pelo sudo do SMART
 - **Ameaça:** usar a regra de `sudo` do `dashmon` para rodar outra coisa como root.
-- **Mitigação:** o sudoers (`/etc/sudoers.d/dashboard`) libera só `smartctl -H /dev/X`,
+- **Mitigação:** o sudoers (`/etc/sudoers.d/dashboard-<computador>-<id>`, um arquivo por
+  instalação, ADR 0020) libera só `smartctl -H /dev/X`,
   uma entrada por disco escolhido, com o caminho absoluto do `smartctl`. Nunca há curinga:
   no sudoers, `*` também casaria espaços e outras opções. A regra passa por `visudo -cf`
-  antes de entrar em uso. A coleta usa `sudo -n` (nunca pede senha).
-- **Verificado por:** `test/unit/setup-nucleo.test.js` e
+  antes de entrar em uso. A coleta usa `sudo -n` (nunca pede senha). O nome do computador
+  entra no nome do arquivo só depois de `machineLabel()` (`[a-z0-9-]`, sem ponto, que o
+  `#includedir` ignoraria), e o nome inteiro é conferido de novo antes de virar comando.
+- **Verificado por:** `test/unit/setup-nucleo.test.js`,
+  `test/unit/preparo-varios-computadores.test.js` e
   `test/integration/ssh-restrito.test.js`.
+
+### 3a. Um computador derruba o acesso do outro (ADR 0020)
+- **Ameaça:** com vários computadores no mesmo servidor, a instalação, a reconfiguração ou a
+  desinstalação de um apaga a linha do `authorized_keys`, a regra de sudo ou o usuário
+  `dashmon` de que os outros dependem (#60).
+- **Mitigação:** cada instalação tem um ID tirado da sua chave pública e só troca a linha e
+  o sudoers desse ID; a linha sai pela mesma chave ou pelo mesmo ID no fim do comentário,
+  nunca por um trecho no meio. O `dashmon` só sai quando não sobra nenhuma linha. Sem o
+  `.pub` da chave, o `desinstalar` não mexe no servidor.
+- **Verificado por:** `test/unit/preparo-varios-computadores.test.js` (os scripts rodam de
+  verdade num servidor simulado), `test/integration/ssh-restrito.test.js` (dois computadores
+  coletam do mesmo sshd) e `test/integration/cli-manutencao.test.js`.
 
 ### 4. Identidade do servidor falsa (ataque no meio do SSH)
 - **Ameaça:** outro aparelho se passa pelo servidor e recebe a senha do administrador ou
@@ -339,11 +355,14 @@ Análises publicadas:
 
 ## Trocar a chave do painel (se ela vazou)
 
-1. Apague a chave local: `~/.ssh/dashboard_ed25519` e o `.pub` (ou a
-   `dashboard_v2_ed25519`, se for ela que aparece em `data/ssh/config`).
-2. Rode `./dashboard reconfigurar`. Ele cria uma chave nova, e o passo "Preparar o
-   servidor" troca a linha do `authorized_keys` do `dashmon`. A chave antiga deixa de valer.
-3. Rode `./dashboard diagnosticar`. O resultado deve ser "nenhum aviso, nenhum erro".
+1. Veja qual é a chave no `IdentityFile` de `data/ssh/config` (ex.:
+   `~/.ssh/dashboard-<servidor>-<id>`) e anote o ID (os 8 últimos caracteres do nome).
+2. No servidor, apague a linha que termina com `:<id>` no `authorized_keys` do `dashmon`
+   e o arquivo `/etc/sudoers.d/dashboard-<computador>-<id>`. A chave antiga deixa de valer.
+   As linhas dos outros computadores ficam.
+3. Apague a chave local e o `.pub` e rode `./dashboard reconfigurar`. Ele cria uma chave
+   nova, com outro ID, e o passo "Preparar o servidor" grava a linha dela.
+4. Rode `./dashboard diagnosticar`. O resultado deve ser "nenhum aviso, nenhum erro".
 
 Instalações vindas da V1 usam a chave da V1, com acesso completo ao servidor, até o
 primeiro `./dashboard reconfigurar`. Depois dele, remova a linha antiga da V1 do

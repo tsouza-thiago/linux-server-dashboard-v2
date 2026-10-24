@@ -21,6 +21,7 @@ import {
 import { currentVersionStatus, describeVersion } from './assinatura.js';
 import { createLoginCode } from '../http/entrar.js';
 import { hasSystemdUser, panelPort, startPanel, unitPath } from '../cli/servico.js';
+import { keyFileFromConfig } from '../cli/diagnosticar.js';
 
 /** Nomes dos 6 passos, na ordem em que a tela os mostra. */
 export const STEPS = ['Boas-vindas', 'Servidor', 'Conectar', 'O que monitorar', 'Preparar servidor', 'Pronto'];
@@ -61,7 +62,7 @@ export class Instalacao {
     this.home = home;
     this.deps = {
       probePort, scanHostKeys, runAdmin, collect: collectV2, runSSH, ensureKey, installService, installShortcut,
-      startPanel, hasSystemdUser, versionStatus: () => currentVersionStatus(root), spawnSync,
+      startPanel, hasSystemdUser, versionStatus: () => currentVersionStatus(root), spawnSync, hostname: os.hostname,
       ...deps,
     };
     this.reset();
@@ -271,13 +272,20 @@ export class Instalacao {
   /** Plano com os comandos exatos (assistido) e os blocos (manual). */
   planoPreparo({ from = true } = {}) {
     if (!this.escolhas) fail('Escolha o que monitorar primeiro.');
-    if (!this.chave) this.chave = this.deps.ensureKey({ home: this.home });
     const d = this.deteccao;
+    // Reconfigurar o MESMO servidor continua com a chave desta pasta (mesmo ID, mesma linha
+    // lá); servidor novo ou instalação nova ganham chave própria (ADR 0020).
+    if (!this.chave) {
+      const atual = currentServer(this.root);
+      const mesmo = atual && atual.host === this.servidor.host && atual.port === Number(this.servidor.port);
+      this.chave = this.deps.ensureKey({ home: this.home, server: d.hostname || this.servidor.host, current: mesmo ? keyFileFromConfig(this.root) : '' });
+    }
     const ip = validIp(d.clientIp) ? d.clientIp : '';
     this.preparo.from = Boolean(from && ip);
     this.plano = preparationPlan({
       adminUser: d.user || this.servidor.user,
       publicKey: this.chave.publicKey,
+      computer: this.deps.hostname(),
       targets: this.#alvos(this.escolhas),
       smartDevs: this.escolhas.smart,
       from: this.preparo.from ? ip : '',

@@ -1,6 +1,7 @@
 // Manutenção pelo comando `dashboard`: diagnosticar, atualizar (tags assinadas de
 // verdade num repositório temporário, com volta atrás), upgrade V1→V2 e desinstalar.
 import test from 'node:test';
+import { installId } from '../../server/setup/acesso.js';
 import assert from 'node:assert/strict';
 import { spawn, spawnSync } from 'node:child_process';
 import fs from 'node:fs';
@@ -333,9 +334,10 @@ test('V1 → V2: para só o processo da V1 daquela pasta e o serviço dela', asy
 
 // ---------------- desinstalar ----------------
 
-test('desinstalar: limpa o servidor com os comandos de sempre e remove os arquivos locais', async (t) => {
+test('desinstalar: limpa só a parte desta instalação no servidor e remove os arquivos locais (#60)', async (t) => {
   const { root, home, key } = installedRoot(t);
   fs.writeFileSync(`${key}.pub`, 'ssh-ed25519 AAAA server-dashboard');
+  const id = installId('ssh-ed25519 AAAA');
   fs.writeFileSync(path.join(root, 'data', 'ssh', 'config'), `Host servidor\n  HostName 192.0.2.10\n  Port 22\n  IdentityFile "${key}"\n`, { mode: 0o600 });
   fs.mkdirSync(path.join(root, 'data', 'history'));
   const answers = ['s', 's', 'maria', 'certa', 'n'];
@@ -345,12 +347,17 @@ test('desinstalar: limpa o servidor com os comandos de sempre e remove os arquiv
     out: o.out, root, home,
     deps: {
       interactive: true, ask: async () => answers.shift(), stopPanel: async () => ({}), removeService: () => true,
-      runAdmin: async (opts) => { admin.push(opts); return { code: 0, stdout: '@@ok removido\n', stderr: '' }; },
+      runAdmin: async (opts) => { admin.push(opts); return { code: 0, stdout: '@@restam 1\n@@ok removido\n', stderr: '' }; },
     },
   });
   assert.equal(code, 0, o.text());
   assert.equal(admin[0].host, '192.0.2.10');
-  assert.match(admin[0].script, /userdel -r dashmon/);
+  assert.match(admin[0].script, /grep -vF ' AAAA ' authorized_keys/, 'tira a linha da chave deste painel');
+  assert.match(admin[0].script, new RegExp(`-name 'dashboard-\\*-${id}\\*' -delete`), 'e só o sudoers desta instalação');
+  assert.match(admin[0].script, /if \[ "\$R" = 0 \]; then userdel -r dashmon/, 'o dashmon só sai sem nenhuma linha');
+  assert.match(o.text(), new RegExp(`sudo find /etc/sudoers\\.d -maxdepth 1 -name 'dashboard-\\*-${id}\\*' -delete`), 'os comandos à mão também');
+  assert.doesNotMatch(o.text(), /sudo userdel -r dashmon;/, 'nunca manda apagar o dashmon direto');
+  assert.match(o.text(), /✓ servidor limpo \(linha e regra de sudo deste computador removidas; o usuário dashmon fica para a outra linha\)/);
   assert.match(admin[0].script, /sudo -S -k -p '' \/bin\/sh -s/);
   assert.match(o.text(), /✓ servidor limpo/);
   assert.match(o.text(), /✓ serviço de usuário removido/);
@@ -367,4 +374,16 @@ test('desinstalar: limpa o servidor com os comandos de sempre e remove os arquiv
   const all = memOut();
   assert.equal(await desinstalar({ out: all.out, root, home, args: ['--sim', '--apagar-historico'], deps: { interactive: false, stopPanel: async () => ({}), removeService: () => false } }), 0);
   assert.equal(fs.existsSync(path.join(root, 'data')), false);
+
+  // Sem o .pub não dá para saber qual linha é deste computador: o servidor fica como está.
+  const semPub = installedRoot(t);
+  fs.writeFileSync(path.join(semPub.root, 'data', 'ssh', 'config'), `Host servidor\n  HostName 192.0.2.10\n  IdentityFile "${semPub.key}"\n`, { mode: 0o600 });
+  const calls = [];
+  const sp = memOut();
+  assert.equal(await desinstalar({
+    out: sp.out, root: semPub.root, home: semPub.home, args: ['--sim', '--limpar-servidor', '--usuario', 'maria'],
+    deps: { interactive: false, stopPanel: async () => ({}), removeService: () => false, runAdmin: async (o2) => { calls.push(o2); return { code: 0, stdout: '' }; } },
+  }), 0);
+  assert.equal(calls.length, 0, 'nenhuma conexão com o servidor');
+  assert.match(sp.text(), /o servidor não foi alterado \(não achei a chave pública deste painel/);
 });

@@ -97,6 +97,7 @@ confere "A: 2 coletas pelo painel" espera_coletas e2e-cli-deb linux-server-dashb
 em e2e-cli-deb "cd linux-server-dashboard-v2 && ./dashboard diagnosticar" | tee "$OUT/A-diagnosticar.txt" || true
 confere "A: diagnóstico sem avisos nem erros" grep -q "nenhum aviso, nenhum erro" "$OUT/A-diagnosticar.txt"
 confere "A: dashmon no servidor só com a chave restrita" docker exec e2e-srv-deb sh -c 'grep -q "^restrict,from=\"127.0.0.1\",command=" /home/dashmon/.ssh/authorized_keys'
+confere "A: linha e sudoers com o computador e o ID da instalação (ADR 0020)" docker exec e2e-srv-deb sh -c 'grep -Eq " dashboard@[a-z0-9-]+:[0-9a-f]{8}\$" /home/dashmon/.ssh/authorized_keys && ls /etc/sudoers.d/dashboard-*-* >/dev/null'
 # O caminho da v2.0.0: da pré-versão para a estável assinada (a v2.0.1 sem assinatura é ignorada).
 cd "$GIT/release" && versao 2.0.0 && git commit -qam "e2e: 2.0.0" && assina v2.0.0 && git tag v2.0.1 && cd "$REPO"
 em e2e-cli-deb "cd linux-server-dashboard-v2 && ./dashboard atualizar && ./dashboard versao" | tee "$OUT/A-atualizar.txt"
@@ -108,7 +109,8 @@ em e2e-cli-deb "cd linux-server-dashboard-v2 && ./dashboard atualizar" | tee "$O
 confere "A: na estável, a rc assinada não é instalada sem --pre" grep -q "versão mais nova (v2.0.0)" "$OUT/A-atualizar-estavel.txt"
 em e2e-cli-deb "cd linux-server-dashboard-v2 && echo senha-de-teste | ./dashboard desinstalar --sim --limpar-servidor --usuario maria --senha-stdin" | tee "$OUT/A-desinstalar.txt"
 confere "A: servidor limpo pelo desinstalar" bash -c "! docker exec e2e-srv-deb id dashmon"
-confere "A: chave e configuração locais apagadas" bash -c "! docker exec e2e-cli-deb sh -c 'ls /home/ana/.ssh/dashboard_ed25519 /home/ana/linux-server-dashboard-v2/.env'"
+confere "A: sudoers da instalação apagado" bash -c "! docker exec e2e-srv-deb sh -c 'ls /etc/sudoers.d/dashboard-*'"
+confere "A: chave e configuração locais apagadas" bash -c "! docker exec e2e-cli-deb sh -c 'ls /home/ana/.ssh/dashboard-* /home/ana/linux-server-dashboard-v2/.env'"
 
 # ------------------------------------------------------------------ B · Ubuntu 24.04
 log "B · Ubuntu 24.04 limpo → servidor Ubuntu 24.04 (assistente no navegador)"

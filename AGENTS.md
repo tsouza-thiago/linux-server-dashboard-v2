@@ -102,6 +102,12 @@ O teste `test/unit/docs.test.js` confere esta documentação contra o código.
   `server/setup/acesso.js` (conferida contra o `opt_dequote` do OpenSSH). O painel envia só
   a palavra do modo (`basico` ou `smart`); qualquer outro texto vira `basico`. Sudoers com
   um `smartctl -H /dev/X` por disco, nunca curinga, validado com `visudo -cf`.
+- **Vários computadores** (ADR 0020): cada instalação tem um ID (8 hex do SHA-256 da chave
+  pública) e troca só a sua linha do `authorized_keys` (comentário
+  `dashboard@<computador>:<id>`) e o seu sudoers
+  (`/etc/sudoers.d/dashboard-<computador>-<id>`). O nome do computador passa por
+  `machineLabel()` (`[a-z0-9-]`, sem ponto) antes de virar nome de arquivo ou comando. O
+  `desinstalar` tira só a parte do próprio ID; o `dashmon` sai só sem nenhuma linha.
 - **Instalação** (`server/setup/`): toda entrada é validada em `acesso.js` antes de virar
   arquivo ou comando. A senha do administrador fica só em memória: o `ssh` a recebe pelo
   askpass (variável de ambiente só daquele processo), e o `sudo -S -k` pelo stdin. Ela
@@ -246,7 +252,7 @@ navegador. O backend só coleta, persiste e serve. O limite de 1 SSH por minuto 
 ./dashboard diagnosticar        # explica cada problema; reaproveita a última amostra e só coleta se ela estiver velha
 ./dashboard reconfigurar        # reabre o assistente
 ./dashboard atualizar           # tag assinada mais nova, backup de data/, volta atrás se falhar
-./dashboard desinstalar         # remove daqui e oferece limpar o servidor
+./dashboard desinstalar         # remove daqui e oferece limpar a parte deste computador no servidor
 ./dashboard versao              # versão instalada
 npm start                       # o painel em primeiro plano (node --max-semi-space-size=2 server/index.js)
 npm run poll                    # 1 coleta, sem o servidor web (node server/poller.js --once)
@@ -343,9 +349,14 @@ echo '===FIM==='
   `case` da 1ª linha; nunca é executada nem ecoada. Exemplo das linhas no servidor:
 
   ```
-  restrict,from="192.0.2.20",command="<script acima>" ssh-ed25519 AAAA… server-dashboard
+  restrict,from="192.0.2.20",command="<script acima>" ssh-ed25519 AAAA… dashboard@notebook-a:3f9a12c4
   dashmon ALL=(root) NOPASSWD: /usr/sbin/smartctl -H /dev/sda, /usr/sbin/smartctl -H /dev/sdb
   ```
+
+  A 1ª linha vai para o `authorized_keys` do `dashmon`, ao lado das linhas dos outros
+  computadores (ADR 0020). A 2ª vai para `/etc/sudoers.d/dashboard-<computador>-<id>`. A
+  regra única das versões até a 2.1.0 (`/etc/sudoers.d/dashboard`) sai quando nenhuma linha
+  sem ID sobrar.
 
 - SMART: root roda `smartctl -H` direto; outro usuário usa `sudo -n` (nunca pede senha).
   Estados: `PASSED`, `FAILED`, `SEM_PERMISSAO`, `SEM_SMARTCTL`, `DESCONHECIDO`.
@@ -427,8 +438,8 @@ Tudo fica no disco local. Nada é gravado no servidor.
 | `.runtime/node/` | Node 24 baixado pelo `./dashboard`, se o do sistema faltar |
 | `.backups/` | Cópias de `data/` feitas pelo `atualizar` (as 3 mais novas, 0700) |
 
-Fora da pasta do projeto: a chave `~/.ssh/dashboard_ed25519` (ou `dashboard_v2_ed25519`,
-se a outra já existir com outro uso), o serviço
+Fora da pasta do projeto: a chave `~/.ssh/dashboard-<servidor>-<id>` (as instalações até a
+2.1.0 continuam com a `dashboard_ed25519` ou a `dashboard_v2_ed25519`), o serviço
 `~/.config/systemd/user/server-dashboard.service` e o atalho
 `~/.local/share/applications/server-dashboard.desktop`.
 

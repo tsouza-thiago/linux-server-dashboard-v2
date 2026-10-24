@@ -55,6 +55,8 @@ const MUTACOES = [
   { nome: 'template html sem escape', arquivo: 'public/js/core/html.js', de: '  return escape(value);\n}\n\nexport function html', para: '  return String(value);\n}\n\nexport function html' },
   { nome: 'SSH aceitando identidade nova do servidor', arquivo: 'server/setup/remoto.js', de: "'StrictHostKeyChecking=yes'", para: "'StrictHostKeyChecking=accept-new'" },
   { nome: 'script de coleta com texto a mais (authorized_keys quebrado)', arquivo: 'server/collector/builder.js', de: `"echo '===FIM==='",`, para: `"echo '===FIM==='; true",` },
+  { nome: 'authorized_keys regravado inteiro (apaga os outros computadores)', arquivo: 'server/setup/preparo.js', de: "        ...keepOthers(publicKey, id),\n", para: "        'rm -f authorized_keys.novo',\n", testes: ['test/unit/preparo-varios-computadores.test.js'] },
+  { nome: 'nome do computador sem saneamento (injeção no sudoers)', arquivo: 'server/setup/acesso.js', de: ".toLowerCase().replace(/[^a-z0-9]+/g, '-')", para: '.toLowerCase()', testes: ['test/unit/preparo-varios-computadores.test.js'] },
   { nome: 'exec com shell importado', arquivo: 'server/cli/servico.js', de: "import { spawn, spawnSync } from 'node:child_process';", para: "import { exec, spawn, spawnSync } from 'node:child_process';" },
 ];
 

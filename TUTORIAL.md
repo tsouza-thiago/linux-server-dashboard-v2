@@ -144,8 +144,13 @@ coleta) e explica cada problema com "O que aconteceu" e "Como resolver".
 ```bash
 ./dashboard atualizar      # versão assinada mais nova; faz backup e volta atrás se falhar
 ./dashboard reconfigurar   # trocar servidor, discos, pastas ou serviços (reabre o assistente)
-./dashboard desinstalar    # remove daqui e oferece limpar o servidor
+./dashboard desinstalar    # remove daqui e oferece limpar a parte deste computador no servidor
 ```
+
+**Mais de um computador com o painel?** Pode. Cada computador tem a sua chave e a sua
+linha no servidor, e uma instalação não apaga a outra. Cada painel faz a sua coleta: com 2
+computadores, o servidor recebe 2 conexões por minuto. O `desinstalar` tira só a parte do
+computador onde ele roda.
 
 **Vindo da V1?** Clone a V2 numa pasta nova e rode
 `./dashboard instalar --importar-v1 ~/linux-server-dashboard`: a V1 é parada, as
@@ -277,6 +282,13 @@ Comece sempre por `./dashboard diagnosticar`: ele aponta o problema e diz como r
 - A regra do `sudo` ou a linha da chave no servidor não batem com a configuração (por
   exemplo, depois de mudar o `.env` à mão). Rode `./dashboard reconfigurar`: o passo
   "Preparar o servidor" atualiza as duas.
+
+### "O servidor recusou a chave do painel"
+
+- A linha deste computador sumiu do servidor ou o endereço dele mudou (opção "só deste
+  computador"). Até a 2.1.0, instalar o painel em outro computador apagava a linha dos
+  anteriores. Atualize e rode `./dashboard reconfigurar` neste computador: a partir da
+  2.1.1, um computador não apaga mais o outro.
 
 ### Adicionei um disco (ou pasta, ou serviço)
 

@@ -1,13 +1,13 @@
 // Arquivos da instalação nesta máquina (zero sudo): tudo dentro da pasta do projeto, em
-// data/ (0700), exceto a chave do painel (~/.ssh/dashboard_ed25519, 0600), o serviço
-// systemd de usuário e o atalho no menu de aplicativos.
+// data/ (0700), exceto a chave do painel (~/.ssh/dashboard-<servidor>-<id>, 0600), o
+// serviço systemd de usuário e o atalho no menu de aplicativos.
 import { spawnSync } from 'node:child_process';
 import crypto from 'node:crypto';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { loadEnvFile } from '../config.js';
-import { KEY_COMMENT, knownHostsName, sshConfigText, validHost, validPort } from './acesso.js';
+import { KEY_COMMENT, NAME_PREFIX, installId, knownHostsName, machineLabel, sshConfigText, validHost, validPort } from './acesso.js';
 import { UNIT_NAME, unitPath, systemctlUser, hasSystemdUser } from '../cli/servico.js';
 import { PANEL_NODE_FLAGS } from '../node-flags.js';
 
@@ -44,29 +44,46 @@ function readPub(file) {
   }
 }
 
+/** A chave é do painel? Ed25519, em ~/.ssh, nome dashboard* e .pub com o comentário do painel. */
+function panelKey(file, dir) {
+  if (!file || path.dirname(file) !== dir || !path.basename(file).startsWith(NAME_PREFIX) || !fs.existsSync(file)) return null;
+  const pub = readPub(`${file}.pub`);
+  return pub && pub.comment === KEY_COMMENT && pub.publicKey.startsWith('ssh-ed25519 ') ? pub : null;
+}
+
 /**
- * Chave Ed25519 dedicada ao painel. Usa ~/.ssh/dashboard_ed25519; se esse nome já for de
- * outra chave (por exemplo, a da V1, com acesso completo ao servidor), cria
- * ~/.ssh/dashboard_v2_ed25519 para nunca misturar as duas.
+ * Chave Ed25519 desta instalação (ADR 0020).
+ * - `current`: a chave que esta pasta já usa (IdentityFile do data/ssh/config). Reconfigurar
+ *   continua com ela, então o ID e a linha no servidor não mudam. Vale também para as
+ *   chaves das versões até a 2.1.0 (~/.ssh/dashboard_ed25519).
+ * - sem ela: chave nova, ~/.ssh/dashboard-<servidor>-<id>. Cada instalação tem a sua, então
+ *   duas pastas no mesmo computador não dividem a linha no servidor. O ID sai da chave
+ *   pública: ela nasce numa pasta temporária de ~/.ssh e só depois ganha o nome final.
  */
-export function ensureKey({ home = os.homedir(), run = spawnSync } = {}) {
+export function ensureKey({ home = os.homedir(), run = spawnSync, server = '', current = '' } = {}) {
   const dir = path.join(home, '.ssh');
   fs.mkdirSync(dir, { recursive: true, mode: 0o700 });
-  const candidates = ['dashboard_ed25519', 'dashboard_v2_ed25519'].map((n) => path.join(dir, n));
-  for (const file of candidates) {
-    if (!fs.existsSync(file)) {
-      const r = run('ssh-keygen', ['-q', '-t', 'ed25519', '-N', '', '-C', KEY_COMMENT, '-f', file], { stdio: 'ignore' });
-      if (r.error || r.status !== 0) throw new Error('não consegui criar a chave SSH (o ssh-keygen está instalado?)');
-      fs.chmodSync(file, 0o600);
-      return { file, publicKey: readPub(`${file}.pub`).publicKey, created: true };
-    }
-    const pub = readPub(`${file}.pub`);
-    if (pub && pub.comment === KEY_COMMENT && pub.publicKey.startsWith('ssh-ed25519 ')) {
-      fs.chmodSync(file, 0o600);
-      return { file, publicKey: pub.publicKey, created: false };
-    }
+  const own = panelKey(current, dir);
+  if (own) {
+    fs.chmodSync(current, 0o600);
+    return { file: current, publicKey: own.publicKey, created: false };
   }
-  throw new Error('~/.ssh/dashboard_ed25519 e ~/.ssh/dashboard_v2_ed25519 já existem e não são do painel');
+  const tmpDir = fs.mkdtempSync(path.join(dir, `.${NAME_PREFIX}-nova-`));
+  try {
+    const tmp = path.join(tmpDir, 'chave');
+    const r = run('ssh-keygen', ['-q', '-t', 'ed25519', '-N', '', '-C', KEY_COMMENT, '-f', tmp], { stdio: 'ignore' });
+    const pub = !r.error && r.status === 0 ? readPub(`${tmp}.pub`) : null;
+    if (!pub) throw new Error('não consegui criar a chave SSH (o ssh-keygen está instalado?)');
+    const file = path.join(dir, `${NAME_PREFIX}-${machineLabel(server, 'servidor')}-${installId(pub.publicKey)}`);
+    // Mesmo nome = mesmo ID = mesma chave: só por colisão de SHA-256; nunca sobrescreve.
+    if (fs.existsSync(file) || fs.existsSync(`${file}.pub`)) throw new Error(`${file} já existe`);
+    fs.chmodSync(tmp, 0o600);
+    fs.renameSync(tmp, file);
+    fs.renameSync(`${tmp}.pub`, `${file}.pub`);
+    return { file, publicKey: pub.publicKey, created: true };
+  } finally {
+    fs.rmSync(tmpDir, { recursive: true, force: true });
+  }
 }
 
 /** known_hosts próprio com a identidade que a pessoa conferiu no passo 3. */

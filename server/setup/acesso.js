@@ -3,14 +3,20 @@
 // sem curinga) e o arquivo de configuração SSH próprio do painel (data/ssh/config).
 // Tudo é validado aqui antes de virar texto: nada do que a pessoa digita chega cru a um
 // arquivo de configuração ou a um comando.
+// Cada instalação tem um ID tirado da sua chave pública (ADR 0020): é ele que liga a chave
+// à linha do authorized_keys e ao arquivo do sudoers, para vários computadores dividirem o
+// mesmo servidor sem um apagar o outro.
+import crypto from 'node:crypto';
 import { buildForcedScript, normalizeTargets } from '../collector/builder.js';
 
 /** Usuário que o painel cria no servidor (sem senha; só roda a coleta). */
 export const PANEL_USER = 'dashmon';
 /** Nome do servidor no data/ssh/config (o SSH_HOST que a instalação grava). */
 export const SSH_ALIAS = 'servidor';
-/** Comentário da chave no authorized_keys (identifica a linha do painel). */
+/** Comentário do .pub das chaves do painel e das linhas gravadas até a 2.1.0 (sem ID). */
 export const KEY_COMMENT = 'server-dashboard';
+/** Prefixo dos nomes por instalação: chave, comentário no servidor e arquivo do sudoers. */
+export const NAME_PREFIX = 'dashboard';
 
 /** Endereço do servidor: IP ou nome, [A-Za-z0-9._-:] (IPv6 sem colchetes), sem '-' no início. */
 export function validHost(v) {
@@ -53,6 +59,44 @@ export function validPublicKey(v) {
 }
 
 /**
+ * ID da instalação: 8 hex do SHA-256 da chave pública. Vem da chave, e não de um arquivo,
+ * de propósito: copiar a pasta do painel para outro computador não leva a chave (ela fica
+ * em ~/.ssh), então o outro computador ganha chave e ID próprios e não apaga a linha deste.
+ */
+export function installId(publicKey) {
+  if (!validPublicKey(publicKey)) throw new Error('chave pública inválida');
+  return crypto.createHash('sha256').update(Buffer.from(publicKey.split(' ')[1], 'base64')).digest('hex').slice(0, 8);
+}
+
+/** ID de instalação: 8 hex minúsculos. */
+export function validInstallId(v) {
+  return typeof v === 'string' && /^[0-9a-f]{8}$/.test(v);
+}
+
+/**
+ * Rótulo de um nome de máquina para nomes de arquivo e comentários: minúsculas, só
+ * [a-z0-9-], até 24 caracteres. O ponto vira hífen porque o `#includedir` do sudo ignora
+ * arquivo com ponto no nome (a regra sumiria sem aviso). O rótulo só serve para leitura:
+ * quem identifica a instalação é o ID (dois computadores podem ter o mesmo nome).
+ */
+export function machineLabel(name, fallback = 'computador') {
+  const s = String(name ?? '').toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+/, '').slice(0, 24).replace(/-+$/, '');
+  return s || fallback;
+}
+
+/** Rótulo já saneado (o que machineLabel devolve). */
+export function validLabel(v) {
+  return typeof v === 'string' && /^[a-z0-9](?:[a-z0-9-]{0,22}[a-z0-9])?$/.test(v);
+}
+
+/** ID, rótulo deste computador e comentário da linha no servidor (dashboard@<computador>:<id>). */
+export function installNames({ publicKey, computer }) {
+  const id = installId(publicKey);
+  const label = machineLabel(computer);
+  return { id, label, comment: `${NAME_PREFIX}@${label}:${id}` };
+}
+
+/**
  * Escapa o comando para `command="…"`: no authorized_keys só `\"` é especial (o OpenSSH
  * troca `\"` por `"` e copia o resto). Comando com quebra de linha ou terminado em `\`
  * não pode ser representado com segurança.
@@ -72,12 +116,14 @@ export function quoteCommandOption(command) {
  * Linha do authorized_keys do dashmon: só roda o comando de coleta, sem terminal, sem
  * encaminhamentos (`restrict`) e, opcionalmente, só a partir deste computador (`from=`).
  */
-export function authorizedKeysLine({ publicKey, targets, from = '' }) {
+export function authorizedKeysLine({ publicKey, targets, from = '', comment = KEY_COMMENT }) {
   if (!validPublicKey(publicKey)) throw new Error('chave pública inválida');
   if (from && !validIp(from)) throw new Error('endereço de origem inválido');
+  // O comentário entra no fim da linha e no padrão que acha a linha depois: só texto simples.
+  if (!/^[A-Za-z0-9@:._-]{1,64}$/.test(comment)) throw new Error('comentário da chave inválido');
   const { script, hash } = buildForcedScript(normalizeTargets(targets));
   const opts = ['restrict', ...(from ? [`from="${from}"`] : []), `command=${quoteCommandOption(script)}`];
-  return { line: `${opts.join(',')} ${publicKey} ${KEY_COMMENT}`, hash };
+  return { line: `${opts.join(',')} ${publicKey} ${comment}`, hash };
 }
 
 /** Linha do sudoers: `smartctl -H` em cada disco escolhido, um por um (nunca `*`). */
