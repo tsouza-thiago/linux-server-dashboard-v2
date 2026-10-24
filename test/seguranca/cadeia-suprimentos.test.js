@@ -54,6 +54,7 @@ test('A08: a chave que assina as versões é a do mantenedor (docs/allowed_signe
   const linhas = ler('docs/allowed_signers').split('\n').filter((l) => l && !l.startsWith('#'));
   assert.deepEqual(linhas, [
     'tsouza-thiago namespaces="git" ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIGMypWrHHf5RVZy/Fb4jgvqvH2MfgGqZsGVMdYMQLJP7',
+    'tsouza-thiago namespaces="git" ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIDnYsXcStBkPcaNMFPpswKiIautYac3UeWKKOqfTcpKA',
   ], 'trocar a chave exige um commit consciente (ADR 0012) e a atualização deste teste');
 });
 
