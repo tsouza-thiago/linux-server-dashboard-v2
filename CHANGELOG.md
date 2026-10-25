@@ -9,6 +9,13 @@ diante: `PATCH` corrige, `MINOR` acrescenta sem quebrar e `MAJOR` quebra.
 
 ## [Não publicado]
 
+## [2.2.1] — 2026-10-25
+
+Correção dos Relatórios no período de 90 dias e o roteiro de testes no navegador só no
+desktop. Nada muda na configuração, no formato de `data/` nem no acesso do painel ao
+servidor: atualize com `./dashboard atualizar`. Quem está na 2.1.0 ou anterior faz antes,
+uma vez, o passo manual das notas da 2.1.1 (a chave de assinatura mudou).
+
 ### Mudado
 
 - Testes no navegador só no desktop (#70): o roteiro `docs/testes-no-navegador.md` não pede
@@ -997,7 +1004,8 @@ Documentados no plano da V2 (seção 2.2, B1–B12), entre eles: alerta SMART fa
 rede zerada com contadores grandes, alerta duplicado a cada coleta e reescrita completa do
 histórico a cada minuto.
 
-[Não publicado]: https://github.com/tsouza-thiago/linux-server-dashboard-v2/compare/v2.2.0...HEAD
+[Não publicado]: https://github.com/tsouza-thiago/linux-server-dashboard-v2/compare/v2.2.1...HEAD
+[2.2.1]: https://github.com/tsouza-thiago/linux-server-dashboard-v2/compare/v2.2.0...v2.2.1
 [2.2.0]: https://github.com/tsouza-thiago/linux-server-dashboard-v2/compare/v2.2.0-rc.1...v2.2.0
 [2.2.0-rc.1]: https://github.com/tsouza-thiago/linux-server-dashboard-v2/compare/v2.1.1...v2.2.0-rc.1
 [2.1.1]: https://github.com/tsouza-thiago/linux-server-dashboard-v2/compare/v2.1.0...v2.1.1
