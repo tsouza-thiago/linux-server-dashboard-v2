@@ -11,10 +11,17 @@ diante: `PATCH` corrige, `MINOR` acrescenta sem quebrar e `MAJOR` quebra.
 
 ## [2.2.1] — 2026-10-25
 
-Correção dos Relatórios no período de 90 dias. Nada muda na configuração, no formato de
+Correção dos Relatórios no período de 90 dias e o roteiro de testes no navegador só no
+desktop. Nada muda na configuração, no formato de
 `data/` nem no acesso do painel ao servidor: atualize com `./dashboard atualizar`. Quem está
 na 2.1.0 ou anterior faz antes, uma vez, o passo manual das notas da 2.1.1 (a chave de
 assinatura mudou).
+
+### Mudado
+
+- Testes no navegador só no desktop (#70): o roteiro `docs/testes-no-navegador.md` não pede
+  mais o assistente em largura de celular (390 px), porque o painel e o assistente não são
+  feitos para celular. Só documentação: nada muda no painel.
 
 ### Corrigido
 
