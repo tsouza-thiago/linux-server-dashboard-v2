@@ -3,8 +3,12 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {
   timeline, levelOf, viewOfKey, offlineMsIn, outagesIn, uptimeIn, dayStatuses, trafficOf, dailyTraffic, monitoredMsIn, reportDays,
-  peakOf, meanOf, trendOf, topPeaks, diskEta, diskForecast, healthLevel, outageOf, cpuState,
+  peakOf, meanOf, trendOf, topPeaks, diskEta, diskForecast, healthLevel, outageOf, cpuState, reportRequests,
 } from '../../public/js/core/analysis.js';
+import fs from 'node:fs';
+import os from 'node:os';
+import path from 'node:path';
+import { History } from '../../server/storage/index.js';
 import { applyDataStyles, html, mount } from '../../public/js/core/html.js';
 import { alpha, autoRange, evenTicks } from '../../public/js/charts/timeseries.js';
 
@@ -100,6 +104,49 @@ test('disponibilidade: só o tempo medido; dia sem nenhuma coleta é "sem dados"
       ['2026-10-04', 'none'], ['2026-10-05', 'crit'], ['2026-10-06', 'none'], ['2026-10-07', 'ok'],
     ], 'o dia 06, sem coleta, fica cinza (antes ficava verde)');
   } finally {
+    if (tz === undefined) delete process.env.TZ; else process.env.TZ = tz;
+  }
+});
+
+// #68: em 90 dias o pedido único de baldes vinha com passo de 65 min, alinhado à época e não à
+// hora; o balde das 23:45 levava as amostras de 00:00–00:50 para o dia anterior.
+test('#68: relatórios contam cada amostra no dia local dela, também em 90 dias', () => {
+  const tz = process.env.TZ;
+  process.env.TZ = 'America/Sao_Paulo';
+  const dataDir = fs.mkdtempSync(path.join(os.tmpdir(), 'lsd-68-'));
+  try {
+    // Uma meia-noite local de ~85 dias atrás; agregados de 5 min só de 23:00 às 00:55.
+    const midnight = new Date(Date.now() - 85 * 86400e3).setHours(0, 0, 0, 0);
+    const rollups = [];
+    for (let t = midnight - H; t < midnight + H; t += 5 * MIN) {
+      rollups.push({ t, n: 5, m: { cpu: t < midnight ? [10, 10, 10] : [50, 50, 50], rxDeltaBytes: [100, 100, 100] } });
+    }
+    fs.mkdirSync(path.join(dataDir, 'rollup'));
+    for (const r of rollups) {
+      fs.appendFileSync(path.join(dataDir, 'rollup', `${new Date(r.t).toISOString().slice(0, 10)}.ndjson`), `${JSON.stringify(r)}\n`);
+    }
+    const h = new History({ dataDir, log: () => {} });
+    for (const days of [7, 30, 90]) {
+      const to = Date.now();
+      const from = to - days * 86400e3;
+      const parts = reportRequests(from, to);
+      assert.ok(parts.every((p) => p.limit <= 2000), `${days} d: no máximo 2000 baldes por pedido`);
+      const buckets = parts.flatMap((p) => h.buckets({ fromMs: Date.parse(p.from), toMs: Date.parse(p.to), maxPoints: p.limit }).buckets);
+      if (days < 85) { assert.deepEqual(buckets, [], `${days} d: o período não alcança a noite`); continue; }
+      assert.equal(buckets.reduce((n, x) => n + x.n, 0), 24 * 5, 'cada amostra contada 1 vez');
+      const before = new Date(midnight - H).toLocaleDateString('sv');
+      const after = new Date(midnight).toLocaleDateString('sv');
+      const rows = new Map(reportDays(buckets, ['cpu'], from, to).map((d) => [d.day, d]));
+      assert.equal(rows.get(before).n, 60, 'só as 23:00–23:59 no dia anterior');
+      assert.equal(rows.get(before).m.cpu.max, 10, 'nenhum valor da madrugada no dia anterior');
+      assert.equal(rows.get(after).n, 60);
+      assert.equal(rows.get(after).m.cpu.avg, 50);
+      const traffic = new Map(dailyTraffic(buckets).map((d) => [d.day, d.rx]));
+      assert.equal(traffic.get(before), 6000);
+      assert.equal(traffic.get(after), 6000);
+    }
+  } finally {
+    fs.rmSync(dataDir, { recursive: true, force: true });
     if (tz === undefined) delete process.env.TZ; else process.env.TZ = tz;
   }
 });

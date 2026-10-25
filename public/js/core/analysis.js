@@ -271,6 +271,27 @@ export function reportDays(buckets, keys, fromMs, toMs) {
   return out;
 }
 
+const HOUR_MS = 3600e3;
+const MAX_BUCKETS = 2000; // limite de baldes por pedido em /api/history
+
+/**
+ * Pedidos de baldes dos Relatórios (#68): passo de 1 h exato, para cada balde caber num
+ * único dia local. O servidor alinha os baldes à época; com a hora cheia, a meia-noite de
+ * todo fuso de hora inteira é uma borda de balde. Um passo maior (90 dias em 1 pedido davam
+ * 65 min) misturava a madrugada com o dia anterior. Acima de 2000 h, o período vai em
+ * partes de até 2000 h, sem sobreposição: cada parte termina 1 ms antes da seguinte.
+ */
+export function reportRequests(fromMs, toMs) {
+  const start = Math.floor(fromMs / HOUR_MS) * HOUR_MS;
+  const end = Math.max(Math.ceil(toMs / HOUR_MS) * HOUR_MS, start + HOUR_MS);
+  const out = [];
+  for (let a = start; a < end; a += MAX_BUCKETS * HOUR_MS) {
+    const b = Math.min(end, a + MAX_BUCKETS * HOUR_MS);
+    out.push({ from: new Date(a).toISOString(), to: new Date(b - 1).toISOString(), limit: (b - a) / HOUR_MS });
+  }
+  return out;
+}
+
 /**
  * Bytes trafegados no balde. Desde a 2.0.4, pelos bytes por coleta (contadores exatos):
  * média × coletas que têm o dado. Baldes gravados antes disso só têm a taxa arredondada, e o
