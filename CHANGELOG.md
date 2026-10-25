@@ -9,6 +9,30 @@ diante: `PATCH` corrige, `MINOR` acrescenta sem quebrar e `MAJOR` quebra.
 
 ## [Não publicado]
 
+## [2.2.0] — 2026-10-25
+
+Versão estável que consolida a pré-versão `2.2.0-rc.1` (ADR 0015), sem código novo: a
+instalação passa a entrar em servidor que só aceita chave SSH. Validada pela bateria
+completa no navegador nos 4 cenários do painel de teste e no assistente de instalação
+(`docs/testes-no-navegador.md`) e por uma instalação real com a rc.1, com o
+`./dashboard diagnosticar` todo verde. Nada muda na configuração, no formato de `data/` nem
+no acesso do painel ao servidor: a coleta continua igual. Atualize com
+`./dashboard atualizar`. Quem está na 2.1.0 ou anterior faz antes, uma vez, o passo manual
+das notas da 2.1.1 (a chave de assinatura mudou). Os detalhes estão na seção da
+`2.2.0-rc.1`.
+
+### Resumo da 2.2 em relação à 2.1.1
+
+- **Entrada por chave SSH** (#61, ADR 0021): o passo 2 do assistente pergunta "Como você
+  entra no servidor?": **Senha** (o padrão, igual a antes) ou **Chave SSH**, por um apelido
+  do `~/.ssh/config`, lido com `ssh -G`. A passphrase fica no ssh-agent; `ProxyJump` e
+  `ProxyCommand` são recusados. A TUI, o modo sem perguntas e o
+  `./dashboard desinstalar` aceitam `--chave-ssh <apelido>`.
+- **Senha do sudo separada da senha do SSH:** quem entra por chave e tem um sudo que pede
+  senha a digita num campo próprio do passo 5.
+- **Conferência do sshd só por leitura** no preparo: avisa o que barraria o `dashmon`, sem
+  alterar o `sshd_config`. `Defaults requiretty` é reconhecido e indica o modo à mão.
+
 ## [2.2.0-rc.1] — 2026-10-24
 
 1ª pré-versão da 2.2.0 (ADR 0015): a instalação passa a entrar em servidor que só aceita
@@ -958,7 +982,8 @@ Documentados no plano da V2 (seção 2.2, B1–B12), entre eles: alerta SMART fa
 rede zerada com contadores grandes, alerta duplicado a cada coleta e reescrita completa do
 histórico a cada minuto.
 
-[Não publicado]: https://github.com/tsouza-thiago/linux-server-dashboard-v2/compare/v2.2.0-rc.1...HEAD
+[Não publicado]: https://github.com/tsouza-thiago/linux-server-dashboard-v2/compare/v2.2.0...HEAD
+[2.2.0]: https://github.com/tsouza-thiago/linux-server-dashboard-v2/compare/v2.2.0-rc.1...v2.2.0
 [2.2.0-rc.1]: https://github.com/tsouza-thiago/linux-server-dashboard-v2/compare/v2.1.1...v2.2.0-rc.1
 [2.1.1]: https://github.com/tsouza-thiago/linux-server-dashboard-v2/compare/v2.1.0...v2.1.1
 [2.1.0]: https://github.com/tsouza-thiago/linux-server-dashboard-v2/compare/v2.1.0-rc.3...v2.1.0
