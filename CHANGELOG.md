@@ -12,10 +12,9 @@ diante: `PATCH` corrige, `MINOR` acrescenta sem quebrar e `MAJOR` quebra.
 ## [2.2.1] — 2026-10-25
 
 Correção dos Relatórios no período de 90 dias e o roteiro de testes no navegador só no
-desktop. Nada muda na configuração, no formato de
-`data/` nem no acesso do painel ao servidor: atualize com `./dashboard atualizar`. Quem está
-na 2.1.0 ou anterior faz antes, uma vez, o passo manual das notas da 2.1.1 (a chave de
-assinatura mudou).
+desktop. Nada muda na configuração, no formato de `data/` nem no acesso do painel ao
+servidor: atualize com `./dashboard atualizar`. Quem está na 2.1.0 ou anterior faz antes,
+uma vez, o passo manual das notas da 2.1.1 (a chave de assinatura mudou).
 
 ### Mudado
 
