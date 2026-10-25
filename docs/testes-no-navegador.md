@@ -37,6 +37,9 @@ pessoa vê: números iguais entre as telas, legendas, estados e textos.
 
 ## O que conferir
 
+A bateria roda só no desktop, numa janela de navegador comum: o painel e o assistente não
+são feitos para celular, então não há teste em largura de celular.
+
 Em todas as telas, nos cenários `normal` e `lacunas`:
 
 - O console não tem erro nem aviso de CSP.
@@ -65,7 +68,7 @@ Por cenário:
 - **Ao vivo (`normal`):** em até 1 min chega uma amostra nova pelo tempo real (SSE), sem
   recarregar a página.
 
-No assistente (`--assistente`), nos 2 temas e a 390 px de largura:
+No assistente (`--assistente`), nos 2 temas:
 
 - **Senha:** endereço `192.0.2.10`, usuário `maria`, senha `certa`; os 6 passos até
   "Abrir o painel", no modo assistido e no modo à mão.

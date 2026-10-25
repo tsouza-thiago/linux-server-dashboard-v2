@@ -9,6 +9,12 @@ diante: `PATCH` corrige, `MINOR` acrescenta sem quebrar e `MAJOR` quebra.
 
 ## [Não publicado]
 
+### Mudado
+
+- Testes no navegador só no desktop (#70): o roteiro `docs/testes-no-navegador.md` não pede
+  mais o assistente em largura de celular (390 px), porque o painel e o assistente não são
+  feitos para celular. Só documentação: nada muda no painel.
+
 ## [2.2.0] — 2026-10-25
 
 Versão estável que consolida a pré-versão `2.2.0-rc.1` (ADR 0015), sem código novo: a
