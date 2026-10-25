@@ -3,7 +3,7 @@
 import { html, mount } from '../core/html.js';
 import * as f from '../core/format.js';
 import {
-  reportDays, dailyTraffic, outagesIn, offlineMsIn, uptimeIn, meanOf, peakOf, timeline, levelOf, fullestDisk,
+  reportDays, dailyTraffic, outagesIn, offlineMsIn, uptimeIn, meanOf, peakOf, timeline, levelOf, fullestDisk, reportRequests,
 } from '../core/analysis.js';
 import { $, icon, panelHead, onClick } from './common.js';
 
@@ -147,10 +147,10 @@ function load(ctx) {
   const { from, to } = range();
   ctx.local.buckets = null;
   update(ctx);
-  // Baldes de ~1 h (no máximo 2000 por pedido): suficientes para o resumo diário e os totais.
-  const limit = Math.min(2000, Math.max(24, Math.ceil((to - from) / 3600e3)));
-  ctx.api.buckets({ from: new Date(from).toISOString(), to: new Date(to).toISOString(), limit })
-    .then((r) => { ctx.local.buckets = r.buckets || []; update(ctx); })
+  // Baldes de 1 h exata, em até 2 pedidos (90 dias passam de 2000 h): cada balde fica num
+  // único dia local, e o resumo diário não leva a madrugada para o dia anterior (#68).
+  Promise.all(reportRequests(from, to).map((p) => ctx.api.buckets(p)))
+    .then((rs) => { ctx.local.buckets = rs.flatMap((r) => r.buckets || []); update(ctx); })
     .catch(() => { ctx.local.buckets = []; update(ctx); });
   mount(document.getElementById('viewActions'), actions()); // botão do período marcado
 }

@@ -9,6 +9,15 @@ diante: `PATCH` corrige, `MINOR` acrescenta sem quebrar e `MAJOR` quebra.
 
 ## [Não publicado]
 
+### Corrigido
+
+- **Relatórios em 90 dias somavam a madrugada no dia anterior** (#68, desde a 2.1.0): o
+  pedido único de baldes vinha com passo de 65 min, alinhado à época e não à hora cheia. O
+  balde das 23:45 levava as amostras de 00:00–00:50 para o dia anterior: um dia que
+  terminava em queda mostrava CPU, RAM, temperatura e rede em vez de "—". A tela agora pede
+  baldes de 1 h exata, em até 2 partes de 2000 h, e cada amostra conta no dia local dela
+  (fuso de hora inteira, como `America/Sao_Paulo`).
+
 ## [2.2.0] — 2026-10-25
 
 Versão estável que consolida a pré-versão `2.2.0-rc.1` (ADR 0015), sem código novo: a
