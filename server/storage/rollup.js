@@ -6,7 +6,7 @@ import fs from 'node:fs';
 import fsp from 'node:fs/promises';
 import path from 'node:path';
 import { aggregate } from './buckets.js';
-import { readNdjson, listDays, dayOf, DAY_MS } from './ndjson.js';
+import { forEachNdjson, readNdjson, listDays, dayOf, DAY_MS } from './ndjson.js';
 import { mergeSpans, clipSpans } from './coverage.js';
 
 /** Tamanho de um balde agregado: 5 min. */
@@ -148,18 +148,34 @@ export class RollupStore {
     return null;
   }
 
-  /** Baldes de 5 min com início em [fromMs, toMs], em ordem, sem duplicatas. */
-  query(fromMs, toMs) {
+  /**
+   * Chama `fn` para cada balde de 5 min com início em [fromMs, toMs], sem duplicatas, logo
+   * que ele é lido (#78). Nada fica guardado: quem junta os baldes (bucketMerger) soma cada
+   * um e o solta, e o bloco de 64 KB mantém texto e objetos na geração jovem do V8. Antes,
+   * os ~26 mil agregados de 90 dias (~100 MB de objetos) ficavam vivos até o fim do pedido.
+   * Cada balde mora no arquivo do dia UTC dele (close e writeBucketsSync gravam por dayOf,
+   * em ordem), então as duplicatas só são procuradas dentro do dia; vale a 1ª linha do `t`.
+   */
+  each(fromMs, toMs, fn) {
     const firstDay = dayOf(Math.max(fromMs, 0));
     const lastDay = dayOf(toMs);
-    const byT = new Map();
+    const buf = Buffer.allocUnsafe(64 * 1024); // 1 bloco para os ~90 arquivos do pedido
     for (const day of listDays(this.dir)) {
       if (day < firstDay || day > lastDay) continue;
-      for (const b of readNdjson(this.fileFor(day)).items) {
-        if (validBucket(b) && b.t >= fromMs && b.t <= toMs) byT.set(b.t, b);
-      }
+      const seen = new Set();
+      forEachNdjson(this.fileFor(day), (b) => {
+        if (!validBucket(b) || b.t < fromMs || b.t > toMs || seen.has(b.t)) return;
+        seen.add(b.t);
+        fn(b);
+      }, { buf });
     }
-    return [...byT.values()].sort((a, b) => a.t - b.t);
+  }
+
+  /** Baldes de 5 min com início em [fromMs, toMs], em ordem, sem duplicatas (lista). */
+  query(fromMs, toMs) {
+    const out = [];
+    this.each(fromMs, toMs, (b) => out.push(b));
+    return out.sort((a, b) => a.t - b.t);
   }
 
   /** Grava baldes prontos (migração): mescla com o que já existe, por `t`. */

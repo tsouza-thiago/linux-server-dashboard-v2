@@ -297,7 +297,7 @@ test('local: unidade systemd com hardening e caminhos com espaço e %', () => {
   const unit = unitText({ root: '/home/maria/Área de Trabalho/dash 100%', nodeBin: '/usr/bin/node' });
   assert.match(unit, /^WorkingDirectory=\/home\/maria\/Área de Trabalho\/dash 100%%$/m);
   // Com as opções de memória do Node do painel (server/node-flags.js, #26).
-  assert.match(unit, /^ExecStart="\/usr\/bin\/node" --max-semi-space-size=2 "\/home\/maria\/Área de Trabalho\/dash 100%%\/server\/index\.js"$/m);
+  assert.match(unit, /^ExecStart="\/usr\/bin\/node" --max-semi-space-size=2 --optimize-for-size "\/home\/maria\/Área de Trabalho\/dash 100%%\/server\/index\.js"$/m);
   assert.match(unit, /^ReadWritePaths="\/home\/maria\/Área de Trabalho\/dash 100%%\/data"$/m);
   for (const opt of ['NoNewPrivileges=yes', 'PrivateTmp=yes', 'ProtectSystem=strict', 'UMask=0077', 'WantedBy=default.target']) assert.ok(unit.includes(opt), opt);
   const soft = unitText({ root: '/r', nodeBin: '/n', hardening: false });

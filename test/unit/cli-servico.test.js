@@ -247,7 +247,7 @@ test('servico: todo caminho que inicia o painel usa as opções do Node de serve
   const ROOT = path.join(path.dirname(fileURLToPath(import.meta.url)), '..', '..');
   assert.ok(PANEL_NODE_FLAGS.length > 0);
   // Cada opção entra crua no ExecStart do systemd: nada de espaço, aspas, % ou $.
-  for (const flag of PANEL_NODE_FLAGS) assert.match(flag, /^--[a-z0-9-]+=[0-9]+$/);
+  for (const flag of PANEL_NODE_FLAGS) assert.match(flag, /^--[a-z0-9-]+(=[0-9]+)?$/);
   const unit = unitText({ root: '/r', nodeBin: '/n' });
   assert.match(unit, new RegExp(`^ExecStart="/n" ${PANEL_NODE_FLAGS.join(' ')} "/r/server/index\\.js"$`, 'm'), 'serviço systemd');
   const { scripts } = JSON.parse(fs.readFileSync(path.join(ROOT, 'package.json'), 'utf8'));
@@ -255,7 +255,9 @@ test('servico: todo caminho que inicia o painel usa as opções do Node de serve
     assert.ok(scripts.start.split(' ').includes(flag), `npm start sem ${flag}`);
     assert.ok(scripts.soak.split(' ').includes(flag), `npm run soak sem ${flag}`);
   }
-  // A fase 2 do soak (a que mede o RSS) roda num processo novo com as mesmas opções.
+  // As fases 2 e 3 do soak (as que medem o RSS) rodam em processos novos com as mesmas opções.
   const soak = fs.readFileSync(path.join(ROOT, 'scripts', 'soak-acelerado.mjs'), 'utf8');
-  assert.match(soak, /spawnSync\(process\.execPath, \['--expose-gc', \.\.\.PANEL_NODE_FLAGS, SELF, '--fase2'/, 'fase 2 do soak');
+  assert.match(soak, /spawnSync\(process\.execPath, \['--expose-gc', \.\.\.PANEL_NODE_FLAGS, SELF, name,/, 'fases do soak');
+  assert.match(soak, /phase\('--fase2'\)/, 'fase 2 do soak');
+  assert.match(soak, /phase\('--fase3'\)/, 'fase 3 do soak (pedidos de 90 dias, #78)');
 });

@@ -11,10 +11,10 @@ diante: `PATCH` corrige, `MINOR` acrescenta sem quebrar e `MAJOR` quebra.
 
 ## [2.2.2] — 2026-10-26
 
-Correção dos Relatórios em fuso de meia hora ou de 45 min. Nada muda na configuração, no
-formato de `data/` nem no acesso do painel ao servidor: atualize com `./dashboard atualizar`.
-Quem está na 2.1.0 ou anterior faz antes, uma vez, o passo manual das notas da 2.1.1 (a
-chave de assinatura mudou).
+Correção dos Relatórios em fuso de meia hora ou de 45 min e da RAM do painel nos pedidos de
+90 dias. Nada muda na configuração, no formato de `data/` nem no acesso do painel ao servidor:
+atualize com `./dashboard atualizar`. Quem está na 2.1.0 ou anterior faz antes, uma vez, o
+passo manual das notas da 2.1.1 (a chave de assinatura mudou).
 
 ### Corrigido
 
@@ -27,6 +27,13 @@ chave de assinatura mudou).
   5). As trocas de horário de verão de 30 min (Lord Howe) também contam. Os pedidos vão um
   depois do outro, e a resposta de um período antigo não sobrescreve o período escolhido
   depois.
+- **Pedidos de baldes de 90 dias levavam a RAM do painel a ~200 MB** (#78): um gráfico de 90
+  dias ou os Relatórios de 90 dias faziam o RSS passar de ~87 MB para 165–264 MB, e ele não
+  voltava. Os agregados de 5 min agora são lidos 1 dia por vez e somados logo depois, sem
+  montar a lista dos 90 dias, e o acumulador guarda só números. O painel sobe também com
+  `--optimize-for-size` (o V8 coleta a memória mais cedo): o pico fica em ~115 MB. Quem
+  atualiza com `./dashboard atualizar` recebe a opção nova no serviço sozinho. O
+  `npm run soak` ganhou uma fase 3, que mede esse pico (limite de 120 MB).
 
 ## [2.2.1] — 2026-10-25
 

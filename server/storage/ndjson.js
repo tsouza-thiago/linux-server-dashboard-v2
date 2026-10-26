@@ -18,19 +18,20 @@ export const dayOf = (ts) => new Date(ts).toISOString().slice(0, 10);
 
 /**
  * Lê um NDJSON tolerando linhas inválidas e a última linha cortada por uma queda no meio
- * da gravação. `torn` indica que o arquivo não termina em \n. Lê em blocos de 1 MB (não o
- * arquivo inteiro de uma vez): ao reiniciar com 72 h no disco, o pico de memória é o de um
- * bloco, não o de ~17 MB de texto. `map` transforma cada item logo que ele é lido.
+ * da gravação, e chama `fn(item)` para cada linha válida, logo que ela é lida. Devolve
+ * `{ bad, torn }`: `torn` indica que o arquivo não termina em \n. Lê em blocos (1 MB por
+ * padrão), não o arquivo inteiro de uma vez. Quem não guarda os itens (os agregados, #78)
+ * usa blocos pequenos: cada texto e cada objeto morre na geração jovem do V8, sem ocupar a
+ * geração velha. `buf` reaproveita o mesmo bloco em vários arquivos.
  */
-export function readNdjson(file, { map = null } = {}) {
+export function forEachNdjson(file, fn, { blockBytes = 1024 * 1024, buf = null } = {}) {
   let fd;
   try {
     fd = fs.openSync(file, 'r');
   } catch (err) {
-    if (err.code === 'ENOENT') return { items: [], bad: 0, torn: false };
+    if (err.code === 'ENOENT') return { bad: 0, torn: false };
     throw err;
   }
-  const items = [];
   let bad = 0;
   let rest = '';
   let lastByte = null;
@@ -40,17 +41,17 @@ export function readNdjson(file, { map = null } = {}) {
     if (!line.trim()) return;
     let item;
     try { item = JSON.parse(line); } catch { bad += 1; return; }
-    items.push(map ? map(item, items.length) : item);
+    fn(item);
   };
   try {
-    const buf = Buffer.allocUnsafe(1024 * 1024);
+    const block = buf || Buffer.allocUnsafe(blockBytes);
     for (;;) {
-      const n = fs.readSync(fd, buf, 0, buf.length, null);
+      const n = fs.readSync(fd, block, 0, block.length, null);
       if (n === 0) break;
-      lastByte = buf[n - 1];
+      lastByte = block[n - 1];
       // O StringDecoder não parte um caractere UTF-8 de vários bytes entre dois blocos, e o
       // pedaço depois do último \n (`rest`) espera o bloco seguinte.
-      const text = rest + decoder.write(buf.subarray(0, n));
+      const text = rest + decoder.write(block.subarray(0, n));
       const lines = text.split('\n');
       rest = lines.pop();
       for (const line of lines) take(line);
@@ -59,10 +60,20 @@ export function readNdjson(file, { map = null } = {}) {
   } finally {
     fs.closeSync(fd);
   }
-  return { items, bad, torn: lastByte !== null && lastByte !== 0x0a };
+  return { bad, torn: lastByte !== null && lastByte !== 0x0a };
 }
 
-/** Dias (AAAA-MM-DD) com arquivo NDJSON na pasta, em ordem. */
+/**
+ * Lê um NDJSON inteiro numa lista (ver forEachNdjson): ao reiniciar com 72 h no disco, o
+ * pico de memória é o de um bloco, não o de ~17 MB de texto. `map` transforma cada item
+ * logo que ele é lido.
+ */
+export function readNdjson(file, { map = null } = {}) {
+  const items = [];
+  const { bad, torn } = forEachNdjson(file, (item) => items.push(map ? map(item, items.length) : item));
+  return { items, bad, torn };
+}
+
 export function listDays(dir) {
   try {
     return fs.readdirSync(dir).map((f) => FILE_RE.exec(f)?.[1]).filter(Boolean).sort();

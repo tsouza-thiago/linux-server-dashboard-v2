@@ -265,7 +265,7 @@ navegador. O backend só coleta, persiste e serve. O limite de 1 SSH por minuto 
 ./dashboard atualizar           # tag assinada mais nova, backup de data/, volta atrás se falhar
 ./dashboard desinstalar         # remove daqui e oferece limpar a parte deste computador no servidor
 ./dashboard versao              # versão instalada
-npm start                       # o painel em primeiro plano (node --max-semi-space-size=2 server/index.js)
+npm start                       # o painel em primeiro plano (node --max-semi-space-size=2 --optimize-for-size server/index.js)
 npm run poll                    # 1 coleta, sem o servidor web (node server/poller.js --once)
 npm test                        # suíte de testes (node --test)
 npm run check                   # verificação completa, obrigatória antes de cada commit
@@ -277,7 +277,7 @@ npm run test:e2e                # ponta a ponta no Chromium (playwright-core; pu
 npm run capturar-amostra        # 1 coleta real → data/amostra-{bruta,anonima}.txt (fixtures)
 npm run migrar-v1 -- --verificar  # resume o data/history.json da V1 sem gravar nada
 npm run migrar-v1               # migra a V1 agora (o painel também migra sozinho ao iniciar)
-npm run soak                    # soak acelerado: 83 h de coletas simuladas; confere RAM e vazamento
+npm run soak                    # soak acelerado: 83 h de coletas simuladas e pedidos de 90 dias; confere RAM e vazamento
 npm run painel-teste            # painel de teste com dados semeados (--cenario=normal|lacunas|offline|vazio, --porta=3943)
 scripts/e2e-instalacao/rodar.sh # instalação de ponta a ponta em contêineres Debian/Ubuntu
 ```
@@ -532,21 +532,29 @@ Motor em `server/alerts/` (ADR 0006).
 ## Orçamento de desempenho
 
 Definido no plano da V2. O limite de RAM foi revisto em 16/10/2026 e em 19/10/2026 (#26),
-sempre depois de medido.
+sempre depois de medido. O pico dos pedidos de 90 dias entrou em 26/10/2026 (#78).
 
 | Medida | Limite | Medido | Como se confere |
 |---|---|---|---|
 | Tempo do comando no servidor | ≤ 1,5 s | 1,26–1,31 s (servidor real, 1 núcleo) | faixa de status e `./dashboard diagnosticar` |
 | Tamanho da resposta | ≤ 16 KB | 2,9 KB (servidor real) | idem; acima de 1 MB a conexão é cortada |
 | Página inicial | ≤ 300 KB transferidos | 289 KB (com gzip) | `test/e2e/telas.test.js` |
-| RAM do Node com 72 h em memória | ≤ 95 MB | 91,1–91,3 MB (painel reiniciado com 72 h) | `npm run soak` |
+| RAM do Node com 72 h em memória | ≤ 95 MB | 88,5–90,4 MB (painel reiniciado com 72 h) | `npm run soak` |
+| RAM do Node no pico dos pedidos de 90 dias | ≤ 120 MB | 113–115 MB (gráfico e Relatórios, 1 h e 15 min) | `npm run soak` (fase 3) |
 | Memória depois que a janela de 72 h enche | sem crescer (≤ +4 MB) | +1,1 a +1,8 MB em 11 h a mais | `npm run soak` |
 
 O Node 24 vazio usa ~44 MB e o painel sem histórico, ~63 MB (o `node:http` sozinho ocupa
 ~16 MB). As amostras de 72 h ocupam ~12 MB de heap. O que mais pesava era a geração jovem do
 V8: ela crescia até 32 MB na carga das 72 h e não encolhia. Por isso o painel sobe com
 `--max-semi-space-size=2` (`server/node-flags.js`), nos 4 caminhos: serviço systemd, segundo
-plano, `npm start` e o soak. A opção só vale na linha de comando do Node. Guardar as amostras
+plano, `npm start` e o soak. A opção só vale na linha de comando do Node.
+
+Os pedidos de baldes de 90 dias (gráficos e Relatórios) levavam o RSS a 165–264 MB (#78), e ele
+não voltava: o V8 guarda as páginas que já usou. Três mudanças trouxeram o pico para ~115 MB.
+Os agregados são lidos 1 arquivo diário por vez, em blocos de 64 KB, e cada um é somado e
+solto logo depois (`RollupStore.each` + `bucketMerger`). O acumulador guarda só números, 4 por
+métrica. E o painel sobe também com `--optimize-for-size`, que faz o V8 coletar a geração
+velha mais cedo (sem custo de CPU por coleta medido no soak). Guardar as amostras
 numa forma compacta foi medido em 19/10/2026: o heap cai ~5 MB, mas o RSS não melhora (a
 codificação gera lixo na carga). A meta antiga de 80 MB não é alcançável assim.
 
