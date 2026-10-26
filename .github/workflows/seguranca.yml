@@ -47,8 +47,11 @@ jobs:
       - name: npm run check
         run: npm run check
 
+      # Sem --with-deps (#81): a imagem ubuntu-24.04 já traz as bibliotecas do Chromium
+      # (vem com o Google Chrome), e o apt-get do --with-deps chegava a levar 8 min no
+      # espelho lento. Se faltar biblioteca, o e2e falha (E2E_OBRIGATORIO), nunca pula.
       - name: Chromium para o e2e
-        run: npx playwright-core install --with-deps chromium
+        run: npx playwright-core install chromium
 
       - name: npm run test:e2e
         run: npm run test:e2e

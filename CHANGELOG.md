@@ -9,6 +9,12 @@ diante: `PATCH` corrige, `MINOR` acrescenta sem quebrar e `MAJOR` quebra.
 
 ## [Não publicado]
 
+### Mudado
+
+- CI mais rápido (#81): a etapa do Chromium do e2e não roda mais o `apt-get`
+  (`--with-deps`). A imagem do GitHub já traz as bibliotecas, e o download delas no
+  espelho lento chegava a 8 min. Só o CI muda: nada muda no painel.
+
 ## [2.2.2] — 2026-10-26
 
 Correção dos Relatórios em fuso de meia hora ou de 45 min e da RAM do painel nos pedidos de
