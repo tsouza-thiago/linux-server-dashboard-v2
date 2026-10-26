@@ -12,6 +12,8 @@ documentos não repetem estes detalhes:
 - [TUTORIAL.md](TUTORIAL.md): passo a passo para leigos.
 - [SECURITY.md](SECURITY.md): modelo de ameaças.
 - [CONTRIBUTING.md](CONTRIBUTING.md): o caminho de uma contribuição (issue, PR, checks).
+- [docs/ROADMAP.md](docs/ROADMAP.md): as próximas features, por complexidade, com o
+  planejamento de cada uma em `docs/roadmap/`.
 
 O teste `test/unit/docs.test.js` confere esta documentação contra o código.
 
@@ -570,8 +572,9 @@ linux-server-dashboard-v2/
 │                           scorecard.yml; dependabot.yml (ADR 0016);
 │                           ISSUE_TEMPLATE/ (bug, funcionalidade, tarefa), template de PR e
 │                           CODEOWNERS (ADR 0016)
-├── docs/                   adr/, seguranca/ (análises e excecoes.json), allowed_signers e
-│                           testes-no-navegador.md (roteiro da bateria, ADR 0019)
+├── docs/                   adr/, seguranca/ (análises e excecoes.json), allowed_signers,
+│                           testes-no-navegador.md (roteiro da bateria, ADR 0019),
+│                           ROADMAP.md e roadmap/ (planejamento de cada feature)
 ├── scripts/                check.mjs, seguranca.mjs, mutacao-seguranca.mjs, soak-acelerado.mjs,
 │                           capturar-amostra.mjs, painel-teste.mjs, node-runtime.sh, askpass.sh,
 │                           e2e-instalacao/

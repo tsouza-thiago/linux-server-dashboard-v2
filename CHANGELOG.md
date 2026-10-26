@@ -9,6 +9,12 @@ diante: `PATCH` corrige, `MINOR` acrescenta sem quebrar e `MAJOR` quebra.
 
 ## [Não publicado]
 
+### Adicionado
+
+- Roadmap das versões 2.3.0 a 2.6.0 (#83, `docs/ROADMAP.md`): 9 features classificadas da mais
+  simples à mais complexa, com o planejamento de cada uma em `docs/roadmap/` (decisão,
+  etapas, testes, riscos e perguntas em aberto). Só documentação: nada muda no painel.
+
 ### Mudado
 
 - CI mais rápido (#81): a etapa do Chromium do e2e não roda mais o `apt-get`
