@@ -1,7 +1,7 @@
 // Baldes de agregação: métricas da amostra, mín/máx/média e buracos sem balde.
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { flatten, aggregate, mergeBuckets, downsample, worstOf, roundValue } from '../../server/storage/buckets.js';
+import { flatten, aggregate, bucketMerger, mergeBuckets, downsample, worstOf, roundValue } from '../../server/storage/buckets.js';
 
 const MIN = 60000;
 const at = (min) => new Date(Date.UTC(2026, 9, 7, 12, 0) + min * MIN).toISOString();
@@ -139,4 +139,27 @@ test('volume (2.0.4): bytes por coleta somam certo nos baldes e na redução de 
   assert.equal(reduced.net.rxDeltaBytes, 100_000);
   assert.equal(reduced.net.txDeltaBytes, 600);
   assert.equal(worstOf([vol(0, null, null), vol(1, null, null)]).net.rxDeltaBytes, null, 'grupo sem dado continua sem dado');
+});
+
+// #78: quem lê os agregados do disco soma cada um logo depois de lê-lo (bucketMerger), sem
+// guardar os ~26 mil de 90 dias. O resultado precisa ser o mesmo, em qualquer ordem.
+test('#78: bucketMerger soma um balde de cada vez, com métricas que aparecem e somem', () => {
+  const H = 60 * MIN;
+  const list = [
+    { t: 0, n: 5, m: { cpu: [1, 3, 2], rx: [10, 10, 10, 2] } },
+    { t: 5 * MIN, n: 5, m: { cpu: [0, 5, 4], ram: [7, 9, 8] } },
+    { t: H + 10 * MIN, n: 2, m: { ram: [1, 1, 1] } },
+    { t: H + 15 * MIN, n: 1 },
+  ];
+  const want = [
+    { t: 0, n: 10, m: { cpu: [0, 5, 3], rx: [10, 10, 10, 2], ram: [7, 9, 8, 5] } },
+    { t: H, n: 3, m: { ram: [1, 1, 1, 2] } },
+  ];
+  for (const order of [[0, 1, 2, 3], [3, 2, 1, 0], [2, 0, 3, 1]]) {
+    const merger = bucketMerger(H);
+    for (const i of order) merger.add(list[i]);
+    assert.deepEqual(merger.finish(), want, `ordem ${order}`);
+  }
+  assert.deepEqual(mergeBuckets(list, H), want, 'mergeBuckets usa o mesmo caminho');
+  assert.deepEqual(bucketMerger(H).finish(), [], 'nenhum balde');
 });

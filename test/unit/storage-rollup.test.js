@@ -159,3 +159,20 @@ test('History.buckets: amostra recente em balde ainda aberto aparece na visão l
   const ts = r.buckets.map((b) => b.t);
   assert.deepEqual(ts, [...new Set(ts)], 'sem baldes repetidos');
 });
+
+// #78: each lê 1 arquivo diário por vez e entrega cada balde logo que o lê, em vez de montar a
+// lista dos 90 dias. Duplicata (só por edição à mão: o painel grava cada `t` 1 vez) vale a
+// 1ª linha do dia.
+test('#78: RollupStore.each entrega os baldes do período, dia a dia, sem duplicatas', () => {
+  const dir = tmp();
+  const line = (b) => `${JSON.stringify(b)}\n`;
+  const d0 = path.join(dir, `${dayOf(BASE)}.ndjson`);
+  const d1 = path.join(dir, `${dayOf(BASE + DAY_MS)}.ndjson`);
+  fs.writeFileSync(d0, line({ t: BASE, n: 1, m: {} }) + line({ t: BASE + ROLLUP_STEP_MS, n: 2, m: {} }) + line({ t: BASE, n: 9, m: {} }) + '{"t":');
+  fs.writeFileSync(d1, line({ t: BASE + DAY_MS, n: 3, m: {} }) + 'lixo\n' + line({ t: BASE + DAY_MS + ROLLUP_STEP_MS, n: 4, m: {} }));
+  const r = new RollupStore({ dir, log: silent });
+  const seen = [];
+  r.each(BASE, BASE + DAY_MS, (b) => seen.push([b.t - BASE, b.n]));
+  assert.deepEqual(seen, [[0, 1], [ROLLUP_STEP_MS, 2], [DAY_MS, 3]], 'período fechado nas pontas; 1ª linha do mesmo t');
+  assert.deepEqual(r.query(0, BASE + 2 * DAY_MS).map((b) => b.n), [1, 2, 3, 4], 'query: a mesma leitura, em lista ordenada');
+});

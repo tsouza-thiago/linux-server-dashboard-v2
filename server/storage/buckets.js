@@ -107,28 +107,62 @@ export function aggregate(samples, step) {
 }
 
 /**
- * Junta baldes menores (ex.: rollups de 5 min) em baldes de `step` ms. A média é ponderada
- * pelo número de amostras de cada balde que têm a métrica (4º item; sem ele, todas).
+ * Junta baldes menores (ex.: rollups de 5 min) em baldes de `step` ms, um de cada vez:
+ * `add(b)` soma o balde e o solta; `finish()` devolve os baldes juntados. Quem lê do disco
+ * soma cada agregado logo depois de lê-lo, sem guardar a lista inteira (#78: 90 dias são
+ * ~26 mil agregados, ~100 MB de objetos vivos de uma vez). A média é ponderada pelo número
+ * de amostras de cada balde que têm a métrica (4º item; sem ele, todas).
  */
-export function mergeBuckets(buckets, step) {
+export function bucketMerger(step) {
+  // Acumulador leve: os nomes das métricas ficam num índice só (`keys`), e cada balde guarda
+  // só números, 4 por métrica (mín, máx, soma, contagem; contagem 0 = sem a métrica). Um
+  // Map com 1 objeto por métrica custava ~4 KB por balde; 2000 baldes de 1 h, ~8 MB.
+  const keys = new Map();
   const out = new Map();
-  for (const b of buckets) {
-    const t = bucketStart(b.t, step);
-    let acc = out.get(t);
-    if (!acc) { acc = { t, n: 0, m: new Map() }; out.set(t, acc); }
-    acc.n += b.n;
-    for (const [k, [min, max, avg, count = b.n]] of Object.entries(b.m || {})) {
-      const cur = acc.m.get(k);
-      if (!cur) acc.m.set(k, { min, max, sum: avg * count, c: count });
-      else {
-        if (min < cur.min) cur.min = min;
-        if (max > cur.max) cur.max = max;
-        cur.sum += avg * count;
-        cur.c += count;
+  return {
+    add(b) {
+      const t = bucketStart(b.t, step);
+      let acc = out.get(t);
+      if (!acc) { acc = { t, n: 0, v: [] }; out.set(t, acc); }
+      acc.n += b.n;
+      const v = acc.v;
+      for (const [k, [min, max, avg, count = b.n]] of Object.entries(b.m || {})) {
+        let i = keys.get(k);
+        if (i === undefined) { i = keys.size * 4; keys.set(k, i); }
+        while (v.length <= i) v.push(0); // sem buracos: o array fica só com números
+        if (!v[i + 3]) { v[i] = min; v[i + 1] = max; v[i + 2] = avg * count; v[i + 3] = count; continue; }
+        if (min < v[i]) v[i] = min;
+        if (max > v[i + 1]) v[i + 1] = max;
+        v[i + 2] += avg * count;
+        v[i + 3] += count;
       }
-    }
-  }
-  return [...out.values()].sort((a, b) => a.t - b.t).map(finishAcc);
+    },
+    // Fecha os baldes em ordem e solta cada acumulador logo depois: os acumuladores e os
+    // baldes prontos nunca ficam todos vivos ao mesmo tempo.
+    finish() {
+      const list = [];
+      for (const t of [...out.keys()].sort((a, b) => a - b)) {
+        const { n, v } = out.get(t);
+        out.delete(t);
+        const m = {};
+        for (const [k, i] of keys) {
+          const c = v[i + 3];
+          if (!c) continue;
+          m[k] = [roundValue(v[i]), roundValue(v[i + 1]), roundValue(v[i + 2] / c)];
+          if (c !== n) m[k].push(c);
+        }
+        list.push({ t, n, m });
+      }
+      return list;
+    },
+  };
+}
+
+/** Junta uma lista de baldes menores em baldes de `step` ms (ver bucketMerger). */
+export function mergeBuckets(buckets, step) {
+  const merger = bucketMerger(step);
+  for (const b of buckets) merger.add(b);
+  return merger.finish();
 }
 
 // Maior e menor valor de um campo num grupo de amostras (ignorando quem não tem o dado), e o

@@ -11,6 +11,11 @@
 //          Node do painel (server/node-flags.js). Orçamento (AGENTS, "Orçamento de
 //          desempenho"): até 95 MB. O Node 24 vazio já usa ~44 MB e o painel sem histórico,
 //          ~63 MB.
+// Fase 3 — num processo novo, com agregados de 5 min até 90 dias para trás (cópias de um
+//          agregado de verdade), pede os baldes de 90 dias como as telas pedem: um gráfico
+//          (720 pontos) e os Relatórios em fuso de hora inteira (passo de 1 h) e de 45 min
+//          (15 min, 5 pedidos). Mede o pico de RSS durante os pedidos (#78). Orçamento: até
+//          120 MB no pico.
 //
 //   npm run soak                      # 5000 coletas (~83 h simuladas)
 //   npm run soak -- --coletas 8000
@@ -23,11 +28,14 @@ import { fileURLToPath } from 'node:url';
 import { createApp } from '../server/index.js';
 import { collect } from '../server/collector/index.js';
 import { PANEL_NODE_FLAGS } from '../server/node-flags.js';
+import { reportRequests } from '../public/js/core/analysis.js';
 
 const SELF = fileURLToPath(import.meta.url);
 const ROOT = path.join(path.dirname(SELF), '..');
 const RAM_LIMIT_MB = 95;
 const GROWTH_LIMIT_MB = 4;
+const PEAK_LIMIT_MB = 120;
+const DAY_MS = 1440 * 60_000;
 const STEP_MS = 60_000;
 const WINDOW = 4320;
 
@@ -70,6 +78,7 @@ async function startPanel(dir, collectFn) {
   });
   sse.req.on('error', () => {});
   const stop = async () => { sse.req.destroy(); await app.shutdown(); await new Promise((r) => server.close(r)); };
+  app.port = port;
   return { app, sse, stop };
 }
 
@@ -108,6 +117,63 @@ if (process.argv.includes('--fase2')) {
   process.exit(0);
 }
 
+/**
+ * Agregados de 5 min de 90 dias atrás até o 1º que a fase 1 gravou, copiados de um agregado
+ * de verdade (as mesmas métricas que o painel grava). Roda no processo pai: a fase 3 mede só
+ * a memória do painel.
+ */
+function seed90Days(dir) {
+  const rdir = path.join(dir, 'rollup');
+  const files = fs.readdirSync(rdir).sort();
+  const lines = (f) => fs.readFileSync(path.join(rdir, f), 'utf8').trim().split('\n').map((l) => JSON.parse(l));
+  const model = lines(files.at(-1)).find((b) => b.n === 5);
+  const firstT = lines(files[0])[0].t;
+  const byDay = new Map();
+  for (let t = Math.ceil((Date.now() - 90 * DAY_MS) / 300_000) * 300_000; t < firstT; t += 300_000) {
+    const day = new Date(t).toISOString().slice(0, 10);
+    byDay.set(day, `${byDay.get(day) || ''}${JSON.stringify({ ...model, t })}\n`);
+  }
+  for (const [day, text] of byDay) fs.appendFileSync(path.join(rdir, `${day}.ndjson`), text);
+}
+
+// ------------------------------------------------------------------ fase 3 (processo filho)
+if (process.argv.includes('--fase3')) {
+  const dir = arg('--dir');
+  const { app, stop } = await startPanel(dir, fakeCollect(Number(arg('--inicio')), Number(arg('--depois-de'))));
+  for (let i = 0; i < 20; i++) await app.runPoll();
+  const base = (await settle()).rss;
+  let peak = base;
+  const timer = setInterval(() => { peak = Math.max(peak, process.memoryUsage().rss); }, 10);
+  // Pede os baldes e descarta o corpo (só conta a memória do painel, não a do cliente).
+  const get = (p) => new Promise((resolve, reject) => {
+    const qs = new URLSearchParams({ formato: 'baldes', from: p.from, to: p.to, limit: String(p.limit) });
+    http.get({ host: '127.0.0.1', port: app.port, path: `/api/history?${qs}`, headers: { Host: `127.0.0.1:${app.port}` } }, (res) => {
+      let bytes = 0;
+      res.on('data', (d) => { bytes += d.length; });
+      res.on('end', () => (res.statusCode === 200 ? resolve(bytes) : reject(new Error(`HTTP ${res.statusCode}`))));
+    }).on('error', reject);
+  });
+  const to = Date.now();
+  const from = to - 90 * DAY_MS;
+  const parts = (tz) => { process.env.TZ = tz; return reportRequests(from, to); };
+  const cases = [
+    ['gráfico de 90 dias', [{ from: new Date(from).toISOString(), to: new Date(to).toISOString(), limit: 720 }]],
+    ['Relatórios 90 dias, fuso de hora inteira', parts('America/Sao_Paulo')],
+    ['Relatórios 90 dias, fuso de 45 min', parts('Asia/Kathmandu')],
+  ];
+  const out = [];
+  for (const [name, list] of cases) {
+    let kb = 0;
+    for (const p of list) kb += (await get(p)) / 1024; // um pedido depois do outro, como a tela
+    out.push({ pedido: name, partes: list.length, KB: Math.round(kb), 'RSS máx. até aqui (MB)': mb(peak) });
+  }
+  clearInterval(timer);
+  const after = (await settle()).rss;
+  await stop();
+  console.log(JSON.stringify({ baseMB: mb(base), peakMB: mb(peak), afterMB: mb(after), cases: out }));
+  process.exit(0);
+}
+
 // ------------------------------------------------------------------ fase 1
 const TOTAL = Number(arg('--coletas') ?? 5000);
 if (!Number.isInteger(TOTAL) || TOTAL < WINDOW + 80) {
@@ -137,19 +203,29 @@ const rawKB = diskKB(path.join(dir, 'history'));
 const rollupKB = diskKB(path.join(dir, 'rollup'));
 
 // A fase 2 roda com as mesmas opções do Node do painel de verdade (server/node-flags.js).
-const child = spawnSync(process.execPath, ['--expose-gc', ...PANEL_NODE_FLAGS, SELF, '--fase2', '--dir', dir, '--inicio', String(startMs), '--depois-de', String(TOTAL)], { encoding: 'utf8' });
+const phase = (name) => {
+  const child = spawnSync(process.execPath, ['--expose-gc', ...PANEL_NODE_FLAGS, SELF, name, '--dir', dir, '--inicio', String(startMs), '--depois-de', String(TOTAL)], { encoding: 'utf8' });
+  if (child.status !== 0) {
+    console.error(child.stderr || child.stdout);
+    fs.rmSync(dir, { recursive: true, force: true });
+    process.exit(1);
+  }
+  return JSON.parse(child.stdout.trim().split('\n').pop());
+};
+const f2 = phase('--fase2');
+// Os agregados de 90 dias vão para a mesma pasta: a fase 3 roda depois da fase 2.
+seed90Days(dir);
+const f3 = phase('--fase3');
 fs.rmSync(dir, { recursive: true, force: true });
-if (child.status !== 0) {
-  console.error(child.stderr || child.stdout);
-  process.exit(1);
-}
-const f2 = JSON.parse(child.stdout.trim().split('\n').pop());
 
 console.log(`Fase 1 — ${TOTAL} coletas (${Math.round((TOTAL * STEP_MS) / 36e5)} h simuladas) em ${elapsed.toFixed(1)} s`);
 console.table(marks);
 console.log(`disco: ${rawKB} KB brutos (72 h) + ${rollupKB} KB agregados · SSE: ${sseKB} KB enviados`);
 console.log(`\nFase 2 — painel reiniciado com ${f2.loaded} amostras do disco (${f2.loadMs} ms), 120 coletas em ritmo calmo`);
-console.log(`RSS ${f2.rssMB} MB (máximo ${f2.maxRssMB} MB) · heap ${f2.heapMB} MB · CPU ${f2.cpuMsPorColeta} ms por coleta\n`);
+console.log(`RSS ${f2.rssMB} MB (máximo ${f2.maxRssMB} MB) · heap ${f2.heapMB} MB · CPU ${f2.cpuMsPorColeta} ms por coleta`);
+console.log(`\nFase 3 — pedidos de baldes de 90 dias, um depois do outro (RSS antes: ${f3.baseMB} MB)`);
+console.table(f3.cases);
+console.log(`RSS no pico ${f3.peakMB} MB · depois ${f3.afterMB} MB\n`);
 
 const full = marks.find((m) => m.coletas === WINDOW);
 const last = marks.at(-1);
@@ -159,6 +235,7 @@ const checks = [
   [`RAM do Node com 72 h na memória: ${peakRss} MB (limite ${RAM_LIMIT_MB} MB)`, peakRss <= RAM_LIMIT_MB],
   [`memória depois da janela de 72 h encher: ${growth >= 0 ? '+' : ''}${growth} MB (limite +${GROWTH_LIMIT_MB} MB, sem vazamento)`, growth <= GROWTH_LIMIT_MB],
   [`amostras em memória: ${last.amostras} e ${f2.amostras} (janela de 72 h = ${WINDOW})`, last.amostras <= WINDOW && f2.amostras <= WINDOW],
+  [`RAM do Node no pico dos pedidos de 90 dias: ${f3.peakMB} MB (limite ${PEAK_LIMIT_MB} MB)`, f3.peakMB <= PEAK_LIMIT_MB],
   [`coletas aceitas: ${ok} de ${TOTAL}`, ok === TOTAL],
   ['SSE entregou as coletas ao navegador', sseKB > 0 && f2.sseKB > 0],
 ];
