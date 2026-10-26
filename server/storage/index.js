@@ -3,7 +3,7 @@
 import path from 'node:path';
 import { RawStore, HOUR_MS } from './ndjson.js';
 import { RollupStore, ROLLUP_STEP_MS } from './rollup.js';
-import { aggregate, mergeBuckets } from './buckets.js';
+import { aggregate, bucketMerger, mergeBuckets } from './buckets.js';
 import { mergeSpans, clipSpans } from './coverage.js';
 
 /** Janela das amostras brutas (1 por minuto): 72 h. */
@@ -96,8 +96,10 @@ export class History {
       // Baldes que começam antes da 1ª amostra bruta alinhada vêm dos agregados.
       boundary = rawStart === Infinity ? toMs + 1 : ceilTo(rawStart, step);
       const first = Math.floor(fromMs / step) * step;
-      old = mergeBuckets(this.rollup.query(first, Math.min(toMs, boundary - 1)), step)
-        .filter((b) => b.t < boundary);
+      // Cada agregado lido é somado e solto na hora (#78): nunca os 90 dias de uma vez.
+      const merger = bucketMerger(step);
+      this.rollup.each(first, Math.min(toMs, boundary - 1), merger.add);
+      old = merger.finish().filter((b) => b.t < boundary);
     }
     // Brutas a partir da fronteira, mais as anteriores a ela que ainda não viraram agregado
     // (balde de 5 min aberto): cada amostra entra uma única vez.
