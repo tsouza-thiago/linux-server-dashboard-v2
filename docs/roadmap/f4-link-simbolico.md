@@ -2,8 +2,8 @@
 
 - **Nível:** P–M · **Versão:** 2.4.0-rc.1 · **Área:** instalação
 - **Decidido:** o nome no PATH é `dashboard`.
-- **Pergunta em aberto:** quando `~/.local/bin` não está no PATH, o painel só **mostra** a
-  linha a acrescentar, sem editar o `~/.profile` nem o `~/.bashrc`? Proposta: sim.
+- **Decidido:** quando `~/.local/bin` não está no PATH, a instalação **pergunta** e, com o
+  sim, acrescenta a linha no arquivo de login do shell (item 4 da decisão).
 
 ## Objetivo
 
@@ -33,10 +33,23 @@ pasta do projeto e sem `./`.
      troca e avisa que o comando passa a valer para esta pasta;
    - é outro programa: **não** sobrescreve; avisa e segue sem o link;
    - existe outro `dashboard` antes no PATH (`command -v dashboard`): avisa qual vai rodar.
-4. **PATH:** se `~/.local/bin` não está no PATH, a instalação explica. No Debian, Ubuntu e
-   Mint, o `~/.profile` padrão põe a pasta no PATH no próximo login, se ela existir. No
-   Fedora, o `~/.bashrc` padrão já põe. Caso contrário, mostra a linha a acrescentar.
-   O painel não edita arquivos do shell.
+4. **PATH (perguntar e editar):** se `~/.local/bin` não está no PATH:
+   - o arquivo de login já cuida da pasta (o `~/.profile` padrão do Debian, Ubuntu e Mint
+     e o `~/.bashrc` padrão do Fedora citam `$HOME/.local/bin`): a instalação só explica
+     que vale no próximo login, sem perguntar;
+   - senão, a instalação **pergunta** se pode acrescentar a linha. Com o sim, ela escolhe
+     o arquivo que o bash lê no login (`~/.bash_profile`, `~/.bash_login` ou `~/.profile`,
+     o 1º que existir; nenhum: cria o `~/.profile`), faz uma cópia antes
+     (`<arquivo>.dashboard-bak`) e acrescenta um bloco marcado
+     (`# >>> server-dashboard >>>` … `# <<< server-dashboard <<<`) que só põe a pasta no
+     PATH se ela ainda não estiver. Rodar de novo não duplica o bloco;
+   - sem o sim, ou sem permissão de escrita no arquivo, mostra a linha para a pessoa
+     acrescentar.
+
+   No assistente é uma caixa de marcar; no TUI, uma pergunta; no `--sem-interface`, só
+   com a opção nova `--editar-profile` (sem perguntas, o padrão é não editar). A mudança
+   vale no próximo login; para o terminal atual, a instalação mostra o caminho completo
+   do comando. O `desinstalar` tira só o bloco marcado.
 5. **Mensagens:** uma função em `server/cli/saida.js` devolve `dashboard` quando o link é
    válido e está no PATH, e `./dashboard` nos outros casos. As 50 mensagens passam a usar
    a função.
@@ -53,17 +66,24 @@ pasta do projeto e sem `./`.
 4. `desinstalar` e `diagnosticar`.
 5. Função de mensagem em `saida.js` e troca das 50 mensagens.
 6. README, TUTORIAL e AGENTS (tabela de comandos e "Fora da pasta do projeto").
-7. Teste no `scripts/e2e-instalacao/rodar.sh` (Debian e Ubuntu): depois de instalar,
+7. Edição do arquivo de login com o sim (item 4): cópia, bloco marcado, sem duplicar,
+   remoção no `desinstalar` e a opção `--editar-profile`.
+8. Teste no `scripts/e2e-instalacao/rodar.sh` (Debian e Ubuntu): depois de instalar,
    `dashboard versao` roda de outra pasta num shell de login.
 
 ## Testes
 
 - Unitário: os 4 casos de conflito do item 3; o link aponta para o caminho absoluto.
+- Unitário do item 4: escolha do arquivo de login; cópia feita; bloco acrescentado 1 vez
+  só; remoção tira só o bloco; arquivo sem escrita só mostra a linha; arquivo que já cita
+  `$HOME/.local/bin` não é editado.
 - `test/unit/docs.test.js`: a opção `--sem-link` aparece na ajuda e no AGENTS.
 - e2e de instalação: comando global funciona; `desinstalar` remove o link.
 
 ## Riscos
 
+- Editar um arquivo pessoal do shell. Mitigação: só com o sim, cópia antes, bloco marcado
+  e removível, e a linha só age se a pasta ainda não estiver no PATH.
 - Pessoa com 2 pastas do painel: o comando global vale para a última instalada. Mitigação:
   o aviso do item 3 e o `dashboard status` mostrando a pasta.
 - `~/.local/bin` só entra no PATH no próximo login (Debian/Ubuntu). Mitigação: a

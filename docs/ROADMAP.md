@@ -83,29 +83,21 @@ mudar o formato de `data/` para quem já usa, ela vira MAJOR (3.0.0) e este road
 | `dashboard atualizar` no terminal | abre a tela de atualização do painel; `--terminal` faz como hoje |
 | Lugar dos botões | menu de manutenção no topo (engrenagem): Atualizar e Reconfigurar |
 | Formato de pacote | só `.deb` (Flatpak fica fora; motivo na F9) |
-| Atualização no modo `.deb` | o próprio painel cuida, sem `apt`; desenho híbrido com foco em segurança (F9) |
+| Atualização no modo `.deb` | o próprio painel cuida, sem `apt`; desenho híbrido aprovado: usuário de sistema sem privilégio grava, a pessoa só pede pelo polkit (F9) |
+| F1 | "hook" é *hover* |
+| F2 | inclui o estado "aguardando" (spinner no botão) |
+| F4 | sem `~/.local/bin` no PATH: pergunta e, com o sim, acrescenta um bloco marcado no arquivo de login |
+| F7 e F8 | painel sem login: aviso aparece, botões desligados, mostra o comando do terminal |
+| F7 | versão que muda o script de coleta: marcador "Exige reconfigurar" no CHANGELOG, aviso antes |
+| F5 | sem o `bash-completion`: mesma regra da F4, no `~/.bashrc` |
+| F9 | Node baixado pelo executor (SHA-256 fixado); 1 pessoa por máquina na 1ª versão |
 | Agrupamento | 4 MINOR por tema (tabela acima) |
 | Registro | este arquivo + 1 documento por feature; ADR quando a feature for aprovada |
 
 ## Perguntas em aberto
 
-Cada uma está detalhada no documento da feature. Nenhuma bloqueia as versões 2.3.0 e 2.4.0.
-
-1. **F1:** "animação do tipo hook" foi lido como *hover* (passar o mouse por cima). Confirmar.
-2. **F2:** a animação de botões inclui o estado "aguardando" (spinner no botão enquanto a
-   ação roda)? Proposta: sim.
-3. **F4:** o painel só **mostra** a linha do PATH quando `~/.local/bin` falta, sem editar o
-   `~/.profile`. Confirmar.
-4. **F7:** painel instalado sem login (`DASH_TOKEN` vazio): o botão de atualizar fica
-   desligado e mostra o comando do terminal? Proposta: sim, porque sem login não há sessão.
-5. **F7:** versão que muda o script de coleta (o `authorized_keys` deixa de bater): avisar
-   antes por um marcador no CHANGELOG? Proposta: sim.
-6. **F9:** o Node vem num pacote por arquitetura ou é baixado pelo executor com a soma
-   SHA-256 que já está no código? Proposta: baixado pelo executor.
-7. **F9:** o painel instalado por `.deb` precisa atender várias pessoas usuárias na mesma
-   máquina, cada uma com o seu painel? Isso muda a porta e o grupo do polkit.
-8. **F9:** confirmar o desenho híbrido da atualização (usuário de sistema sem privilégio +
-   regra estreita do polkit), proposto no lugar de "`/opt` gravável" e "ajudante root".
+As 9 perguntas deste roadmap foram respondidas em 26/10/2026 (tabela acima). Nenhuma
+pergunta em aberto agora. Pergunta nova que surgir entra aqui, com a feature e a proposta.
 
 ## Fluxo de trabalho
 

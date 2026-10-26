@@ -41,8 +41,10 @@ quando faz sentido, os valores das opções.
    `${BASH_COMPLETION_USER_DIR:-${XDG_DATA_HOME:-$HOME/.local/share}/bash-completion}/completions/dashboard`.
    O pacote `bash-completion` carrega o arquivo na 1ª vez que se aperta Tab depois de
    `dashboard`. Sem sudo e sem editar o `~/.bashrc`.
-5. **Sem o pacote `bash-completion`:** o `diagnosticar` avisa e mostra a linha `source` a
-   acrescentar no `~/.bashrc`. O painel não edita o arquivo.
+5. **Sem o pacote `bash-completion` (decidido: mesma regra da F4):** a instalação
+   pergunta e, com o sim, acrescenta no `~/.bashrc` um bloco marcado que carrega o
+   arquivo (cópia antes, sem duplicar, removido no `desinstalar`; no `--sem-interface`, só
+   com `--editar-profile`). Sem o sim, o `diagnosticar` mostra a linha `source`.
 6. Mesma opção `--sem-link` da F4 pula também o autocomplete; `desinstalar` remove.
 
 ### Alternativas descartadas
@@ -60,7 +62,8 @@ quando faz sentido, os valores das opções.
    `ssh/config` de teste).
 3. Teste de sincronia com o código (item 2 da decisão).
 4. Instalar e remover junto com o link da F4 (`server/setup/local.js`).
-5. Aviso no `diagnosticar` quando falta o `bash-completion`.
+5. Sem o `bash-completion`: pergunta, bloco marcado no `~/.bashrc` (mesmo código da F4)
+   e aviso no `diagnosticar`.
 6. README, TUTORIAL e AGENTS.
 7. e2e de instalação: num shell interativo do contêiner, `dashboard atu<Tab>` vira
    `dashboard atualizar`.

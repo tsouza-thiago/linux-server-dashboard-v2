@@ -1,8 +1,7 @@
 # F2 — Animação de clique nos botões
 
 - **Nível:** P · **Versão:** 2.3.0-rc.2 · **Área:** telas · **Depende de:** F1 (tokens)
-- **Pergunta em aberto:** incluir o estado "aguardando" (spinner dentro do botão enquanto
-  a ação roda)? A proposta abaixo inclui.
+- **Decidido:** inclui o estado "aguardando" (spinner no botão enquanto a ação roda).
 
 ## Objetivo
 

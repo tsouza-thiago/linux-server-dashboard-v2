@@ -7,8 +7,8 @@
   - a instalação por `git clone` continua, e cada pessoa escolhe;
   - o painel cuida da própria atualização, **sem** `apt`;
   - o critério principal do desenho da atualização é a **segurança**.
-- **Perguntas em aberto:** o Node (item 6 da decisão) e várias pessoas usuárias na mesma
-  máquina (item "Riscos").
+- **Decidido em 26/10/2026:** o desenho híbrido (C) está aprovado; o Node é baixado pelo
+  executor (item 6); a 1ª versão atende 1 pessoa por máquina (item "Riscos").
 
 ## Objetivo
 
@@ -37,7 +37,7 @@ O código em `/opt` pertence ao root. A pergunta é: quem grava a versão nova l
 | Integridade do `dpkg` | quebrada (arquivos alterados) | mantida | mantida (as versões ficam fora da lista do `dpkg`) |
 | Volta atrás | trocar arquivos | trocar arquivos | trocar 1 link |
 
-**Proposta: C.** Ela junta o que A e B têm de bom e corta o que têm de perigoso:
+**Escolhida: C** (aprovada em 26/10/2026). Ela junta o que A e B têm de bom e corta o que têm de perigoso:
 
 - **De A** fica a troca de versão feita pelo próprio painel, direto no `/opt`, sem `apt` e
   sem `dpkg`. **Fica de fora** a permissão de gravação da pessoa usuária: é ela que abre a
@@ -46,7 +46,7 @@ O código em `/opt` pertence ao root. A pergunta é: quem grava a versão nova l
   fora** o root: quem grava é um usuário de sistema sem privilégio, numa unidade systemd
   isolada, como o `_apt` do Debian faz para baixar pacotes.
 
-## Decisão proposta (C — híbrido)
+## Decisão (C — híbrido)
 
 1. **Arquivos do pacote** (do `dpkg`, root, só leitura):
 
@@ -88,10 +88,11 @@ O código em `/opt` pertence ao root. A pergunta é: quem grava a versão nova l
 5. **Regra do polkit:** pessoas do grupo `server-dashboard` podem só **iniciar** (`start`)
    só as unidades `server-dashboard-atualizar` e `server-dashboard-voltar`, sem senha.
    Nenhuma outra ação do systemd.
-6. **Node:** proposta: o executor baixa o Node para `/opt/server-dashboard/node/` com a
+6. **Node (decidido):** o executor baixa o Node para `/opt/server-dashboard/node/` com a
    soma SHA-256 fixada no `scripts/node-runtime.sh` da versão (que veio numa tag
    assinada). Assim o pacote é `all` (um só para amd64 e arm64) e há 1 cópia do Node para
-   todas as pessoas. Alternativa: um `.deb` por arquitetura com o Node dentro (~30 MB).
+   todas as pessoas. Descartado: um `.deb` por arquitetura com o Node dentro (~30 MB cada,
+   e trocar o Node exigiria um `.deb` novo).
 7. **Isolamento das unidades:** `User=_server-dashboard`, `NoNewPrivileges=yes`,
    `ProtectSystem=strict`, `ReadWritePaths=` só `repo.git`, `versoes`, `estado` e `node`,
    `ProtectHome=yes`, `PrivateTmp=yes`, `PrivateDevices=yes`,
@@ -132,7 +133,7 @@ O código em `/opt` pertence ao root. A pergunta é: quem grava a versão nova l
    testes em contêiner.
 5. Unidades systemd isoladas e o timer; conferir com `systemd-analyze security`.
 6. Regra do polkit e o grupo; teste de que outra unidade e outra ação são recusadas.
-7. Node baixado pelo executor (ou embutido, conforme a resposta da pergunta).
+7. Node baixado pelo executor, com a soma SHA-256 conferida.
 8. F7 no modo sistema: o painel usa o executor no lugar do `git checkout`.
 9. `npm run empacotar-deb` reprodutível, `SHA256SUMS` assinado e conferência no CI.
 10. `--importar-pasta`, `desinstalar` e `apt purge`.
@@ -144,8 +145,9 @@ O código em `/opt` pertence ao root. A pergunta é: quem grava a versão nova l
 
 - **Grupo novo só vale no próximo login:** o `systemd --user` só enxerga o grupo depois
   de sair e entrar. A instalação avisa.
-- **Várias pessoas na mesma máquina:** cada uma tem o seu painel e precisa de outra porta.
-  Confirmar se é um caso de uso; se não for, a 1ª versão atende 1 pessoa e documenta.
+- **Várias pessoas na mesma máquina:** fora da 1ª versão (decidido). Ela atende 1 pessoa
+  por máquina: a instalação recusa uma 2ª pessoa com um aviso claro, e o README documenta
+  o limite. Atender várias pessoas (uma porta e um painel por pessoa) fica para depois.
 - **Clone e `.deb` na mesma máquina:** o `~/.local/bin/dashboard` (F4) vem antes do
   `/usr/bin/dashboard` no PATH. O `diagnosticar` avisa qual roda.
 - **Troca de chave de assinatura:** segue a regra de hoje (a chave nova precisa estar na

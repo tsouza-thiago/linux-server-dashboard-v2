@@ -5,12 +5,12 @@
   outro executor (F9).
 - **Decidido:** procurar versão nova 1 vez por dia, sempre ligado; qualquer sessão logada
   pode atualizar.
-- **Perguntas em aberto:**
-  1. Painel sem login (`DASH_TOKEN` vazio): o botão fica desligado e mostra o comando do
-     terminal? Proposta: sim. Sem login não há sessão, e qualquer programa da máquina
-     poderia pedir a atualização.
-  2. Versão que muda o script de coleta: avisar antes, por um marcador no CHANGELOG?
-     Proposta: sim (item 9 da decisão).
+- **Decidido também (26/10/2026):**
+  1. Painel sem login (`DASH_TOKEN` vazio): o aviso de versão nova aparece, mas o botão
+     fica desligado e mostra o comando do terminal. Sem login não há sessão, e qualquer
+     programa da máquina poderia pedir a atualização.
+  2. Versão que muda o script de coleta: aviso antes, por um marcador no CHANGELOG (item 9
+     da decisão).
 
 ## Objetivo
 
@@ -81,7 +81,7 @@
    lugar do SSE porque sobrevive à queda do painel no meio da atualização.
 9. **Mudança no script de coleta:** no modo restrito, versão nova com outro script deixa
    o `authorized_keys` desatualizado (`hashMismatch`) e a coleta para até o
-   `./dashboard reconfigurar`, que pede a senha do administrador do servidor. Proposta:
+   `./dashboard reconfigurar`, que pede a senha do administrador do servidor. Decidido:
    - o CHANGELOG da versão traz a linha "**Exige reconfigurar o acesso ao servidor.**";
    - o aviso e o diálogo mostram isso antes de atualizar;
    - depois de atualizar, a Visão geral mostra o passo a passo se a 1ª coleta der

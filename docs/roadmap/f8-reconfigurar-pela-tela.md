@@ -4,7 +4,8 @@
 - **Depende de:** F7 (menu de manutenção no topo, executor fora do serviço, web como
   caminho padrão).
 - **Decidido:** o botão "Reconfigurar" fica no menu de manutenção do topo (engrenagem),
-  ao lado de "Atualizar". A web é o caminho padrão; o terminal continua.
+  ao lado de "Atualizar". A web é o caminho padrão; o terminal continua. Painel sem login
+  (`DASH_TOKEN` vazio): o botão fica desligado e mostra o comando do terminal, como na F7.
 
 ## Objetivo
 
