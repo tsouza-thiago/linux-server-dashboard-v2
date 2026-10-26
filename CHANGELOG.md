@@ -9,6 +9,13 @@ diante: `PATCH` corrige, `MINOR` acrescenta sem quebrar e `MAJOR` quebra.
 
 ## [Não publicado]
 
+## [2.2.2] — 2026-10-26
+
+Correção dos Relatórios em fuso de meia hora ou de 45 min. Nada muda na configuração, no
+formato de `data/` nem no acesso do painel ao servidor: atualize com `./dashboard atualizar`.
+Quem está na 2.1.0 ou anterior faz antes, uma vez, o passo manual das notas da 2.1.1 (a
+chave de assinatura mudou).
+
 ### Corrigido
 
 - **Relatórios em fuso de meia hora ou de 45 min somavam a madrugada no dia anterior**
@@ -18,7 +25,8 @@ diante: `PATCH` corrige, `MINOR` acrescenta sem quebrar e `MAJOR` quebra.
   escolhe o passo pelo fuso do navegador em todo o período: 1 h em fuso de hora inteira (como
   antes, até 2 pedidos), 30 min em fuso de meia hora (até 3) e 15 min em fuso de 45 min (até
   5). As trocas de horário de verão de 30 min (Lord Howe) também contam. Os pedidos vão um
-  depois do outro, para o pico de memória do painel não crescer.
+  depois do outro, e a resposta de um período antigo não sobrescreve o período escolhido
+  depois.
 
 ## [2.2.1] — 2026-10-25
 
@@ -1015,7 +1023,8 @@ Documentados no plano da V2 (seção 2.2, B1–B12), entre eles: alerta SMART fa
 rede zerada com contadores grandes, alerta duplicado a cada coleta e reescrita completa do
 histórico a cada minuto.
 
-[Não publicado]: https://github.com/tsouza-thiago/linux-server-dashboard-v2/compare/v2.2.1...HEAD
+[Não publicado]: https://github.com/tsouza-thiago/linux-server-dashboard-v2/compare/v2.2.2...HEAD
+[2.2.2]: https://github.com/tsouza-thiago/linux-server-dashboard-v2/compare/v2.2.1...v2.2.2
 [2.2.1]: https://github.com/tsouza-thiago/linux-server-dashboard-v2/compare/v2.2.0...v2.2.1
 [2.2.0]: https://github.com/tsouza-thiago/linux-server-dashboard-v2/compare/v2.2.0-rc.1...v2.2.0
 [2.2.0-rc.1]: https://github.com/tsouza-thiago/linux-server-dashboard-v2/compare/v2.1.1...v2.2.0-rc.1
