@@ -273,21 +273,43 @@ export function reportDays(buckets, keys, fromMs, toMs) {
 
 const HOUR_MS = 3600e3;
 const MAX_BUCKETS = 2000; // limite de baldes por pedido em /api/history
+const ROLLUP_MIN = 5; // os agregados do servidor são de 5 min: nenhum balde é menor
+
+const gcd = (a, b) => (b ? gcd(b, a % b) : a);
 
 /**
- * Pedidos de baldes dos Relatórios (#68): passo de 1 h exato, para cada balde caber num
- * único dia local. O servidor alinha os baldes à época; com a hora cheia, a meia-noite de
- * todo fuso de hora inteira é uma borda de balde. Um passo maior (90 dias em 1 pedido davam
- * 65 min) misturava a madrugada com o dia anterior. Acima de 2000 h, o período vai em
- * partes de até 2000 h, sem sobreposição: cada parte termina 1 ms antes da seguinte.
+ * Passo dos baldes dos Relatórios, em minutos (#74): o maior divisor de 60 que alinha a
+ * meia-noite local de todo o período a uma borda de balde. O servidor alinha os baldes à
+ * época, e a meia-noite local fica a `getTimezoneOffset` minutos de uma hora cheia UTC. Fuso
+ * de hora inteira dá 60; de meia hora (UTC+5:30), 30; de 45 min (UTC+5:45), 15. O
+ * deslocamento é lido de hora em hora, para achar as trocas de horário de verão (Lord Howe
+ * troca 30 min); são 2160 leituras em 90 dias.
+ */
+export function reportStepMin(fromMs, toMs) {
+  let step = 60;
+  for (let t = fromMs; step > ROLLUP_MIN; t += HOUR_MS) {
+    const at = Math.min(t, toMs);
+    step = gcd(step, Math.abs(new Date(at).getTimezoneOffset()) % 60);
+    if (at === toMs) break;
+  }
+  return Math.max(step, ROLLUP_MIN);
+}
+
+/**
+ * Pedidos de baldes dos Relatórios (#68, #74): cada balde cabe num único dia local. Um passo
+ * que não alinha a meia-noite (90 dias em 1 pedido davam 65 min) misturava a madrugada com
+ * o dia anterior. O passo é o de reportStepMin: 1 h em fuso de hora inteira (90 dias = 2
+ * pedidos), 30 ou 15 min nos outros (até 5 pedidos). Cada parte tem até 2000 baldes, sem
+ * sobreposição: ela termina 1 ms antes da seguinte.
  */
 export function reportRequests(fromMs, toMs) {
-  const start = Math.floor(fromMs / HOUR_MS) * HOUR_MS;
-  const end = Math.max(Math.ceil(toMs / HOUR_MS) * HOUR_MS, start + HOUR_MS);
+  const stepMs = reportStepMin(fromMs, toMs) * 60e3;
+  const start = Math.floor(fromMs / stepMs) * stepMs;
+  const end = Math.max(Math.ceil(toMs / stepMs) * stepMs, start + stepMs);
   const out = [];
-  for (let a = start; a < end; a += MAX_BUCKETS * HOUR_MS) {
-    const b = Math.min(end, a + MAX_BUCKETS * HOUR_MS);
-    out.push({ from: new Date(a).toISOString(), to: new Date(b - 1).toISOString(), limit: (b - a) / HOUR_MS });
+  for (let a = start; a < end; a += MAX_BUCKETS * stepMs) {
+    const b = Math.min(end, a + MAX_BUCKETS * stepMs);
+    out.push({ from: new Date(a).toISOString(), to: new Date(b - 1).toISOString(), limit: (b - a) / stepMs });
   }
   return out;
 }
