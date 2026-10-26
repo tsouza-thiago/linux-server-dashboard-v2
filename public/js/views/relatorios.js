@@ -142,16 +142,24 @@ function customForm() {
   </form>`;
 }
 
-/** Busca os baldes de 1 h do período (uma vez por período escolhido). */
+/** Busca os baldes do período (uma vez por período escolhido). */
 function load(ctx) {
   const { from, to } = range();
   ctx.local.buckets = null;
   update(ctx);
-  // Baldes de 1 h exata, em até 2 pedidos (90 dias passam de 2000 h): cada balde fica num
-  // único dia local, e o resumo diário não leva a madrugada para o dia anterior (#68).
-  Promise.all(reportRequests(from, to).map((p) => ctx.api.buckets(p)))
-    .then((rs) => { ctx.local.buckets = rs.flatMap((r) => r.buckets || []); update(ctx); })
-    .catch(() => { ctx.local.buckets = []; update(ctx); });
+  // Baldes que não cruzam a meia-noite local (#68, #74): 1 h em fuso de hora inteira (até 2
+  // pedidos), 30 ou 15 min nos outros (até 5). Os pedidos vão um depois do outro: o
+  // servidor monta 1 resposta de cada vez, e o pico de memória dele não cresce.
+  const seq = (ctx.local.loadSeq || 0) + 1;
+  ctx.local.loadSeq = seq;
+  const done = (buckets) => {
+    if (ctx.local.loadSeq !== seq) return; // outro período foi escolhido no meio do caminho
+    ctx.local.buckets = buckets;
+    update(ctx);
+  };
+  reportRequests(from, to)
+    .reduce((acc, p) => acc.then((all) => ctx.api.buckets(p).then((r) => all.concat(r.buckets || []))), Promise.resolve([]))
+    .then(done, () => done([]));
   mount(document.getElementById('viewActions'), actions()); // botão do período marcado
 }
 

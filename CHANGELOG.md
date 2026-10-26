@@ -9,6 +9,17 @@ diante: `PATCH` corrige, `MINOR` acrescenta sem quebrar e `MAJOR` quebra.
 
 ## [Não publicado]
 
+### Corrigido
+
+- **Relatórios em fuso de meia hora ou de 45 min somavam a madrugada no dia anterior**
+  (#74, limite da correção da #68): os baldes de 1 h só alinham a meia-noite em fuso de hora
+  inteira. Em UTC+5:30 (Índia), UTC+9:30 (Adelaide) ou UTC−3:30 (Terra Nova), as amostras de
+  00:00–00:29 contavam no dia anterior; em UTC+5:45 (Nepal), as de 00:00–00:44. A tela agora
+  escolhe o passo pelo fuso do navegador em todo o período: 1 h em fuso de hora inteira (como
+  antes, até 2 pedidos), 30 min em fuso de meia hora (até 3) e 15 min em fuso de 45 min (até
+  5). As trocas de horário de verão de 30 min (Lord Howe) também contam. Os pedidos vão um
+  depois do outro, para o pico de memória do painel não crescer.
+
 ## [2.2.1] — 2026-10-25
 
 Correção dos Relatórios no período de 90 dias e o roteiro de testes no navegador só no

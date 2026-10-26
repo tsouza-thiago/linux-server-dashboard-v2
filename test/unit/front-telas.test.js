@@ -3,7 +3,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {
   timeline, levelOf, viewOfKey, offlineMsIn, outagesIn, uptimeIn, dayStatuses, trafficOf, dailyTraffic, monitoredMsIn, reportDays,
-  peakOf, meanOf, trendOf, topPeaks, diskEta, diskForecast, healthLevel, outageOf, cpuState, reportRequests,
+  peakOf, meanOf, trendOf, topPeaks, diskEta, diskForecast, healthLevel, outageOf, cpuState, reportRequests, reportStepMin,
 } from '../../public/js/core/analysis.js';
 import fs from 'node:fs';
 import os from 'node:os';
@@ -147,6 +147,88 @@ test('#68: relatórios contam cada amostra no dia local dela, também em 90 dias
     }
   } finally {
     fs.rmSync(dataDir, { recursive: true, force: true });
+    if (tz === undefined) delete process.env.TZ; else process.env.TZ = tz;
+  }
+});
+
+// #74: os baldes de 1 h da #68 só alinham a meia-noite em fuso de hora inteira. Em UTC+5:30 o
+// balde das 23:30 levava as amostras de 00:00–00:29 para o dia anterior (45 min em UTC+5:45).
+const FUSOS_74 = ['America/Sao_Paulo', 'Asia/Kolkata', 'Asia/Kathmandu', 'America/St_Johns', 'Australia/Lord_Howe'];
+
+test('#74: passo e pedidos dos relatórios pelo fuso local, até 2000 baldes por pedido', () => {
+  const tz = process.env.TZ;
+  try {
+    const at = (s) => Date.parse(s);
+    const casos = [
+      ['America/Sao_Paulo', 60, 2], ['Asia/Kolkata', 30, 3], ['Asia/Kathmandu', 15, 5],
+      ['America/St_Johns', 30, 3], ['UTC', 60, 2],
+    ];
+    for (const [fuso, passo, partes] of casos) {
+      process.env.TZ = fuso;
+      const from = at('2026-07-01T00:00:00Z');
+      const to = from + 90 * 86400e3;
+      assert.equal(reportStepMin(from, to), passo, `${fuso}: passo`);
+      const ps = reportRequests(from, to);
+      assert.equal(ps.length, partes, `${fuso}: pedidos em 90 dias`);
+      assert.ok(ps.every((p) => p.limit <= 2000), `${fuso}: no máximo 2000 baldes por pedido`);
+      // As partes se encostam sem sobreposição e cobrem o período inteiro.
+      assert.ok(Date.parse(ps[0].from) <= from && Date.parse(ps.at(-1).to) + 1 >= to, `${fuso}: cobre o período`);
+      for (let i = 1; i < ps.length; i++) assert.equal(Date.parse(ps[i].from), Date.parse(ps[i - 1].to) + 1);
+    }
+    // Lord Howe: +10:30 no inverno, +11 no verão. A troca dentro do período pede 30 min.
+    process.env.TZ = 'Australia/Lord_Howe';
+    assert.equal(reportStepMin(at('2026-12-01T00:00:00Z'), at('2027-01-31T00:00:00Z')), 60, 'só +11');
+    assert.equal(reportStepMin(at('2026-06-01T00:00:00Z'), at('2026-07-31T00:00:00Z')), 30, 'só +10:30');
+    assert.equal(reportStepMin(at('2026-09-01T00:00:00Z'), at('2026-11-30T00:00:00Z')), 30, 'com a troca de outubro');
+  } finally {
+    if (tz === undefined) delete process.env.TZ; else process.env.TZ = tz;
+  }
+});
+
+test('#74: relatórios contam cada amostra no dia local dela, também em fuso de meia hora', () => {
+  const tz = process.env.TZ;
+  try {
+    for (const fuso of FUSOS_74) {
+      process.env.TZ = fuso;
+      // Meias-noites locais de ~85 e de ~5 dias atrás: em Lord Howe, ao menos uma das duas
+      // costuma cair em +10:30. Agregados de 5 min só de 1 h antes a 1 h depois de cada uma.
+      const nights = [85, 5].map((d) => new Date(Date.now() - d * 86400e3).setHours(0, 0, 0, 0));
+      const dataDir = fs.mkdtempSync(path.join(os.tmpdir(), 'lsd-74-'));
+      try {
+        fs.mkdirSync(path.join(dataDir, 'rollup'));
+        for (const midnight of nights) {
+          for (let t = midnight - H; t < midnight + H; t += 5 * MIN) {
+            const r = { t, n: 5, m: { cpu: t < midnight ? [10, 10, 10] : [50, 50, 50], rxDeltaBytes: [100, 100, 100] } };
+            fs.appendFileSync(path.join(dataDir, 'rollup', `${new Date(t).toISOString().slice(0, 10)}.ndjson`), `${JSON.stringify(r)}\n`);
+          }
+        }
+        const h = new History({ dataDir, log: () => {} });
+        for (const days of [7, 30, 90]) {
+          const to = Date.now();
+          const from = to - days * 86400e3;
+          const buckets = reportRequests(from, to)
+            .flatMap((p) => h.buckets({ fromMs: Date.parse(p.from), toMs: Date.parse(p.to), maxPoints: p.limit }).buckets);
+          const rows = new Map(reportDays(buckets, ['cpu'], from, to).map((d) => [d.day, d]));
+          const traffic = new Map(dailyTraffic(buckets).map((d) => [d.day, d.rx]));
+          const inside = nights.filter((m) => m - H >= from);
+          assert.equal(buckets.reduce((n, x) => n + x.n, 0), inside.length * 24 * 5, `${fuso} ${days} d: cada amostra contada 1 vez`);
+          for (const midnight of inside) {
+            const before = new Date(midnight - H).toLocaleDateString('sv');
+            const after = new Date(midnight).toLocaleDateString('sv');
+            const msg = `${fuso} ${days} d, meia-noite de ${after}`;
+            assert.equal(rows.get(before).n, 60, `${msg}: só a última hora no dia anterior`);
+            assert.equal(rows.get(before).m.cpu.max, 10, `${msg}: nenhum valor da madrugada no dia anterior`);
+            assert.equal(rows.get(after).n, 60, msg);
+            assert.equal(rows.get(after).m.cpu.avg, 50, msg);
+            assert.equal(traffic.get(before), 6000, `${msg}: rede do dia anterior`);
+            assert.equal(traffic.get(after), 6000, `${msg}: rede do dia`);
+          }
+        }
+      } finally {
+        fs.rmSync(dataDir, { recursive: true, force: true });
+      }
+    }
+  } finally {
     if (tz === undefined) delete process.env.TZ; else process.env.TZ = tz;
   }
 });
