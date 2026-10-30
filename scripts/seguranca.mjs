@@ -112,6 +112,11 @@ function semgrep() {
   };
 }
 
+// O Node que o ./dashboard baixa em .runtime/ é código de terceiros, fora do git, e tem
+// cabeçalhos que parecem chave (#98). Só a varredura de arquivos o ignora: se algo dali entrar
+// num commit, a varredura do histórico ainda acusa.
+const foraDoRepositorio = (arquivo) => arquivo.startsWith('.runtime/');
+
 /**
  * Gitleaks: segredos nos arquivos e em todo o histórico. O worktree e o .git comum são
  * montados nos mesmos caminhos absolutos para o `git log` funcionar dentro do contêiner.
@@ -146,7 +151,11 @@ function segredos() {
     // Quantos commits o modo "histórico" percorreu: zero quer dizer que o histórico não foi
     // lido (montagem errada), e isso reprova em vez de passar em silêncio.
     if (extra.length) commits = Number((`${r.stderr}`.replace(/\x1b\[[0-9;]*m/g, '').match(/(\d+) commits scanned/) || [])[1] || 0);
-    for (const x of lista) achados.push({ ferramenta: 'gitleaks', regra: x.RuleID, arquivo: x.File.replace(`${ROOT}/`, ''), linha: x.StartLine, commit: x.Commit });
+    for (const x of lista) {
+      const arquivo = x.File.replace(`${ROOT}/`, '');
+      if (!extra.length && foraDoRepositorio(arquivo)) continue;
+      achados.push({ ferramenta: 'gitleaks', regra: x.RuleID, arquivo, linha: x.StartLine, commit: x.Commit });
+    }
   }
   fs.rmSync(base, { recursive: true, force: true });
   const { novos, aceitos } = triar(achados);
