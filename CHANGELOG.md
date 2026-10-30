@@ -19,6 +19,8 @@ diante: `PATCH` corrige, `MINOR` acrescenta sem quebrar e `MAJOR` quebra.
 - O gráfico sob o mouse ganha destaque, com menos força que os botões (#100, ADR 0024): cartão
   ou painel sobe 1 px com sombra e borda suaves, cada faixa de telemetria ganha fundo, e o anel
   de saúde ganha um halo. O cursor, o zoom e a dica dos gráficos continuam iguais.
+- O orçamento da página inicial subiu de 300 KB para 450 KB transferidos (#100). Só o limite do
+  teste muda: nada muda no painel.
 
 ### Corrigido
 

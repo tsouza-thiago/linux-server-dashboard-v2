@@ -59,4 +59,4 @@ não "pular" quando o dado chega. Trocar os textos "Carregando…" por esses blo
 
 - Esqueleto com altura diferente do conteúdo final: a tela pula do mesmo jeito.
   Mitigação: o teste de posição do e2e.
-- Orçamento de 300 KB: as peças são pequenas, mas F1, F2, F3 e F6 somam. Medir a cada PR.
+- Orçamento de 450 KB: as peças são pequenas, mas F1, F2, F3 e F6 somam. Medir a cada PR.

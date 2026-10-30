@@ -44,7 +44,7 @@ deslocamento com "reduzir movimento".
 
 ## Consequências
 
-- O custo em bytes continua sendo só o CSS. O teste de tamanho da página inicial confere os 300 KB.
+- O custo em bytes continua sendo só o CSS. O teste de tamanho da página inicial confere o limite.
 - A F2 parte destes tokens e precisa manter o `:active` compatível com o `--lift` de 2 px.
 - O teste `e2e: hover` passa por todo `button`, `a`, `summary` e gráfico visível das 8 telas e
   confere que o estilo muda. Clicável ou gráfico novo sem hover reprova nesse teste.

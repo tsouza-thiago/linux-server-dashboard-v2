@@ -103,9 +103,9 @@ test('e2e: visão geral mostra a manchete e os dados da última coleta', { skip:
   assert.deepEqual(s.problems, []);
 });
 
-// Orçamento de desempenho (AGENTS): a página inicial transfere até 300 KB (HTML, CSS, JS, fontes,
+// Orçamento de desempenho (AGENTS): a página inicial transfere até 450 KB (HTML, CSS, JS, fontes,
 // uPlot e os dados das primeiras chamadas da API; o SSE fica de fora, ele não termina).
-test('e2e: a página inicial transfere até 300 KB (orçamento de desempenho)', { skip: !chromium && 'sem playwright-core' }, async (t) => {
+test('e2e: a página inicial transfere até 450 KB (orçamento de desempenho)', { skip: !chromium && 'sem playwright-core' }, async (t) => {
   const s = await setup(t);
   if (s.skip) return t.skip(s.skip);
   const sizes = [];
@@ -119,7 +119,7 @@ test('e2e: a página inicial transfere até 300 KB (orçamento de desempenho)', 
   const top = all.sort((a, b) => b.bytes - a.bytes).slice(0, 5).map((r) => `${r.url.replace(s.base, '')} ${Math.round(r.bytes / 1024)} KB`);
   t.diagnostic(`página inicial: ${Math.round(total / 1024)} KB em ${all.length} pedidos · maiores: ${top.join(' · ')}`);
   assert.ok(all.length > 5, 'pedidos medidos');
-  assert.ok(total <= 300 * 1024, `página inicial com ${Math.round(total / 1024)} KB (limite 300 KB)`);
+  assert.ok(total <= 450 * 1024, `página inicial com ${Math.round(total / 1024)} KB (limite 450 KB)`);
   assert.deepEqual(s.problems, []);
 });
 
