@@ -98,7 +98,7 @@ mudar o formato de `data/` para quem já usa, ela vira MAJOR (3.0.0) e este road
 | Agrupamento | 4 MINOR por tema (tabela acima) |
 | Registro | este arquivo + 1 documento por feature; ADR quando a feature for aprovada |
 | F10 (30/10/2026) | a F1 ficou fraca: animação mais visível e hover em todo clicável, antes da F2 |
-| F11 (30/10/2026) | pedido do mantenedor: README e TUTORIAL com prints das telas e outros elementos gráficos; a versão e o orçamento de imagens são proposta |
+| F11 (30/10/2026) | pedido do mantenedor: README e TUTORIAL com prints das telas e outros elementos gráficos; sai nas notas da 2.4.0, com até 200 KB por print e 3 MB em `docs/img/` |
 
 ## Perguntas em aberto
 

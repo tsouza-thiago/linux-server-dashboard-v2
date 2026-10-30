@@ -16,7 +16,7 @@ outros elementos gráficos, para o projeto ficar mais ilustrativo e chamativo.
 - `test/unit/docs.test.js` confere os links, e `test/seguranca/segredos-osint.test.js` confere o
   texto do repositório. Nenhum dos 2 enxerga o conteúdo de uma imagem.
 
-## Decisão proposta
+## Decisão
 
 1. **Prints das telas:** as 8 telas do painel, nos 2 temas, mais o login e os passos do
    assistente. O README mostra a Visão geral em destaque e uma galeria curta. O TUTORIAL põe cada
