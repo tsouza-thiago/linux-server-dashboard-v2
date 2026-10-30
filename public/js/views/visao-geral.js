@@ -11,12 +11,11 @@ import {
 } from '../core/analysis.js';
 import { PERIODS } from '../core/router.js';
 import {
-  $, icon, pill, chip, iconBox, big, n0, meter, chartBox, drawCharts, drawStrips, strips, panelHead, smartOf, onClick, withBusy,
+  $, icon, pill, chip, iconBox, big, n0, meter, chartBox, drawCharts, drawStrips, strips, panelHead, smartOf, onClick, withBusy, skelCabeca, skelFaixas, skelLinha, skelTexto,
 } from './common.js';
 
 // Circunferência do anel de saúde (raio 58) e: esta tela desenha o próprio esqueleto.
 const RING = 2 * Math.PI * 58;
-export const ownSkeleton = true;
 
 // ---------------- Alerta crítico: título e "o que fazer" por tipo de alerta ----------------
 function advice(alert) {
@@ -294,15 +293,16 @@ function procsPanel(state) {
 }
 
 // ---------------- Estados especiais ----------------
-function skeleton() {
+export function ownSkeleton(state) {
   return html`
-    <section class="hero" aria-label="Carregando" aria-busy="true">
+    <section class="hero">
       <div class="skel ring-skel"></div>
       <div class="hero-text"><div class="skel" data-w="40"></div><div class="skel tall" data-w="70"></div><div class="skel soft" data-w="85"></div></div>
+      <div class="hero-minis">${[1, 2, 3].map(() => html`<div class="mini"><span class="k">${skelLinha(60)}</span><span class="v big sm">${skelLinha(80)}</span></div>`)}</div>
     </section>
     <div class="grid-cards narrow">${CARDS.map(() => html`<div class="skel soft card-skel"></div>`)}</div>
-    <div class="skel soft panel-skel"></div>
-    <p class="note">Carregando o histórico… · blocos no formato final, nada "pula" quando os dados chegam.</p>`;
+    <section class="panel flush">${skelCabeca(true)}<div class="panel-body">${skelFaixas(state.sample ? telemetryRows(state).length : 5)}</div></section>
+    <div class="grid-3">${[1, 2, 3].map(() => html`<section class="panel">${skelCabeca()}${skelTexto(4)}</section>`)}</div>`;
 }
 
 /** Aviso de primeiro uso (dados ainda chegando). */
@@ -341,8 +341,6 @@ const sigOf = (state) => telemetryRows(state).map((r) => r.id).join(',');
 
 /** Monta a tela inteira. */
 export function render(ctx) {
-  if (ctx.state.loading) { mount(ctx.el, skeleton()); ctx.local.skeleton = true; return; }
-  ctx.local.skeleton = false;
   const rows = telemetryRows(ctx.state);
   ctx.local.sig = sigOf(ctx.state);
   mount(ctx.el, html`
@@ -379,7 +377,6 @@ function loadDisk30(ctx) {
 
 /** Atualiza só o que muda com os dados novos. */
 export function update(ctx) {
-  if (ctx.local.skeleton || ctx.state.loading) { if (!ctx.state.loading) render(ctx); return; }
   if (sigOf(ctx.state) !== ctx.local.sig) {
     for (const c of ctx.charts.values()) c.destroy();
     ctx.charts.clear();

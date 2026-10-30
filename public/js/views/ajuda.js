@@ -3,7 +3,7 @@
 // SMART, com a linha do sudoers pronta para copiar), versões e sessão.
 import { html, mount } from '../core/html.js';
 import * as f from '../core/format.js';
-import { $, icon, iconBox, panelHead } from './common.js';
+import { $, icon, iconBox, panelHead, skelCabeca, skelTabela, skelTexto } from './common.js';
 
 /** Subtítulo da tela. */
 export const sub = () => 'Como ler o painel, o que fazer em cada alerta e como ele está configurado';
@@ -48,7 +48,9 @@ function howToRead() {
 /** Configuração ativa (só leitura, vinda de /api/config: sem segredos). */
 function config(state) {
   const c = state.config;
-  if (!c) return html`<p class="empty">Carregando configuração…</p>`;
+  // Durante a carga vale o esqueleto da tela: aqui, sem configuração, a API falhou (só um novo
+  // carregamento traz os dados), e um bloco pulsando prometeria o que não vai chegar.
+  if (!c) return html`<p class="empty">Configuração indisponível. Recarregue a página.</p>`;
   const t = c.thresholds || {};
   const list = (a) => (a && a.length ? a.join(' ') : '—');
   const row = (k, v, varName) => html`<tr><th scope="row">${k}</th><td class="num mono">${v}${varName ? html` <span class="ink-3">${varName}</span>` : ''}</td></tr>`;
@@ -108,6 +110,17 @@ function access(state) {
       <button class="btn btn-sm btn-danger" type="button" id="aj-logout-all">Encerrar todas as sessões</button>
     </div>` : ''}`;
 }
+
+/** Esqueleto no formato da tela: os 2 painéis de cima são texto fixo, e já ficam prontos. */
+export const ownSkeleton = (state) => html`
+  <div class="grid-2">
+    <section class="panel">${whatToDo(state.meta?.thresholds || state.config?.thresholds || {})}</section>
+    <section class="panel">${howToRead()}</section>
+  </div>
+  <div class="grid-2">
+    <section class="panel flush">${skelCabeca(true)}${skelTabela(10, 2)}</section>
+    <section class="panel">${skelCabeca()}${skelTexto(10)}</section>
+  </div>`;
 
 /** Monta a tela inteira. */
 export function render(ctx) {

@@ -313,6 +313,26 @@ pre.code {
 }
 .skel.soft { background: var(--surface-2); }
 @keyframes shimmer { 50% { opacity: 0.55; } }
+/* Texto: o invisível dá a altura da linha do lugar, e o bloco fica mais fino que ela. */
+.skel.skel-txt { position: relative; display: inline-block; vertical-align: top; max-width: 100%; color: transparent; background: none; animation: none; }
+.skel-txt::before {
+  content: ""; position: absolute; inset: 0.2em 0; border-radius: var(--r-1); background: var(--surface-3);
+  animation: shimmer 1.5s ease-in-out infinite;
+}
+.skel-grafico { width: 100%; }
+.skel-texto { display: flex; flex-direction: column; gap: 6px; font-size: 13px; }
+/* Peças de uma região: seguem o layout de quem as recebe; ocultas, só guardam o espaço. */
+.esqueleto { display: contents; }
+.esqueleto.oculto { visibility: hidden; }
+#ar-fc-skel:empty { display: none; }
+
+/* Troca de período (ADR 0027): os dados velhos esmaecem e uma faixa fina corre no topo. */
+.atualizando .chart > .uplot { opacity: 0.5; transition: opacity var(--t-fast); }
+.atualizando .panel > .chart::before, .atualizando .strips::before {
+  content: ""; position: absolute; top: 0; left: 0; z-index: 1; width: 100%; height: 2px; background: var(--accent);
+  transform-origin: left; animation: atualizando 1s ease-in-out infinite alternate;
+}
+@keyframes atualizando { from { transform: scaleX(0.15); } }
 
 /* ---------------- Gráficos (uPlot) ---------------- */
 .chart { position: relative; min-width: 0; }

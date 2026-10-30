@@ -3,7 +3,7 @@
 // ordenação sobrevivem às atualizações ao vivo) e para onde vai a memória.
 import { html, mount } from '../core/html.js';
 import * as f from '../core/format.js';
-import { $, iconBox, meter, panelHead } from './common.js';
+import { $, iconBox, meter, panelHead, skelCabeca, skelLinha, skelTabela, skelTexto } from './common.js';
 
 /** Subtítulo da tela. */
 export const sub = () => 'Serviços monitorados e os processos que mais usam memória, na última coleta';
@@ -104,6 +104,18 @@ function memory(s) {
       <div class="kv sep"><span class="ink-2">disponível</span><span class="mono ink-2">${f.mb(r.avail)}</span></div>
     </div>`;
 }
+
+/** Esqueleto no formato da tela (na coleta, são até 8 processos). */
+export const ownSkeleton = (state) => html`
+  <section class="grid-cards svc-grid">${Array.from({ length: Object.keys(state.sample?.services || {}).length + 1 }, () => html`
+    <article class="card svc-card"><span class="icon-box lg"></span><div class="svc-text"><span class="svc-name">${skelLinha(null, 'servico')}</span><span>${skelLinha(null, 'rodando')}</span><span class="note">${skelLinha(null, 'sem quedas registradas')}</span></div></article>`)}</section>
+  <div class="split">
+    <section class="panel flush split-main">
+      <div class="panel-head"><div><h2>${skelLinha(null, 'Top processos · última coleta')}</h2></div><div class="search"><label>&nbsp;</label><span class="input">&nbsp;</span></div></div>
+      ${skelTabela(8, COLS.length, { cabeca: head() })}
+    </section>
+    <section class="panel split-side">${skelCabeca()}${skelTexto(7)}</section>
+  </div>`;
 
 /** Monta a tela inteira. */
 export function render(ctx) {

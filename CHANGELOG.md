@@ -17,6 +17,11 @@ diante: `PATCH` corrige, `MINOR` acrescenta sem quebrar e `MAJOR` quebra.
 - Transição suave na troca de telas (#86, ADR 0026): a tela nova, o conteúdo que substitui o
   esqueleto, o login e os diálogos entram com um esmaecer e um deslocamento curtos. A chegada de
   uma amostra e a troca de período ou de tema não animam, e com "reduzir movimento" nada se move.
+- Esqueleto em tudo o que carrega (#89, ADR 0027): as 8 telas mostram blocos no formato final, e
+  o conteúdo entra sem a tela pular. Rede, Relatórios e Armazenamento fazem o mesmo nas partes que
+  carregam depois. Na troca de período, o gráfico fica com os dados velhos, esmaecido, com uma
+  faixa fina no topo. Resposta em menos de 150 ms não mostra nada, e o que apareceu fica pelo menos
+  300 ms. O leitor de tela ouve "carregando", e com "reduzir movimento" nada pulsa.
 - Estado "aguardando" nos botões (#85): coletar agora, reconhecer, resolver, salvar e remover
   anotação e entrar mostram um spinner, sem mudar a largura, e o duplo clique não repete a ação.
 - Roadmap: nova feature F11 (#106, milestone 2.4.0), README e TUTORIAL ilustrados com prints das

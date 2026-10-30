@@ -5,7 +5,9 @@ import * as f from '../core/format.js';
 import { peakOf, dailyTraffic, topPeaks } from '../core/analysis.js';
 
 const dayOf = f.localDay;
-import { $, pill, big, chartBox, legend, drawCharts, panelHead } from './common.js';
+import {
+  $, pill, big, chartBox, legend, drawCharts, panelHead, carregarRegiao, skelCabeca, skelCartao, skelGrafico, skelLinha, skelRegiao, skelTabela,
+} from './common.js';
 
 /** Subtítulo da tela, com a interface acompanhada. */
 export const sub = (state) => (state.sample?.net ? `Interface ${state.sample.net.iface} · tráfego, totais e erros` : 'Tráfego, totais e erros da interface de rede');
@@ -50,9 +52,12 @@ function cards(ctx) {
     </article>`;
 }
 
+// Barras da semana: a área, os rótulos dos dias e a nota do maior dia.
+const skelSemana = () => html`${skelGrafico(181)}<div class="week-labels"><span>&nbsp;</span></div><span class="note">${skelLinha(70)}</span>`;
+
 /** Volume por dia nos últimos 7 dias (barras). */
 function weekBars(ctx) {
-  if (!ctx.local.week) return html`<p class="empty">Carregando os últimos 7 dias…</p>`;
+  if (!ctx.local.week) return skelRegiao(ctx, skelSemana());
   const days = dailyTraffic(ctx.local.week, ctx.state.meta?.pollIntervalMs);
   const todayKey = dayOf(Date.now());
   const list = Array.from({ length: 7 }, (_, i) => {
@@ -86,6 +91,15 @@ function peaksTable(state) {
   </table></div>`;
 }
 
+/** Esqueleto no formato da tela. */
+export const ownSkeleton = () => html`
+  <section class="grid-cards">${[1, 2, 3, 4].map(() => skelCartao({ nota: 'pico 24h 000,00 Mbps às 00:00' }))}</section>
+  <section class="panel">${skelCabeca()}${skelGrafico(260)}</section>
+  <div class="grid-2">
+    <section class="panel">${skelCabeca()}${skelSemana()}</section>
+    <section class="panel">${skelCabeca()}${skelTabela(3, 4)}<span class="note">${skelLinha(80)}</span></section>
+  </div>`;
+
 /** Monta a tela inteira. */
 export function render(ctx) {
   mount(ctx.el, html`
@@ -106,9 +120,9 @@ export function render(ctx) {
       </section>
     </div>`);
   // Volume por dia vem de baldes de 1 h dos últimos 7 dias (independe do período escolhido).
-  ctx.api.buckets({ from: new Date(Date.now() - 7 * 86400e3).toISOString(), to: new Date().toISOString(), limit: 168 })
-    .then((r) => { ctx.local.week = r.buckets || []; update(ctx); })
-    .catch(() => { ctx.local.week = []; update(ctx); });
+  carregarRegiao(ctx, update,
+    () => ctx.api.buckets({ from: new Date(Date.now() - 7 * 86400e3).toISOString(), to: new Date().toISOString(), limit: 168 }),
+    (r) => { ctx.local.week = r?.buckets || []; });
   update(ctx);
 }
 

@@ -335,7 +335,7 @@ test('e2e: troca de tela — entra com a tela nova; amostra do SSE, período e t
 test('e2e: troca de tela — o conteúdo que substitui o esqueleto entra, na tela geral e na Visão geral', { skip: !chromium && 'sem playwright-core' }, async (t) => {
   const s = await setup(t);
   if (s.skip) return t.skip(s.skip);
-  for (const [hash, conteudo] of [['#/processos', '.view-processos .panel'], ['#/visao-geral', '.hero']]) {
+  for (const [hash, conteudo] of [['#/processos', '#pr-rows'], ['#/visao-geral', '#vg-hero .hero']]) {
     let solta;
     const espera = new Promise((r) => { solta = r; });
     await s.page.route('**/api/status', async (rota) => { await espera; await rota.continue(); });
@@ -431,6 +431,220 @@ test('e2e: troca de tela — login e diálogo entram igual; o movimento reduzido
   const tela = await s.page.evaluate(entrada(), '.view');
   assert.equal(tela.nome, 'none');
   assert.ok(tela.duracao < 0.01, `duração ${tela.duracao}`);
+});
+
+// Posição e altura dos blocos principais da tela, para comparar o esqueleto com o conteúdo.
+// Largura para medir o pulo: nela as notas dos cartões cabem em 1 linha. A 1280 px, elas ficam no
+// limite da quebra, e quebrar ou não depende do valor do pico, que muda com os baldes da hora.
+const LARGA = { width: 1600, height: 900 };
+// Relativa à tela: a entrada desloca a tela inteira, e isso não é pulo.
+const blocos = (page) => page.evaluate(() => {
+  const base = document.querySelector('.view').getBoundingClientRect();
+  return [...document.querySelectorAll('.view > *:not(.visually-hidden)')]
+    .filter((el) => el.getBoundingClientRect().height > 0)
+    .map((el) => { const r = el.getBoundingClientRect(); return { nome: el.className || el.tagName, top: Math.round(r.top - base.top) }; });
+});
+// Segura um pedido da API até `solta()`. Função sobre o caminho: o glob não pega URL com query.
+async function segura(page, caminho) {
+  let solta;
+  const portao = new Promise((r) => { solta = r; });
+  const filtro = (url) => url.pathname === caminho;
+  await page.route(filtro, async (rota) => { await portao; await rota.continue(); });
+  return { solta, tira: () => page.unroute(filtro) };
+}
+
+test('e2e: esqueleto — nas 8 telas fica no formato final: o conteúdo entra sem pulo', { skip: !chromium && 'sem playwright-core' }, async (t) => {
+  const s = await setup(t, { viewport: LARGA });
+  if (s.skip) return t.skip(s.skip);
+  for (const [id] of VIEWS) {
+    const status = await segura(s.page, '/api/status');
+    await s.page.goto(`${s.base}/#/${id}`, { waitUntil: 'load' });
+    await s.page.reload({ waitUntil: 'load' });
+    await s.page.waitForSelector('.view .skel');
+    assert.equal(await s.page.getAttribute('#view', 'aria-busy'), '', `${id}: a região avisa que carrega`);
+    assert.match(await s.page.textContent('.view .visually-hidden'), /carregando/, `${id}: texto para leitor de tela`);
+    const antes = await blocos(s.page);
+    status.solta();
+    await s.page.waitForFunction(() => !document.querySelector('#view[aria-busy], .view .skel'));
+    await status.tira();
+    const depois = await blocos(s.page);
+    assert.equal(depois.length, antes.length, `${id}: mesmos blocos`);
+    depois.forEach((b, i) => assert.ok(Math.abs(b.top - antes[i].top) <= 2, `${id}: ${b.nome} pulou de ${antes[i].top} para ${b.top}`));
+  }
+  assert.deepEqual(s.problems, []);
+});
+
+// Grava na página cada vez que surge ou some um esqueleto visível ou o "atualizando".
+const gravaEsperas = (page) => page.addInitScript(() => {
+  window.esperas = [];
+  let antes = false;
+  const olha = () => {
+    const agora = [...document.querySelectorAll('.view .skel, .view.atualizando')].some((el) => getComputedStyle(el).visibility === 'visible');
+    if (agora !== antes) window.esperas.push({ visivel: agora, ms: performance.now() });
+    antes = agora;
+    requestAnimationFrame(olha);
+  };
+  requestAnimationFrame(olha);
+});
+
+test('e2e: esqueleto — resposta rápida não mostra esqueleto nem "atualizando"', { skip: !chromium && 'sem playwright-core' }, async (t) => {
+  const s = await setup(t);
+  if (s.skip) return t.skip(s.skip);
+  await gravaEsperas(s.page);
+  await s.page.goto(`${s.base}/#/processos`, { waitUntil: 'networkidle' });
+  await s.page.waitForFunction(() => !document.querySelector('#view[aria-busy]') && document.querySelector('#pr-rows'));
+  await s.page.evaluate(() => { window.esperas.length = 0; });
+  for (const [hash, pronto] of [['#/recursos', '.view-recursos .uplot'], ['#/rede', '.week-bars'], ['#/armazenamento', '[data-chart="ar-fc"] .uplot'], ['#/relatorios', '#rl-table tbody td'], ['#/recursos?p=7d', '.view-recursos .uplot']]) {
+    await s.page.evaluate((h) => { location.hash = h; }, hash);
+    await s.page.waitForSelector(pronto);
+    await s.page.waitForFunction(() => !document.querySelector('#view[aria-busy]'));
+    await s.page.waitForTimeout(200);
+    assert.deepEqual(await s.page.evaluate(() => window.esperas), [], `${hash}: nada apareceu`);
+  }
+  assert.deepEqual(s.problems, []);
+});
+
+test('e2e: esqueleto — uma vez visível, fica pelo menos o tempo mínimo', { skip: !chromium && 'sem playwright-core' }, async (t) => {
+  const s = await setup(t);
+  if (s.skip) return t.skip(s.skip);
+  await gravaEsperas(s.page);
+  await s.page.goto(`${s.base}/#/processos`, { waitUntil: 'networkidle' });
+  await s.page.waitForFunction(() => !document.querySelector('#view[aria-busy]') && document.querySelector('#pr-rows'));
+  await s.page.evaluate(() => { window.esperas.length = 0; });
+  await s.page.route((url) => url.pathname === '/api/history', async (rota) => {
+    await new Promise((r) => { setTimeout(r, 220); });
+    await rota.continue();
+  });
+  await s.page.evaluate(() => { location.hash = '#/recursos'; });
+  await s.page.waitForSelector('.view-recursos .uplot');
+  const [aparece, some] = await s.page.evaluate(() => window.esperas);
+  assert.equal(aparece.visivel, true);
+  assert.equal(some.visivel, false);
+  assert.ok(some.ms - aparece.ms >= 270, `ficou ${Math.round(some.ms - aparece.ms)} ms`);
+  assert.deepEqual(s.problems, []);
+});
+
+test('e2e: esqueleto — na troca de período o gráfico fica com os dados velhos, esmaecido e com a faixa', { skip: !chromium && 'sem playwright-core' }, async (t) => {
+  const s = await setup(t);
+  if (s.skip) return t.skip(s.skip);
+  await s.page.goto(`${s.base}/#/recursos`, { waitUntil: 'load' });
+  await s.page.waitForSelector('.view-recursos .uplot');
+  await s.page.waitForFunction(() => !document.querySelector('#view[aria-busy]'));
+  const canvas = await s.page.evaluateHandle(() => document.querySelector('[data-chart="rc-cpu"] canvas'));
+  const baldes = await segura(s.page, '/api/history');
+  await s.page.click('[data-period="7d"]');
+  // Os baldes estão presos: o botão responde antes deles (o hashchange só chega no tique seguinte).
+  await s.page.waitForSelector('[data-period="7d"][aria-pressed="true"]', { timeout: 2000 });
+  await s.page.waitForSelector('.view.atualizando');
+  const estado = () => s.page.evaluate(() => {
+    const painel = document.querySelector('.panel > [data-chart="rc-cpu"]');
+    const faixa = getComputedStyle(painel, '::before');
+    const faixas = getComputedStyle(document.querySelector('.view .strips'), '::before');
+    return {
+      opacidade: Number(getComputedStyle(painel.querySelector('.uplot')).opacity), faixa: faixa.animationName, altura: faixa.height,
+      faixas: faixas.animationName, esqueleto: document.querySelector('.view .skel') !== null, ocupada: document.getElementById('view').hasAttribute('aria-busy'),
+      aviso: document.querySelector('.view > .visually-hidden')?.textContent,
+    };
+  });
+  await s.page.waitForTimeout(200);
+  assert.deepEqual(await estado(), { opacidade: 0.5, faixa: 'atualizando', altura: '2px', faixas: 'atualizando', esqueleto: false, ocupada: true, aviso: 'carregando' });
+  assert.equal(await canvas.evaluate((c) => c.isConnected), true, 'o mesmo gráfico continua na tela');
+  baldes.solta();
+  await s.page.waitForFunction(() => !document.querySelector('.view.atualizando, #view[aria-busy]'));
+  await baldes.tira();
+  assert.equal(await temEntrada(s.page), false, 'trocar de período não é trocar de tela');
+  assert.ok(await s.page.locator('[data-chart="rc-cpu"] .uplot').count());
+  assert.deepEqual(s.problems, []);
+});
+
+test('e2e: esqueleto — região que carrega depois guarda o espaço, e sair no meio não quebra', { skip: !chromium && 'sem playwright-core' }, async (t) => {
+  const s = await setup(t, { viewport: LARGA });
+  if (s.skip) return t.skip(s.skip);
+  await s.page.goto(`${s.base}/#/processos`, { waitUntil: 'networkidle' });
+  await s.page.waitForSelector('#pr-rows');
+  // A 1ª resposta (baldes do período) passa; a dos 7 dias fica presa.
+  let solta;
+  const portao = new Promise((r) => { solta = r; });
+  const semana = (url) => url.pathname === '/api/history' && url.searchParams.get('limit') === '168';
+  await s.page.route(semana, async (rota) => { await portao; await rota.continue(); });
+  await s.page.evaluate(() => { location.hash = '#/rede'; });
+  await s.page.waitForSelector('#rd-week .esqueleto', { state: 'attached' });
+  await s.page.waitForSelector('#rd-week .esqueleto:not(.oculto) .skel');
+  assert.equal(await s.page.getAttribute('#rd-week .esqueleto', 'aria-busy'), 'true');
+  assert.match(await s.page.textContent('#rd-week'), /carregando/);
+  const antes = await blocos(s.page);
+  solta();
+  await s.page.waitForSelector('#rd-week .week-bars');
+  await s.page.unroute(semana);
+  assert.deepEqual((await blocos(s.page)).map((b) => b.top), antes.map((b) => b.top));
+  // Sair com o pedido no ar: a resposta tardia não mexe na tela nova nem dá erro.
+  let soltaSaida;
+  const portaoSaida = new Promise((r) => { soltaSaida = r; });
+  const filtro = (url) => url.pathname === '/api/history' && url.searchParams.get('limit') === '720';
+  await s.page.route(filtro, async (rota) => { await portaoSaida; await rota.continue(); });
+  await s.page.evaluate(() => { location.hash = '#/armazenamento'; });
+  await s.page.waitForSelector('#ar-fc-skel .esqueleto:not(.oculto)');
+  await s.page.evaluate(() => { location.hash = '#/ajuda'; });
+  await s.page.waitForSelector('.view-ajuda');
+  soltaSaida();
+  await s.page.waitForTimeout(150);
+  assert.equal(await s.page.locator('.view-ajuda').count(), 1);
+  assert.deepEqual(s.problems, []);
+});
+
+test('e2e: esqueleto — Relatórios mantém o resumo até o atraso e mostra blocos no período novo', { skip: !chromium && 'sem playwright-core' }, async (t) => {
+  const s = await setup(t);
+  if (s.skip) return t.skip(s.skip);
+  await s.page.goto(`${s.base}/#/relatorios`, { waitUntil: 'load' });
+  await s.page.waitForSelector('#rl-table tbody td:not(:has(.skel))');
+  const baldes = await segura(s.page, '/api/history');
+  await s.page.click('[data-days="30"]');
+  assert.equal(await s.page.locator('#rl-cards .skel').count(), 0, 'antes do atraso, o resumo velho continua');
+  assert.equal(await s.page.getAttribute('[data-days="30"]', 'aria-pressed'), 'true');
+  await s.page.waitForSelector('#rl-cards .esqueleto:not(.oculto) .skel');
+  assert.equal(await s.page.locator('#rl-table tbody tr').count(), 31, '1 linha por dia do período');
+  baldes.solta();
+  await s.page.waitForFunction(() => !document.querySelector('.view .skel'));
+  await baldes.tira();
+  assert.equal(await s.page.locator('#rl-table tbody tr').count(), 31);
+  assert.deepEqual(s.problems, []);
+});
+
+test('e2e: esqueleto — com movimento reduzido nada pulsa nem corre', { skip: !chromium && 'sem playwright-core' }, async (t) => {
+  const s = await setup(t);
+  if (s.skip) return t.skip(s.skip);
+  await s.page.emulateMedia({ reducedMotion: 'reduce' });
+  const status = await segura(s.page, '/api/status');
+  await s.page.goto(`${s.base}/#/recursos`, { waitUntil: 'load' });
+  await s.page.waitForSelector('.view .skel');
+  // Sem animação ativa, cada bloco fica com a aparência final: parado e inteiro.
+  await s.page.waitForTimeout(50);
+  const rodando = () => s.page.evaluate(() => document.getAnimations({ subtree: true }).filter((a) => a.playState === 'running').length);
+  assert.equal(await rodando(), 0);
+  status.solta();
+  await s.page.waitForSelector('.view-recursos .uplot');
+  await status.tira();
+  await s.page.waitForFunction(() => !document.querySelector('#view[aria-busy]'));
+  const baldes = await segura(s.page, '/api/history');
+  await s.page.click('[data-period="7d"]');
+  await s.page.waitForSelector('.view.atualizando');
+  await s.page.waitForTimeout(50);
+  assert.equal(await rodando(), 0);
+  const largura = await s.page.evaluate(() => getComputedStyle(document.querySelector('.panel > [data-chart="rc-cpu"]'), '::before').transform);
+  assert.equal(largura, 'none', 'a faixa fica inteira');
+  baldes.solta();
+  await s.page.waitForFunction(() => !document.querySelector('.view.atualizando'));
+  await baldes.tira();
+  assert.deepEqual(s.problems, []);
+});
+
+test('e2e: esqueleto — sem a configuração, a Ajuda diz que falhou em vez de pulsar para sempre', { skip: !chromium && 'sem playwright-core' }, async (t) => {
+  const s = await setup(t);
+  if (s.skip) return t.skip(s.skip);
+  await s.page.route((url) => url.pathname === '/api/config', (rota) => rota.abort());
+  await s.page.goto(`${s.base}/#/ajuda`, { waitUntil: 'load' });
+  await s.page.waitForFunction(() => /Configuração indisponível/.test(document.getElementById('aj-config')?.textContent));
+  assert.equal(await s.page.locator('.view .skel').count(), 0);
 });
 
 test('e2e: anotação com HTML malicioso aparece como texto (anti-XSS)', { skip: !chromium && 'sem playwright-core' }, async (t) => {

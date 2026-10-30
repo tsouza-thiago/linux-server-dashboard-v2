@@ -5,7 +5,7 @@ import * as f from '../core/format.js';
 import {
   reportDays, dailyTraffic, outagesIn, offlineMsIn, uptimeIn, meanOf, peakOf, timeline, levelOf, fullestDisk, reportRequests,
 } from '../core/analysis.js';
-import { $, icon, panelHead, onClick } from './common.js';
+import { $, icon, panelHead, onClick, carregarRegiao, skelCabeca, skelCartao, skelLinha, skelRegiao, skelTabela } from './common.js';
 
 // Métricas resumidas por dia e os períodos oferecidos.
 const DAY = 86400e3;
@@ -51,10 +51,22 @@ function range() {
   return { from: to - view.days * DAY, to };
 }
 
+// Cabeçalho da tabela por dia.
+const CABECA = () => html`<tr><th scope="col">Dia</th><th scope="col" class="num">Disponível</th><th scope="col" class="num">CPU méd / máx</th>
+  <th scope="col" class="num">RAM méd / máx</th><th scope="col" class="num">Temp máx</th><th scope="col" class="num">Rede ↓ / ↑</th><th scope="col" class="num">Eventos</th></tr>`;
+// Peças do resumo: 1 cartão por indicador e 1 linha por dia do período.
+const skelResumo = () => html`${[1, 2, 3, 4, 5].map(() => skelCartao({ numero: 'md' }))}`;
+const skelDias = () => {
+  const { from, to } = range();
+  return skelTabela(reportDays([], KEYS, from, to).length, 7, { cabeca: CABECA(), cls: 'daily' });
+};
+// Sem dados ainda ou, na troca de período, depois do atraso: os dados velhos ficam até ali.
+const carregando = (ctx) => !ctx.local.buckets || ctx.local.regiaoVisivel;
+
 /** Cartões de resumo do período (disponibilidade, médias, picos). */
 function cards(ctx) {
   const b = ctx.local.buckets;
-  if (!b) return html`${[1, 2, 3, 4, 5].map(() => html`<div class="skel soft card-skel"></div>`)}`;
+  if (carregando(ctx)) return skelRegiao(ctx, skelResumo());
   const { from, to } = range();
   const outs = outagesIn(ctx.state.outages?.outages, from, to);
   const since = ctx.state.outages?.uptime?.from ? Date.parse(ctx.state.outages.uptime.from) : -Infinity;
@@ -83,7 +95,7 @@ function cards(ctx) {
 /** Tabela por dia (fuso local) com médias, picos e eventos. */
 function table(ctx) {
   const b = ctx.local.buckets;
-  if (!b) return html`<p class="empty">Carregando resumo…</p>`;
+  if (carregando(ctx)) return skelRegiao(ctx, skelDias());
   // Todos os dias do período, com ou sem amostra (#43): o dia só de queda mostra 0% e o dia
   // sem coleta, "sem dados", como na faixa de Eventos.
   const { from, to } = range();
@@ -95,8 +107,7 @@ function table(ctx) {
   const today = f.localDay(Date.now());
   const mm = (m, k, d = 0) => (m[k] ? `${f.num(m[k].avg, d)} / ${f.num(m[k].max, d)}%` : '—');
   return html`<div class="table-wrap"><table class="table daily">
-    <thead><tr><th scope="col">Dia</th><th scope="col" class="num">Disponível</th><th scope="col" class="num">CPU méd / máx</th>
-      <th scope="col" class="num">RAM méd / máx</th><th scope="col" class="num">Temp máx</th><th scope="col" class="num">Rede ↓ / ↑</th><th scope="col" class="num">Eventos</th></tr></thead>
+    <thead>${CABECA()}</thead>
     <tbody>${daily.map((d) => {
     const start = new Date(`${d.day}T00:00:00`).getTime();
     const up = uptimeIn(ctx.state.outages?.outages, start, start + DAY, { sinceMs: since, monitored: ctx.state.outages?.monitored });
@@ -145,23 +156,22 @@ function customForm() {
 /** Busca os baldes do período (uma vez por período escolhido). */
 function load(ctx) {
   const { from, to } = range();
-  ctx.local.buckets = null;
-  update(ctx);
   // Baldes que não cruzam a meia-noite local (#68, #74): 1 h em fuso de hora inteira (até 2
   // pedidos), 30 ou 15 min nos outros (até 5). Os pedidos vão um depois do outro: o
   // servidor monta 1 resposta de cada vez, e o pico de memória dele não cresce.
-  const seq = (ctx.local.loadSeq || 0) + 1;
-  ctx.local.loadSeq = seq;
-  const done = (buckets) => {
-    if (ctx.local.loadSeq !== seq) return; // outro período foi escolhido no meio do caminho
-    ctx.local.buckets = buckets;
-    update(ctx);
-  };
-  reportRequests(from, to)
-    .reduce((acc, p) => acc.then((all) => ctx.api.buckets(p).then((r) => all.concat(r.buckets || []))), Promise.resolve([]))
-    .then(done, () => done([]));
+  carregarRegiao(ctx, update,
+    () => reportRequests(from, to)
+      .reduce((acc, p) => acc.then((all) => ctx.api.buckets(p).then((r) => all.concat(r.buckets || []))), Promise.resolve([])),
+    (buckets) => { ctx.local.buckets = buckets || []; });
+  update(ctx);
   mount(document.getElementById('viewActions'), actions()); // botão do período marcado
 }
+
+/** Esqueleto no formato da tela. */
+export const ownSkeleton = () => html`
+  <section class="grid-cards narrow">${skelResumo()}</section>
+  <section class="panel flush">${skelCabeca(true)}${skelDias()}</section>
+  <section class="panel">${skelCabeca(true)}<div class="export-grid">${[1, 2, 3].map(() => html`<div class="export-btn">${skelLinha(90)}</div>`)}</div></section>`;
 
 /** Monta a tela inteira. */
 export function render(ctx) {

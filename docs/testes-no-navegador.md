@@ -60,6 +60,11 @@ Em todas as telas, nos cenários `normal` e `lacunas`:
   em sequência rápida, fica só a última tela e a animação não acumula. A tela não pisca com uma
   amostra nova nem ao trocar o período ou o tema. Depois da entrada, o gráfico continua com a
   largura certa, e o cursor e o zoom acompanham o mouse.
+- **Esqueleto (ADR 0027), nos 2 temas:** com a rede lenta (limitação de rede do navegador), as 8
+  telas sobem com blocos no formato final, e o conteúdo entra sem a tela pular. Sem limitação, nada
+  pisca. Ao trocar o período com a rede lenta, o gráfico fica com os dados velhos, esmaecido, com
+  uma faixa fina no topo, e o botão do período responde na hora. Em Relatórios, o resumo velho fica
+  até os blocos aparecerem. Rede e Armazenamento guardam o espaço do que carrega depois.
 - **Aguardando (ADR 0025):** em "Coletar agora", "Reconhecer", "Resolver", "Salvar", "Remover" e
   "Entrar", o botão mostra o spinner e fica desligado até a resposta, sem mudar a largura, e o
   duplo clique faz só 1 pedido. Com "reduzir movimento", o spinner vira um ponto fixo.

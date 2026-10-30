@@ -3,7 +3,9 @@
 import { html, mount } from '../core/html.js';
 import * as f from '../core/format.js';
 import { keysWith, meanOf, peakOf, trendOf } from '../core/analysis.js';
-import { $, pill, big, n0, meter, chartBox, legend, drawCharts, drawStrips, strips, panelHead } from './common.js';
+import {
+  $, pill, big, n0, meter, chartBox, legend, drawCharts, drawStrips, strips, panelHead, skelCabeca, skelCartao, skelFaixas, skelGrafico, skelLinha,
+} from './common.js';
 
 /** Subtítulo da tela. */
 export const sub = () => 'Processador, memória, pressão do sistema e temperatura';
@@ -95,6 +97,16 @@ function psiPill(s) {
   const worst = Math.max(...['cpu', 'memory', 'io'].map((k) => p[k]?.some10 ?? 0));
   return worst >= 10 ? pill('warn', 'engasgando', { lg: true }) : pill('ok', 'sem engasgos', { lg: true });
 }
+
+/** Esqueleto no formato da tela. */
+export const ownSkeleton = () => html`
+  <section class="grid-cards">${[1, 2, 3, 4].map(() => skelCartao({ medidor: true, nota: 'usuário 0,0 · sistema 0,0 · espera de disco 0,0' }))}</section>
+  <section class="panel">${skelCabeca(true)}${skelGrafico(240)}</section>
+  <div class="grid-2">
+    <section class="panel">${skelCabeca()}${skelGrafico(170)}<div class="minis-4">${[1, 2, 3, 4].map(() => html`<div class="mini"><span class="k">${skelLinha(60)}</span><span class="v">${skelLinha(null, '00% 00:00')}</span></div>`)}</div></section>
+    <section class="panel">${skelCabeca()}${skelGrafico(170)}</section>
+  </div>
+  <section class="panel flush">${skelCabeca(true)}<div class="panel-body">${skelFaixas(3, 'psi')}</div></section>`;
 
 /** Monta a tela inteira. */
 export function render(ctx) {

@@ -4,6 +4,7 @@
 import { html, raw } from '../core/html.js';
 import { series, xs } from '../core/analysis.js';
 import { timeChart, evenTicks, renderTip } from '../charts/timeseries.js';
+import { ATRASO_MS, esperaVisivel, pausa } from '../core/espera.js';
 import * as f from '../core/format.js';
 
 /** Primeiro elemento que casa com o seletor (na tela inteira ou dentro de `root`). */
@@ -238,6 +239,79 @@ export const strips = (groupId, rows, cls = '') => html`
 /** Cabeçalho de painel: título, nota e um lado direito opcional. */
 export const panelHead = (title, note = '', right = '') => html`
   <div class="panel-head"><div><h2>${title}</h2>${note ? html`<span class="hint">${note}</span>` : ''}</div>${right}</div>`;
+
+// ---------------- Esqueletos (F6, ADR 0027) ----------------
+// As peças usam as mesmas classes do conteúdo e têm um texto invisível: o bloco ocupa o mesmo
+// espaço, com a fonte do lugar onde ele está, e a tela não pula.
+
+/**
+ * Bloco no lugar de um texto, com `w`% da largura. Com um `exemplo` do tamanho do texto final, a
+ * largura vem dele (use `w` nulo) e ele quebra de linha onde o texto final quebraria.
+ */
+export const skelLinha = (w = 100, exemplo = '\u00a0') => html`<span class="skel skel-txt" aria-hidden="true"${w === null ? '' : html` data-w="${w}"`}>${exemplo}</span>`;
+
+/** Cabeçalho de painel, com a nota opcional. A coluna encolhe no texto: a largura vem do exemplo. */
+export const skelCabeca = (nota = false) => html`
+  <div class="panel-head"><div><h2>${skelLinha(null, 'Título do painel · 24h')}</h2>${nota ? html`<span class="hint">${skelLinha(null, 'nota de exemplo deste painel, com um tamanho médio de texto')}</span>` : ''}</div></div>`;
+
+/** Cartão de número: rótulo, número e nota. `numero` é o tamanho do `big()` ("md", "sm"…). */
+export const skelCartao = ({ medidor = false, numero = '', nota = '' } = {}) => html`<article class="card">
+  <span class="card-label">${skelLinha(45)}</span>
+  <span class="big${numero ? ` ${numero}` : ''}">${skelLinha(60)}</span>
+  ${medidor ? html`<div class="meter"></div>` : ''}
+  <span class="note mono">${nota ? skelLinha(null, nota) : skelLinha(85)}</span>
+</article>`;
+
+/** Área de um gráfico, com a altura dele em pixels. */
+export const skelGrafico = (altura = 220) => html`<div class="skel soft skel-grafico" data-px="${altura}"></div>`;
+
+/** Faixas empilhadas: `linhas` com rótulo e gráfico, mais a régua de tempo. */
+export const skelFaixas = (linhas, cls = '', altura = 60) => html`<div class="strips${cls ? ` ${cls}` : ''}">
+  ${Array.from({ length: linhas }, () => html`<div class="strip-row"><span class="strip-label"><span class="name">${skelLinha(70)}</span></span>${skelGrafico(altura)}<span class="strip-value">${skelLinha(100)}</span></div>`)}
+  <div class="ticks strip-ticks"><span>&nbsp;</span></div>
+</div>`;
+
+/** Tabela com `linhas` linhas e `colunas` colunas; `cabeca` é o `<tr>` do cabeçalho real. */
+export const skelTabela = (linhas, colunas = 4, { cabeca = '', cls = '' } = {}) => html`<div class="table-wrap"><table class="table${cls ? ` ${cls}` : ''}">
+  ${cabeca ? html`<thead>${cabeca}</thead>` : ''}
+  <tbody>${Array.from({ length: linhas }, () => html`<tr>${Array.from({ length: colunas }, () => html`<td>${skelLinha(70)}</td>`)}</tr>`)}</tbody>
+</table></div>`;
+
+/** Parágrafo de `linhas` linhas, com larguras variadas como num texto. */
+export const skelTexto = (linhas = 3) => html`<div class="skel-texto">${Array.from({ length: linhas }, (_, i) => skelLinha([96, 82, 90, 70][i % 4]))}</div>`;
+
+/** Peças de uma região que carrega depois da tela aberta: guardam o espaço desde o início. */
+export const skelRegiao = (ctx, pecas) => html`<div class="esqueleto${ctx.local.regiaoVisivel ? '' : ' oculto'}" aria-busy="true"><span class="visually-hidden">carregando</span>${pecas}</div>`;
+
+/**
+ * Busca uma parte da tela depois de aberta. Só o último pedido vale, e a resposta espera o tempo
+ * mínimo se as peças já apareceram. Vindo de um esqueleto visível, as peças aparecem na hora: um
+ * vão entre o esqueleto da tela e o da região piscaria. Falha entrega `null`.
+ */
+export function carregarRegiao(ctx, atualizar, buscar, pronto) {
+  ctx.local.fimRegiao?.();
+  const vez = (ctx.local.regiaoVez || 0) + 1;
+  ctx.local.regiaoVez = vez;
+  const vale = () => ctx.local.regiaoVez === vez && ctx.el.isConnected !== false;
+  ctx.local.regiaoVisivel = Boolean(ctx.semAtraso);
+  const fim = esperaVisivel(() => {
+    if (!vale()) return;
+    ctx.local.regiaoVisivel = true;
+    atualizar(ctx);
+  }, { atraso: ctx.semAtraso ? 0 : ATRASO_MS });
+  ctx.semAtraso = false;
+  ctx.local.fimRegiao = fim;
+  const entrega = async (valor) => {
+    if (!vale()) return;
+    const falta = fim();
+    if (falta > 0) await pausa(falta);
+    if (!vale()) return;
+    ctx.local.regiaoVisivel = false;
+    pronto(valor);
+    atualizar(ctx);
+  };
+  return buscar().then(entrega, () => entrega(null));
+}
 
 /** Um único ouvinte de clique por tela (o render pode rodar de novo no mesmo elemento). */
 export function onClick(ctx, handler) {

@@ -4,7 +4,7 @@
 import { html, mount } from '../core/html.js';
 import * as f from '../core/format.js';
 import { timeline, dayStatuses, levelOf, viewOfKey, offlineMsIn } from '../core/analysis.js';
-import { $, icon, iconBox, onClick, withBusy } from './common.js';
+import { $, icon, iconBox, onClick, withBusy, skelGrafico, skelLinha, skelTabela } from './common.js';
 
 /** Subtítulo da tela. */
 export const sub = () => 'Alertas, quedas e anotações numa linha do tempo única';
@@ -42,6 +42,14 @@ function matches(e) {
   return true;
 }
 
+// Legenda das cores da faixa de disponibilidade.
+const LEGENDA = () => html`<div class="legend small">
+  <span><span class="swatch" data-bg="ok"></span>sem problemas</span>
+  <span><span class="swatch" data-bg="warn"></span>alerta de atenção</span>
+  <span><span class="swatch" data-bg="crit"></span>queda ou crítico</span>
+  <span><span class="swatch" data-bg="surface-3"></span>sem dados</span>
+</div>`;
+
 /** Faixa de disponibilidade de 90 dias (um quadradinho por dia). */
 function uptime(state) {
   const o = state.outages;
@@ -61,12 +69,7 @@ function uptime(state) {
         <span class="big md">${u && u.uptimePct === null ? 'sem dados' : f.pct(u?.uptimePct, 2)}</span>
         <span class="note">${outs.length} queda${outs.length === 1 ? '' : 's'} · ${svcDown} serviço${svcDown === 1 ? '' : 's'} parado${svcDown === 1 ? '' : 's'} · ${f.duration(offMs / 1000)} fora no total</span>
       </div>
-      <div class="legend small">
-        <span><span class="swatch" data-bg="ok"></span>sem problemas</span>
-        <span><span class="swatch" data-bg="warn"></span>alerta de atenção</span>
-        <span><span class="swatch" data-bg="crit"></span>queda ou crítico</span>
-        <span><span class="swatch" data-bg="surface-3"></span>sem dados</span>
-      </div>
+      ${LEGENDA()}
     </div>
     <div class="day-bars" role="img" aria-label="Disponibilidade por dia nos últimos 90 dias">
       ${days.map((d) => html`<span class="day day-${d.status}" title="${new Date(d.from).toLocaleDateString('pt-BR')}: ${word[d.status]}"></span>`)}
@@ -151,6 +154,19 @@ function list(all) {
 
 // Alertas, anotações e quedas juntos, do mais recente ao mais antigo.
 const allEvents = (state) => timeline({ alerts: state.alerts?.all, annotations: state.annotations, outages: state.outages?.outages });
+
+/** Esqueleto no formato da tela. */
+export const ownSkeleton = () => html`
+  <section class="panel">
+    <div class="panel-head">
+      <div class="uptime-head"><h2>${skelLinha(null, 'Disponibilidade · 90 dias')}</h2><span class="big md">${skelLinha(null, '100,00%')}</span><span class="note">${skelLinha(null, '0 quedas · 0 serviços parados · 0 s fora no total')}</span></div>
+      ${LEGENDA()}
+    </div>
+    ${skelGrafico(44)}
+    <div class="ticks"><span>&nbsp;</span></div>
+  </section>
+  <div class="filters"><div class="segmented is-text"><button type="button" disabled>${skelLinha(null, 'Todos 0 · Alertas 0 · Quedas 0 · Anotações 0')}</button></div></div>
+  <section class="panel flush">${skelTabela(5, 3)}</section>`;
 
 /** Monta a tela inteira. */
 export function render(ctx) {

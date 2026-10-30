@@ -39,16 +39,18 @@ export function html(strings, ...values) {
  * A CSP não aceita `style="…"` (sem 'unsafe-inline'). Medidas e cores vindas dos dados vão em
  * atributos `data-*` e são aplicadas pelo CSSOM, que a CSP permite:
  * data-w / data-h / data-l = largura / altura / posição esquerda em % (0–100),
+ * data-px = altura em pixels (esqueleto de gráfico),
  * data-bg = token de cor (ex.: "s1", "ok"), data-op = opacidade (0–1).
  */
 export function applyDataStyles(root) {
   if (!root || typeof root.querySelectorAll !== 'function') return;
   const pct = (v) => `${Math.min(100, Math.max(0, Number(v) || 0))}%`;
-  for (const el of root.querySelectorAll('[data-w],[data-h],[data-l],[data-bg],[data-op]')) {
+  for (const el of root.querySelectorAll('[data-w],[data-h],[data-l],[data-px],[data-bg],[data-op]')) {
     const d = el.dataset;
     if (d.w !== undefined) el.style.width = pct(d.w);
     if (d.h !== undefined) el.style.height = pct(d.h);
     if (d.l !== undefined) el.style.left = pct(d.l);
+    if (d.px !== undefined) el.style.height = `${Math.max(0, Number(d.px) || 0)}px`;
     if (d.bg && /^[a-z0-9-]+$/.test(d.bg)) el.style.background = `var(--${d.bg})`;
     if (d.op !== undefined) el.style.opacity = String(Math.min(1, Math.max(0, Number(d.op) || 0)));
   }
