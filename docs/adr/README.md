@@ -30,3 +30,4 @@ Uma ADR aceita não é editada; se a decisão mudar, uma nova ADR a substitui.
 | [0023](0023-versoes-por-milestone-sem-pre-versao-em-mudanca-pequena.md) | Versões por milestone, sem pré-versão em mudança pequena | Aceita |
 | [0024](0024-hover-visivel-em-tudo-o-que-e-clicavel.md) | Hover visível em clicáveis, contêineres e gráficos | Aceita |
 | [0025](0025-clique-e-estado-aguardando.md) | Clique e estado "aguardando" nos botões | Aceita |
+| [0026](0026-entrada-de-tela-so-quando-ela-muda.md) | Entrada de tela só quando ela muda | Aceita |

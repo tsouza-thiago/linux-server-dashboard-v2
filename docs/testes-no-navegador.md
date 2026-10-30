@@ -55,6 +55,11 @@ Em todas as telas, nos cenários `normal` e `lacunas`:
   hover desce e encolhe enquanto o mouse está apertado, com um anel fino no lugar da sombra, e
   soltar na borda ainda conta como clique. Botões em grupo, os da lista de eventos e o menu só
   escurecem o fundo. Botão desligado não responde. Com "reduzir movimento", nada se move.
+- **Troca de tela (ADR 0026), nos 2 temas:** menu, atalhos 1–8 e link com `#/tela` trocam de tela
+  com uma entrada curta (esmaecer e 4 px), sem corte seco. O login entra igual. Com 1–8 apertados
+  em sequência rápida, fica só a última tela e a animação não acumula. A tela não pisca com uma
+  amostra nova nem ao trocar o período ou o tema. Depois da entrada, o gráfico continua com a
+  largura certa, e o cursor e o zoom acompanham o mouse.
 - **Aguardando (ADR 0025):** em "Coletar agora", "Reconhecer", "Resolver", "Salvar", "Remover" e
   "Entrar", o botão mostra o spinner e fica desligado até a resposta, sem mudar a largura, e o
   duplo clique faz só 1 pedido. Com "reduzir movimento", o spinner vira um ponto fixo.

@@ -288,13 +288,18 @@ function renderHead() {
   renderPeriod();
 }
 
-/** Monta a tela atual do zero (ou o esqueleto, se os dados ainda não chegaram). */
-function renderView() {
+/**
+ * Monta a tela atual do zero (ou o esqueleto, se os dados ainda não chegaram). A entrada por CSS
+ * só vale quando a tela é outra ou com `entra`: tema, período e amostra nova passam por aqui com
+ * a mesma tela, e animar piscaria a cada minuto (ADR 0026).
+ */
+function renderView({ entra = false } = {}) {
   const { view } = store.get();
+  const animar = entra || current?.view !== view;
   destroyCurrent();
   const mod = MODULES[view];
   const el = document.createElement('div');
-  el.className = `view view-${view}`;
+  el.className = `view view-${view}${animar ? ' view-entra' : ''}`;
   $('view').replaceChildren(el);
   const ctx = { el, charts: new Map(), local: {}, api, act, get state() { return store.get(); } };
   current = { view, mod, ctx };
@@ -311,6 +316,8 @@ function renderView() {
 
 /** Atualiza a tela atual com os dados novos (update, ou monta de novo se não houver). */
 function refreshView() {
+  // O esqueleto (geral ou o da Visão geral) dá lugar ao conteúdo: é a chegada da tela.
+  if (current && !store.get().loading && (current.ctx.pending || current.ctx.local.skeleton)) return renderView({ entra: true });
   if (!current || current.ctx.pending) return renderView();
   renderHead();
   if (current.mod.update) current.mod.update(current.ctx);
@@ -349,14 +356,19 @@ store.subscribe((state, patch) => {
   if (relevant.some((k) => k in patch)) refreshView();
 });
 
+// Conta as navegações: a que acabou de esperar os baldes sabe se outra já passou na frente.
+let navegacao = 0;
 /** Troca de tela ou de período a partir do hash da URL. */
 async function navigate() {
   const { view, period } = parseHash(location.hash);
   const changed = view !== store.get().view || period !== store.get().period;
+  if (!changed && current?.view === view) return; // mesma tela e período: montar de novo cortaria a entrada
+  const vez = ++navegacao;
   store.set({ view, period });
   $('viewTitle').textContent = VIEWS.find((v) => v.id === view).title; // na hora, antes dos dados
   closeNav();
   if (USES_BUCKETS.has(view) && (changed || !store.get().buckets.length)) await loadBuckets();
+  if (vez !== navegacao) return; // atalhos em sequência: só a última tecla desenha e anima
   renderView();
   $('view').focus({ preventScroll: true });
   window.scrollTo(0, 0);

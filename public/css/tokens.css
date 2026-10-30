@@ -93,6 +93,8 @@
   --t-fast: 150ms;
   --t-base: 200ms;
   --t-press: 80ms; /* clique: desce rápido e volta em --t-fast */
+  --t-enter: 180ms; /* entrada de tela, login e diálogo */
+  --enter-y: 4px;
   --press: scale(0.97);
   --ease-out: cubic-bezier(0.22, 1, 0.36, 1);
   --lift: -2px;
