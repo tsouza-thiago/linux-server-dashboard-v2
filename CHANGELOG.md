@@ -16,6 +16,8 @@ diante: `PATCH` corrige, `MINOR` acrescenta sem quebrar e `MAJOR` quebra.
   "reduzir movimento", nada se move. O painel e o assistente seguem a mesma regra.
 - Estado "aguardando" nos botões (#85): coletar agora, reconhecer, resolver, salvar e remover
   anotação e entrar mostram um spinner, sem mudar a largura, e o duplo clique não repete a ação.
+- Roadmap: nova feature F11 (#106, milestone 2.4.0), README e TUTORIAL ilustrados com prints das
+  telas e outros elementos gráficos.
 
 ## [2.2.4] — 2026-10-30
 
