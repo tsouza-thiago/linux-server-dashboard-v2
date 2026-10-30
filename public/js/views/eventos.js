@@ -4,7 +4,7 @@
 import { html, mount } from '../core/html.js';
 import * as f from '../core/format.js';
 import { timeline, dayStatuses, levelOf, viewOfKey, offlineMsIn } from '../core/analysis.js';
-import { $, icon, iconBox, onClick } from './common.js';
+import { $, icon, iconBox, onClick, withBusy } from './common.js';
 
 /** Subtítulo da tela. */
 export const sub = () => 'Alertas, quedas e anotações numa linha do tempo única';
@@ -171,16 +171,16 @@ export function render(ctx) {
     const input = $('#ev-text', ctx.el);
     const text = input.value.trim();
     if (!text) return;
-    await ctx.act.addAnnotation({ text });
+    await withBusy($('button[type="submit"]', e.target), ctx.act.addAnnotation({ text }));
     input.value = '';
   });
   onClick(ctx, (e) => {
     const t = e.target.closest('button');
     if (!t) return;
     if (t.dataset.filter) { view[t.dataset.filter] = t.dataset.value; view.page = 1; update(ctx); }
-    else if (t.dataset.ack) ctx.act.ack(t.dataset.ack);
-    else if (t.dataset.resolve) ctx.act.resolve(t.dataset.resolve);
-    else if (t.dataset.remove) ctx.act.removeAnnotation(t.dataset.remove);
+    else if (t.dataset.ack) withBusy(t, ctx.act.ack(t.dataset.ack));
+    else if (t.dataset.resolve) withBusy(t, ctx.act.resolve(t.dataset.resolve));
+    else if (t.dataset.remove) withBusy(t, ctx.act.removeAnnotation(t.dataset.remove));
     else if (t.id === 'ev-more') { view.page += 1; update(ctx); }
   });
   update(ctx);

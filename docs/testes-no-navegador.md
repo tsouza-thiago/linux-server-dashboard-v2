@@ -51,6 +51,13 @@ Em todas as telas, nos cenários `normal` e `lacunas`:
   em grupo (períodos e filtros) e os da lista de eventos trocam de fundo sem subir. Links,
   títulos de coluna e `summary` ganham sublinhado com a cor de destaque. As opções do assistente
   ganham fundo ou borda. Botão desligado não responde. O texto continua legível no hover.
+- **Clique (ADR 0025), nos 2 temas, nas 8 telas, no login e no assistente:** o botão que sobe no
+  hover desce e encolhe enquanto o mouse está apertado, com um anel fino no lugar da sombra, e
+  soltar na borda ainda conta como clique. Botões em grupo, os da lista de eventos e o menu só
+  escurecem o fundo. Botão desligado não responde. Com "reduzir movimento", nada se move.
+- **Aguardando (ADR 0025):** em "Coletar agora", "Reconhecer", "Resolver", "Salvar", "Remover" e
+  "Entrar", o botão mostra o spinner e fica desligado até a resposta, sem mudar a largura, e o
+  duplo clique faz só 1 pedido. Com "reduzir movimento", o spinner vira um ponto fixo.
   Todo contêiner e gráfico sob o mouse ganha destaque, mais fraco que o dos botões: cartão ou
   painel sobe 1 px com sombra e borda suaves, painel de tabela e bloco principal ganham borda e
   sombra sem subir, cada faixa de telemetria ganha fundo sem subir, e o anel de saúde ganha um

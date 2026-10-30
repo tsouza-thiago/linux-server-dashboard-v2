@@ -18,6 +18,9 @@ Mostrar que o clique foi recebido e, nas ações que demoram, que a ação está
 
 ## Decisão proposta
 
+A decisão final está na [ADR 0025](../adr/0025-clique-e-estado-aguardando.md): grupo e menu não
+se movem, e exportar fica sem o estado aguardando, porque os relatórios são links `download`.
+
 1. **Pressionar:** `:active` com `transform: scale(0.97)` em ~80 ms, e volta em
    `--t-fast`. Vale para `.btn`, `.icon-btn`, `.nav-item` e `.segmented button`.
 2. **Aguardando:** um utilitário em `public/js/views/common.js` marca o botão com

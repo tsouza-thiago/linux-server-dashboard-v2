@@ -7,7 +7,7 @@ import assert from 'node:assert/strict';
 import { createWizardApp } from '../../server/setup/web.js';
 import { listen, close } from '../../test-support/request.js';
 import { makeInstalacao, detectionWithSudo } from '../../test-support/instalacao-fake.js';
-import { semHover, sobe } from '../../test-support/hover.js';
+import { APERTADO, pressiona, semHover, sobe } from '../../test-support/hover.js';
 
 let chromium = null;
 try { ({ chromium } = await import('playwright-core')); } catch { /* sem playwright-core */ }
@@ -54,13 +54,14 @@ async function throughStep4(s) {
   await s.page.waitForSelector('.wz-row');
 }
 
-test('assistente e2e: hover — todo clicável dos passos responde, e o botão solto sobe', async (t) => {
+test('assistente e2e: hover e clique — todo clicável dos passos responde, e o botão solto sobe e encolhe', async (t) => {
   const s = await setup(t);
   if (s.skip) return t.skip(s.skip);
   const CLICAVEIS = 'a, button, summary, .wz-radio, .wz-svc, .wz-from, .wz-switch, .wz-row';
   await s.page.goto(`${s.base}/configurar#codigo=ACD-347`);
   await s.page.waitForSelector('.wz-chk');
   await sobe(s.page, '.wz-next');
+  assert.equal((await pressiona(s.page, '.wz-next')).transform, APERTADO, '.wz-next');
   assert.deepEqual(await semHover(s.page, CLICAVEIS), [], 'passo 1');
   await s.page.click('text=Começar');
   await s.page.waitForSelector('#host');
@@ -70,12 +71,14 @@ test('assistente e2e: hover — todo clicável dos passos responde, e o botão s
   await s.page.click('[data-act="servidor"]');
   await s.page.waitForSelector('.wz-fp span');
   await sobe(s.page, '.wz-eye');
+  assert.equal((await pressiona(s.page, '.wz-eye')).transform, APERTADO, '.wz-eye');
   assert.deepEqual(await semHover(s.page, CLICAVEIS), [], 'passo 3');
   await s.page.check('#confio');
   await s.page.fill('#senha', 'certa');
   await s.page.click('[data-act="conectar"]');
   await s.page.waitForSelector('.wz-row');
   await sobe(s.page, '.wz-back');
+  assert.equal((await pressiona(s.page, '.wz-back')).transform, APERTADO, '.wz-back');
   assert.deepEqual(await semHover(s.page, CLICAVEIS), [], 'passo 4');
   await s.page.click('[data-act="escolhas"]');
   await s.page.waitForSelector('.wz-act');

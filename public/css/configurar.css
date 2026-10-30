@@ -318,3 +318,16 @@
     content: ""; position: absolute; inset: 0 0 var(--lift);
   }
 }
+
+/* Clique, igual ao dos botões do painel (ADR 0025). */
+.wz-next:active:not(:disabled), .wz-back:active:not(:disabled), .wz-mini:active:not(:disabled), .wz-more:active:not(:disabled), .wz-eye:active:not(:disabled) {
+  box-shadow: inset 0 0 0 1px currentColor; transition-duration: var(--t-press);
+}
+.wz-next.big:active:not(:disabled) { box-shadow: var(--wz-btn-halo), inset 0 0 0 1px currentColor; }
+.wz-seg button:active:not(:disabled) { background: var(--hover-bg-strong); transition-duration: var(--t-press); }
+@media (prefers-reduced-motion: no-preference) {
+  .wz-next:active:not(:disabled), .wz-back:active:not(:disabled), .wz-mini:active:not(:disabled), .wz-more:active:not(:disabled), .wz-eye:active:not(:disabled) { transform: var(--press); }
+  .wz-next:active:not(:disabled)::after, .wz-back:active:not(:disabled)::after, .wz-mini:active:not(:disabled)::after, .wz-more:active:not(:disabled)::after, .wz-eye:active:not(:disabled)::after {
+    content: ""; position: absolute; inset: calc(var(--lift) - 2%) -2%;
+  }
+}

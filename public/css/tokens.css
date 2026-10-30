@@ -92,6 +92,8 @@
   --touch: 44px;
   --t-fast: 150ms;
   --t-base: 200ms;
+  --t-press: 80ms; /* clique: desce rápido e volta em --t-fast */
+  --press: scale(0.97);
   --ease-out: cubic-bezier(0.22, 1, 0.36, 1);
   --lift: -2px;
   --lift-soft: -1px; /* gráficos: um pouco menos que os botões */

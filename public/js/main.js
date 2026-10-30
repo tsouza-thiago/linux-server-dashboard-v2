@@ -14,7 +14,7 @@ import { VIEWS, PERIODS, parseHash, buildHash, viewByKey } from './core/router.j
 import { html, mount } from './core/html.js';
 import { isOffline, mergeAlerts } from './core/analysis.js';
 import * as f from './core/format.js';
-import { icon } from './views/common.js';
+import { icon, withBusy } from './views/common.js';
 import * as visaoGeral from './views/visao-geral.js';
 import * as recursos from './views/recursos.js';
 import * as armazenamento from './views/armazenamento.js';
@@ -104,17 +104,14 @@ $('loginForm').addEventListener('submit', async (e) => {
   e.preventDefault();
   const token = $('loginToken').value.trim();
   if (!token) return;
-  $('loginSubmit').disabled = true;
   try {
-    await api.login(token, { remember: $('loginRemember').checked });
+    await withBusy($('loginSubmit'), api.login(token, { remember: $('loginRemember').checked }));
     $('loginToken').value = '';
     location.reload();
   } catch (err) {
     setLoginError(err.status === 429 ? 'Muitas tentativas. Aguarde 1 minuto.'
       : err.status === 401 ? 'Token incorreto. Confira e tente de novo.' : 'Painel inacessível. Confira se o serviço está rodando.');
     $('loginToken').select();
-  } finally {
-    $('loginSubmit').disabled = false;
   }
 });
 
@@ -158,7 +155,7 @@ const act = {
   async logout(all) { await api.logout(all); location.reload(); },
   async poll() {
     try {
-      await api.poll();
+      await withBusy($('pollBtn'), api.poll());
       toast('Coletando agora…', { level: 'busy', sub: 'próxima coleta manual liberada em 5 s' });
     } catch (err) { toast(err.message, { level: 'warn' }); }
   },

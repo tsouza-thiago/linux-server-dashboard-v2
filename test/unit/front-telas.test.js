@@ -474,6 +474,29 @@ test('visão geral (2.0.5): a manchete mede a queda pela queda, não pelo alerta
   assert.equal(outageOf(alert, [outage]), outage);
 });
 
+test('withBusy (#85): liga aguardando e desliga no fim, também quando a ação falha, e devolve o foco', async () => {
+  const { withBusy } = await import('../../public/js/views/common.js');
+  const attrs = new Map();
+  const focos = [];
+  const btn = {
+    disabled: false, setAttribute: (k, v) => attrs.set(k, v), removeAttribute: (k) => attrs.delete(k), focus: (o) => focos.push(o),
+  };
+  let termina;
+  const ok = withBusy(btn, new Promise((r) => { termina = r; }));
+  assert.equal(btn.disabled, true);
+  assert.equal(attrs.get('aria-busy'), 'true');
+  termina(7);
+  assert.equal(await ok, 7, 'devolve o resultado da ação');
+  assert.equal(btn.disabled, false);
+  assert.equal(attrs.has('aria-busy'), false);
+  assert.deepEqual(focos, [], 'sem foco antes, não rouba o foco');
+  btn.ownerDocument = { activeElement: btn };
+  await assert.rejects(withBusy(btn, Promise.reject(new Error('falhou'))), /falhou/);
+  assert.equal(btn.disabled, false);
+  assert.equal(attrs.has('aria-busy'), false);
+  assert.equal(focos.length, 1, 'quem usa o teclado continua no botão');
+});
+
 test('cartões (#48): sem dado, só o traço "—", sem a unidade colada', async () => {
   const { big, n0 } = await import('../../public/js/views/common.js');
   for (const unit of ['%', '°C', ' Mbps', ' ↓']) {

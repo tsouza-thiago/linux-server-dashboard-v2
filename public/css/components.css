@@ -487,3 +487,33 @@ a, summary, .btn, .btn-link, .nav-item, .nav-item svg, .segmented button, .icon-
   .card:hover::after, .panel:not(.flush):hover::after { content: ""; position: absolute; inset: 100% 0 var(--lift-soft); }
   .ring:hover { transform: scale(1.03); }
 }
+
+/* Clique (ADR 0025): só o botão que sobe se move; ele volta da altura do hover e encolhe. O
+   anel interno substitui a sombra e é o que resta com "reduzir movimento". Grupo, lista longa e
+   menu não se movem: só o fundo muda. Desligado não responde. */
+.btn:active:not(:disabled, .event-list *), .icon-btn:active:not(:disabled), .export-btn:active:not(:disabled) {
+  box-shadow: inset 0 0 0 1px currentColor; transition-duration: var(--t-press);
+}
+.segmented button:active:not(:disabled), .event-list .btn:active:not(:disabled), .btn-link:active:not(:disabled), .nav-item:active {
+  background: var(--hover-bg-strong); transition-duration: var(--t-press);
+}
+@media (prefers-reduced-motion: no-preference) {
+  .btn:active:not(:disabled, .event-list *), .icon-btn:active:not(:disabled), .export-btn:active:not(:disabled) { transform: var(--press); }
+  /* A faixa cobre o que o botão deixou ao descer e encolher: sem ela, soltar o mouse na borda cai
+     fora do botão e o clique se perde. */
+  .btn:active:not(:disabled, .event-list *)::after, .icon-btn:active:not(:disabled)::after, .export-btn:active:not(:disabled)::after {
+    content: ""; position: absolute; inset: calc(var(--lift) - 2%) -2%;
+  }
+}
+
+/* Aguardando (F2): o spinner fica por cima do texto apagado, e a largura do botão não muda. */
+.btn[aria-busy="true"], .icon-btn[aria-busy="true"] { --busy-ink: var(--accent); position: relative; color: transparent; cursor: progress; opacity: 1; }
+.btn-primary[aria-busy="true"] { --busy-ink: var(--on-accent); }
+.btn[aria-busy="true"]::before, .icon-btn[aria-busy="true"]::before {
+  content: ""; position: absolute; inset: 0; width: 14px; height: 14px; margin: auto; border-radius: 50%;
+  border: 2px solid var(--busy-ink); border-right-color: transparent; animation: spin 0.9s linear infinite;
+}
+/* Sem rotação, o anel aberto pareceria um defeito: vira um ponto fixo. */
+@media (prefers-reduced-motion: reduce) {
+  .btn[aria-busy="true"]::before, .icon-btn[aria-busy="true"]::before { width: 8px; height: 8px; border: 0; background: var(--busy-ink); animation: none; }
+}
