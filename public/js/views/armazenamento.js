@@ -161,7 +161,7 @@ export const ownSkeleton = (state) => {
   const n = Math.max(1, state.sample?.disks?.length || 0);
   return html`
     <section class="grid-cards wide">${Array.from({ length: n }, () => html`<article class="card mount-card">
-      <div class="card-top"><span class="mount-name">${skelLinha(30)}</span></div>
+      <div class="card-top"><span class="mount-name">${skelLinha(null, '/mnt/disco')}</span></div>
       <span class="big xl">${skelLinha(40)}</span>
       <div class="meter lg"></div>
       <div class="row-between ink-2">${skelLinha(90)}</div>

@@ -108,10 +108,10 @@ function memory(s) {
 /** Esqueleto no formato da tela (na coleta, são até 8 processos). */
 export const ownSkeleton = (state) => html`
   <section class="grid-cards svc-grid">${Array.from({ length: Object.keys(state.sample?.services || {}).length + 1 }, () => html`
-    <article class="card svc-card"><span class="icon-box lg"></span><div class="svc-text"><span class="svc-name">${skelLinha(50)}</span><span>${skelLinha(40)}</span><span class="note">${skelLinha(80)}</span></div></article>`)}</section>
+    <article class="card svc-card"><span class="icon-box lg"></span><div class="svc-text"><span class="svc-name">${skelLinha(null, 'servico')}</span><span>${skelLinha(null, 'rodando')}</span><span class="note">${skelLinha(null, 'sem quedas registradas')}</span></div></article>`)}</section>
   <div class="split">
     <section class="panel flush split-main">
-      <div class="panel-head"><div><h2>${skelLinha(40)}</h2></div><div class="search"><label>&nbsp;</label><span class="input">&nbsp;</span></div></div>
+      <div class="panel-head"><div><h2>${skelLinha(null, 'Top processos · última coleta')}</h2></div><div class="search"><label>&nbsp;</label><span class="input">&nbsp;</span></div></div>
       ${skelTabela(8, COLS.length, { cabeca: head() })}
     </section>
     <section class="panel split-side">${skelCabeca()}${skelTexto(7)}</section>

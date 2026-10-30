@@ -248,11 +248,11 @@ export const panelHead = (title, note = '', right = '') => html`
  * Bloco no lugar de um texto, com `w`% da largura. Com um `exemplo` do tamanho do texto final, a
  * largura vem dele (use `w` nulo) e ele quebra de linha onde o texto final quebraria.
  */
-export const skelLinha = (w = 100, exemplo = '\u00a0') => html`<span class="skel skel-txt"${w === null ? '' : html` data-w="${w}"`}>${exemplo}</span>`;
+export const skelLinha = (w = 100, exemplo = '\u00a0') => html`<span class="skel skel-txt" aria-hidden="true"${w === null ? '' : html` data-w="${w}"`}>${exemplo}</span>`;
 
-/** Cabeçalho de painel, com a nota opcional. */
+/** Cabeçalho de painel, com a nota opcional. A coluna encolhe no texto: a largura vem do exemplo. */
 export const skelCabeca = (nota = false) => html`
-  <div class="panel-head"><div><h2>${skelLinha(40)}</h2>${nota ? html`<span class="hint">${skelLinha(75)}</span>` : ''}</div></div>`;
+  <div class="panel-head"><div><h2>${skelLinha(null, 'Título do painel · 24h')}</h2>${nota ? html`<span class="hint">${skelLinha(null, 'nota de exemplo deste painel, com um tamanho médio de texto')}</span>` : ''}</div></div>`;
 
 /** Cartão de número: rótulo, número e nota. `numero` é o tamanho do `big()` ("md", "sm"…). */
 export const skelCartao = ({ medidor = false, numero = '', nota = '' } = {}) => html`<article class="card">

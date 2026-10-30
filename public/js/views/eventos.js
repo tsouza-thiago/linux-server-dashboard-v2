@@ -4,7 +4,7 @@
 import { html, mount } from '../core/html.js';
 import * as f from '../core/format.js';
 import { timeline, dayStatuses, levelOf, viewOfKey, offlineMsIn } from '../core/analysis.js';
-import { $, icon, iconBox, onClick, withBusy, skelLinha, skelTabela } from './common.js';
+import { $, icon, iconBox, onClick, withBusy, skelGrafico, skelLinha, skelTabela } from './common.js';
 
 /** Subtítulo da tela. */
 export const sub = () => 'Alertas, quedas e anotações numa linha do tempo única';
@@ -162,10 +162,10 @@ export const ownSkeleton = () => html`
       <div class="uptime-head"><h2>${skelLinha(null, 'Disponibilidade · 90 dias')}</h2><span class="big md">${skelLinha(null, '100,00%')}</span><span class="note">${skelLinha(null, '0 quedas · 0 serviços parados · 0 s fora no total')}</span></div>
       ${LEGENDA()}
     </div>
-    <div class="day-bars"><span class="day"></span></div>
+    ${skelGrafico(44)}
     <div class="ticks"><span>&nbsp;</span></div>
   </section>
-  <div class="filters"><div class="segmented is-text"><button type="button" disabled>${skelLinha(100)}</button></div></div>
+  <div class="filters"><div class="segmented is-text"><button type="button" disabled>${skelLinha(null, 'Todos 0 · Alertas 0 · Quedas 0 · Anotações 0')}</button></div></div>
   <section class="panel flush">${skelTabela(5, 3)}</section>`;
 
 /** Monta a tela inteira. */
