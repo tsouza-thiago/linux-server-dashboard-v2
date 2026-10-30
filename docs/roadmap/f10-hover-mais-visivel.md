@@ -39,6 +39,8 @@ itens 3 e 4 dela. As outras regras continuam: só CSS, só propriedades baratas,
    fundo ou borda com a cor de destaque; links e `.th-sort` ganham sublinhado animado ou cor
    mais forte.
 5. **Desligado:** elemento `:disabled` não responde ao mouse.
+6. **Contêineres e gráficos (pedido de 30/10/2026, na revisão do PR):** todo contêiner e gráfico
+   sob o mouse ganha destaque, com a mesma lógica dos botões e um pouco menos de intensidade.
 
 ## Etapas
 
@@ -61,5 +63,5 @@ itens 3 e 4 dela. As outras regras continuam: só CSS, só propriedades baratas,
 ## Riscos
 
 - Efeito forte demais em tabela ou lista longa. Mitigação: nada se desloca nessas áreas.
-- Orçamento de 300 KB (292 KB hoje). Mitigação: só CSS; medir no e2e.
+- Orçamento de 450 KB (293 KB hoje; o limite era 300 KB até 30/10/2026). Mitigação: só CSS; medir no e2e.
 - Conflito com o `:active` da F2. Mitigação: a F2 vem depois e parte dos novos tokens.

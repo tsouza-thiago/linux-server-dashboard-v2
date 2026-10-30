@@ -7,6 +7,7 @@ import assert from 'node:assert/strict';
 import { createWizardApp } from '../../server/setup/web.js';
 import { listen, close } from '../../test-support/request.js';
 import { makeInstalacao, detectionWithSudo } from '../../test-support/instalacao-fake.js';
+import { semHover, sobe } from '../../test-support/hover.js';
 
 let chromium = null;
 try { ({ chromium } = await import('playwright-core')); } catch { /* sem playwright-core */ }
@@ -53,6 +54,34 @@ async function throughStep4(s) {
   await s.page.waitForSelector('.wz-row');
 }
 
+test('assistente e2e: hover — todo clicável dos passos responde, e o botão solto sobe', async (t) => {
+  const s = await setup(t);
+  if (s.skip) return t.skip(s.skip);
+  const CLICAVEIS = 'a, button, summary, .wz-radio, .wz-svc, .wz-from, .wz-switch, .wz-row';
+  await s.page.goto(`${s.base}/configurar#codigo=ACD-347`);
+  await s.page.waitForSelector('.wz-chk');
+  await sobe(s.page, '.wz-next');
+  assert.deepEqual(await semHover(s.page, CLICAVEIS), [], 'passo 1');
+  await s.page.click('text=Começar');
+  await s.page.waitForSelector('#host');
+  assert.deepEqual(await semHover(s.page, CLICAVEIS), [], 'passo 2');
+  await s.page.fill('#host', '192.0.2.10');
+  await s.page.fill('#user', 'maria');
+  await s.page.click('[data-act="servidor"]');
+  await s.page.waitForSelector('.wz-fp span');
+  await sobe(s.page, '.wz-eye');
+  assert.deepEqual(await semHover(s.page, CLICAVEIS), [], 'passo 3');
+  await s.page.check('#confio');
+  await s.page.fill('#senha', 'certa');
+  await s.page.click('[data-act="conectar"]');
+  await s.page.waitForSelector('.wz-row');
+  await sobe(s.page, '.wz-back');
+  assert.deepEqual(await semHover(s.page, CLICAVEIS), [], 'passo 4');
+  await s.page.click('[data-act="escolhas"]');
+  await s.page.waitForSelector('.wz-act');
+  assert.deepEqual(await semHover(s.page, CLICAVEIS), [], 'passo 5');
+});
+
 test('assistente e2e: modo assistido do passo 1 ao "Abrir o painel"', async (t) => {
   const s = await setup(t);
   if (s.skip) return t.skip(s.skip);
@@ -96,6 +125,7 @@ test('assistente e2e: modo assistido do passo 1 ao "Abrir o painel"', async (t) 
   await s.page.click('[data-go="6"]');
   await s.page.waitForSelector('.wz-hero');
   assert.match(await s.page.textContent('.wz-read'), /71%/);
+  assert.deepEqual(await semHover(s.page, 'a, button, summary, .wz-switch'), [], 'passo 6');
   await s.page.click('[data-act="token"]');
   await s.page.waitForSelector('.wz-token code');
   await s.page.uncheck('[data-pref="shortcut"]');

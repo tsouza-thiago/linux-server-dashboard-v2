@@ -9,6 +9,27 @@ diante: `PATCH` corrige, `MINOR` acrescenta sem quebrar e `MAJOR` quebra.
 
 ## [Não publicado]
 
+## [2.2.4] — 2026-10-30
+
+Versão estável com o hover mais visível em tudo o que é clicável, nos contêineres e nos
+gráficos. Nada muda na configuração, no formato de `data/` nem no acesso do painel ao servidor:
+atualize com `./dashboard atualizar`. Quem está na 2.1.0 ou anterior faz antes, uma vez, o passo
+manual das notas da 2.1.1 (a chave de assinatura mudou).
+
+### Mudado
+
+- O hover ficou mais visível e chegou a tudo o que é clicável (#100, ADR 0024): todo botão do
+  painel, do login e do assistente sobe 2 px com sombra e ganha fundo e borda com a cor de
+  destaque. Botões em grupo e botões da lista de eventos trocam de fundo sem subir. Links,
+  cabeçalhos de tabela, opções e caixas de seleção do assistente também respondem ao mouse.
+  Elemento desligado não responde, e com "reduzir movimento" nada se desloca.
+- Contêiner e gráfico sob o mouse ganham destaque, com menos força que os botões (#100, ADR
+  0024): todo cartão e painel sobe 1 px com sombra e borda suaves, painéis de tabela e o bloco
+  principal ganham borda e sombra, cada faixa de telemetria ganha fundo, o anel de saúde ganha um
+  halo e os campos de texto ganham a borda. O cursor, o zoom e a dica dos gráficos continuam iguais.
+- O orçamento da página inicial subiu de 300 KB para 450 KB transferidos (#100). Só o limite do
+  teste muda: nada muda no painel.
+
 ### Corrigido
 
 - `npm run seguranca` não reprova mais por causa do Node baixado em `.runtime/` (#98): a
@@ -1080,7 +1101,9 @@ Documentados no plano da V2 (seção 2.2, B1–B12), entre eles: alerta SMART fa
 rede zerada com contadores grandes, alerta duplicado a cada coleta e reescrita completa do
 histórico a cada minuto.
 
-[Não publicado]: https://github.com/tsouza-thiago/linux-server-dashboard-v2/compare/v2.2.2...HEAD
+[Não publicado]: https://github.com/tsouza-thiago/linux-server-dashboard-v2/compare/v2.2.4...HEAD
+[2.2.4]: https://github.com/tsouza-thiago/linux-server-dashboard-v2/compare/v2.2.3...v2.2.4
+[2.2.3]: https://github.com/tsouza-thiago/linux-server-dashboard-v2/compare/v2.2.2...v2.2.3
 [2.2.2]: https://github.com/tsouza-thiago/linux-server-dashboard-v2/compare/v2.2.1...v2.2.2
 [2.2.1]: https://github.com/tsouza-thiago/linux-server-dashboard-v2/compare/v2.2.0...v2.2.1
 [2.2.0]: https://github.com/tsouza-thiago/linux-server-dashboard-v2/compare/v2.2.0-rc.1...v2.2.0

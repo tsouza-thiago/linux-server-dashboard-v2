@@ -536,12 +536,13 @@ Motor em `server/alerts/` (ADR 0006).
 
 Definido no plano da V2. O limite de RAM foi revisto em 16/10/2026 e em 19/10/2026 (#26),
 sempre depois de medido. O pico dos pedidos de 90 dias entrou em 26/10/2026 (#78).
+O limite da página inicial subiu de 300 KB para 450 KB em 30/10/2026, a pedido do mantenedor (#100).
 
 | Medida | Limite | Medido | Como se confere |
 |---|---|---|---|
 | Tempo do comando no servidor | ≤ 1,5 s | 1,26–1,31 s (servidor real, 1 núcleo) | faixa de status e `./dashboard diagnosticar` |
 | Tamanho da resposta | ≤ 16 KB | 2,9 KB (servidor real) | idem; acima de 1 MB a conexão é cortada |
-| Página inicial | ≤ 300 KB transferidos | 292 KB (com gzip) | `test/e2e/telas.test.js` |
+| Página inicial | ≤ 450 KB transferidos | 293 KB (com gzip) | `test/e2e/telas.test.js` |
 | RAM do Node com 72 h em memória | ≤ 95 MB | 88,5–90,4 MB (painel reiniciado com 72 h) | `npm run soak` |
 | RAM do Node no pico dos pedidos de 90 dias | ≤ 120 MB | 113–115 MB (gráfico e Relatórios, 1 h e 15 min) | `npm run soak` (fase 3) |
 | Memória depois que a janela de 72 h enche | sem crescer (≤ +4 MB) | +1,1 a +1,8 MB em 11 h a mais | `npm run soak` |
@@ -603,7 +604,8 @@ linux-server-dashboard-v2/
 │   └── js/                 main.js, locale-guard.js, core/, charts/, views/ (as 8 telas)
 ├── test/                   unit/, integration/, seguranca/, e2e/ e fixtures/ (node --test)
 └── test-support/           request.js (HTTP/SSE), sshd.js (sshd real), instalacao-fake.js,
-                            rotas.js (rotas lidas do código), fonte.js (código sem comentários)
+                            rotas.js (rotas lidas do código), fonte.js (código sem comentários),
+                            hover.js (resposta ao mouse no navegador)
 ```
 
 ## Solução de problemas (para quem desenvolve)
