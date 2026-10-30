@@ -137,7 +137,7 @@ O teste `test/unit/docs.test.js` confere esta documentação contra o código.
      no que vai para o repositório público (`segredos-osint`) e cadeia de suprimentos,
      inclusive o hash dourado do script de coleta (`cadeia-suprimentos`).
   2. `npm run seguranca` (`scripts/seguranca.mjs`): Semgrep (regras OWASP), Gitleaks
-     (arquivos e histórico), ShellCheck, OSV-Scanner e OWASP ZAP (ataque ativo e
+     (arquivos, sem o Node de `.runtime/`, e histórico), ShellCheck, OSV-Scanner e OWASP ZAP (ataque ativo e
      autenticado a um painel de teste), em imagens Docker presas por digest; e a mutação
      dos guardas (`scripts/mutacao-seguranca.mjs`): cada proteção é quebrada de propósito
      numa cópia e algum teste precisa acusar. Achado médio ou alto só passa com análise

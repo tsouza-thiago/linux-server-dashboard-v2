@@ -76,6 +76,9 @@ No assistente (`--assistente`), nos 2 temas:
 
 - **Senha:** endereço `192.0.2.10`, usuário `maria`, senha `certa`; os 6 passos até
   "Abrir o painel", no modo assistido e no modo à mão.
+- **Modo à mão:** o servidor falso não recebe os blocos colados, e só o modo assistido cria o
+  `dashmon`. Rode o assistido, depois "Prefiro fazer à mão" no passo 5: os 4 "Testar" passam
+  e os blocos ficam "4 de 4". Sem o assistido, o "Testar" diz que o usuário não existe.
 - **Chave SSH:** apelido `com-salto` mostra o erro do ProxyJump; `meu-servidor` mostra
   endereço, porta, usuário, chave e agente. No passo 3 não há campo de senha; o 1º
   Conectar mostra o `ssh-add -t 15m …` e "Tentar de novo"; o 2º conecta. No passo 5 aparece

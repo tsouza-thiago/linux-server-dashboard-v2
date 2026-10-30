@@ -9,6 +9,16 @@ diante: `PATCH` corrige, `MINOR` acrescenta sem quebrar e `MAJOR` quebra.
 
 ## [Não publicado]
 
+### Corrigido
+
+- `npm run seguranca` não reprova mais por causa do Node baixado em `.runtime/` (#98): a
+  varredura de arquivos do Gitleaks ignora só essa pasta, e a do histórico continua igual. Só
+  a verificação local muda: nada muda no painel.
+
+### Mudado
+
+- O roteiro dos testes no navegador explica como conferir o modo à mão do assistente.
+
 ## [2.2.3] — 2026-10-30
 
 Versão estável com a animação ao passar o mouse, com o mesmo código da `2.3.0-rc.1`:

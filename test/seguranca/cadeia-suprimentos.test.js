@@ -103,6 +103,15 @@ test('A03: as imagens base do e2e de instalação são presas por digest sha256'
   for (const [f, img] of imagens) assert.match(img, digest, `${f}: ${img} sem digest`);
 });
 
+// #98: o Node baixado em .runtime/ não vai para o repositório, mas a exceção não pode crescer
+// nem valer para o histórico: um segredo versionado ali ainda tem de ser acusado.
+test('gitleaks: só .runtime/ fica de fora, e só na varredura de arquivos', () => {
+  const src = ler('scripts/seguranca.mjs');
+  assert.match(src, /const foraDoRepositorio = \(arquivo\) => arquivo\.startsWith\('\.runtime\/'\);/);
+  assert.match(src, /if \(!extra\.length && foraDoRepositorio\(arquivo\)\) continue;/);
+  assert.equal(src.match(/foraDoRepositorio\(/g).length, 1, 'usado só no filtro do Gitleaks');
+});
+
 test('exceções de segurança: cada achado aceito tem motivo e um teste que o confere', () => {
   const { excecoes } = JSON.parse(ler('docs/seguranca/excecoes.json'));
   assert.ok(Array.isArray(excecoes));
