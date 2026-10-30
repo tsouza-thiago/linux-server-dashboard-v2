@@ -17,6 +17,8 @@ diante: `PATCH` corrige, `MINOR` acrescenta sem quebrar e `MAJOR` quebra.
 
 ### Mudado
 
+- Roadmap: nova feature F10 (#100, milestone 2.2.4), hover mais visível em tudo o que é
+  clicável. Só documentação: nada muda no painel.
 - O roteiro dos testes no navegador explica como conferir o modo à mão do assistente.
 
 ## [2.2.3] — 2026-10-30

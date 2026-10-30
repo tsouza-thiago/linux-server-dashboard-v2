@@ -31,6 +31,7 @@ risco de segurança, os testes novos e o que muda para quem já usa o painel.
 | 7 | Atualização pelo painel, com aviso e log | G | 2.5.0 | — | #90 | [f7-atualizacao-pelo-painel.md](roadmap/f7-atualizacao-pelo-painel.md) |
 | 8 | Reconfigurar pelo painel | G | 2.5.0 | 7 (menu e executor) | #91 | [f8-reconfigurar-pela-tela.md](roadmap/f8-reconfigurar-pela-tela.md) |
 | 9 | Instalação em `/opt` por pacote `.deb` | GG | 2.6.0 | 4, 5, 7 e 8 | #92 | [f9-deb-e-opt.md](roadmap/f9-deb-e-opt.md) |
+| 10 | Hover mais visível em tudo o que é clicável | M | 2.2.4 | 1 | #100 | [f10-hover-mais-visivel.md](roadmap/f10-hover-mais-visivel.md) |
 
 A F8 é menos arriscada que a F7 (reaproveita o assistente e não acessa a internet), mas
 vem depois dela porque usa o menu e o executor que a F7 cria.
@@ -43,6 +44,7 @@ as features de nível G e GG. A F1 saiu na 2.2.3.
 
 | Versão | Tema | Pré-versões |
 |---|---|---|
+| 2.2.4 | Hover mais visível | nenhuma |
 | 2.3.0 | Interface mais suave | nenhuma: clique, troca de tela e skeleton saem juntos |
 | 2.4.0 | Comando no PATH | nenhuma: link simbólico e autocomplete saem juntos |
 | 2.5.0 | Manutenção pelo painel | atualizar: uma pré-versão por grupo de etapas (detecção, aviso, execução); depois reconfigurar |
@@ -95,6 +97,7 @@ mudar o formato de `data/` para quem já usa, ela vira MAJOR (3.0.0) e este road
 | F9 | Node baixado pelo executor (SHA-256 fixado); 1 pessoa por máquina na 1ª versão |
 | Agrupamento | 4 MINOR por tema (tabela acima) |
 | Registro | este arquivo + 1 documento por feature; ADR quando a feature for aprovada |
+| F10 (30/10/2026) | a F1 ficou fraca: animação mais visível e hover em todo clicável, antes da F2 |
 
 ## Perguntas em aberto
 
