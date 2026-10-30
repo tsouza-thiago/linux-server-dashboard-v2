@@ -34,3 +34,22 @@ export async function sobe(page, seletor, y = -2) {
   await page.waitForFunction(([sel, d]) => getComputedStyle(document.querySelector(sel)).transform === `matrix(1, 0, 0, 1, 0, ${d})`, [seletor, y]);
   return page.locator(seletor).first().evaluate((b) => getComputedStyle(b).boxShadow);
 }
+
+/** `transform` calculado do botão apertado (o --press). */
+export const APERTADO = 'matrix(0.97, 0, 0, 0.97, 0, 0)';
+
+/** Segura o mouse sobre o elemento e devolve o estilo dele; solta fora, para não clicar de verdade. */
+export async function pressiona(page, seletor) {
+  const el = page.locator(seletor).first();
+  await page.mouse.move(0, 0);
+  await el.hover();
+  await page.waitForTimeout(200);
+  const hover = await el.evaluate(ESTILO);
+  await page.mouse.down();
+  await page.waitForTimeout(200);
+  const estilo = await el.evaluate((b) => ({ transform: getComputedStyle(b).transform, boxShadow: getComputedStyle(b).boxShadow }));
+  const mudou = await el.evaluate(ESTILO) !== hover;
+  await page.mouse.move(0, 0);
+  await page.mouse.up();
+  return { ...estilo, mudou };
+}

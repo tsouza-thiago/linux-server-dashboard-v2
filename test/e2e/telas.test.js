@@ -8,7 +8,7 @@ import os from 'node:os';
 import path from 'node:path';
 import { createApp } from '../../server/index.js';
 import { listen, close } from '../../test-support/request.js';
-import { semHover, sobe } from '../../test-support/hover.js';
+import { APERTADO, pressiona, semHover, sobe } from '../../test-support/hover.js';
 
 let chromium = null;
 try { ({ chromium } = await import('playwright-core')); } catch { /* sem playwright-core */ }
@@ -208,6 +208,81 @@ test('e2e: hover — nenhum clicável, contêiner ou gráfico das 8 telas, nos 2
       assert.deepEqual(await semHover(s.page, `a, button, summary, ${CONTEINERES}`), [], `${id}, tema ${tema}`);
     }
   }
+});
+
+// ADR 0025: o botão solto encolhe ao ser apertado; grupo, lista e menu só mudam o fundo.
+test('e2e: clique — botão solto encolhe, grupo, lista e desligado não se movem e o movimento reduzido anula o deslocamento', { skip: !chromium && 'sem playwright-core' }, async (t) => {
+  const s = await setup(t);
+  if (s.skip) return t.skip(s.skip);
+  s.app.annotationsStore.add({ text: 'troquei o disco' });
+  await s.page.goto(`${s.base}/#/eventos?p=6h`, { waitUntil: 'load' });
+  await s.page.locator('.event-list .btn').first().waitFor();
+  for (const seletor of ['[data-act="note"]', '#pollBtn', '#themeToggle', '[data-act="notify"]']) {
+    const e = await pressiona(s.page, seletor);
+    assert.equal(e.transform, APERTADO, seletor);
+    assert.match(e.boxShadow, /inset/, `anel no lugar da sombra: ${seletor}`);
+  }
+  for (const seletor of ['.segmented button:not([aria-pressed="true"])', '.event-list .btn', '.nav-item:not([aria-current])']) {
+    const e = await pressiona(s.page, seletor);
+    assert.equal(e.transform, 'none', `não se move: ${seletor}`);
+    assert.equal(e.mudou, true, `o fundo responde: ${seletor}`);
+  }
+  await s.page.locator('#pollBtn').evaluate((b) => { b.disabled = true; });
+  assert.deepEqual(await pressiona(s.page, '#pollBtn'), { transform: 'none', boxShadow: 'none', mudou: false }, 'desligado não responde');
+  await s.page.locator('#pollBtn').evaluate((b) => { b.disabled = false; });
+  await s.page.emulateMedia({ reducedMotion: 'reduce' });
+  const e = await pressiona(s.page, '#pollBtn');
+  assert.equal(e.transform, 'none', 'sem deslocamento com movimento reduzido');
+  assert.match(e.boxShadow, /inset/, 'o anel continua mostrando o clique');
+  assert.deepEqual(s.problems, []);
+});
+
+test('e2e: clique — soltar o mouse no canto do botão, depois de ele encolher, ainda conta como clique', { skip: !chromium && 'sem playwright-core' }, async (t) => {
+  const s = await setup(t);
+  if (s.skip) return t.skip(s.skip);
+  await s.page.goto(`${s.base}/#/eventos`, { waitUntil: 'load' });
+  // O botão da barra lateral não é remontado pela tela. O clique para aqui, sem coletar.
+  const botao = s.page.locator('#pollBtn');
+  await botao.evaluate((b) => b.addEventListener('click', (e) => { e.stopImmediatePropagation(); window.__cliques = 1; }, { capture: true }));
+  await botao.hover();
+  await s.page.waitForTimeout(200);
+  const caixa = await botao.boundingBox();
+  await s.page.mouse.move(caixa.x + 1, caixa.y + 1);
+  await s.page.mouse.down();
+  await s.page.waitForTimeout(200);
+  await s.page.mouse.up();
+  assert.equal(await s.page.evaluate(() => window.__cliques), 1);
+});
+
+test('e2e: clique — o botão fica aguardando sem mudar de largura, e o duplo clique faz só 1 pedido', { skip: !chromium && 'sem playwright-core' }, async (t) => {
+  const s = await setup(t);
+  if (s.skip) return t.skip(s.skip);
+  const pedidos = { poll: 0, nota: 0 };
+  let libera;
+  const espera = new Promise((r) => { libera = r; });
+  await s.page.route('**/api/poll', async (rota) => { pedidos.poll++; await espera; await rota.continue(); });
+  await s.page.route('**/api/annotations', async (rota) => {
+    if (rota.request().method() === 'POST') { pedidos.nota++; await espera; }
+    await rota.continue();
+  });
+  await s.page.goto(`${s.base}/#/eventos`, { waitUntil: 'load' });
+  const coletar = s.page.locator('#pollBtn');
+  const salvar = s.page.locator('#ev-form button');
+  await salvar.waitFor();
+  await coletar.dblclick();
+  await s.page.waitForSelector('#pollBtn[aria-busy="true"]:disabled');
+  const largura = (await salvar.boundingBox()).width;
+  await s.page.fill('#ev-text', 'troquei o disco');
+  await salvar.dblclick();
+  await s.page.waitForSelector('#ev-form button[aria-busy="true"]:disabled');
+  assert.equal((await salvar.boundingBox()).width, largura, 'a linha não pula');
+  assert.deepEqual(pedidos, { poll: 1, nota: 1 });
+  await s.page.emulateMedia({ reducedMotion: 'reduce' });
+  assert.deepEqual(await salvar.evaluate((b) => { const e = getComputedStyle(b, '::before'); return [e.animationName, e.width]; }), ['none', '8px'], 'sem rotação, um ponto fixo');
+  libera();
+  await s.page.waitForSelector('#pollBtn:not([aria-busy]):enabled');
+  await s.page.waitForSelector('#ev-form button:not([aria-busy]):enabled');
+  assert.deepEqual(pedidos, { poll: 1, nota: 1 });
 });
 
 test('e2e: anotação com HTML malicioso aparece como texto (anti-XSS)', { skip: !chromium && 'sem playwright-core' }, async (t) => {

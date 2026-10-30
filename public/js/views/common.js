@@ -245,3 +245,18 @@ export function onClick(ctx, handler) {
   ctx.local.clickBound = true;
   ctx.el.addEventListener('click', handler);
 }
+
+/** Deixa o botão "aguardando" até a ação terminar (F2): o `disabled` barra o duplo clique. */
+export async function withBusy(btn, promessa) {
+  // Desligar o botão tira o foco dele: quem usa o teclado não pode perder o lugar.
+  const tinhaFoco = btn.ownerDocument?.activeElement === btn;
+  btn.disabled = true;
+  btn.setAttribute('aria-busy', 'true');
+  try {
+    return await promessa;
+  } finally {
+    btn.disabled = false;
+    btn.removeAttribute('aria-busy');
+    if (tinhaFoco) btn.focus({ preventScroll: true });
+  }
+}

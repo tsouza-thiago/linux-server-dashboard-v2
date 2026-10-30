@@ -11,7 +11,7 @@ import {
 } from '../core/analysis.js';
 import { PERIODS } from '../core/router.js';
 import {
-  $, icon, pill, chip, iconBox, big, n0, meter, chartBox, drawCharts, drawStrips, strips, panelHead, smartOf, onClick,
+  $, icon, pill, chip, iconBox, big, n0, meter, chartBox, drawCharts, drawStrips, strips, panelHead, smartOf, onClick, withBusy,
 } from './common.js';
 
 // Circunferência do anel de saúde (raio 58) e: esta tela desenha o próprio esqueleto.
@@ -361,7 +361,7 @@ export function render(ctx) {
   onClick(ctx, (e) => {
     const t = e.target.closest('button');
     if (!t) return;
-    if (t.dataset.ack) ctx.act.ack(t.dataset.ack);
+    if (t.dataset.ack) withBusy(t, ctx.act.ack(t.dataset.ack));
     else if ('annotate' in t.dataset) ctx.act.go('eventos');
   });
   loadDisk30(ctx);

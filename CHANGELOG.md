@@ -9,6 +9,14 @@ diante: `PATCH` corrige, `MINOR` acrescenta sem quebrar e `MAJOR` quebra.
 
 ## [Não publicado]
 
+### Adicionado
+
+- Botões respondem ao clique (#85, ADR 0025): o botão que sobe no hover desce e encolhe enquanto
+  o mouse está apertado, e botões em grupo, da lista de eventos e o menu mudam o fundo. Com
+  "reduzir movimento", nada se move. O painel e o assistente seguem a mesma regra.
+- Estado "aguardando" nos botões (#85): coletar agora, reconhecer, resolver, salvar e remover
+  anotação e entrar mostram um spinner, sem mudar a largura, e o duplo clique não repete a ação.
+
 ## [2.2.4] — 2026-10-30
 
 Versão estável com o hover mais visível em tudo o que é clicável, nos contêineres e nos
