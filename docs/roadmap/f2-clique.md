@@ -1,6 +1,6 @@
 # F2 — Animação de clique nos botões
 
-- **Nível:** P · **Versão:** 2.3.0-rc.2 · **Área:** telas · **Depende de:** F1 (tokens)
+- **Nível:** P · **Versão:** 2.3.0 · **Área:** telas · **Depende de:** F1 (tokens)
 - **Decidido:** inclui o estado "aguardando" (spinner no botão enquanto a ação roda).
 
 ## Objetivo

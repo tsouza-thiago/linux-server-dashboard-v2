@@ -1,6 +1,6 @@
 # Roadmap — versões 2.3.0 a 2.6.0
 
-- **Situação:** em implementação. Entregue: F1 (2.3.0-rc.1, ADR 0022). As outras seguem em
+- **Situação:** em implementação. Entregue: F1 (2.2.3, ADR 0022). As outras seguem em
   planejamento.
 - **Data:** 26/10/2026.
 - **Issue do roadmap:** #83. Milestones 2.3.0 a 2.6.0.
@@ -22,7 +22,7 @@ risco de segurança, os testes novos e o que muda para quem já usa o painel.
 
 | # | Feature | Nível | Versão | Depende de | Issue | Documento |
 |---|---|---|---|---|---|---|
-| 1 | Animação ao passar o mouse nos botões (hover) — **entregue na 2.3.0-rc.1** | P | 2.3.0 | — | #84 | [f1-hover.md](roadmap/f1-hover.md) |
+| 1 | Animação ao passar o mouse nos botões (hover) — **entregue na 2.2.3** | P | 2.2.3 | — | #84 | [f1-hover.md](roadmap/f1-hover.md) |
 | 2 | Animação de clique nos botões | P | 2.3.0 | 1 (mesmos tokens) | #85 | [f2-clique.md](roadmap/f2-clique.md) |
 | 3 | Transição suave na troca de telas | P | 2.3.0 | — | #86 | [f3-troca-de-tela.md](roadmap/f3-troca-de-tela.md) |
 | 4 | Link simbólico: `dashboard` sem `./` e fora da pasta | P–M | 2.4.0 | — | #87 | [f4-link-simbolico.md](roadmap/f4-link-simbolico.md) |
@@ -35,15 +35,16 @@ risco de segurança, os testes novos e o que muda para quem já usa o painel.
 A F8 é menos arriscada que a F7 (reaproveita o assistente e não acessa a internet), mas
 vem depois dela porque usa o menu e o executor que a F7 cria.
 
-## Versões (ADR 0015)
+## Versões (ADR 0015 e 0023)
 
-Cada feature sai num PR próprio, como pré-versão (`-rc.N`) da MINOR do tema. A MINOR estável
-consolida as pré-versões. As PATCH da fila (hoje a 2.2.3) saem antes da 1ª pré-versão.
+Cada feature sai num PR próprio. As versões sobem conforme os milestones, e mudança pequena
+sai direto na versão estável, sem pré-versão (ADR 0023, de 30/10/2026). A pré-versão fica para
+as features de nível G e GG. A F1 saiu na 2.2.3.
 
-| Versão | Tema | Pré-versões previstas |
+| Versão | Tema | Pré-versões |
 |---|---|---|
-| 2.3.0 | Interface mais suave | rc.1 hover · rc.2 clique · rc.3 troca de tela · rc.4 skeleton |
-| 2.4.0 | Comando no PATH | rc.1 link simbólico · rc.2 autocomplete |
+| 2.3.0 | Interface mais suave | nenhuma: clique, troca de tela e skeleton saem juntos |
+| 2.4.0 | Comando no PATH | nenhuma: link simbólico e autocomplete saem juntos |
 | 2.5.0 | Manutenção pelo painel | atualizar: uma pré-versão por grupo de etapas (detecção, aviso, execução); depois reconfigurar |
 | 2.6.0 | Pacote `.deb` e `/opt` | uma pré-versão por grupo de etapas (modo sistema, executor, pacote) |
 

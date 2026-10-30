@@ -9,6 +9,21 @@ diante: `PATCH` corrige, `MINOR` acrescenta sem quebrar e `MAJOR` quebra.
 
 ## [Não publicado]
 
+## [2.2.3] — 2026-10-30
+
+Versão estável com a animação ao passar o mouse, com o mesmo código da `2.3.0-rc.1`:
+os botões principais sobem 1 px com uma sombra suave e o item do menu mostra a barra de
+destaque. Nada muda na configuração, no formato de `data/` nem no acesso do painel ao
+servidor: atualize com `./dashboard atualizar`. Quem está na 2.1.0 ou anterior faz antes, uma
+vez, o passo manual das notas da 2.1.1 (a chave de assinatura mudou).
+
+### Mudado
+
+- Versões por milestone (#96, ADR 0023): mudança pequena sai direto na versão estável, sem
+  pré-versão, e as versões sobem conforme os milestones. A pré-versão fica para mudança
+  grande. A F1 sai nesta PATCH, e quem instalou a `2.3.0-rc.1` fica nela até a 2.3.0. Só o
+  processo muda: nada muda no painel.
+
 ## [2.3.0-rc.1] — 2026-10-30
 
 1ª pré-versão da 2.3.0 (ADR 0015), o tema "interface mais suave": chega a animação ao passar

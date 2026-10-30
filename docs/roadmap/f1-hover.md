@@ -1,6 +1,6 @@
 # F1 — Animação ao passar o mouse (hover)
 
-- **Nível:** P · **Versão:** 2.3.0-rc.1 · **Área:** telas
+- **Nível:** P · **Versão:** 2.2.3 · **Área:** telas
 - **Decidido:** "animação do tipo hook ao sobrepor o mouse" é *hover* (confirmado em
   26/10/2026).
 

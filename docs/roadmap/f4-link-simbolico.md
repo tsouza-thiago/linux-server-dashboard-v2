@@ -1,6 +1,6 @@
 # F4 — Link simbólico: `dashboard` sem `./`, de qualquer pasta
 
-- **Nível:** P–M · **Versão:** 2.4.0-rc.1 · **Área:** instalação
+- **Nível:** P–M · **Versão:** 2.4.0 · **Área:** instalação
 - **Decidido:** o nome no PATH é `dashboard`.
 - **Decidido:** quando `~/.local/bin` não está no PATH, a instalação **pergunta** e, com o
   sim, acrescenta a linha no arquivo de login do shell (item 4 da decisão).

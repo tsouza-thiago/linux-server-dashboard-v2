@@ -188,10 +188,11 @@ O teste `test/unit/docs.test.js` confere esta documentação contra o código.
   (`./dashboard instalar --pre`, `./dashboard atualizar --pre`): uma instalação nova a
   partir do `main` fica na estável assinada mais nova, mesmo que o último commit tenha uma
   tag `-rc`. Toda versão é uma tag assinada + GitHub Release (abaixo).
-- **Entregas pequenas** (ADR 0015): um PR por mudança lógica. Correção sai como `PATCH`
-  (2.0.2, 2.0.3…); funcionalidade, como pré-versão da próxima `MINOR` (2.1.0-rc.1…), e a
-  `MINOR` estável consolida as pré-versões. As `PATCH` da fila saem antes da 1ª pré-versão;
-  correção urgente durante as pré-versões sai de um ramo `manutencao/X.Y` criado da última
+- **Entregas pequenas** (ADR 0015 e 0023): um PR por mudança lógica. Correção sai como
+  `PATCH` (2.0.2, 2.0.3…). As versões sobem conforme os milestones, e mudança pequena sai
+  direto na versão estável, sem pré-versão. A pré-versão fica para mudança grande (níveis G e
+  GG do `docs/ROADMAP.md`). As `PATCH` da fila saem antes da 1ª pré-versão; correção urgente
+  durante as pré-versões sai de um ramo `manutencao/X.Y` criado da última
   tag e volta ao `main` por merge. Merge com merge commit, sem squash nem reescrita do
   `main`. Documentação sem código não gera versão: sai nas notas da próxima.
 - **Issue primeiro** (ADR 0016): toda mudança começa numa issue aberta pelo formulário do
