@@ -11,6 +11,9 @@ diante: `PATCH` corrige, `MINOR` acrescenta sem quebrar e `MAJOR` quebra.
 
 ### Adicionado
 
+- Animação ao passar o mouse (#84, ADR 0022): os botões principais sobem 1 px com uma sombra
+  suave, o item do menu mostra a barra de destaque e a troca de cor fica mais suave, no painel
+  e no assistente. Com "reduzir movimento" ligado, nada se desloca.
 - Roadmap das versões 2.3.0 a 2.6.0 (#83, `docs/ROADMAP.md`): 9 features classificadas da mais
   simples à mais complexa, com o planejamento de cada uma em `docs/roadmap/` (decisão,
   etapas, testes, riscos e perguntas em aberto). Só documentação: nada muda no painel.

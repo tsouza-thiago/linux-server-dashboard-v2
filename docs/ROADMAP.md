@@ -1,6 +1,6 @@
 # Roadmap — versões 2.3.0 a 2.6.0
 
-- **Situação:** planejamento. Nenhuma feature desta lista está implementada.
+- **Situação:** em implementação. Feita: F1 (ADR 0022). As outras seguem em planejamento.
 - **Data:** 26/10/2026.
 - **Issue do roadmap:** #83. Milestones 2.3.0 a 2.6.0.
 - **Regra:** cada feature tem um documento em [`docs/roadmap/`](roadmap/) com o objetivo, a
@@ -53,8 +53,8 @@ mudar o formato de `data/` para quem já usa, ela vira MAJOR (3.0.0) e este road
 
 1. As invariantes I1–I10 do [AGENTS.md](../AGENTS.md) continuam valendo. Nenhuma feature
    abre SSH para o servidor nem grava nada nele.
-2. **Orçamento da página inicial:** 300 KB transferidos; hoje são 289 KB. Sobram ~11 KB
-   para as features 1, 2, 3 e 6 juntas. Cada PR de tela mede o tamanho no
+2. **Orçamento da página inicial:** 300 KB transferidos; hoje são 292 KB. Sobram ~8 KB
+   para as features 2, 3 e 6 juntas. Cada PR de tela mede o tamanho no
    `test/e2e/telas.test.js`.
 3. **CSP sem `'unsafe-inline'`:** animação só por CSS em arquivo ou pelo CSSOM. Nunca
    `style="…"` no HTML (ADR 0010).

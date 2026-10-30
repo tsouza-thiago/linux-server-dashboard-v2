@@ -16,7 +16,9 @@ Dar uma resposta visual leve e suave quando o mouse fica sobre um elemento clic�
 - A transição usa só `background` e `color`, com `--t-fast` (150 ms) de `tokens.css`.
 - `base.css` já zera as durações com `prefers-reduced-motion: reduce`.
 
-## Decisão proposta
+## Decisão
+
+Registrada na [ADR 0022](../adr/0022-animacao-de-interface-so-com-css.md).
 
 1. Animar só propriedades baratas: `transform`, `opacity`, `background-color`,
    `border-color`, `color` e `box-shadow`. Nunca `width`, `height`, `margin` ou `padding`

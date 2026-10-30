@@ -46,7 +46,6 @@ body.login-open { overflow: hidden; }
 .nav-item {
   display: flex; align-items: center; gap: 12px; min-height: var(--touch); padding: 0 12px;
   border-radius: 10px; color: var(--text-2); text-decoration: none; font-size: 14px;
-  transition: background var(--t-fast), color var(--t-fast);
 }
 .nav-item:hover { background: var(--surface); color: var(--text); }
 .nav-item svg { flex: 0 0 18px; }
@@ -123,7 +122,6 @@ body.login-open { overflow: hidden; }
 .segmented button {
   min-height: 36px; padding: 0 12px; border: 0; border-radius: var(--r-1);
   background: transparent; color: var(--text-2); font-family: var(--mono); font-size: 12px;
-  transition: background var(--t-fast), color var(--t-fast);
 }
 .segmented.is-text button { font-family: var(--font); font-size: 13px; padding: 0 14px; }
 .segmented button:hover { color: var(--text); }
@@ -136,7 +134,6 @@ body.login-open { overflow: hidden; }
   min-height: var(--touch); padding: 0 16px; border-radius: 10px;
   border: 1px solid var(--border-strong); background: transparent; color: var(--text);
   font-size: 14px; text-decoration: none; white-space: nowrap;
-  transition: background var(--t-fast), border-color var(--t-fast), color var(--t-fast);
 }
 .btn:hover { background: var(--surface-2); color: var(--text); }
 .btn-sm { min-height: 40px; padding: 0 14px; font-size: 13px; }
@@ -441,4 +438,31 @@ pre.code {
   .big { font-size: 28px; }
   .big .unit { font-size: 14px; }
   .toasts { right: 16px; bottom: 16px; }
+}
+
+/* Resposta ao mouse (ADR 0022): só propriedades que não recalculam o layout da página. */
+.btn, .nav-item, .segmented button, .icon-btn, .th-sort, .export-btn {
+  transition-property: background-color, border-color, color, box-shadow, transform;
+  transition-duration: var(--t-fast);
+  transition-timing-function: var(--ease-out);
+}
+.nav-item { position: relative; }
+.nav-item::before {
+  content: ""; position: absolute; left: 0; top: 10px; bottom: 10px; width: 2px; border-radius: 2px;
+  background: var(--accent); transform: scaleY(0); transition: transform var(--t-fast) var(--ease-out);
+}
+/* Só com mouse: em tela de toque o :hover fica preso depois do toque. */
+@media (hover: hover) and (pointer: fine) {
+  .nav-item:hover::before { transform: scaleY(1); }
+}
+/* O base.css só zera a duração: com "reduzir movimento", o deslocamento nem pode ser aplicado. */
+@media (hover: hover) and (pointer: fine) and (prefers-reduced-motion: no-preference) {
+  .btn-primary:hover:not(:disabled), .btn-soft:hover:not(:disabled) {
+    transform: translateY(var(--lift)); box-shadow: var(--shadow-lift);
+  }
+  /* Cobre a faixa que o botão deixa ao subir: sem ela, o mouse na borda de baixo perde o
+     :hover, o botão desce, ganha o :hover de novo e treme. */
+  .btn-primary:hover:not(:disabled)::after, .btn-soft:hover:not(:disabled)::after {
+    content: ""; position: absolute; inset: 0 0 var(--lift);
+  }
 }

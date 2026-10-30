@@ -540,7 +540,7 @@ sempre depois de medido. O pico dos pedidos de 90 dias entrou em 26/10/2026 (#78
 |---|---|---|---|
 | Tempo do comando no servidor | ≤ 1,5 s | 1,26–1,31 s (servidor real, 1 núcleo) | faixa de status e `./dashboard diagnosticar` |
 | Tamanho da resposta | ≤ 16 KB | 2,9 KB (servidor real) | idem; acima de 1 MB a conexão é cortada |
-| Página inicial | ≤ 300 KB transferidos | 289 KB (com gzip) | `test/e2e/telas.test.js` |
+| Página inicial | ≤ 300 KB transferidos | 292 KB (com gzip) | `test/e2e/telas.test.js` |
 | RAM do Node com 72 h em memória | ≤ 95 MB | 88,5–90,4 MB (painel reiniciado com 72 h) | `npm run soak` |
 | RAM do Node no pico dos pedidos de 90 dias | ≤ 120 MB | 113–115 MB (gráfico e Relatórios, 1 h e 15 min) | `npm run soak` (fase 3) |
 | Memória depois que a janela de 72 h enche | sem crescer (≤ +4 MB) | +1,1 a +1,8 MB em 11 h a mais | `npm run soak` |

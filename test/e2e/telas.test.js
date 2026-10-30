@@ -134,6 +134,30 @@ test('e2e: atalhos de teclado trocam de tela e de tema', { skip: !chromium && 's
   assert.equal(before, 'dark', 'escuro é o padrão (ADR 0009)');
 });
 
+// ADR 0022: botão principal sobe com o mouse em cima; com "reduzir movimento", só a cor muda.
+test('e2e: hover — botão principal sobe e o movimento reduzido anula o deslocamento', { skip: !chromium && 'sem playwright-core' }, async (t) => {
+  const s = await setup(t);
+  if (s.skip) return t.skip(s.skip);
+  await s.page.goto(`${s.base}/#/eventos?p=6h`, { waitUntil: 'load' });
+  const botao = s.page.locator('[data-act="note"]');
+  await botao.waitFor();
+  await botao.hover();
+  await s.page.waitForFunction(() => getComputedStyle(document.querySelector('[data-act="note"]')).transform === 'matrix(1, 0, 0, 1, 0, -1)');
+  const sombra = await botao.evaluate((b) => getComputedStyle(b).boxShadow);
+  assert.notEqual(sombra, 'none', 'sombra junto com o deslocamento');
+  const barra = s.page.locator('.nav-item:not([aria-current])').first();
+  await barra.hover();
+  await s.page.waitForFunction(() => {
+    const item = document.querySelector('.nav-item:not([aria-current])');
+    return getComputedStyle(item, '::before').transform === 'matrix(1, 0, 0, 1, 0, 0)';
+  });
+  await s.page.emulateMedia({ reducedMotion: 'reduce' });
+  await botao.hover();
+  await s.page.waitForFunction(() => document.querySelector('[data-act="note"]').matches(':hover'));
+  assert.equal(await botao.evaluate((b) => getComputedStyle(b).transform), 'none', 'sem deslocamento com movimento reduzido');
+  assert.deepEqual(s.problems, []);
+});
+
 test('e2e: anotação com HTML malicioso aparece como texto (anti-XSS)', { skip: !chromium && 'sem playwright-core' }, async (t) => {
   const s = await setup(t);
   if (s.skip) return t.skip(s.skip);
