@@ -18,6 +18,10 @@ corte seco.
 
 ## Decisão proposta
 
+A decisão final está na [ADR 0026](../adr/0026-entrada-de-tela-so-quando-ela-muda.md): a própria
+`renderView()` compara a tela, sem receber a origem da chamada, e a tecla mais nova cancela as
+navegações anteriores.
+
 1. **Entrada por CSS:** `.view` entra com `opacity` de 0 a 1 e `translateY(4px)` para 0,
    em ~180 ms com `--ease-out`. Nenhum JavaScript novo para animar.
 2. **Animar só quando a tela muda de verdade:** `renderView()` recebe a origem da
