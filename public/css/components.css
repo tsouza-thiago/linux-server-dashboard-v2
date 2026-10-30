@@ -47,7 +47,6 @@ body.login-open { overflow: hidden; }
   display: flex; align-items: center; gap: 12px; min-height: var(--touch); padding: 0 12px;
   border-radius: 10px; color: var(--text-2); text-decoration: none; font-size: 14px;
 }
-.nav-item:hover { background: var(--surface); color: var(--text); }
 .nav-item svg { flex: 0 0 18px; }
 .nav-item[aria-current="page"] {
   background: var(--surface-2); color: var(--text); font-weight: 500;
@@ -124,7 +123,6 @@ body.login-open { overflow: hidden; }
   background: transparent; color: var(--text-2); font-family: var(--mono); font-size: 12px;
 }
 .segmented.is-text button { font-family: var(--font); font-size: 13px; padding: 0 14px; }
-.segmented button:hover { color: var(--text); }
 .segmented button[aria-pressed="true"] { background: var(--surface-3); color: var(--text); font-weight: 600; }
 .segmented .count { font-family: var(--mono); color: var(--text-3); font-weight: 400; }
 .segmented:empty { display: none; }
@@ -135,26 +133,20 @@ body.login-open { overflow: hidden; }
   border: 1px solid var(--border-strong); background: transparent; color: var(--text);
   font-size: 14px; text-decoration: none; white-space: nowrap;
 }
-.btn:hover { background: var(--surface-2); color: var(--text); }
 .btn-sm { min-height: 40px; padding: 0 14px; font-size: 13px; }
 .btn-primary { border: 0; background: var(--accent-strong); color: var(--on-accent); font-weight: 600; }
-.btn-primary:hover { background: var(--accent-text); color: var(--on-accent); }
 .btn-soft { border-color: var(--accent-line); background: var(--accent-soft); color: var(--accent-text); font-weight: 600; }
-.btn-soft:hover { background: color-mix(in srgb, var(--accent) 18%, transparent); color: var(--accent-text); }
 .btn-quiet { color: var(--text-2); }
 .btn-surface { border-color: var(--border); background: var(--surface); color: var(--text-2); font-size: 13px; border-radius: var(--r-2); }
 .btn-danger { border-color: var(--crit-line); color: var(--crit-ink); }
-.btn-danger:hover { background: var(--crit-soft); color: var(--crit-ink); }
 .btn-block { width: 100%; }
 .btn-link { border: 0; padding: 0 12px; min-height: 36px; background: transparent; color: var(--accent-text); font-size: 13px; }
-.btn-link:hover { background: transparent; color: var(--text); text-decoration: underline; }
 
 .icon-btn {
   width: var(--touch); height: var(--touch); flex: 0 0 var(--touch);
   display: inline-flex; align-items: center; justify-content: center;
   border-radius: var(--r-2); border: 1px solid var(--border); background: var(--surface); color: var(--text-2);
 }
-.icon-btn:hover { color: var(--text); background: var(--surface-2); }
 
 .field { display: flex; flex-direction: column; gap: 6px; }
 .field label { font-size: 13px; color: var(--text-2); }
@@ -286,7 +278,6 @@ body.login-open { overflow: hidden; }
   border: 0; background: none; padding: 0; color: inherit; font: inherit; font-weight: inherit;
   display: inline-flex; gap: 4px; align-items: center;
 }
-.th-sort:hover { color: var(--text); }
 th[aria-sort] { color: var(--accent-text); font-weight: 600; }
 
 kbd {
@@ -440,9 +431,9 @@ pre.code {
   .toasts { right: 16px; bottom: 16px; }
 }
 
-/* Resposta ao mouse (ADR 0022): só propriedades que não recalculam o layout da página. */
-.btn, .nav-item, .segmented button, .icon-btn, .th-sort, .export-btn {
-  transition-property: background-color, border-color, color, box-shadow, transform;
+/* Resposta ao mouse (ADR 0022 e 0024): só propriedades que não recalculam o layout da página. */
+a, summary, .btn, .btn-link, .nav-item, .nav-item svg, .segmented button, .icon-btn, .th-sort, .export-btn, .check label {
+  transition-property: background-color, border-color, color, box-shadow, transform, text-decoration-color;
   transition-duration: var(--t-fast);
   transition-timing-function: var(--ease-out);
 }
@@ -453,16 +444,30 @@ pre.code {
 }
 /* Só com mouse: em tela de toque o :hover fica preso depois do toque. */
 @media (hover: hover) and (pointer: fine) {
+  a:hover, summary:hover { color: var(--text); text-decoration: underline 2px var(--accent); text-underline-offset: 3px; }
+  .nav-item:hover { background: var(--hover-bg); color: var(--text); text-decoration: none; }
+  .nav-item:hover svg { color: var(--accent); }
   .nav-item:hover::before { transform: scaleY(1); }
+  .segmented button:hover:not(:disabled) { background: var(--hover-bg); color: var(--text); }
+  .btn:hover:not(:disabled), .icon-btn:hover:not(:disabled), .export-btn:hover:not(:disabled) {
+    background: var(--hover-bg); border-color: var(--accent); color: var(--text); text-decoration: none;
+  }
+  .btn-primary:hover:not(:disabled) { background: var(--accent-strong-hover); color: var(--on-accent); }
+  .btn-soft:hover:not(:disabled) { background: var(--hover-bg-strong); color: var(--text); }
+  .btn-danger:hover:not(:disabled) { background: var(--crit-soft); border-color: var(--crit); color: var(--crit-ink); }
+  .btn-link:hover:not(:disabled) { background: var(--hover-bg); color: var(--text); text-decoration: underline; }
+  .th-sort:hover:not(:disabled) { color: var(--accent-text); text-decoration: underline 2px var(--accent); }
+  .check:hover label { color: var(--accent-text); }
 }
-/* O base.css só zera a duração: com "reduzir movimento", o deslocamento nem pode ser aplicado. */
+/* O base.css só zera a duração: com "reduzir movimento", o deslocamento nem pode ser aplicado.
+   Grupo, tabela e lista longa não sobem (ADR 0024). */
 @media (hover: hover) and (pointer: fine) and (prefers-reduced-motion: no-preference) {
-  .btn-primary:hover:not(:disabled), .btn-soft:hover:not(:disabled) {
+  .btn:hover:not(:disabled, .event-list *), .icon-btn:hover:not(:disabled), .export-btn:hover:not(:disabled) {
     transform: translateY(var(--lift)); box-shadow: var(--shadow-lift);
   }
   /* Cobre a faixa que o botão deixa ao subir: sem ela, o mouse na borda de baixo perde o
      :hover, o botão desce, ganha o :hover de novo e treme. */
-  .btn-primary:hover:not(:disabled)::after, .btn-soft:hover:not(:disabled)::after {
+  .btn:hover:not(:disabled, .event-list *)::after, .icon-btn:hover:not(:disabled)::after, .export-btn:hover:not(:disabled)::after {
     content: ""; position: absolute; inset: 0 0 var(--lift);
   }
 }

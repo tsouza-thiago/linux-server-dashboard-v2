@@ -9,6 +9,14 @@ diante: `PATCH` corrige, `MINOR` acrescenta sem quebrar e `MAJOR` quebra.
 
 ## [Não publicado]
 
+### Alterado
+
+- O hover ficou mais visível e chegou a tudo o que é clicável (#100, ADR 0024): todo botão do
+  painel, do login e do assistente sobe 2 px com sombra e ganha fundo e borda com a cor de
+  destaque. Botões em grupo e botões da lista de eventos trocam de fundo sem subir. Links,
+  cabeçalhos de tabela, opções e caixas de seleção do assistente também respondem ao mouse.
+  Elemento desligado não responde, e com "reduzir movimento" nada se desloca.
+
 ### Corrigido
 
 - `npm run seguranca` não reprova mais por causa do Node baixado em `.runtime/` (#98): a

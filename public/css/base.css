@@ -37,7 +37,6 @@ h2 { font-size: var(--fs-section); font-weight: 600; }
 h3 { font-size: var(--fs-small); font-weight: 600; }
 
 a { color: var(--accent-text); text-underline-offset: 3px; }
-a:hover { color: var(--text); }
 
 button, input, select, textarea { font: inherit; color: inherit; }
 button { cursor: pointer; }

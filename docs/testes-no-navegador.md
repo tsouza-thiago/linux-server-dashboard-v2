@@ -45,10 +45,14 @@ Em todas as telas, nos cenários `normal` e `lacunas`:
 - O console não tem erro nem aviso de CSP.
 - Nenhum pedido sai para outro endereço além do painel.
 - O tema claro e o escuro (tecla `t`) deixam todo texto legível.
-- **Hover (ADR 0022), nos 2 temas:** "Coletar agora" e "Nova anotação" sobem 1 px com sombra,
-  sem tremer com o mouse na borda de baixo; o item do menu mostra a barra de destaque; os
-  botões em grupo (períodos) só trocam de cor. O foco por teclado (Tab) aparece sem o mouse.
-  Com "reduzir movimento" ligado, nada se desloca e a cor continua mudando.
+- **Hover (ADR 0022 e 0024), nos 2 temas, nas 8 telas, no login e no assistente:** todo botão
+  sobe 2 px com sombra e ganha fundo e borda com a cor de destaque, sem tremer com o mouse na
+  borda de baixo. O item do menu mostra a barra, o fundo e o ícone na cor de destaque. Os botões
+  em grupo (períodos e filtros) e os da lista de eventos trocam de fundo sem subir. Links,
+  títulos de coluna e `summary` ganham sublinhado com a cor de destaque. As opções do assistente
+  ganham fundo ou borda. Botão desligado não responde. O texto continua legível no hover. O foco
+  por teclado (Tab) aparece sem o mouse. Com "reduzir movimento" ligado, nada se desloca e o
+  fundo continua mudando. Na janela da extensão, leia o estilo depois de uma captura.
 
 | Tela | O que conferir |
 |---|---|

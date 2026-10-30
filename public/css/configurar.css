@@ -17,7 +17,7 @@
   --wz-ok-line-soft: rgba(18, 161, 92, 0.30);
   --wz-warn-line: rgba(201, 138, 11, 0.45);
   --wz-ok-halo: none;
-  --wz-btn-halo: none;
+  --wz-btn-halo: 0 0 0 0 transparent; /* sombra válida: o hover soma outra a esta */
   --wz-step-halo: none;
   --wz-ok-hero: 0 20px 50px -30px rgba(11, 15, 23, 0.18);
 }
@@ -91,24 +91,10 @@
 .wz-foot-note { font-size: 13px; color: var(--text-3); }
 .wz-next, .wz-back { min-height: 48px; padding: 0 22px; border-radius: 12px; font: inherit; font-size: 15px; display: inline-flex; align-items: center; gap: 8px; cursor: pointer; text-decoration: none; }
 .wz-next { border: 0; background: var(--accent-strong); color: var(--on-accent); font-weight: 600; }
-.wz-next:hover { background: var(--accent-text); }
 .wz-next[disabled] { background: var(--surface-3); color: var(--text-3); cursor: not-allowed; }
 .wz-next.big { min-height: 52px; padding: 0 26px; border-radius: 14px; font-size: 16px; box-shadow: var(--wz-btn-halo); }
 .wz-back { padding: 0 18px; border: 1px solid var(--border); background: transparent; color: var(--text-2); }
-.wz-back:hover { color: var(--text); background: var(--surface-2); }
 .wz-linkbtn { border: 0; background: transparent; padding: 0; min-height: 44px; font: inherit; font-size: 14px; color: var(--text-2); text-decoration: underline; cursor: pointer; }
-.wz-linkbtn:hover { color: var(--text); }
-/* Mesma resposta ao mouse dos botões do painel (ADR 0022). O .big já tem o halo como sombra. */
-.wz-next, .wz-back, .wz-linkbtn {
-  transition-property: background-color, border-color, color, box-shadow, transform;
-  transition-duration: var(--t-fast);
-  transition-timing-function: var(--ease-out);
-}
-@media (hover: hover) and (pointer: fine) and (prefers-reduced-motion: no-preference) {
-  .wz-next:hover:not(:disabled) { transform: translateY(var(--lift)); }
-  .wz-next:not(.big):hover:not(:disabled) { box-shadow: var(--shadow-lift); }
-  .wz-next:hover:not(:disabled)::after { content: ""; position: absolute; inset: 0 0 var(--lift); }
-}
 
 /* Campos */
 .wz-field { display: flex; flex-direction: column; gap: 8px; }
@@ -151,6 +137,7 @@
 .wz-ident details p { margin: 0 0 8px; font-size: 13px; line-height: 1.5; color: var(--text-2); }
 .wz-code { margin: 0; padding: 12px 14px; border-radius: 10px; background: var(--bg); font-family: var(--mono); font-size: 13px; color: var(--text); white-space: pre-wrap; overflow-wrap: anywhere; }
 .wz-confirm { display: flex; align-items: center; gap: 10px; font-size: 14px; }
+.wz-confirm label, .wz-row-smart label { cursor: pointer; }
 .wz-confirm input, .wz-row input[type="checkbox"], .wz-radio input, .wz-from input { width: 20px; height: 20px; flex: 0 0 auto; accent-color: var(--accent); }
 .wz-pass { display: flex; gap: 8px; }
 .wz-pass .wz-input { flex: 1; min-width: 0; }
@@ -266,7 +253,7 @@
 .wz-box { padding: 22px; border-radius: 18px; border: 1px solid var(--border); display: flex; flex-direction: column; gap: 12px; }
 .wz-box.tight { gap: 4px; }
 .wz-box h2 { font-size: 16px; font-weight: 600; margin-bottom: 4px; }
-.wz-switch { display: flex; align-items: center; justify-content: space-between; gap: 12px; min-height: 52px; border-bottom: 1px solid var(--grid); cursor: pointer; }
+.wz-switch { display: flex; align-items: center; justify-content: space-between; gap: 12px; min-height: 52px; margin: 0 -8px; padding: 0 8px; border-radius: 8px; border-bottom: 1px solid var(--grid); cursor: pointer; }
 .wz-switch:last-child { border-bottom: 0; }
 .wz-switch > span { display: flex; flex-direction: column; }
 .wz-switch > span > span:first-child { font-size: 14px; }
@@ -297,3 +284,36 @@
   .wz-head-right .wz-meta { display: none; }
 }
 @media (prefers-reduced-motion: reduce) { .wz-act.is-now .spinner { animation: none; } }
+
+/* Resposta ao mouse, igual à dos botões do painel (ADR 0024). No fim do arquivo para valer também
+   sobre as opções marcadas (.wz-radio:has(input:checked) e parecidas). */
+.wz-next, .wz-back, .wz-linkbtn, .wz-mini, .wz-more, .wz-eye, .wz-seg button, .wz-radio, .wz-svc, .wz-switch, .wz-from, .wz-row, .wz-adv, .wz-confirm label, .wz-row-smart label {
+  transition-property: background-color, border-color, color, box-shadow, transform, text-decoration-color;
+  transition-duration: var(--t-fast);
+  transition-timing-function: var(--ease-out);
+}
+@media (hover: hover) and (pointer: fine) {
+  .wz-next:hover:not(:disabled) { background: var(--accent-strong-hover); text-decoration: none; }
+  .wz-back:hover:not(:disabled), .wz-mini:hover:not(:disabled), .wz-more:hover:not(:disabled), .wz-eye:hover:not(:disabled) {
+    background: var(--hover-bg); border-color: var(--accent); color: var(--text); text-decoration: none;
+  }
+  .wz-mini.soft:hover:not(:disabled) { background: var(--hover-bg-strong); color: var(--text); }
+  .wz-linkbtn:hover:not(:disabled) { color: var(--accent-text); text-decoration: underline 2px var(--accent); }
+  .wz-seg button:hover:not(:disabled) { background: var(--hover-bg); color: var(--text); }
+  .wz-radio:hover:not(:has(input:disabled)), .wz-svc:hover:not(:has(input:disabled)) { background: var(--hover-bg); border-color: var(--accent); }
+  .wz-from:hover:not(:has(input:disabled)) { background: var(--hover-bg); border-color: var(--accent); }
+  .wz-switch:hover:not(:has(input:disabled)) { background: var(--hover-bg); }
+  .wz-row:hover:not(:has(> input:disabled)) { border-color: var(--accent); }
+  .wz-adv:has(> summary:hover) { border-color: var(--accent); }
+  .wz-confirm:hover label, .wz-row-smart:hover label { color: var(--accent-text); }
+}
+@media (hover: hover) and (pointer: fine) and (prefers-reduced-motion: no-preference) {
+  .wz-next:hover:not(:disabled), .wz-back:hover:not(:disabled), .wz-mini:hover:not(:disabled), .wz-more:hover:not(:disabled), .wz-eye:hover:not(:disabled) {
+    transform: translateY(var(--lift)); box-shadow: var(--shadow-lift);
+  }
+  .wz-next.big:hover:not(:disabled) { box-shadow: var(--wz-btn-halo), var(--shadow-lift); }
+  /* A mesma faixa do components.css: sem ela, o botão treme na borda de baixo. */
+  .wz-next:hover:not(:disabled)::after, .wz-back:hover:not(:disabled)::after, .wz-mini:hover:not(:disabled)::after, .wz-more:hover:not(:disabled)::after, .wz-eye:hover:not(:disabled)::after {
+    content: ""; position: absolute; inset: 0 0 var(--lift);
+  }
+}

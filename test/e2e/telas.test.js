@@ -8,6 +8,7 @@ import os from 'node:os';
 import path from 'node:path';
 import { createApp } from '../../server/index.js';
 import { listen, close } from '../../test-support/request.js';
+import { semHover, sobe } from '../../test-support/hover.js';
 
 let chromium = null;
 try { ({ chromium } = await import('playwright-core')); } catch { /* sem playwright-core */ }
@@ -135,27 +136,49 @@ test('e2e: atalhos de teclado trocam de tela e de tema', { skip: !chromium && 's
 });
 
 // ADR 0022: botão principal sobe com o mouse em cima; com "reduzir movimento", só a cor muda.
-test('e2e: hover — botão principal sobe e o movimento reduzido anula o deslocamento', { skip: !chromium && 'sem playwright-core' }, async (t) => {
+test('e2e: hover — botão solto sobe, grupo não sobe e o movimento reduzido anula o deslocamento', { skip: !chromium && 'sem playwright-core' }, async (t) => {
   const s = await setup(t);
   if (s.skip) return t.skip(s.skip);
   await s.page.goto(`${s.base}/#/eventos?p=6h`, { waitUntil: 'load' });
-  const botao = s.page.locator('[data-act="note"]');
-  await botao.waitFor();
-  await botao.hover();
-  await s.page.waitForFunction(() => getComputedStyle(document.querySelector('[data-act="note"]')).transform === 'matrix(1, 0, 0, 1, 0, -1)');
-  const sombra = await botao.evaluate((b) => getComputedStyle(b).boxShadow);
-  assert.notEqual(sombra, 'none', 'sombra junto com o deslocamento');
+  await s.page.locator('[data-act="note"]').waitFor();
+  for (const seletor of ['[data-act="note"]', '#pollBtn', '#themeToggle', '[data-act="notify"]']) {
+    assert.notEqual(await sobe(s.page, seletor), 'none', `sombra junto com o deslocamento: ${seletor}`);
+  }
+  await s.page.locator('.segmented button:not([aria-pressed="true"])').first().hover();
+  await s.page.waitForTimeout(250);
+  assert.equal(await s.page.locator('.segmented button:not([aria-pressed="true"])').first().evaluate((b) => getComputedStyle(b).transform), 'none', 'botão em grupo não sobe');
   const barra = s.page.locator('.nav-item:not([aria-current])').first();
   await barra.hover();
   await s.page.waitForFunction(() => {
     const item = document.querySelector('.nav-item:not([aria-current])');
     return getComputedStyle(item, '::before').transform === 'matrix(1, 0, 0, 1, 0, 0)';
   });
+  await s.page.goto(`${s.base}/#/relatorios`, { waitUntil: 'load' });
+  await s.page.locator('.export-btn').first().waitFor();
+  await sobe(s.page, '.export-btn');
   await s.page.emulateMedia({ reducedMotion: 'reduce' });
-  await botao.hover();
-  await s.page.waitForFunction(() => document.querySelector('[data-act="note"]').matches(':hover'));
-  assert.equal(await botao.evaluate((b) => getComputedStyle(b).transform), 'none', 'sem deslocamento com movimento reduzido');
+  await s.page.locator('.export-btn').first().hover();
+  await s.page.waitForFunction(() => document.querySelector('.export-btn').matches(':hover'));
+  assert.equal(await s.page.locator('.export-btn').first().evaluate((b) => getComputedStyle(b).transform), 'none', 'sem deslocamento com movimento reduzido');
   assert.deepEqual(s.problems, []);
+});
+
+test('e2e: hover — nenhum clicável das 8 telas, nos 2 temas, fica sem mudança de estilo', { skip: !chromium && 'sem playwright-core' }, async (t) => {
+  const s = await setup(t);
+  if (s.skip) return t.skip(s.skip);
+  s.app.annotationsStore.add({ text: 'troquei o disco', label: 'manutenção' });
+  for (const tema of ['dark', 'light']) {
+    await s.page.goto(`${s.base}/`, { waitUntil: 'load' });
+    await s.page.evaluate((th) => localStorage.setItem('dash_theme', th), tema);
+    await s.page.reload({ waitUntil: 'load' });
+    assert.equal(await s.page.getAttribute('html', 'data-theme'), tema);
+    for (const [id, , charts] of VIEWS) {
+      await s.page.goto(`${s.base}/#/${id}`, { waitUntil: 'load' });
+      await s.page.waitForSelector(`.view-${id}`);
+      if (charts) await s.page.waitForFunction(([v, n]) => document.querySelectorAll(`.view-${v} .uplot`).length >= n, [id, charts]);
+      assert.deepEqual(await semHover(s.page), [], `${id}, tema ${tema}`);
+    }
+  }
 });
 
 test('e2e: anotação com HTML malicioso aparece como texto (anti-XSS)', { skip: !chromium && 'sem playwright-core' }, async (t) => {
@@ -175,6 +198,7 @@ test('e2e: com DASH_TOKEN a tela pede login e só então mostra os dados', { ski
   if (s.skip) return t.skip(s.skip);
   await s.page.goto(`${s.base}/`, { waitUntil: 'load' });
   await s.page.waitForSelector('#login:not([hidden])');
+  await sobe(s.page, '#loginSubmit');
   await s.page.fill('#loginToken', 'errado');
   await s.page.click('#loginSubmit');
   await s.page.waitForFunction(() => /Token incorreto/.test(document.getElementById('loginError').textContent));

@@ -31,6 +31,7 @@
   --accent-line: rgba(62, 224, 208, 0.35);
   --on-accent: #06231F;
   --accent-strong: #3EE0D0; /* fundo do botão principal */
+  --accent-strong-hover: #8FF5EA;
   --focus: rgba(62, 224, 208, 0.55);
 
   /* Séries de dados, ordem fixa (a cor segue a métrica): CPU, RAM, disco, temperatura */
@@ -69,7 +70,7 @@
   --shadow-crit: 0 30px 80px -40px rgba(240, 82, 92, 0.55);
   --shadow-pop: 0 16px 40px rgba(0, 0, 0, 0.35);
   --shadow-login: 0 0 0 1px rgba(62, 224, 208, 0.05), 0 40px 100px -50px rgba(62, 224, 208, 0.5);
-  --shadow-lift: 0 8px 18px -10px rgba(62, 224, 208, 0.7);
+  --shadow-lift: 0 10px 20px -8px rgba(62, 224, 208, 0.8);
 
   /* Tipografia (Geist + Geist Mono, OFL, servidas localmente) */
   --font: 'Geist', system-ui, -apple-system, 'Segoe UI', sans-serif;
@@ -91,7 +92,10 @@
   --t-fast: 150ms;
   --t-base: 200ms;
   --ease-out: cubic-bezier(0.22, 1, 0.36, 1);
-  --lift: -1px;
+  --lift: -2px;
+  /* Fundo de hover: a mesma conta nos 2 temas, sobre o --accent de cada um. */
+  --hover-bg: color-mix(in srgb, var(--accent) 14%, transparent);
+  --hover-bg-strong: color-mix(in srgb, var(--accent) 26%, transparent);
 }
 
 :root[data-theme="light"] {
@@ -119,6 +123,7 @@
   --on-accent: #FFFFFF;
   /* #0B8FA3 sob texto branco daria 3,8:1; escurecido até o AA (4,6:1). */
   --accent-strong: #0A8193;
+  --accent-strong-hover: #065E6B;
   --focus: rgba(11, 143, 163, 0.6);
 
   --s1: #0B8FA3;
@@ -154,5 +159,5 @@
   --shadow-crit: 0 20px 50px -30px rgba(208, 51, 64, 0.35);
   --shadow-pop: 0 16px 40px rgba(11, 15, 23, 0.14);
   --shadow-login: 0 20px 50px -30px rgba(11, 15, 23, 0.25);
-  --shadow-lift: 0 6px 14px -8px rgba(11, 15, 23, 0.35);
+  --shadow-lift: 0 8px 16px -6px rgba(11, 15, 23, 0.45);
 }

@@ -603,7 +603,8 @@ linux-server-dashboard-v2/
 │   └── js/                 main.js, locale-guard.js, core/, charts/, views/ (as 8 telas)
 ├── test/                   unit/, integration/, seguranca/, e2e/ e fixtures/ (node --test)
 └── test-support/           request.js (HTTP/SSE), sshd.js (sshd real), instalacao-fake.js,
-                            rotas.js (rotas lidas do código), fonte.js (código sem comentários)
+                            rotas.js (rotas lidas do código), fonte.js (código sem comentários),
+                            hover.js (resposta ao mouse no navegador)
 ```
 
 ## Solução de problemas (para quem desenvolve)
