@@ -32,6 +32,7 @@ risco de segurança, os testes novos e o que muda para quem já usa o painel.
 | 8 | Reconfigurar pelo painel | G | 2.5.0 | 7 (menu e executor) | #91 | [f8-reconfigurar-pela-tela.md](roadmap/f8-reconfigurar-pela-tela.md) |
 | 9 | Instalação em `/opt` por pacote `.deb` | GG | 2.6.0 | 4, 5, 7 e 8 | #92 | [f9-deb-e-opt.md](roadmap/f9-deb-e-opt.md) |
 | 10 | Hover mais visível em clicáveis, contêineres e gráficos — **entregue na 2.2.4** | M | 2.2.4 | 1 | #100 | [f10-hover-mais-visivel.md](roadmap/f10-hover-mais-visivel.md) |
+| 11 | README e TUTORIAL ilustrados com prints e elementos gráficos | M | 2.4.0 | 6 (prints da interface final) | #106 | [f11-documentacao-ilustrada.md](roadmap/f11-documentacao-ilustrada.md) |
 
 A F8 é menos arriscada que a F7 (reaproveita o assistente e não acessa a internet), mas
 vem depois dela porque usa o menu e o executor que a F7 cria.
@@ -46,7 +47,7 @@ as features de nível G e GG. A F1 saiu na 2.2.3.
 |---|---|---|
 | 2.2.4 | Hover mais visível | nenhuma |
 | 2.3.0 | Interface mais suave | nenhuma: clique, troca de tela e skeleton saem juntos |
-| 2.4.0 | Comando no PATH | nenhuma: link simbólico e autocomplete saem juntos |
+| 2.4.0 | Comando no PATH | nenhuma: link simbólico e autocomplete saem juntos; a F11 é só documentação e sai nas notas desta versão |
 | 2.5.0 | Manutenção pelo painel | atualizar: uma pré-versão por grupo de etapas (detecção, aviso, execução); depois reconfigurar |
 | 2.6.0 | Pacote `.deb` e `/opt` | uma pré-versão por grupo de etapas (modo sistema, executor, pacote) |
 
@@ -97,6 +98,7 @@ mudar o formato de `data/` para quem já usa, ela vira MAJOR (3.0.0) e este road
 | Agrupamento | 4 MINOR por tema (tabela acima) |
 | Registro | este arquivo + 1 documento por feature; ADR quando a feature for aprovada |
 | F10 (30/10/2026) | a F1 ficou fraca: animação mais visível e hover em todo clicável, antes da F2 |
+| F11 (30/10/2026) | pedido do mantenedor: README e TUTORIAL com prints das telas e outros elementos gráficos; sai nas notas da 2.4.0, com até 200 KB por print e 3 MB em `docs/img/` |
 
 ## Perguntas em aberto
 

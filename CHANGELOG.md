@@ -19,6 +19,8 @@ diante: `PATCH` corrige, `MINOR` acrescenta sem quebrar e `MAJOR` quebra.
   uma amostra e a troca de período ou de tema não animam, e com "reduzir movimento" nada se move.
 - Estado "aguardando" nos botões (#85): coletar agora, reconhecer, resolver, salvar e remover
   anotação e entrar mostram um spinner, sem mudar a largura, e o duplo clique não repete a ação.
+- Roadmap: nova feature F11 (#106, milestone 2.4.0), README e TUTORIAL ilustrados com prints das
+  telas e outros elementos gráficos.
 
 ## [2.2.4] — 2026-10-30
 
