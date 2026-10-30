@@ -14,6 +14,9 @@ diante: `PATCH` corrige, `MINOR` acrescenta sem quebrar e `MAJOR` quebra.
 - Botões respondem ao clique (#85, ADR 0025): o botão que sobe no hover desce e encolhe enquanto
   o mouse está apertado, e botões em grupo, da lista de eventos e o menu mudam o fundo. Com
   "reduzir movimento", nada se move. O painel e o assistente seguem a mesma regra.
+- Transição suave na troca de telas (#86, ADR 0026): a tela nova, o conteúdo que substitui o
+  esqueleto, o login e os diálogos entram com um esmaecer e um deslocamento curtos. A chegada de
+  uma amostra e a troca de período ou de tema não animam, e com "reduzir movimento" nada se move.
 - Estado "aguardando" nos botões (#85): coletar agora, reconhecer, resolver, salvar e remover
   anotação e entrar mostram um spinner, sem mudar a largura, e o duplo clique não repete a ação.
 - Roadmap: nova feature F11 (#106, milestone 2.4.0), README e TUTORIAL ilustrados com prints das

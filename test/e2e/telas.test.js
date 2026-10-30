@@ -285,6 +285,154 @@ test('e2e: clique — o botão fica aguardando sem mudar de largura, e o duplo c
   assert.deepEqual(pedidos, { poll: 1, nota: 1 });
 });
 
+// ADR 0026: a tela entra por CSS só quando muda de verdade. O que redesenha a mesma tela não anima.
+const entrada = () => (seletor) => {
+  const css = getComputedStyle(document.querySelector(seletor));
+  return { nome: css.animationName, duracao: parseFloat(css.animationDuration) };
+};
+const semEntrada = (page) => page.evaluate(() => {
+  const el = document.querySelector('.view');
+  el.classList.remove('view-entra');
+  el.dataset.velha = '1';
+});
+const trocouElemento = (page) => page.waitForFunction(() => !document.querySelector('.view')?.dataset.velha);
+const temEntrada = (page) => page.evaluate(() => document.querySelector('.view').classList.contains('view-entra'));
+
+test('e2e: troca de tela — entra com a tela nova; amostra do SSE, período e tema não animam', { skip: !chromium && 'sem playwright-core' }, async (t) => {
+  const s = await setup(t, { collect: async () => ({ ok: true, sample: { ...sample(Date.now(), 120), host: 'servidor-novo' } }) });
+  if (s.skip) return t.skip(s.skip);
+  await s.page.goto(`${s.base}/`, { waitUntil: 'load' });
+  await s.page.waitForSelector('.hero');
+  while (!s.app.sse.size) await new Promise((r) => setTimeout(r, 20));
+
+  await s.page.keyboard.press('8');
+  await s.page.waitForSelector('.view-ajuda');
+  assert.ok(await temEntrada(s.page), 'o atalho trocou a tela');
+  assert.deepEqual(await s.page.evaluate(entrada(), '.view'), { nome: 'entra', duracao: 0.18 });
+
+  await semEntrada(s.page);
+  await s.app.runPoll();
+  await s.page.waitForFunction(() => document.body.textContent.includes('servidor-novo'));
+  assert.equal(await temEntrada(s.page), false, 'amostra nova não anima');
+  assert.equal(await s.page.evaluate(() => document.querySelector('.view').dataset.velha), '1', 'a amostra não monta a tela de novo');
+
+  await s.page.evaluate(() => { location.hash = '#/recursos'; });
+  await s.page.waitForSelector('.view-recursos .uplot');
+  assert.ok(await temEntrada(s.page), 'o link trocou a tela');
+
+  await semEntrada(s.page);
+  await s.page.evaluate(() => { location.hash = '#/recursos?p=7d'; });
+  await trocouElemento(s.page);
+  assert.equal(await temEntrada(s.page), false, 'trocar o período não anima');
+
+  await semEntrada(s.page);
+  await s.page.keyboard.press('t');
+  await trocouElemento(s.page);
+  assert.equal(await temEntrada(s.page), false, 'trocar o tema não anima');
+  assert.deepEqual(s.problems, []);
+});
+
+test('e2e: troca de tela — o conteúdo que substitui o esqueleto entra, na tela geral e na Visão geral', { skip: !chromium && 'sem playwright-core' }, async (t) => {
+  const s = await setup(t);
+  if (s.skip) return t.skip(s.skip);
+  for (const [hash, conteudo] of [['#/processos', '.view-processos .panel'], ['#/visao-geral', '.hero']]) {
+    let solta;
+    const espera = new Promise((r) => { solta = r; });
+    await s.page.route('**/api/status', async (rota) => { await espera; await rota.continue(); });
+    await s.page.goto(`${s.base}/${hash}`, { waitUntil: 'load' });
+    await s.page.reload({ waitUntil: 'load' });
+    await s.page.waitForSelector('.view .skel');
+    await semEntrada(s.page);
+    solta();
+    await s.page.waitForSelector(conteudo);
+    assert.ok(await temEntrada(s.page), `${hash}: o esqueleto deu lugar ao conteúdo`);
+    await s.page.unroute('**/api/status');
+  }
+});
+
+test('e2e: troca de tela — atalhos em sequência não acumulam, e o gráfico mantém a largura', { skip: !chromium && 'sem playwright-core' }, async (t) => {
+  const s = await setup(t);
+  if (s.skip) return t.skip(s.skip);
+  await s.page.goto(`${s.base}/`, { waitUntil: 'load' });
+  await s.page.waitForSelector('.hero');
+  for (const tecla of '234567812345') await s.page.keyboard.press(tecla);
+  await s.page.waitForSelector('.view-processos');
+  assert.equal(await s.page.textContent('#viewTitle'), 'Processos & serviços');
+  const telas = await s.page.evaluate(() => ({
+    views: document.querySelectorAll('.view').length,
+    animacoes: document.querySelector('.view').getAnimations().length,
+  }));
+  assert.equal(telas.views, 1);
+  assert.ok(telas.animacoes <= 1, `${telas.animacoes} animações na tela`);
+
+  // Teclas no mesmo instante: todo hashchange lê a última tela; montar de novo cortaria a entrada.
+  await s.page.evaluate(() => { for (const key of '678') document.dispatchEvent(new KeyboardEvent('keydown', { key, bubbles: true })); });
+  await s.page.waitForSelector('.view-ajuda');
+  await s.page.waitForTimeout(100);
+  assert.ok(await temEntrada(s.page), 'as teclas seguintes não cortam a entrada');
+
+  // A navegação que esperava os baldes ficou para trás: ela não pode montar a tela de novo.
+  let solta;
+  const espera = new Promise((r) => { solta = r; });
+  const baldes = (url) => url.pathname === '/api/history';
+  const pedido = s.page.waitForRequest((r) => r.url().includes('/api/history'));
+  await s.page.route(baldes, async (rota) => { await espera; await rota.continue(); });
+  await s.page.keyboard.press('3');
+  await pedido;
+  await s.page.keyboard.press('5');
+  await s.page.waitForSelector('.view-processos');
+  await semEntrada(s.page);
+  const resposta = s.page.waitForResponse((r) => r.url().includes('/api/history'));
+  solta();
+  await resposta;
+  await s.page.waitForTimeout(100);
+  assert.equal(await s.page.evaluate(() => document.querySelector('.view').dataset.velha), '1', 'a tecla antiga não monta a tela de novo');
+  await s.page.unroute(baldes);
+
+  await s.page.keyboard.press('2');
+  await s.page.waitForSelector('.view-recursos .uplot');
+  const largura = () => s.page.evaluate(() => document.querySelector('.view .uplot').getBoundingClientRect().width);
+  const durante = await largura();
+  await s.page.evaluate(() => Promise.all(document.querySelector('.view').getAnimations().map((a) => a.finished)));
+  assert.equal(await largura(), durante, 'o deslocamento não muda a largura medida pelo uPlot');
+  const transform = await s.page.evaluate(() => getComputedStyle(document.querySelector('.view')).transform);
+  assert.equal(transform, 'none', 'ao terminar, a tela não guarda transform');
+  assert.deepEqual(s.problems, []);
+});
+
+test('e2e: troca de tela — login e diálogo entram igual; o movimento reduzido anula a entrada', { skip: !chromium && 'sem playwright-core' }, async (t) => {
+  const s = await setup(t, { dashToken: 'e'.repeat(43) });
+  if (s.skip) return t.skip(s.skip);
+  const dialogo = () => s.page.evaluate(() => {
+    const d = document.createElement('dialog');
+    document.body.append(d);
+    d.showModal();
+    const css = getComputedStyle(d);
+    const r = { nome: css.animationName, duracao: parseFloat(css.animationDuration) };
+    d.remove();
+    return r;
+  });
+  await s.page.goto(`${s.base}/`, { waitUntil: 'load' });
+  await s.page.waitForSelector('#login:not([hidden])');
+  assert.deepEqual(await s.page.evaluate(entrada(), '.login-card'), { nome: 'entra', duracao: 0.18 });
+  assert.deepEqual(await dialogo(), { nome: 'entra', duracao: 0.18 });
+
+  await s.page.emulateMedia({ reducedMotion: 'reduce' });
+  for (const atual of [await s.page.evaluate(entrada(), '.login-card'), await dialogo()]) {
+    assert.equal(atual.nome, 'none');
+    assert.ok(atual.duracao < 0.01, `duração ${atual.duracao}`);
+  }
+  await s.page.fill('#loginToken', 'e'.repeat(43));
+  await Promise.all([s.page.waitForNavigation(), s.page.click('#loginSubmit')]);
+  await s.page.waitForSelector('.hero');
+  await s.page.keyboard.press('2');
+  await s.page.waitForSelector('.view-recursos');
+  assert.ok(await temEntrada(s.page), 'a classe continua, para o CSS decidir');
+  const tela = await s.page.evaluate(entrada(), '.view');
+  assert.equal(tela.nome, 'none');
+  assert.ok(tela.duracao < 0.01, `duração ${tela.duracao}`);
+});
+
 test('e2e: anotação com HTML malicioso aparece como texto (anti-XSS)', { skip: !chromium && 'sem playwright-core' }, async (t) => {
   const s = await setup(t);
   if (s.skip) return t.skip(s.skip);

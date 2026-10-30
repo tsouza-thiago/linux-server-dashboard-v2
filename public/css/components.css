@@ -352,6 +352,13 @@ pre.code {
 .strip-ticks { padding: 10px var(--strip-value-pad, 92px) 16px var(--strip-label-pad, 108px); }
 .strips .tip { top: 12px; }
 
+/* Entrada (F3, ADR 0026): tela nova, login e diálogo. Sem `both`: ao terminar, nada guarda um
+   `transform`, que prenderia dentro da tela o que usa `position: fixed`. */
+@keyframes entra { from { opacity: 0; transform: translateY(var(--enter-y)); } }
+@media (prefers-reduced-motion: no-preference) {
+  .view-entra, .login > *, dialog[open] { animation: entra var(--t-enter) var(--ease-out); }
+}
+
 /* ---------------- Login ---------------- */
 .login {
   position: fixed; inset: 0; z-index: 80; overflow-y: auto;
