@@ -14,7 +14,8 @@ diante: `PATCH` corrige, `MINOR` acrescenta sem quebrar e `MAJOR` quebra.
 1ª pré-versão da 2.3.0 (ADR 0015), o tema "interface mais suave": chega a animação ao passar
 o mouse. Só chega a quem já está numa pré-versão ou usa `--pre`
 (`./dashboard atualizar --pre`). Nada muda na configuração, no formato de `data/` nem no
-acesso do painel ao servidor: a coleta continua igual.
+acesso do painel ao servidor: a coleta continua igual. Quem está na 2.1.0 ou anterior faz
+antes, uma vez, o passo manual das notas da 2.1.1 (a chave de assinatura mudou).
 
 ### Adicionado
 
