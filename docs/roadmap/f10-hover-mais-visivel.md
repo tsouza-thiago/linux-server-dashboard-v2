@@ -39,8 +39,8 @@ itens 3 e 4 dela. As outras regras continuam: só CSS, só propriedades baratas,
    fundo ou borda com a cor de destaque; links e `.th-sort` ganham sublinhado animado ou cor
    mais forte.
 5. **Desligado:** elemento `:disabled` não responde ao mouse.
-6. **Gráficos (pedido de 30/10/2026, na revisão do PR):** todo gráfico sob o mouse ganha destaque,
-   com a mesma lógica dos botões e um pouco menos de intensidade.
+6. **Contêineres e gráficos (pedido de 30/10/2026, na revisão do PR):** todo contêiner e gráfico
+   sob o mouse ganha destaque, com a mesma lógica dos botões e um pouco menos de intensidade.
 
 ## Etapas
 

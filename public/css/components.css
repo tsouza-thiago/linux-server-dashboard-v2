@@ -433,7 +433,7 @@ pre.code {
 
 /* Resposta ao mouse (ADR 0022 e 0024): só propriedades que não recalculam o layout da página. */
 a, summary, .btn, .btn-link, .nav-item, .nav-item svg, .segmented button, .icon-btn, .th-sort, .export-btn, .check label,
-.card, .panel, .strip-row, .ring, .mem-cell .meter {
+.card, .panel, .hero, .mini, .input, .strip-row, .ring, .mem-cell .meter {
   transition-property: background-color, border-color, color, box-shadow, transform, text-decoration-color;
   transition-duration: var(--t-fast);
   transition-timing-function: var(--ease-out);
@@ -459,11 +459,14 @@ a, summary, .btn, .btn-link, .nav-item, .nav-item svg, .segmented button, .icon-
   .btn-link:hover:not(:disabled) { background: var(--hover-bg); color: var(--text); text-decoration: underline; }
   .th-sort:hover:not(:disabled) { color: var(--accent-text); text-decoration: underline 2px var(--accent); }
   .check:hover label { color: var(--accent-text); }
-  /* Gráficos: mesma lógica dos botões, com menos força. O painel de faixas não reage: cada
-     faixa é um gráfico. O medidor de tabela só ganha o contorno. */
-  .card:hover:has(.chart, .bars, .meter), .panel:not(.flush):hover:has(.chart, .week-bars, .day-bars, .meter) {
-    background: var(--hover-surface); border-color: var(--accent-line);
-  }
+  /* Contêineres e gráficos: mesma lógica dos botões, com menos força. Painel de tabela ou de
+     faixas e o bloco principal não sobem nem mudam de fundo: o overflow corta a faixa ::after, e
+     cada faixa tem o próprio fundo. O medidor de tabela só ganha o contorno. */
+  .card:hover, .panel:not(.flush):hover { background: var(--hover-surface); border-color: var(--accent-line); }
+  .panel.flush:hover, .hero:hover { border-color: var(--accent-line); box-shadow: var(--shadow-lift-soft); }
+  .hero-crit:hover { border-color: var(--crit-line); }
+  .mini:hover { background: var(--hover-bg); }
+  .input:hover:not(:disabled) { border-color: var(--accent); }
   .strip-row:hover { background: var(--hover-surface); box-shadow: -16px 0 0 var(--hover-surface), 16px 0 0 var(--hover-surface); }
   .ring:hover { border-radius: 50%; background: var(--hover-surface); box-shadow: 0 0 0 6px var(--hover-surface); }
   .mem-cell:hover .meter { box-shadow: 0 0 0 1px var(--accent-line); }
@@ -479,12 +482,8 @@ a, summary, .btn, .btn-link, .nav-item, .nav-item svg, .segmented button, .icon-
   .btn:hover:not(:disabled, .event-list *)::after, .icon-btn:hover:not(:disabled)::after, .export-btn:hover:not(:disabled)::after {
     content: ""; position: absolute; inset: 0 0 var(--lift);
   }
-  .card:hover:has(.chart, .bars, .meter), .panel:not(.flush):hover:has(.chart, .week-bars, .day-bars, .meter) {
-    transform: translateY(var(--lift-soft)); box-shadow: var(--shadow-lift-soft);
-  }
+  .card:hover, .panel:not(.flush):hover { transform: translateY(var(--lift-soft)); box-shadow: var(--shadow-lift-soft); }
   /* A mesma faixa, só abaixo do cartão: por cima, ela tiraria o mouse do gráfico. */
-  .card:hover:has(.chart, .bars, .meter)::after, .panel:not(.flush):hover:has(.chart, .week-bars, .day-bars, .meter)::after {
-    content: ""; position: absolute; inset: 100% 0 var(--lift-soft);
-  }
+  .card:hover::after, .panel:not(.flush):hover::after { content: ""; position: absolute; inset: 100% 0 var(--lift-soft); }
   .ring:hover { transform: scale(1.03); }
 }

@@ -51,9 +51,10 @@ Em todas as telas, nos cenários `normal` e `lacunas`:
   em grupo (períodos e filtros) e os da lista de eventos trocam de fundo sem subir. Links,
   títulos de coluna e `summary` ganham sublinhado com a cor de destaque. As opções do assistente
   ganham fundo ou borda. Botão desligado não responde. O texto continua legível no hover.
-  Todo gráfico sob o mouse ganha destaque, mais fraco que o dos botões: cartão ou painel sobe 1 px
-  com sombra e borda suaves, cada faixa de telemetria ganha fundo sem subir, e o anel de saúde
-  ganha um halo. O cursor, o zoom e a dica do gráfico continuam funcionando. O foco
+  Todo contêiner e gráfico sob o mouse ganha destaque, mais fraco que o dos botões: cartão ou
+  painel sobe 1 px com sombra e borda suaves, painel de tabela e bloco principal ganham borda e
+  sombra sem subir, cada faixa de telemetria ganha fundo sem subir, e o anel de saúde ganha um
+  halo. O cursor, o zoom e a dica do gráfico continuam funcionando. O foco
   por teclado (Tab) aparece sem o mouse. Com "reduzir movimento" ligado, nada se desloca e o
   fundo continua mudando. Na janela da extensão, leia o estilo depois de uma captura.
 

@@ -24,8 +24,8 @@ const VIEWS = [
   ['relatorios', 'Relatórios', 0], ['ajuda', 'Ajuda', 0],
 ];
 
-// Todo gráfico das telas, por tipo (ADR 0024).
-const GRAFICOS = '.card:has(.chart, .bars, .meter), .panel:not(.flush):has(.chart, .week-bars, .day-bars, .meter), .strip-row, .ring, .mem-cell .meter';
+// Todo contêiner, gráfico e campo das telas, por tipo (ADR 0024).
+const CONTEINERES = '.card, .panel, .hero, .mini, .input, .strip-row, .ring, .mem-cell .meter';
 
 function sample(ts, i) {
   const wave = Math.sin(i / 10);
@@ -182,10 +182,17 @@ test('e2e: hover — o gráfico sobe menos que o botão, a faixa não sobe e o m
   await s.page.locator('.strip-row').first().hover();
   await s.page.waitForTimeout(250);
   assert.equal(await s.page.locator('.strip-row').first().evaluate((r) => getComputedStyle(r).transform), 'none');
+  await s.page.goto(`${s.base}/#/relatorios`, { waitUntil: 'load' });
+  await s.page.locator('.view-relatorios .card').first().waitFor();
+  await sobe(s.page, '.view-relatorios .card', -1);
+  await sobe(s.page, '.view-relatorios .panel:not(.flush)', -1);
+  await s.page.locator('.view-relatorios .panel.flush').hover();
+  await s.page.waitForTimeout(250);
+  assert.equal(await s.page.locator('.view-relatorios .panel.flush').evaluate((p) => getComputedStyle(p).transform), 'none', 'painel de tabela não sobe');
   assert.deepEqual(s.problems, []);
 });
 
-test('e2e: hover — nenhum clicável ou gráfico das 8 telas, nos 2 temas, fica sem mudança de estilo', { skip: !chromium && 'sem playwright-core' }, async (t) => {
+test('e2e: hover — nenhum clicável, contêiner ou gráfico das 8 telas, nos 2 temas, fica sem mudança de estilo', { skip: !chromium && 'sem playwright-core' }, async (t) => {
   const s = await setup(t);
   if (s.skip) return t.skip(s.skip);
   s.app.annotationsStore.add({ text: 'troquei o disco', label: 'manutenção' });
@@ -198,7 +205,7 @@ test('e2e: hover — nenhum clicável ou gráfico das 8 telas, nos 2 temas, fica
       await s.page.goto(`${s.base}/#/${id}`, { waitUntil: 'load' });
       await s.page.waitForSelector(`.view-${id}`);
       if (charts) await s.page.waitForFunction(([v, n]) => document.querySelectorAll(`.view-${v} .uplot`).length >= n, [id, charts]);
-      assert.deepEqual(await semHover(s.page, `a, button, summary, ${GRAFICOS}`), [], `${id}, tema ${tema}`);
+      assert.deepEqual(await semHover(s.page, `a, button, summary, ${CONTEINERES}`), [], `${id}, tema ${tema}`);
     }
   }
 });

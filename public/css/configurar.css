@@ -287,7 +287,7 @@
 
 /* Resposta ao mouse, igual à dos botões do painel (ADR 0024). No fim do arquivo para valer também
    sobre as opções marcadas (.wz-radio:has(input:checked) e parecidas). */
-.wz-next, .wz-back, .wz-linkbtn, .wz-mini, .wz-more, .wz-eye, .wz-seg button, .wz-radio, .wz-svc, .wz-switch, .wz-from, .wz-row, .wz-adv, .wz-confirm label, .wz-row-smart label {
+.wz-next, .wz-back, .wz-linkbtn, .wz-mini, .wz-more, .wz-eye, .wz-seg button, .wz-radio, .wz-svc, .wz-switch, .wz-from, .wz-row, .wz-adv, .wz-input, .wz-confirm label, .wz-row-smart label {
   transition-property: background-color, border-color, color, box-shadow, transform, text-decoration-color;
   transition-duration: var(--t-fast);
   transition-timing-function: var(--ease-out);
@@ -305,6 +305,7 @@
   .wz-switch:hover:not(:has(input:disabled)) { background: var(--hover-bg); }
   .wz-row:hover:not(:has(> input:disabled)) { border-color: var(--accent); }
   .wz-adv:has(> summary:hover) { border-color: var(--accent); }
+  .wz-input:hover:not(:disabled) { border-color: var(--accent); }
   .wz-confirm:hover label, .wz-row-smart:hover label { color: var(--accent-text); }
 }
 @media (hover: hover) and (pointer: fine) and (prefers-reduced-motion: no-preference) {

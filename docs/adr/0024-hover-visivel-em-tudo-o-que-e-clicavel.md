@@ -1,4 +1,4 @@
-# ADR 0024 — Hover visível em tudo o que é clicável e nos gráficos
+# ADR 0024 — Hover visível em clicáveis, contêineres e gráficos
 
 - **Status:** Aceita
 - **Data:** 30/10/2026
@@ -9,7 +9,7 @@
 
 A F1 (#84) levou o hover discreto para a 2.2.3: só 3 tipos de botão subiam 1 px, e os outros
 clicáveis trocavam pouco de cor. O mantenedor achou fraco. Vários clicáveis do assistente nem
-tinham hover (#100). Ele também pediu destaque em todo gráfico sob o mouse. As outras regras
+tinham hover (#100). Ele também pediu destaque em todo gráfico e contêiner sob o mouse. As outras regras
 da ADR 0022 continuam: só CSS, só propriedades baratas, efeito só com mouse e nenhum
 deslocamento com "reduzir movimento".
 
@@ -31,11 +31,14 @@ deslocamento com "reduzir movimento".
    de uma caixa de seleção fica na cor de destaque.
 6. **Desligado não responde:** toda regra de hover exclui `:disabled`, e o cartão com a caixa
    desligada também não responde.
-7. **Gráficos, com menos força que os botões:** cartão ou painel com gráfico (uPlot, barras ou
-   medidor) sobe `--lift-soft`, com sombra e borda mais suaves e leve fundo de destaque. Cada
-   faixa de telemetria é um gráfico: ganha só o fundo, sem subir, e o painel dela não reage. O
-   anel de saúde ganha um halo e cresce 3%. O medidor de tabela ganha só um contorno.
-8. A faixa `::after` do gráfico fica **só abaixo** do cartão: por cima, ela tiraria o mouse do
+7. **Contêineres e gráficos, com menos força que os botões:** todo `.card` e `.panel` sobe
+   `--lift-soft`, com sombra e borda mais suaves e leve fundo de destaque, com ou sem gráfico.
+   `.panel.flush` (tabelas e faixas) e `.hero` ganham só a borda e a sombra: o `overflow: hidden`
+   corta a faixa `::after`, e subir faria o contêiner tremer na borda de baixo. Cada faixa de
+   telemetria ganha o fundo, sem subir. O anel de saúde ganha um halo e cresce 3%. `.mini` ganha
+   o fundo, campos de texto ganham a borda e o medidor de tabela, um contorno. Grupos de botões
+   (`.segmented`) não reagem: quem responde são os botões deles.
+8. A faixa `::after` do contêiner fica **só abaixo** dele: por cima, ela tiraria o mouse do
    gráfico (cursor, zoom e dica).
 9. A lista de propriedades baratas da ADR 0022 ganha `text-decoration-color`, que só repinta o
    sublinhado.
@@ -46,5 +49,5 @@ deslocamento com "reduzir movimento".
 
 - O custo em bytes continua sendo só o CSS. O teste de tamanho da página inicial confere o limite.
 - A F2 parte destes tokens e precisa manter o `:active` compatível com o `--lift` de 2 px.
-- O teste `e2e: hover` passa por todo `button`, `a`, `summary` e gráfico visível das 8 telas e
-  confere que o estilo muda. Clicável ou gráfico novo sem hover reprova nesse teste.
+- O teste `e2e: hover` passa por todo `button`, `a`, `summary`, contêiner e gráfico visível das 8
+  telas e confere que o estilo muda. Elemento novo desses tipos sem hover reprova nesse teste.

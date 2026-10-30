@@ -16,9 +16,10 @@ diante: `PATCH` corrige, `MINOR` acrescenta sem quebrar e `MAJOR` quebra.
   destaque. Botões em grupo e botões da lista de eventos trocam de fundo sem subir. Links,
   cabeçalhos de tabela, opções e caixas de seleção do assistente também respondem ao mouse.
   Elemento desligado não responde, e com "reduzir movimento" nada se desloca.
-- O gráfico sob o mouse ganha destaque, com menos força que os botões (#100, ADR 0024): cartão
-  ou painel sobe 1 px com sombra e borda suaves, cada faixa de telemetria ganha fundo, e o anel
-  de saúde ganha um halo. O cursor, o zoom e a dica dos gráficos continuam iguais.
+- Contêiner e gráfico sob o mouse ganham destaque, com menos força que os botões (#100, ADR
+  0024): todo cartão e painel sobe 1 px com sombra e borda suaves, painéis de tabela e o bloco
+  principal ganham borda e sombra, cada faixa de telemetria ganha fundo, o anel de saúde ganha um
+  halo e os campos de texto ganham a borda. O cursor, o zoom e a dica dos gráficos continuam iguais.
 - O orçamento da página inicial subiu de 300 KB para 450 KB transferidos (#100). Só o limite do
   teste muda: nada muda no painel.
 
