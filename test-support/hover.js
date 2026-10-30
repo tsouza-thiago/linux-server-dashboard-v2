@@ -3,7 +3,7 @@
 
 const ESTILO = (el) => {
   const s = getComputedStyle(el);
-  return JSON.stringify([s.backgroundColor, s.borderTopColor, s.borderBottomColor, s.color, s.textDecorationLine,
+  return JSON.stringify([s.boxShadow, s.backgroundColor, s.borderTopColor, s.borderBottomColor, s.color, s.textDecorationLine,
     s.textDecorationColor, getComputedStyle(el, '::before').transform]);
 };
 
@@ -27,10 +27,10 @@ export async function semHover(page, seletor = 'a, button, summary') {
   return faltam;
 }
 
-/** Espera o elemento subir o --lift no hover e devolve a sombra dele. */
-export async function sobe(page, seletor) {
+/** Espera o elemento subir `y` px no hover (padrão: o --lift) e devolve a sombra dele. */
+export async function sobe(page, seletor, y = -2) {
   await page.mouse.move(0, 0);
   await page.locator(seletor).first().hover();
-  await page.waitForFunction((sel) => getComputedStyle(document.querySelector(sel)).transform === 'matrix(1, 0, 0, 1, 0, -2)', seletor);
+  await page.waitForFunction(([sel, d]) => getComputedStyle(document.querySelector(sel)).transform === `matrix(1, 0, 0, 1, 0, ${d})`, [seletor, y]);
   return page.locator(seletor).first().evaluate((b) => getComputedStyle(b).boxShadow);
 }

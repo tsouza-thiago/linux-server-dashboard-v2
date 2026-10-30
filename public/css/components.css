@@ -432,7 +432,8 @@ pre.code {
 }
 
 /* Resposta ao mouse (ADR 0022 e 0024): só propriedades que não recalculam o layout da página. */
-a, summary, .btn, .btn-link, .nav-item, .nav-item svg, .segmented button, .icon-btn, .th-sort, .export-btn, .check label {
+a, summary, .btn, .btn-link, .nav-item, .nav-item svg, .segmented button, .icon-btn, .th-sort, .export-btn, .check label,
+.card, .panel, .strip-row, .ring, .mem-cell .meter {
   transition-property: background-color, border-color, color, box-shadow, transform, text-decoration-color;
   transition-duration: var(--t-fast);
   transition-timing-function: var(--ease-out);
@@ -458,6 +459,14 @@ a, summary, .btn, .btn-link, .nav-item, .nav-item svg, .segmented button, .icon-
   .btn-link:hover:not(:disabled) { background: var(--hover-bg); color: var(--text); text-decoration: underline; }
   .th-sort:hover:not(:disabled) { color: var(--accent-text); text-decoration: underline 2px var(--accent); }
   .check:hover label { color: var(--accent-text); }
+  /* Gráficos: mesma lógica dos botões, com menos força. O painel de faixas não reage: cada
+     faixa é um gráfico. O medidor de tabela só ganha o contorno. */
+  .card:hover:has(.chart, .bars, .meter), .panel:not(.flush):hover:has(.chart, .week-bars, .day-bars, .meter) {
+    background: var(--hover-surface); border-color: var(--accent-line);
+  }
+  .strip-row:hover { background: var(--hover-surface); box-shadow: -16px 0 0 var(--hover-surface), 16px 0 0 var(--hover-surface); }
+  .ring:hover { border-radius: 50%; background: var(--hover-surface); box-shadow: 0 0 0 6px var(--hover-surface); }
+  .mem-cell:hover .meter { box-shadow: 0 0 0 1px var(--accent-line); }
 }
 /* O base.css só zera a duração: com "reduzir movimento", o deslocamento nem pode ser aplicado.
    Grupo, tabela e lista longa não sobem (ADR 0024). */
@@ -470,4 +479,12 @@ a, summary, .btn, .btn-link, .nav-item, .nav-item svg, .segmented button, .icon-
   .btn:hover:not(:disabled, .event-list *)::after, .icon-btn:hover:not(:disabled)::after, .export-btn:hover:not(:disabled)::after {
     content: ""; position: absolute; inset: 0 0 var(--lift);
   }
+  .card:hover:has(.chart, .bars, .meter), .panel:not(.flush):hover:has(.chart, .week-bars, .day-bars, .meter) {
+    transform: translateY(var(--lift-soft)); box-shadow: var(--shadow-lift-soft);
+  }
+  /* A mesma faixa, só abaixo do cartão: por cima, ela tiraria o mouse do gráfico. */
+  .card:hover:has(.chart, .bars, .meter)::after, .panel:not(.flush):hover:has(.chart, .week-bars, .day-bars, .meter)::after {
+    content: ""; position: absolute; inset: 100% 0 var(--lift-soft);
+  }
+  .ring:hover { transform: scale(1.03); }
 }

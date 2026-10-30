@@ -24,6 +24,9 @@ const VIEWS = [
   ['relatorios', 'Relatórios', 0], ['ajuda', 'Ajuda', 0],
 ];
 
+// Todo gráfico das telas, por tipo (ADR 0024).
+const GRAFICOS = '.card:has(.chart, .bars, .meter), .panel:not(.flush):has(.chart, .week-bars, .day-bars, .meter), .strip-row, .ring, .mem-cell .meter';
+
 function sample(ts, i) {
   const wave = Math.sin(i / 10);
   return {
@@ -163,7 +166,26 @@ test('e2e: hover — botão solto sobe, grupo não sobe e o movimento reduzido a
   assert.deepEqual(s.problems, []);
 });
 
-test('e2e: hover — nenhum clicável das 8 telas, nos 2 temas, fica sem mudança de estilo', { skip: !chromium && 'sem playwright-core' }, async (t) => {
+test('e2e: hover — o gráfico sobe menos que o botão, a faixa não sobe e o mouse continua chegando ao gráfico', { skip: !chromium && 'sem playwright-core' }, async (t) => {
+  const s = await setup(t);
+  if (s.skip) return t.skip(s.skip);
+  await s.page.goto(`${s.base}/#/recursos`, { waitUntil: 'load' });
+  await s.page.waitForFunction(() => document.querySelectorAll('.view-recursos .uplot').length >= 6);
+  const painel = '.view-recursos .panel:not(.flush):has(.chart)';
+  assert.notEqual(await sobe(s.page, painel, -1), 'none', 'sombra junto com o deslocamento');
+  const alvo = await s.page.evaluate((sel) => {
+    const r = document.querySelector(`${sel} .u-over`).getBoundingClientRect();
+    const e = document.elementFromPoint(r.x + r.width / 2, r.y + r.height / 2);
+    return e.className;
+  }, painel);
+  assert.equal(alvo, 'u-over', 'a faixa do hover não cobre o gráfico');
+  await s.page.locator('.strip-row').first().hover();
+  await s.page.waitForTimeout(250);
+  assert.equal(await s.page.locator('.strip-row').first().evaluate((r) => getComputedStyle(r).transform), 'none');
+  assert.deepEqual(s.problems, []);
+});
+
+test('e2e: hover — nenhum clicável ou gráfico das 8 telas, nos 2 temas, fica sem mudança de estilo', { skip: !chromium && 'sem playwright-core' }, async (t) => {
   const s = await setup(t);
   if (s.skip) return t.skip(s.skip);
   s.app.annotationsStore.add({ text: 'troquei o disco', label: 'manutenção' });
@@ -176,7 +198,7 @@ test('e2e: hover — nenhum clicável das 8 telas, nos 2 temas, fica sem mudanç
       await s.page.goto(`${s.base}/#/${id}`, { waitUntil: 'load' });
       await s.page.waitForSelector(`.view-${id}`);
       if (charts) await s.page.waitForFunction(([v, n]) => document.querySelectorAll(`.view-${v} .uplot`).length >= n, [id, charts]);
-      assert.deepEqual(await semHover(s.page), [], `${id}, tema ${tema}`);
+      assert.deepEqual(await semHover(s.page, `a, button, summary, ${GRAFICOS}`), [], `${id}, tema ${tema}`);
     }
   }
 });
