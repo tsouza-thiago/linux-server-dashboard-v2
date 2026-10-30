@@ -9,6 +9,13 @@ diante: `PATCH` corrige, `MINOR` acrescenta sem quebrar e `MAJOR` quebra.
 
 ## [Não publicado]
 
+## [2.3.0-rc.1] — 2026-10-30
+
+1ª pré-versão da 2.3.0 (ADR 0015), o tema "interface mais suave": chega a animação ao passar
+o mouse. Só chega a quem já está numa pré-versão ou usa `--pre`
+(`./dashboard atualizar --pre`). Nada muda na configuração, no formato de `data/` nem no
+acesso do painel ao servidor: a coleta continua igual.
+
 ### Adicionado
 
 - Animação ao passar o mouse (#84, ADR 0022): os botões principais sobem 1 px com uma sombra

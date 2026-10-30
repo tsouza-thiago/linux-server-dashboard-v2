@@ -1,6 +1,7 @@
 # Roadmap — versões 2.3.0 a 2.6.0
 
-- **Situação:** em implementação. Feita: F1 (ADR 0022). As outras seguem em planejamento.
+- **Situação:** em implementação. Entregue: F1 (2.3.0-rc.1, ADR 0022). As outras seguem em
+  planejamento.
 - **Data:** 26/10/2026.
 - **Issue do roadmap:** #83. Milestones 2.3.0 a 2.6.0.
 - **Regra:** cada feature tem um documento em [`docs/roadmap/`](roadmap/) com o objetivo, a
@@ -21,7 +22,7 @@ risco de segurança, os testes novos e o que muda para quem já usa o painel.
 
 | # | Feature | Nível | Versão | Depende de | Issue | Documento |
 |---|---|---|---|---|---|---|
-| 1 | Animação ao passar o mouse nos botões (hover) | P | 2.3.0 | — | #84 | [f1-hover.md](roadmap/f1-hover.md) |
+| 1 | Animação ao passar o mouse nos botões (hover) — **entregue na 2.3.0-rc.1** | P | 2.3.0 | — | #84 | [f1-hover.md](roadmap/f1-hover.md) |
 | 2 | Animação de clique nos botões | P | 2.3.0 | 1 (mesmos tokens) | #85 | [f2-clique.md](roadmap/f2-clique.md) |
 | 3 | Transição suave na troca de telas | P | 2.3.0 | — | #86 | [f3-troca-de-tela.md](roadmap/f3-troca-de-tela.md) |
 | 4 | Link simbólico: `dashboard` sem `./` e fora da pasta | P–M | 2.4.0 | — | #87 | [f4-link-simbolico.md](roadmap/f4-link-simbolico.md) |
