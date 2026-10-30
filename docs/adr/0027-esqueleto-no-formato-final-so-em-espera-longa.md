@@ -43,8 +43,10 @@ costuma ser rápida: um bloco cinza a cada troca piscaria mais do que ajudaria.
 ## Consequências
 
 - Tela nova com dados lentos sobe com o esqueleto dela, mesmo enquanto os baldes não chegam.
-- Em Recursos e na Visão geral, o exemplo de texto segue o formato atual dos cartões. Mudou o
-  texto de um cartão? O teste `e2e: esqueleto — nas 8 telas` confere o pulo a 1280 px.
+- Em Recursos e na Rede, o exemplo de texto segue o formato atual dos cartões. Mudou o texto de um
+  cartão? O teste `e2e: esqueleto — nas 8 telas` confere o pulo a 1600 px.
+- Em tela mais estreita, uma nota no limite da quebra depende do valor que chegou: o esqueleto pode
+  errar por 1 linha, e os blocos abaixo andam essa linha. Por isso o teste mede a 1600 px.
 - O número de discos e serviços só é conhecido depois da 1ª amostra. Antes dela, o esqueleto
   supõe 1 disco, e os blocos depois deles podem descer.
 - Um novo carregamento de tela deve usar `carregarRegiao`, sem timer próprio.

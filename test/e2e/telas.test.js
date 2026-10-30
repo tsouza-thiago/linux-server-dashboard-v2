@@ -434,6 +434,9 @@ test('e2e: troca de tela — login e diálogo entram igual; o movimento reduzido
 });
 
 // Posição e altura dos blocos principais da tela, para comparar o esqueleto com o conteúdo.
+// Largura para medir o pulo: nela as notas dos cartões cabem em 1 linha. A 1280 px, elas ficam no
+// limite da quebra, e quebrar ou não depende do valor do pico, que muda com os baldes da hora.
+const LARGA = { width: 1600, height: 900 };
 // Relativa à tela: a entrada desloca a tela inteira, e isso não é pulo.
 const blocos = (page) => page.evaluate(() => {
   const base = document.querySelector('.view').getBoundingClientRect();
@@ -451,7 +454,7 @@ async function segura(page, caminho) {
 }
 
 test('e2e: esqueleto — nas 8 telas fica no formato final: o conteúdo entra sem pulo', { skip: !chromium && 'sem playwright-core' }, async (t) => {
-  const s = await setup(t);
+  const s = await setup(t, { viewport: LARGA });
   if (s.skip) return t.skip(s.skip);
   for (const [id] of VIEWS) {
     const status = await segura(s.page, '/api/status');
@@ -555,7 +558,7 @@ test('e2e: esqueleto — na troca de período o gráfico fica com os dados velho
 });
 
 test('e2e: esqueleto — região que carrega depois guarda o espaço, e sair no meio não quebra', { skip: !chromium && 'sem playwright-core' }, async (t) => {
-  const s = await setup(t);
+  const s = await setup(t, { viewport: LARGA });
   if (s.skip) return t.skip(s.skip);
   await s.page.goto(`${s.base}/#/processos`, { waitUntil: 'networkidle' });
   await s.page.waitForSelector('#pr-rows');
