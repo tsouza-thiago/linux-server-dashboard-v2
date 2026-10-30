@@ -45,6 +45,10 @@ Em todas as telas, nos cenários `normal` e `lacunas`:
 - O console não tem erro nem aviso de CSP.
 - Nenhum pedido sai para outro endereço além do painel.
 - O tema claro e o escuro (tecla `t`) deixam todo texto legível.
+- **Hover (ADR 0022), nos 2 temas:** "Coletar agora" e "Nova anotação" sobem 1 px com sombra,
+  sem tremer com o mouse na borda de baixo; o item do menu mostra a barra de destaque; os
+  botões em grupo (períodos) só trocam de cor. O foco por teclado (Tab) aparece sem o mouse.
+  Com "reduzir movimento" ligado, nada se desloca e a cor continua mudando.
 
 | Tela | O que conferir |
 |---|---|

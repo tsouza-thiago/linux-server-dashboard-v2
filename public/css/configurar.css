@@ -98,6 +98,17 @@
 .wz-back:hover { color: var(--text); background: var(--surface-2); }
 .wz-linkbtn { border: 0; background: transparent; padding: 0; min-height: 44px; font: inherit; font-size: 14px; color: var(--text-2); text-decoration: underline; cursor: pointer; }
 .wz-linkbtn:hover { color: var(--text); }
+/* Mesma resposta ao mouse dos botões do painel (ADR 0022). O .big já tem o halo como sombra. */
+.wz-next, .wz-back, .wz-linkbtn {
+  transition-property: background-color, border-color, color, box-shadow, transform;
+  transition-duration: var(--t-fast);
+  transition-timing-function: var(--ease-out);
+}
+@media (hover: hover) and (pointer: fine) and (prefers-reduced-motion: no-preference) {
+  .wz-next:hover:not(:disabled) { transform: translateY(var(--lift)); }
+  .wz-next:not(.big):hover:not(:disabled) { box-shadow: var(--shadow-lift); }
+  .wz-next:hover:not(:disabled)::after { content: ""; position: absolute; inset: 0 0 var(--lift); }
+}
 
 /* Campos */
 .wz-field { display: flex; flex-direction: column; gap: 8px; }
