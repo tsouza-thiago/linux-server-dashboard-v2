@@ -4,6 +4,7 @@
 // Contrato de cada tela (public/js/views/*.js):
 //   sub(state)         subtítulo;              actions(ctx)  botões do topo (opcional)
 //   render(ctx)        monta a tela;           update(ctx)   atualiza com dados novos
+//   ownSkeleton(state) esqueleto no formato da tela
 //   onAction(ctx, e)   clique nos botões do topo (opcional)
 // `ctx` traz o elemento da tela, os gráficos dela (`charts`), um estado local (`local`), a
 // API, as ações comuns (`act`) e o estado global (`state`).
@@ -13,6 +14,7 @@ import { connect } from './core/sse.js';
 import { VIEWS, PERIODS, parseHash, buildHash, viewByKey } from './core/router.js';
 import { html, mount } from './core/html.js';
 import { isOffline, mergeAlerts } from './core/analysis.js';
+import { esperaVisivel } from './core/espera.js';
 import * as f from './core/format.js';
 import { icon, withBusy } from './views/common.js';
 import * as visaoGeral from './views/visao-geral.js';
@@ -288,6 +290,39 @@ function renderHead() {
   renderPeriod();
 }
 
+// A navegação ainda espera os baldes? `fim()` da espera em curso e a troca marcada por ela (ADR 0027).
+let esperandoBaldes = false;
+let espera = null;
+let trocaTimer = null;
+/** Os dados da tela já chegaram? */
+const telaPronta = () => !store.get().loading && !esperandoBaldes;
+
+/** Abandona a espera em curso: outra navegação passou na frente. */
+function pararEspera() {
+  clearTimeout(trocaTimer);
+  espera?.();
+  espera = null;
+}
+
+/** Monta a tela com os dados novos, depois do tempo mínimo do que está visível. */
+function entregar(opcoes) {
+  const falta = espera ? espera() : 0;
+  clearTimeout(trocaTimer);
+  if (falta > 0) { trocaTimer = setTimeout(() => entregar(opcoes), falta); return; }
+  espera = null;
+  renderView(opcoes);
+}
+
+/** Troca de período na mesma tela: os gráficos ficam com os dados velhos, esmaecidos. */
+function marcarAtualizando() {
+  const { el } = current.ctx;
+  el.classList.add('atualizando');
+  const aviso = document.createElement('span');
+  aviso.className = 'visually-hidden';
+  aviso.textContent = 'carregando';
+  el.append(aviso);
+}
+
 /**
  * Monta a tela atual do zero (ou o esqueleto, se os dados ainda não chegaram). A entrada por CSS
  * só vale quando a tela é outra ou com `entra`: tema, período e amostra nova passam por aqui com
@@ -296,19 +331,22 @@ function renderHead() {
 function renderView({ entra = false } = {}) {
   const { view } = store.get();
   const animar = entra || current?.view !== view;
+  const vinhaDoEsqueleto = Boolean(current?.ctx.pending);
   destroyCurrent();
   const mod = MODULES[view];
   const el = document.createElement('div');
   el.className = `view view-${view}${animar ? ' view-entra' : ''}`;
   $('view').replaceChildren(el);
-  const ctx = { el, charts: new Map(), local: {}, api, act, get state() { return store.get(); } };
+  const ctx = { el, charts: new Map(), local: {}, api, act, semAtraso: vinhaDoEsqueleto, get state() { return store.get(); } };
   current = { view, mod, ctx };
   document.title = `${VIEWS.find((v) => v.id === view).title} · Server Dashboard`;
   renderHead();
-  // Antes da 1ª resposta da API: blocos no formato final (a Visão geral tem os seus).
-  if (store.get().loading && !mod.ownSkeleton) {
+  $('view').toggleAttribute('aria-busy', !telaPronta());
+  // Antes dos dados: blocos no formato final. O esqueleto geral é só a reserva.
+  if (!telaPronta()) {
     ctx.pending = true;
-    mount(el, html`<div class="grid-cards" aria-busy="true">${[1, 2, 3, 4].map(() => html`<div class="skel soft card-skel"></div>`)}</div><div class="skel soft panel-skel"></div>`);
+    mount(el, html`<span class="visually-hidden">carregando</span>${mod.ownSkeleton ? mod.ownSkeleton(store.get()) : html`
+      <div class="grid-cards">${[1, 2, 3, 4].map(() => html`<div class="skel soft card-skel"></div>`)}</div><div class="skel soft panel-skel"></div>`}`);
     return;
   }
   mod.render(ctx);
@@ -316,9 +354,10 @@ function renderView({ entra = false } = {}) {
 
 /** Atualiza a tela atual com os dados novos (update, ou monta de novo se não houver). */
 function refreshView() {
-  // O esqueleto (geral ou o da Visão geral) dá lugar ao conteúdo: é a chegada da tela.
-  if (current && !store.get().loading && (current.ctx.pending || current.ctx.local.skeleton)) return renderView({ entra: true });
-  if (!current || current.ctx.pending) return renderView();
+  if (!telaPronta()) return; // o esqueleto (ou o "atualizando") fica até os dados chegarem
+  // O esqueleto dá lugar ao conteúdo: é a chegada da tela.
+  if (!current || current.ctx.pending) return entregar({ entra: true });
+  if (espera) return; // o "atualizando" cumpre o tempo mínimo: a entrega já vem
   renderHead();
   if (current.mod.update) current.mod.update(current.ctx);
   else renderView();
@@ -364,14 +403,24 @@ async function navigate() {
   const changed = view !== store.get().view || period !== store.get().period;
   if (!changed && current?.view === view) return; // mesma tela e período: montar de novo cortaria a entrada
   const vez = ++navegacao;
+  const trocouTela = current?.view !== view;
+  pararEspera();
   store.set({ view, period });
   $('viewTitle').textContent = VIEWS.find((v) => v.id === view).title; // na hora, antes dos dados
+  renderPeriod();
   closeNav();
-  if (USES_BUCKETS.has(view) && (changed || !store.get().buckets.length)) await loadBuckets();
+  const buscar = USES_BUCKETS.has(view) && (changed || !store.get().buckets.length);
+  esperandoBaldes = buscar;
+  $('view').toggleAttribute('aria-busy', !telaPronta());
+  // A tela velha fica até o atraso: resposta rápida troca direto, sem esqueleto no meio.
+  if (trocouTela && !telaPronta()) espera = esperaVisivel(() => renderView());
+  else if (buscar) espera = esperaVisivel(marcarAtualizando);
+  if (buscar) await loadBuckets();
   if (vez !== navegacao) return; // atalhos em sequência: só a última tecla desenha e anima
-  renderView();
+  esperandoBaldes = false;
   $('view').focus({ preventScroll: true });
   window.scrollTo(0, 0);
+  if (telaPronta()) entregar({ entra: current?.ctx.pending });
 }
 
 // ---------------- Ao vivo (SSE) ----------------

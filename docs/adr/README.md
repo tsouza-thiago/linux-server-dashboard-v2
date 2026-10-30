@@ -31,3 +31,4 @@ Uma ADR aceita não é editada; se a decisão mudar, uma nova ADR a substitui.
 | [0024](0024-hover-visivel-em-tudo-o-que-e-clicavel.md) | Hover visível em clicáveis, contêineres e gráficos | Aceita |
 | [0025](0025-clique-e-estado-aguardando.md) | Clique e estado "aguardando" nos botões | Aceita |
 | [0026](0026-entrada-de-tela-so-quando-ela-muda.md) | Entrada de tela só quando ela muda | Aceita |
+| [0027](0027-esqueleto-no-formato-final-so-em-espera-longa.md) | Esqueleto no formato final, só em espera longa | Aceita |

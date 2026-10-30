@@ -4,7 +4,10 @@
 import { html, mount } from '../core/html.js';
 import * as f from '../core/format.js';
 import { diskEta, diskForecast, fullestDisk, keysWith } from '../core/analysis.js';
-import { $, chip, big, meter, chartBox, drawCharts, drawStrips, panelHead, icon, smartOf, onClick } from './common.js';
+import {
+  $, chip, big, meter, chartBox, drawCharts, drawStrips, panelHead, icon, smartOf, onClick, carregarRegiao, skelCabeca, skelFaixas, skelGrafico, skelLinha,
+  skelRegiao, skelTabela,
+} from './common.js';
 
 const DAY = 86400e3;
 /** Subtítulo da tela. */
@@ -56,6 +59,8 @@ function mountCards(ctx) {
 }
 
 // ---------------- Previsão ----------------
+const ALTURA_PREVISAO = 220;
+
 function forecastOf(ctx, mountPoint) {
   return diskForecast(history(ctx), mountPoint, { alertPct: thr(ctx.state).diskPct ?? 90 });
 }
@@ -92,7 +97,7 @@ function forecastSpec(ctx) {
   const end = fc.status === 'enchendo' ? now + Math.min(Math.max(fc.days * 1.08, 30), 365) * DAY : now;
   const t = thr(ctx.state);
   return {
-    id: 'ar-fc', height: 220, range: [0, 100], annotations: false, format: (v) => f.pct(v),
+    id: 'ar-fc', height: ALTURA_PREVISAO, range: [0, 100], annotations: false, format: (v) => f.pct(v),
     thresholds: [{ value: t.diskPct, level: 'warn' }, { value: 100, level: 'crit' }],
     xRange: [from / 1000, end / 1000],
     series: [
@@ -151,6 +156,22 @@ function smartTable(ctx) {
 }
 
 // ---------------- Montagem ----------------
+/** Esqueleto no formato da tela, com 1 cartão e 1 faixa por disco já conhecido. */
+export const ownSkeleton = (state) => {
+  const n = Math.max(1, state.sample?.disks?.length || 0);
+  return html`
+    <section class="grid-cards wide">${Array.from({ length: n }, () => html`<article class="card mount-card">
+      <div class="card-top"><span class="mount-name">${skelLinha(30)}</span></div>
+      <span class="big xl">${skelLinha(40)}</span>
+      <div class="meter lg"></div>
+      <div class="row-between ink-2">${skelLinha(90)}</div>
+      <div class="chips"><span class="chip">&nbsp;</span></div>
+    </article>`)}</section>
+    <section class="panel">${skelCabeca(true)}${skelGrafico(ALTURA_PREVISAO)}<div class="chips"><span class="chip mono">&nbsp;</span></div></section>
+    <section class="panel flush">${skelCabeca(true)}<div class="panel-body">${skelFaixas(n, 'io')}</div></section>
+    <section class="panel">${skelCabeca()}${skelTabela(n, 4)}</section>`;
+};
+
 export function render(ctx) {
   const disks = ctx.state.sample?.disks || [];
   if (!ctx.local.mount || !disks.some((d) => d.mount === ctx.local.mount)) ctx.local.mount = hotMount(ctx) || disks[0]?.mount;
@@ -160,6 +181,7 @@ export function render(ctx) {
     <section class="grid-cards wide" aria-label="Pontos de montagem" id="ar-mounts"></section>
     <section class="panel stale" aria-label="Previsão de lotação">
       <div id="ar-fc-head"></div>
+      <div id="ar-fc-skel"></div>
       ${chartBox('ar-fc')}
       <div class="chips" id="ar-fc-chips"></div>
     </section>
@@ -192,9 +214,9 @@ export function render(ctx) {
 
 /** Busca 30 dias de baldes para a previsão (uma vez por tela aberta). */
 function loadDisk30(ctx) {
-  ctx.api.buckets({ from: new Date(Date.now() - 30 * DAY).toISOString(), to: new Date().toISOString(), limit: 720 })
-    .then((r) => { ctx.local.disk30 = r.buckets || []; update(ctx); })
-    .catch(() => {});
+  carregarRegiao(ctx, update,
+    () => ctx.api.buckets({ from: new Date(Date.now() - 30 * DAY).toISOString(), to: new Date().toISOString(), limit: 720 }),
+    (r) => { ctx.local.disk30 = r?.buckets || []; });
 }
 
 /** Atualiza só o que muda com os dados novos. */
@@ -204,6 +226,7 @@ export function update(ctx) {
   mount($('#ar-mounts', ctx.el), mountCards(ctx));
   mount($('#ar-fc-head', ctx.el), forecastHead(ctx));
   mount($('#ar-fc-chips', ctx.el), forecastChips(ctx));
+  mount($('#ar-fc-skel', ctx.el), ctx.local.disk30 ? '' : skelRegiao(ctx, skelGrafico(ALTURA_PREVISAO)));
   if (ctx.local.mount && ctx.local.disk30) drawCharts(ctx, ctx.el, [forecastSpec(ctx)], ctx.local.disk30);
   const list = devs(ctx);
   drawStrips(ctx, ctx.el, 'ar-io', list.map((dev) => ({

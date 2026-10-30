@@ -78,7 +78,8 @@
 .ring-skel { width: 136px; height: 136px; flex: 0 0 136px; border-radius: 50%; background: transparent; border: 10px solid var(--surface-3); }
 .hero .skel:not(.ring-skel) { height: 14px; }
 .hero .skel.tall { height: 30px; }
-.card-skel { height: 176px; border-radius: var(--r-3); }
+.card-skel { min-height: 191px; border-radius: var(--r-3); }
+.card-skel:not(:last-child) { min-height: 209px; }
 .panel-skel { height: 420px; border-radius: var(--r-4); }
 
 /* ---------------- Recursos ---------------- */
