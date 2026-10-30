@@ -530,7 +530,8 @@ test('e2e: esqueleto — na troca de período o gráfico fica com os dados velho
   const canvas = await s.page.evaluateHandle(() => document.querySelector('[data-chart="rc-cpu"] canvas'));
   const baldes = await segura(s.page, '/api/history');
   await s.page.click('[data-period="7d"]');
-  assert.equal(await s.page.getAttribute('[data-period="7d"]', 'aria-pressed'), 'true', 'o botão responde na hora');
+  // Os baldes estão presos: o botão responde antes deles (o hashchange só chega no tique seguinte).
+  await s.page.waitForSelector('[data-period="7d"][aria-pressed="true"]', { timeout: 2000 });
   await s.page.waitForSelector('.view.atualizando');
   const estado = () => s.page.evaluate(() => {
     const painel = document.querySelector('.panel > [data-chart="rc-cpu"]');
