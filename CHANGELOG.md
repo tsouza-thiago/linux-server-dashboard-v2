@@ -9,7 +9,14 @@ diante: `PATCH` corrige, `MINOR` acrescenta sem quebrar e `MAJOR` quebra.
 
 ## [Não publicado]
 
-### Alterado
+## [2.2.4] — 2026-10-30
+
+Versão estável com o hover mais visível em tudo o que é clicável, nos contêineres e nos
+gráficos. Nada muda na configuração, no formato de `data/` nem no acesso do painel ao servidor:
+atualize com `./dashboard atualizar`. Quem está na 2.1.0 ou anterior faz antes, uma vez, o passo
+manual das notas da 2.1.1 (a chave de assinatura mudou).
+
+### Mudado
 
 - O hover ficou mais visível e chegou a tudo o que é clicável (#100, ADR 0024): todo botão do
   painel, do login e do assistente sobe 2 px com sombra e ganha fundo e borda com a cor de
@@ -1094,7 +1101,9 @@ Documentados no plano da V2 (seção 2.2, B1–B12), entre eles: alerta SMART fa
 rede zerada com contadores grandes, alerta duplicado a cada coleta e reescrita completa do
 histórico a cada minuto.
 
-[Não publicado]: https://github.com/tsouza-thiago/linux-server-dashboard-v2/compare/v2.2.2...HEAD
+[Não publicado]: https://github.com/tsouza-thiago/linux-server-dashboard-v2/compare/v2.2.4...HEAD
+[2.2.4]: https://github.com/tsouza-thiago/linux-server-dashboard-v2/compare/v2.2.3...v2.2.4
+[2.2.3]: https://github.com/tsouza-thiago/linux-server-dashboard-v2/compare/v2.2.2...v2.2.3
 [2.2.2]: https://github.com/tsouza-thiago/linux-server-dashboard-v2/compare/v2.2.1...v2.2.2
 [2.2.1]: https://github.com/tsouza-thiago/linux-server-dashboard-v2/compare/v2.2.0...v2.2.1
 [2.2.0]: https://github.com/tsouza-thiago/linux-server-dashboard-v2/compare/v2.2.0-rc.1...v2.2.0

@@ -31,7 +31,7 @@ risco de segurança, os testes novos e o que muda para quem já usa o painel.
 | 7 | Atualização pelo painel, com aviso e log | G | 2.5.0 | — | #90 | [f7-atualizacao-pelo-painel.md](roadmap/f7-atualizacao-pelo-painel.md) |
 | 8 | Reconfigurar pelo painel | G | 2.5.0 | 7 (menu e executor) | #91 | [f8-reconfigurar-pela-tela.md](roadmap/f8-reconfigurar-pela-tela.md) |
 | 9 | Instalação em `/opt` por pacote `.deb` | GG | 2.6.0 | 4, 5, 7 e 8 | #92 | [f9-deb-e-opt.md](roadmap/f9-deb-e-opt.md) |
-| 10 | Hover mais visível em tudo o que é clicável | M | 2.2.4 | 1 | #100 | [f10-hover-mais-visivel.md](roadmap/f10-hover-mais-visivel.md) |
+| 10 | Hover mais visível em clicáveis, contêineres e gráficos — **entregue na 2.2.4** | M | 2.2.4 | 1 | #100 | [f10-hover-mais-visivel.md](roadmap/f10-hover-mais-visivel.md) |
 
 A F8 é menos arriscada que a F7 (reaproveita o assistente e não acessa a internet), mas
 vem depois dela porque usa o menu e o executor que a F7 cria.
