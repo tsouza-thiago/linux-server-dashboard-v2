@@ -21,7 +21,7 @@ Ele segue as ADRs [0015](docs/adr/0015-entregas-incrementais-e-consolidacao-em-v
 primeiro):
 
 1. **Issue** com rótulos e o milestone da versão. Correção sai como PATCH; funcionalidade,
-   como pré-versão da próxima MINOR.
+   na versão do milestone (ADR 0023). Só mudança grande usa pré-versão.
 2. **Ramo** a partir do `main`, um por issue.
 3. **Teste que falha** antes da mudança, depois a mudança. Os testes usam só `node:test`.
 4. **`npm run check`** antes de cada commit (Node 24). Conforme a mudança, rode também

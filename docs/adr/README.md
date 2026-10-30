@@ -19,7 +19,7 @@ Uma ADR aceita não é editada; se a decisão mudar, uma nova ADR a substitui.
 | [0012](0012-distribuicao-por-git-clone-com-tag-assinada.md) | Distribuição por `git clone` com tag assinada | Aceita |
 | [0013](0013-somente-linux-na-maquina-local.md) | Somente Linux na máquina local | Aceita |
 | [0014](0014-verificacao-de-seguranca-continua.md) | Verificação de segurança contínua (local e no GitHub) | Aceita |
-| [0015](0015-entregas-incrementais-e-consolidacao-em-versoes-minor.md) | Entregas incrementais e consolidação em versões MINOR | Aceita |
+| [0015](0015-entregas-incrementais-e-consolidacao-em-versoes-minor.md) | Entregas incrementais e consolidação em versões MINOR | Aceita; os itens 3 e 4 foram substituídos pela 0023 |
 | [0016](0016-fluxo-no-github-issue-primeiro.md) | Fluxo no GitHub: issue primeiro e as ferramentas gratuitas da plataforma | Aceita; o item 10 foi substituído pela 0017 |
 | [0017](0017-superficie-publica-minima-no-github.md) | Superfície pública mínima no GitHub | Aceita |
 | [0018](0018-disponibilidade-so-sobre-o-tempo-medido.md) | Disponibilidade só sobre o tempo medido | Aceita |
@@ -27,3 +27,4 @@ Uma ADR aceita não é editada; se a decisão mudar, uma nova ADR a substitui.
 | [0020](0020-varios-computadores-no-mesmo-servidor.md) | Vários computadores no mesmo servidor: uma chave, uma linha e um sudoers por instalação | Aceita |
 | [0021](0021-instalacao-em-servidor-so-com-chave.md) | Instalação em servidor que só aceita chave SSH | Aceita |
 | [0022](0022-animacao-de-interface-so-com-css.md) | Animação de interface só com CSS e propriedades baratas | Aceita |
+| [0023](0023-versoes-por-milestone-sem-pre-versao-em-mudanca-pequena.md) | Versões por milestone, sem pré-versão em mudança pequena | Aceita |

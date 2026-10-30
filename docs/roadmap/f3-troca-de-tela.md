@@ -1,6 +1,6 @@
 # F3 — Transição suave na troca de telas
 
-- **Nível:** P · **Versão:** 2.3.0-rc.3 · **Área:** telas
+- **Nível:** P · **Versão:** 2.3.0 · **Área:** telas
 
 ## Objetivo
 

@@ -1,4 +1,4 @@
-# Formulário de funcionalidade (ADR 0016): sai como pré-versão da próxima MINOR (ADR 0015).
+# Formulário de funcionalidade (ADR 0016): sai na versão do milestone (ADR 0023).
 name: Funcionalidade
 description: Uma ideia nova para o painel. Ideias ainda em aberto vão antes para Discussions.
 title: "[funcionalidade] "

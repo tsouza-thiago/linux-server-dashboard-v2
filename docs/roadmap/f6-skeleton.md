@@ -1,6 +1,6 @@
 # F6 — Skeleton em tudo o que carrega
 
-- **Nível:** M · **Versão:** 2.3.0-rc.4 · **Área:** telas · **Depende de:** F3 (entrada
+- **Nível:** M · **Versão:** 2.3.0 · **Área:** telas · **Depende de:** F3 (entrada
   do conteúdo)
 
 ## Objetivo

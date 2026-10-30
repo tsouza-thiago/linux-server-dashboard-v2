@@ -1,6 +1,6 @@
 # F5 — Autocomplete com Tab (bash)
 
-- **Nível:** M · **Versão:** 2.4.0-rc.2 · **Área:** instalação
+- **Nível:** M · **Versão:** 2.4.0 · **Área:** instalação
 - **Decidido:** só bash.
 - **Depende de:** F4 para valer em `dashboard <Tab>` de qualquer pasta. Em
   `./dashboard <Tab>` funciona sem a F4.
