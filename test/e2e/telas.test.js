@@ -365,11 +365,29 @@ test('e2e: troca de tela — atalhos em sequência não acumulam, e o gráfico m
   assert.equal(telas.views, 1);
   assert.ok(telas.animacoes <= 1, `${telas.animacoes} animações na tela`);
 
-  // Vários hashchange com a mesma tela: montar de novo tiraria a classe e cortaria a entrada.
-  await s.page.evaluate(() => { for (const key of '888') document.dispatchEvent(new KeyboardEvent('keydown', { key, bubbles: true })); });
+  // Teclas no mesmo instante: todo hashchange lê a última tela; montar de novo cortaria a entrada.
+  await s.page.evaluate(() => { for (const key of '678') document.dispatchEvent(new KeyboardEvent('keydown', { key, bubbles: true })); });
   await s.page.waitForSelector('.view-ajuda');
   await s.page.waitForTimeout(100);
-  assert.ok(await temEntrada(s.page), 'a tecla repetida não corta a entrada');
+  assert.ok(await temEntrada(s.page), 'as teclas seguintes não cortam a entrada');
+
+  // A navegação que esperava os baldes ficou para trás: ela não pode montar a tela de novo.
+  let solta;
+  const espera = new Promise((r) => { solta = r; });
+  const baldes = (url) => url.pathname === '/api/history';
+  const pedido = s.page.waitForRequest((r) => r.url().includes('/api/history'));
+  await s.page.route(baldes, async (rota) => { await espera; await rota.continue(); });
+  await s.page.keyboard.press('3');
+  await pedido;
+  await s.page.keyboard.press('5');
+  await s.page.waitForSelector('.view-processos');
+  await semEntrada(s.page);
+  const resposta = s.page.waitForResponse((r) => r.url().includes('/api/history'));
+  solta();
+  await resposta;
+  await s.page.waitForTimeout(100);
+  assert.equal(await s.page.evaluate(() => document.querySelector('.view').dataset.velha), '1', 'a tecla antiga não monta a tela de novo');
+  await s.page.unroute(baldes);
 
   await s.page.keyboard.press('2');
   await s.page.waitForSelector('.view-recursos .uplot');
