@@ -89,8 +89,8 @@ test('telas: as 8 têm esqueleto próprio, e nenhuma fala "Carregando"', async (
   }
 });
 
-// Espera as promessas e os timers de 1 tique.
-const respira = () => new Promise((r) => { setImmediate(r); });
+// Deixa as promessas pendentes terminarem.
+const respira = () => new Promise((r) => { setTimeout(r, 20); });
 
 test('região: resposta rápida entrega sem mostrar as peças; só o último pedido vale', async () => {
   const ctx = { el: {}, local: {} };

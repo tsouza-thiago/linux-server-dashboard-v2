@@ -303,7 +303,8 @@ export function carregarRegiao(ctx, atualizar, buscar, pronto) {
   ctx.local.fimRegiao = fim;
   const entrega = async (valor) => {
     if (!vale()) return;
-    await pausa(fim());
+    const falta = fim();
+    if (falta > 0) await pausa(falta);
     if (!vale()) return;
     ctx.local.regiaoVisivel = false;
     pronto(valor);
