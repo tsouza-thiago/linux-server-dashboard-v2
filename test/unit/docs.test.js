@@ -345,6 +345,8 @@ test('docs: imagens citadas existem, têm texto alternativo, ficam no repositór
     const md = prose(read(doc));
     const fontes = [...md.matchAll(/!\[([^\]]*)\]\(([^)\s]+)\)/g)].map((m) => ({ alt: m[1], src: m[2] }));
     for (const [tag] of md.matchAll(/<img\b[^>]*>/g)) {
+      // Uma aspa dentro do alt fecha o atributo, e o GitHub mostra a tag como texto.
+      assert.match(tag, /^<img(\s+[a-z]+="[^"]*")+>$/, `${doc}: tag malformada: ${tag}`);
       fontes.push({ alt: tag.match(/\balt="([^"]*)"/)?.[1], src: tag.match(/\bsrc="([^"]*)"/)?.[1] });
     }
     for (const [, src] of md.matchAll(/\bsrcset="([^"]*)"/g)) fontes.push({ alt: 'na imagem ao lado', src });

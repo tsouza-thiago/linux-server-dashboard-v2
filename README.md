@@ -4,7 +4,7 @@
 
 **Painel em tempo real do seu servidor Linux, no navegador. Nada é instalado no servidor.**
 
-<picture><source media="(prefers-color-scheme: dark)" srcset="docs/img/visao-geral-escuro.webp"><img src="docs/img/visao-geral-claro.webp" alt="Visão geral do painel: saúde 100 de 100, "Servidor saudável", disponibilidade e indicadores de processador, memória, disco, temperatura e rede"></picture>
+<picture><source media="(prefers-color-scheme: dark)" srcset="docs/img/visao-geral-escuro.webp"><img src="docs/img/visao-geral-claro.webp" alt="Visão geral do painel: saúde 100 de 100, servidor saudável, disponibilidade e indicadores de processador, memória, disco, temperatura e rede"></picture>
 
 Uma vez por minuto, o painel conecta no servidor por SSH, lê dezenas de métricas e mostra
 tudo em gráficos. Ele roda no **seu computador**: o servidor só responde 1 comando de
