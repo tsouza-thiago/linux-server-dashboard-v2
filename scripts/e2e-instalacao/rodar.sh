@@ -98,6 +98,7 @@ em e2e-cli-deb "cd linux-server-dashboard-v2 && ./dashboard diagnosticar" | tee 
 confere "A: diagnóstico sem avisos nem erros" grep -q "nenhum aviso, nenhum erro" "$OUT/A-diagnosticar.txt"
 confere "A: dashmon no servidor só com a chave restrita" docker exec e2e-srv-deb sh -c 'grep -q "^restrict,from=\"127.0.0.1\",command=" /home/dashmon/.ssh/authorized_keys'
 confere "A: linha e sudoers com o computador e o ID da instalação (ADR 0020)" docker exec e2e-srv-deb sh -c 'grep -Eq " dashboard@[a-z0-9-]+:[0-9a-f]{8}\$" /home/dashmon/.ssh/authorized_keys && ls /etc/sudoers.d/dashboard-*-* >/dev/null'
+confere "A: comando dashboard de outra pasta, num shell de login" em e2e-cli-deb "cd /tmp && dashboard versao"
 # O caminho da v2.0.0: da pré-versão para a estável assinada (a v2.0.1 sem assinatura é ignorada).
 cd "$GIT/release" && versao 2.0.0 && git commit -qam "e2e: 2.0.0" && assina v2.0.0 && git tag v2.0.1 && cd "$REPO"
 em e2e-cli-deb "cd linux-server-dashboard-v2 && ./dashboard atualizar && ./dashboard versao" | tee "$OUT/A-atualizar.txt"
@@ -110,6 +111,7 @@ confere "A: na estável, a rc assinada não é instalada sem --pre" grep -q "ver
 em e2e-cli-deb "cd linux-server-dashboard-v2 && echo senha-de-teste | ./dashboard desinstalar --sim --limpar-servidor --usuario maria --senha-stdin" | tee "$OUT/A-desinstalar.txt"
 confere "A: servidor limpo pelo desinstalar" bash -c "! docker exec e2e-srv-deb id dashmon"
 confere "A: sudoers da instalação apagado" bash -c "! docker exec e2e-srv-deb sh -c 'ls /etc/sudoers.d/dashboard-*'"
+confere "A: o desinstalar removeu o comando" bash -c "! docker exec e2e-cli-deb test -e /home/ana/.local/bin/dashboard"
 confere "A: chave e configuração locais apagadas" bash -c "! docker exec e2e-cli-deb sh -c 'ls /home/ana/.ssh/dashboard-* /home/ana/linux-server-dashboard-v2/.env'"
 
 # ------------------------------------------------------------------ B · Ubuntu 24.04
@@ -126,6 +128,7 @@ docker exec e2e-cli-ubu cat /home/ana/instalar.log > "$OUT/B-instalar.txt" || tr
 confere "B: o terminal registrou o fim do assistente" grep -q "Tudo pronto. Pode fechar esta janela." "$OUT/B-instalar.txt"
 em e2e-cli-ubu "cd linux-server-dashboard-v2 && ./dashboard diagnosticar" | tee "$OUT/B-diagnosticar.txt" || true
 confere "B: diagnóstico sem erros" grep -q "nenhum erro" "$OUT/B-diagnosticar.txt"
+confere "B: comando dashboard de outra pasta, num shell de login" em e2e-cli-ubu "cd /tmp && dashboard versao"
 
 # ------------------------------------------------------------------ C · V1 → V2
 log "C · upgrade V1 → V2 (a V1 roda de verdade e gera o data/ dela)"

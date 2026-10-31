@@ -3,6 +3,7 @@
 // (--identidade SHA256:…) — nada de aceitar a primeira que aparecer — e a senha, quando
 // houver, vem pelo stdin (--senha-stdin), nunca pela linha de comando. Com --chave-ssh, a
 // entrada é pelo apelido do ~/.ssh/config e o --senha-stdin passa a ser a senha do sudo.
+import { mostrarComando } from '../cli/saida.js';
 
 /** Texto de `--sem-interface --ajuda` (as opções são conferidas pelo docs.test.js). */
 export const HEADLESS_HELP = `Uso: ./dashboard instalar --sem-interface --servidor <ip> --usuario <nome> --identidade <SHA256:…> [opções]
@@ -24,6 +25,8 @@ export const HEADLESS_HELP = `Uso: ./dashboard instalar --sem-interface --servid
   --sem-origem            não limita a chave a este computador (sem from=)
   --sem-inicio-automatico não liga o serviço ao iniciar o computador
   --sem-atalho            não cria o atalho no menu
+  --sem-link              não cria o comando dashboard (~/.local/bin/dashboard)
+  --editar-profile        põe ~/.local/bin no PATH pelo arquivo de login do bash, com cópia antes
 `;
 
 // Lista de uma opção: ausente = undefined (usa a recomendação); a palavra `none` = vazia.
@@ -45,10 +48,10 @@ async function readLine(stream) {
  */
 export async function runHeadless({ out, inst, flags, stdin = process.stdin }) {
   const fail = (msg, how) => { out.fail(msg); if (how) out.explain('', how); return 2; };
-  if (flags.ajuda || flags.help) { out.line(HEADLESS_HELP); return 0; }
+  if (flags.ajuda || flags.help) { out.line(HEADLESS_HELP.replaceAll('./dashboard', out.cmd)); return 0; }
   const chave = flags['chave-ssh'] !== undefined;
   if (chave && (flags['chave-ssh'] === true || !String(flags['chave-ssh']).trim())) return fail('falta o apelido em --chave-ssh <apelido>', 'use o nome de um Host do seu ~/.ssh/config.');
-  if (!chave && (!flags.servidor || !flags.usuario)) return fail('faltam --servidor e --usuario (ou --chave-ssh <apelido>)', 'veja: ./dashboard instalar --sem-interface --ajuda');
+  if (!chave && (!flags.servidor || !flags.usuario)) return fail('faltam --servidor e --usuario (ou --chave-ssh <apelido>)', `veja: ${out.cmd} instalar --sem-interface --ajuda`);
   if (!flags.identidade || flags.identidade === true) {
     return fail('falta --identidade', 'confira no servidor com: ssh-keygen -lf /etc/ssh/ssh_host_ed25519_key.pub e passe o SHA256:… aqui');
   }
@@ -109,9 +112,11 @@ export async function runHeadless({ out, inst, flags, stdin = process.stdin }) {
     }
     const t = inst.resumoTeste();
     out.ok('primeira coleta', `${t.duracaoMs ?? '?'} ms · ${t.bytes ?? '?'} bytes`);
-    inst.concluir({ iniciarComComputador: !flags['sem-inicio-automatico'], atalho: !flags['sem-atalho'] });
+    // Sem perguntas: não troca o link de outra pasta e só edita o arquivo de login com a opção.
+    inst.concluir({ iniciarComComputador: !flags['sem-inicio-automatico'], atalho: !flags['sem-atalho'], link: !flags['sem-link'], trocarLink: false, editarProfile: Boolean(flags['editar-profile']) });
+    mostrarComando(out, inst.comando);
     const lig = await inst.ligarPainel({ iniciarComComputador: !flags['sem-inicio-automatico'] });
-    if (!lig.ok) return fail(`o painel não subiu: ${lig.erro}`, 'rode ./dashboard diagnosticar.');
+    if (!lig.ok) return fail(`o painel não subiu: ${lig.erro}`, `rode ${out.cmd} diagnosticar.`);
     out.ok(lig.servico && lig.servico.ok ? 'painel rodando como serviço de usuário' : 'painel rodando em segundo plano');
     out.line(`  link de entrada (uso único, 2 min): ${lig.url}`);
     return 0;

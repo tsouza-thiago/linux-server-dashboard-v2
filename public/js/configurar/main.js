@@ -53,7 +53,7 @@ const st = {
   prep: { state: 'revisar', feitos: [], error: '', precisaSenha: false },
   manual: { tests: {}, errors: {}, busy: '' },
   result: null,
-  prefs: { boot: true, shortcut: true, notify: false },
+  prefs: { boot: true, shortcut: true, link: true, editar: false, notify: false },
   token: '',
   opening: false,
   pastHelp: false,
@@ -525,6 +525,7 @@ function viewManual(p, seg) {
 // ---------------- Passo 6 ----------------
 function viewStep6() {
   const r = st.result || {};
+  const cmd = st.computer.comando;
   const val = (v, unit) => (v === null || v === undefined ? html`<span class="val soft">sem dado</span>` : html`<span class="val">${v}${unit === '%' ? '%' : ` ${unit}`}</span>`);
   return html`<main class="wz-card ok-hero">
     <div class="wz-hero"><span class="wz-hero-mark">${icon('check', 26, 3)}</span>
@@ -541,10 +542,12 @@ function viewStep6() {
       <section class="wz-box tight" aria-label="Preferências"><h2>Do jeito que você preferir</h2>
         <label class="wz-switch"><span><span>Iniciar com o computador</span><span>${st.computer && st.computer.systemd === false ? 'este sistema não tem systemd de usuário: use o atalho' : 'nunca precisa deixar um terminal aberto'}</span></span><input type="checkbox" role="switch" data-pref="boot" ${st.prefs.boot ? raw('checked') : ''} ${st.computer && st.computer.systemd === false ? raw('disabled') : ''}></label>
         <label class="wz-switch"><span><span>Atalho no menu de aplicativos</span><span>"Server Dashboard", com ícone</span></span><input type="checkbox" role="switch" data-pref="shortcut" ${st.prefs.shortcut ? raw('checked') : ''}></label>
+        <label class="wz-switch"><span><span>Comando <span class="mono">dashboard</span> no terminal</span><span>${cmd.detalhe}</span></span><input type="checkbox" role="switch" data-pref="link" ${st.prefs.link ? raw('checked') : ''} ${cmd.trava ? raw('disabled') : ''}></label>
+        ${cmd.pedeEdicao && st.prefs.link ? html`<label class="wz-switch"><span><span>Pôr <span class="mono">~/.local/bin</span> no PATH</span><span>acrescenta um bloco no <span class="mono">~/${cmd.arquivo}</span>, com cópia antes</span></span><input type="checkbox" role="switch" data-pref="editar" ${st.prefs.editar ? raw('checked') : ''}></label>` : ''}
         <label class="wz-switch"><span><span>Avisar no navegador quando algo for crítico</span><span>o navegador vai pedir permissão</span></span><input type="checkbox" role="switch" data-pref="notify" ${st.prefs.notify ? raw('checked') : ''}></label>
       </section>
       <section class="wz-box" aria-label="O que foi criado"><h2>O que foi criado</h2>
-        <div class="wz-made"><span>Neste computador</span><span>pasta <span class="mono">data/</span> do projeto · chave <span class="mono">${st.plan ? st.plan.chave : '~/.ssh/dashboard_ed25519'}</span> · ${st.prefs.boot ? 'serviço de usuário · ' : ''}${st.prefs.shortcut ? 'atalho' : 'sem atalho'}</span>
+        <div class="wz-made"><span>Neste computador</span><span>pasta <span class="mono">data/</span> do projeto · chave <span class="mono">${st.plan ? st.plan.chave : '~/.ssh/dashboard_ed25519'}</span> · ${st.prefs.boot ? 'serviço de usuário · ' : ''}${st.prefs.shortcut ? 'atalho' : 'sem atalho'}${st.prefs.link ? ' · comando dashboard' : ''}</span>
           <span>No servidor</span><span>usuário <span class="mono">dashmon</span> · chave restrita · ${st.plan && st.plan.temSmart ? html`regra de sudo para <span class="mono">smartctl -H</span>` : 'sem regra de sudo'}</span></div>
         <span class="wz-hint">Para desfazer tudo, aqui e no servidor: <span class="mono">dashboard desinstalar</span></span>
         <div class="wz-token"><span>Token de reserva, para entrar de outro navegador</span>
@@ -582,6 +585,7 @@ async function loadState() {
   st.computer = s.computador;
   st.passos = s.passos;
   if (s.computador.systemd === false) st.prefs.boot = false;
+  st.prefs.link = s.computador.comando.liga;
   if (s.computador.servidorAtual && !st.form.host) {
     st.form.host = s.computador.servidorAtual.host;
     st.form.port = String(s.computador.servidorAtual.port);
@@ -720,7 +724,7 @@ async function openPanel() {
   render();
   let url;
   try {
-    url = (await api('concluir', { iniciarComComputador: st.prefs.boot, atalho: st.prefs.shortcut })).url;
+    url = (await api('concluir', { iniciarComComputador: st.prefs.boot, atalho: st.prefs.shortcut, link: st.prefs.link, editarProfile: st.prefs.editar })).url;
   } catch (err) {
     st.opening = false;
     st.error = err.message;

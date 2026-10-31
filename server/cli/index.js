@@ -22,6 +22,7 @@ const HELP = `Uso: ./dashboard <comando>
                     --sem-interface  sem perguntas, por opções (veja --sem-interface --ajuda)
                     --importar-v1 <pasta>  traz configuração e histórico da V1 (e para a V1)
                     --pre            aceita pré-versão (rc); sem ela, fica na estável
+                    --sem-link       não cria o comando dashboard (~/.local/bin/dashboard)
   abrir           abre o painel no navegador, já logado
   iniciar         inicia o painel (serviço de usuário ou segundo plano)
   parar           para o painel
@@ -30,10 +31,13 @@ const HELP = `Uso: ./dashboard <comando>
   reconfigurar    reabre o assistente (trocar servidor, discos, serviços)
   atualizar       baixa a versão assinada mais nova, com backup e volta atrás se falhar
                     --pre            aceita pré-versão (rc) mesmo estando na estável
-  desinstalar     remove serviço, atalho e arquivos locais (e ajuda a limpar o servidor)
+  desinstalar     remove serviço, atalho, comando e arquivos locais (e ajuda a limpar o servidor)
   versao          mostra a versão
   ajuda           esta ajuda
 `;
+
+// A ajuda cita o comando do jeito que ele roda agora.
+const help = (out) => HELP.replaceAll('./dashboard', out.cmd);
 
 /** Versão do package.json da pasta `root` ("?" se ilegível). */
 function version(root) {
@@ -63,12 +67,14 @@ const COMMANDS = {
   diagnosticar: (ctx) => diagnosticar(ctx),
   atualizar: (ctx) => atualizar(ctx),
   desinstalar: (ctx) => desinstalar(ctx),
-  async ajuda({ out }) { out.line(HELP); return 0; },
+  async ajuda({ out }) { out.line(help(out)); return 0; },
   async versao({ out, root }) { out.line(`Server Dashboard ${version(root)}`); return 0; },
 
   async status({ out, root, home }) {
     const st = panelStatus({ root, home });
-    if (!isConfigured(root)) out.warn('ainda não instalado', 'rode ./dashboard instalar');
+    // Com 2 pastas na máquina, o comando no PATH vale para só uma: diz qual respondeu.
+    out.line(out.c.dim(`pasta: ${root}`));
+    if (!isConfigured(root)) out.warn('ainda não instalado', `rode ${out.cmd} instalar`);
     if (st.running) {
       const how = st.mode === 'servico'
         ? `serviço de usuário${st.enabled ? ', inicia com o computador' : ''}`
@@ -76,13 +82,13 @@ const COMMANDS = {
       out.ok(`painel rodando em http://127.0.0.1:${st.port}`, how);
       return 0;
     }
-    out.warn('painel parado', 'inicie com ./dashboard iniciar');
+    out.warn('painel parado', `inicie com ${out.cmd} iniciar`);
     return 3;
   },
 
   async iniciar({ out, root, home }) {
     if (!isConfigured(root)) {
-      out.fail('ainda não instalado', 'rode ./dashboard instalar');
+      out.fail('ainda não instalado', `rode ${out.cmd} instalar`);
       return 1;
     }
     const r = await startPanel({ root, home });
@@ -101,7 +107,7 @@ const COMMANDS = {
 
   async abrir({ out, root, home }) {
     if (!isConfigured(root)) {
-      out.fail('ainda não instalado', 'rode ./dashboard instalar');
+      out.fail('ainda não instalado', `rode ${out.cmd} instalar`);
       return 1;
     }
     const r = await startPanel({ root, home });
@@ -126,14 +132,14 @@ export const COMMAND_NAMES = Object.freeze(Object.keys(COMMANDS));
  * (padrão: a do usuário); os testes passam uma pasta temporária para não enxergar o painel
  * instalado na máquina de quem roda a suíte.
  */
-export async function main(argv = process.argv.slice(2), { out = makeOutput(), root = ROOT, home = os.homedir() } = {}) {
+export async function main(argv = process.argv.slice(2), { root = ROOT, home = os.homedir(), out = makeOutput({ root }) } = {}) {
   const [name = 'ajuda', ...args] = argv;
   // Formas alternativas aceitas para ajuda e versão.
   const alias = { '--help': 'ajuda', '-h': 'ajuda', help: 'ajuda', '--version': 'versao', versão: 'versao' };
   const cmd = COMMANDS[alias[name] ?? name];
   if (!cmd) {
     out.fail(`comando desconhecido: ${name}`);
-    out.line(HELP);
+    out.line(help(out));
     return 2;
   }
   return cmd({ out, root, home, args });

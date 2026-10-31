@@ -135,6 +135,12 @@ aplicativos como **Server Dashboard**. Pelo terminal, na pasta do projeto:
 ./dashboard iniciar    # liga de novo
 ```
 
+A instalação também cria o comando `dashboard`. Com ele, você roda tudo de qualquer pasta e
+sem o `./`, por exemplo `dashboard abrir`. Ele vale no próximo login. Até lá, use o caminho
+completo que a instalação mostrou. Se `~/.local/bin` não estiver no seu PATH, a instalação pergunta
+se pode acrescentar a pasta no arquivo de login, e guarda uma cópia antes. Instalou antes desta
+versão? Rode `./dashboard reconfigurar`: o último passo oferece criar o comando.
+
 O painel só existe **neste computador** (`http://127.0.0.1:3000`): ninguém mais na rede
 consegue abrir, de propósito. Em outro navegador, ele pede o **token de reserva** (o
 assistente mostra uma vez; ele também fica no `.env`).
@@ -310,6 +316,13 @@ Comece sempre por `./dashboard diagnosticar`: ele aponta o problema e diz como r
 
 - Na primeira execução, aguarde 1-2 minutos: CPU e rede aparecem a partir da 2ª coleta.
 - O período escolhido pode ser maior que o histórico disponível: selecione `1h`.
+
+### "dashboard: comando não encontrado"
+
+- Saia e entre de novo na sua conta: o comando vale no próximo login.
+- Rode `./dashboard diagnosticar` na pasta do projeto. Ele mostra se o link existe e se
+  `~/.local/bin` está no PATH, e diz a linha que falta.
+- Dentro da pasta do projeto, `./dashboard` sempre funciona.
 
 ### A porta 3000 já está em uso
 

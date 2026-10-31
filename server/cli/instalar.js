@@ -10,6 +10,7 @@ import { createWizardApp, makeSetupCode } from '../setup/web.js';
 import { currentVersionStatus, describeVersion, signedReleaseTags, installTag } from '../setup/assinatura.js';
 import { ensureDataDirs } from '../setup/local.js';
 import { openBrowser, panelPort, panelStatus, portFree, stopPanel } from './servico.js';
+import { mostrarComando } from './saida.js';
 
 // O assistente se desliga sozinho depois de 1 h sem nenhum pedido.
 const IDLE_MS = 60 * 60 * 1000;
@@ -168,7 +169,7 @@ export async function runWizard({ out, root, inst, port, open = openBrowser, idl
   out.line();
   const opened = open(`${url}#codigo=${code.raw}`);
   out.line(out.c.dim(opened ? 'O navegador não abriu? Copie o endereço acima.' : 'Abra o endereço acima no navegador desta máquina e digite o código.'));
-  out.line(`${out.c.dim('Máquina sem tela? Rode:')} ./dashboard instalar --terminal`);
+  out.line(`${out.c.dim('Máquina sem tela? Rode:')} ${out.cmd} instalar --terminal`);
   out.line(out.c.dim('Deixe esta janela aberta até o fim do assistente.'));
 
   // Ctrl+C ou SIGTERM durante o assistente: cancela de forma limpa.
@@ -187,17 +188,18 @@ export async function runWizard({ out, root, inst, port, open = openBrowser, idl
     return 1;
   }
   out.ok('assistente concluído e desligado');
+  mostrarComando(out, inst.comando);
   const lig = await inst.ligarPainel(result.prefs);
   if (!lig.ok) {
     out.fail('o painel não subiu', lig.erro);
-    out.explain('a configuração foi salva, mas o painel não iniciou.', 'rode ./dashboard diagnosticar para ver o motivo.');
+    out.explain('a configuração foi salva, mas o painel não iniciou.', `rode ${out.cmd} diagnosticar para ver o motivo.`);
     return 1;
   }
   if (lig.servico && lig.servico.ok) {
     out.ok('painel rodando como serviço de usuário', result.prefs.iniciarComComputador ? 'inicia com o computador' : 'liga quando você abrir o atalho');
     if (!lig.servico.hardening) out.warn('isolamento do systemd indisponível neste sistema', 'o serviço roda sem ProtectSystem/PrivateTmp');
   } else {
-    out.ok('painel rodando em segundo plano', 'use ./dashboard abrir para abrir de novo');
+    out.ok('painel rodando em segundo plano', `use ${out.cmd} abrir para abrir de novo`);
   }
   out.ok(`painel em http://127.0.0.1:${port}`, 'só nesta máquina');
   out.line();
@@ -226,7 +228,7 @@ export async function instalar({ out, root, args, home, reconfigurar = false, de
     const { importarV1 } = await import('./importar-v1.js');
     if (panelStatus({ root, home }).running && !flags.forcar) {
       out.warn('a V2 já está rodando nesta pasta');
-      out.explain('', 'para importar de novo, pare a V2 (./dashboard parar) e repita.');
+      out.explain('', `para importar de novo, pare a V2 (${out.cmd} parar) e repita.`);
       return 1;
     }
     return importarV1({ out, root, dir: flags['importar-v1'] });
@@ -236,7 +238,7 @@ export async function instalar({ out, root, args, home, reconfigurar = false, de
   if (st.running) {
     if (!reconfigurar && !flags.forcar) {
       out.warn('o painel já está instalado e rodando');
-      out.explain('', 'para trocar servidor, discos ou serviços, rode ./dashboard reconfigurar.');
+      out.explain('', `para trocar servidor, discos ou serviços, rode ${out.cmd} reconfigurar.`);
       return 1;
     }
     await stopPanel({ root, home });
@@ -251,7 +253,8 @@ export async function instalar({ out, root, args, home, reconfigurar = false, de
   }
   out.ok(`porta ${port} livre · painel só nesta máquina`, '127.0.0.1');
 
-  const inst = deps.inst ?? new Instalacao({ root });
+  const inst = deps.inst ?? new Instalacao({ root, home });
+  inst.semLink = Boolean(flags['sem-link']);
   if (flags.terminal) {
     const { runTui } = await import('../setup/tui.js');
     return runTui({ out, inst, open: deps.open ?? openBrowser });

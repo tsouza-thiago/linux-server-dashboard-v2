@@ -85,6 +85,17 @@ test('docs: arquivos e pastas citados existem', () => {
   assert.deepEqual(problems, []);
 });
 
+test('docs: as opções do comando no PATH aparecem na ajuda e no AGENTS (F4)', () => {
+  const index = read('server/cli/index.js');
+  const headless = read('server/setup/sem-interface.js');
+  const agents = read('AGENTS.md');
+  assert.ok(index.includes('--sem-link'), 'ajuda do ./dashboard');
+  for (const flag of ['--sem-link', '--editar-profile']) {
+    assert.ok(headless.includes(flag), `--sem-interface --ajuda: ${flag}`);
+    assert.ok(agents.includes(flag), `AGENTS.md: ${flag}`);
+  }
+});
+
 test('docs: subcomandos e opções do ./dashboard existem', () => {
   const problems = [];
   const knownFlag = (f) => cliSource.includes(`--${f}`) || cliSource.includes(`flags['${f}']`) || new RegExp(`flags\\.${f}\\b`).test(cliSource);
