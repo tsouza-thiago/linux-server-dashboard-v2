@@ -14,6 +14,7 @@
     "check": "node scripts/check.mjs",
     "seguranca": "node scripts/seguranca.mjs",
     "capturar-amostra": "node scripts/capturar-amostra.mjs",
+    "capturar-telas": "node scripts/capturar-telas.mjs",
     "migrar-v1": "node server/storage/migrate-v1.js",
     "soak": "node --expose-gc --max-semi-space-size=2 --optimize-for-size scripts/soak-acelerado.mjs",
     "painel-teste": "node --max-semi-space-size=2 --optimize-for-size scripts/painel-teste.mjs",

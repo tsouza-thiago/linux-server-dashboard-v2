@@ -20,8 +20,8 @@ import { arquivosRastreados } from '../../test-support/fonte.js';
 import { anonymize, anonymizeKernel, KEEP_PROGRAMS } from '../../scripts/capturar-amostra.mjs';
 
 const ARQUIVOS = arquivosRastreados();
-// Binários (fontes) ficam de fora: só texto é varrido.
-const TEXTO = ARQUIVOS.filter((f) => !/\.(woff2|png|ico)$/.test(f));
+// Binários (fontes e prints) ficam de fora: só texto é varrido. Os SVG são texto e entram.
+const TEXTO = ARQUIVOS.filter((f) => !/\.(woff2|png|ico|webp)$/.test(f));
 const ler = (f) => fs.readFileSync(path.join(ROOT, f), 'utf8');
 
 // Testes que usam IP privado e MAC DE PROPÓSITO: conferem que a anonimização das amostras

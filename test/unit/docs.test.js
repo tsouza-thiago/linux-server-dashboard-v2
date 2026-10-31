@@ -44,7 +44,8 @@ function anchors(md) {
   for (const line of prose(md).split('\n')) {
     const m = line.match(/^#{1,6}\s+(.*?)\s*#*\s*$/);
     if (!m) continue;
-    const text = m[1].replace(/`/g, '').replace(/\[([^\]]*)\]\([^)]*\)/g, '$1').replace(/[*_]{2}/g, '');
+    // O GitHub tira o HTML do título (os ícones do README), mas fica o espaço depois dele.
+    const text = m[1].replace(/<[^>]*>/g, '').replace(/`/g, '').replace(/\[([^\]]*)\]\([^)]*\)/g, '$1').replace(/[*_]{2}/g, '');
     const base = text.toLowerCase().replace(/[^\p{L}\p{N}\s_-]/gu, '').replace(/\s/g, '-');
     const n = seen.get(base) ?? 0;
     seen.set(base, n + 1);
@@ -335,6 +336,36 @@ test('docs: o SECURITY cobre as 10 categorias do OWASP Top 10:2025, cada uma com
     assert.ok(testes.length, `${l.slice(0, 40)}: sem teste`);
     for (const t of testes) assert.ok(fs.existsSync(path.join(ROOT, t)), `${t} não existe`);
   }
+});
+
+test('docs: imagens citadas existem, têm texto alternativo, ficam no repositório e cabem no orçamento', () => {
+  const pasta = path.join(ROOT, 'docs', 'img');
+  const citadas = new Set();
+  for (const doc of ['README.md', 'TUTORIAL.md']) {
+    const md = prose(read(doc));
+    const fontes = [...md.matchAll(/!\[([^\]]*)\]\(([^)\s]+)\)/g)].map((m) => ({ alt: m[1], src: m[2] }));
+    for (const [tag] of md.matchAll(/<img\b[^>]*>/g)) {
+      fontes.push({ alt: tag.match(/\balt="([^"]*)"/)?.[1], src: tag.match(/\bsrc="([^"]*)"/)?.[1] });
+    }
+    for (const [, src] of md.matchAll(/\bsrcset="([^"]*)"/g)) fontes.push({ alt: 'na imagem ao lado', src });
+    assert.ok(fontes.length, `${doc} sem imagens`);
+    for (const { alt, src } of fontes) {
+      assert.match(src, /^docs\/img\//, `${doc}: ${src} fora de docs/img/`);
+      assert.ok(fs.existsSync(path.join(ROOT, src)), `${doc}: ${src} não existe`);
+      // Os ícones dos títulos são decorativos: o alt vazio faz o leitor de tela pular.
+      if (!src.startsWith('docs/img/icones/')) assert.ok(alt?.trim(), `${doc}: ${src} sem texto alternativo`);
+      citadas.add(src);
+    }
+  }
+  const arquivos = fs.readdirSync(pasta, { recursive: true }).filter((f) => fs.statSync(path.join(pasta, f)).isFile());
+  assert.deepEqual(arquivos.map((f) => `docs/img/${f}`).filter((f) => !citadas.has(f)), [], 'imagem que nenhum documento usa');
+  let total = 0;
+  for (const f of arquivos) {
+    const { size } = fs.statSync(path.join(pasta, f));
+    total += size;
+    assert.ok(size <= 200 * 1024, `${f}: ${size} bytes, acima de 200 KB`);
+  }
+  assert.ok(total <= 3 * 1024 * 1024, `docs/img/ com ${total} bytes, acima de 3 MB`);
 });
 
 test('docs: o README continua enxuto (detalhes técnicos ficam no AGENTS)', () => {

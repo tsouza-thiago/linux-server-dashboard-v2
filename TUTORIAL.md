@@ -4,6 +4,7 @@ Guia completo, passo a passo, para instalar, iniciar, parar e usar o **Server Da
 o painel que mostra em tempo real o que acontece no seu servidor Linux
 (ex.: um Debian modesto na sua rede local).
 
+> [!TIP]
 > **Para leigos:** se você nunca abriu um terminal, siga as seções **1**, **2** e **3**
 > na ordem. Cada comando foi escrito para copiar e colar. Não precisa decorar nada.
 
@@ -68,6 +69,7 @@ Só são necessários 3 itens:
 2. **O servidor ligado e na mesma rede**.
 3. **Um usuário do servidor que possa usar `sudo`**, e a senha dele (usada uma vez).
 
+> [!NOTE]
 > Não precisa instalar o Node.js nem configurar chave SSH: o `./dashboard` baixa o Node 24
 > oficial para dentro da pasta (conferido) e o assistente cria uma chave só para o painel.
 
@@ -83,17 +85,25 @@ git clone https://github.com/tsouza-thiago/linux-server-dashboard-v2.git && cd l
 
 O terminal mostra uma lista de verificações (versão assinada, Node.js, pasta `data/`,
 porta) e **abre o assistente no navegador** sozinho. Se o navegador não abrir, copie o
-endereço e o **código de uso único** que aparecem no terminal. Deixe o terminal aberto até
-o fim do assistente.
+endereço e o **código de uso único** que aparecem no terminal.
+
+> [!IMPORTANT]
+> Deixe o terminal aberto até o fim do assistente.
 
 ### Os 6 passos
 
 1. **Boas-vindas** — o que será feito e o que nunca é feito. Clique em **Começar**.
+
+   ![Passo 1 do assistente: boas-vindas, com o que será feito e o que nunca é feito](docs/img/assistente-1-boas-vindas.webp)
+
 2. **Servidor** — escolha como você entra no servidor. Com **Senha** (o comum), informe o
    endereço (ex.: `192.0.2.10`; no servidor, `hostname -I` mostra) e o seu usuário dele.
    Com **Chave SSH** (servidor que só aceita chave), informe o apelido que você usa no
    terminal (o de `ssh meu-servidor`) e clique em **Ler o apelido**: confira o endereço, a
    porta, o usuário e a chave. O assistente confere se o servidor responde.
+
+   ![Passo 2 do assistente: endereço do servidor e usuário administrador](docs/img/assistente-2-servidor.webp)
+
 3. **Conectar** — aparece a **identidade do servidor** em blocos de letras. Se quiser
    conferir, rode no servidor `ssh-keygen -lf /etc/ssh/ssh_host_ed25519_key.pub`: as letras
    devem ser iguais. Marque "Este é o meu servidor", digite a senha e clique em
@@ -102,9 +112,15 @@ o fim do assistente.
    assistente mostra o comando (ex.: `ssh-add -t 15m ~/.ssh/minha_chave`); rode no seu
    terminal, digite a passphrase lá e clique em **Tentar de novo**. O painel nunca pede a
    passphrase. Apelido com `ProxyJump` não serve: o painel conecta direto ao servidor.
+
+   ![Passo 3 do assistente: identidade do servidor em blocos de letras e campo da senha](docs/img/assistente-3-conectar.webp)
+
 4. **O que monitorar** — discos, pastas, rede e serviços que o assistente encontrou, já
    marcados como recomendado, e os limites de aviso. O resumo ao lado mostra o custo
    estimado no servidor (cerca de 1 segundo por coleta, num servidor de 1 núcleo).
+
+   ![Passo 4 do assistente: discos, pastas, rede e serviços marcados, com os limites de aviso](docs/img/assistente-4-monitorar.webp)
+
 5. **Preparar o servidor** — confira os comandos exatos e clique em **Confirmar e
    preparar** (*assistido*), ou escolha **Prefiro fazer à mão** e cole os blocos no
    servidor, clicando em **Testar** depois de cada um. Isso cria o usuário `dashmon`, sem
@@ -114,10 +130,16 @@ o fim do assistente.
    vai aceitar o `dashmon` e avisa o que ajustar, como o `AllowUsers`; ele nunca muda o
    `sshd_config`. Se o servidor tem `Defaults requiretty` no sudo, use **Prefiro fazer à
    mão**.
+
+   ![Passo 5 do assistente: lista das ações no servidor, antes de confirmar](docs/img/assistente-5-preparar.webp)
+
 6. **Pronto** — a primeira leitura real do servidor. Escolha "iniciar com o computador",
    o atalho no menu e os avisos do navegador, e clique em **Abrir o painel**: o assistente
    se desliga e o painel abre já logado.
 
+   ![Passo 6 do assistente: primeira coleta feita, preferências e botão Abrir o painel](docs/img/assistente-6-pronto.webp)
+
+> [!TIP]
 > **Máquina sem tela?** `./dashboard instalar --terminal` faz os mesmos 6 passos no
 > terminal (setas, espaço e Enter).
 
@@ -149,6 +171,8 @@ acrescentar um bloco no `~/.bashrc`, e guarda uma cópia antes. Só funciona no 
 O painel só existe **neste computador** (`http://127.0.0.1:3000`): ninguém mais na rede
 consegue abrir, de propósito. Em outro navegador, ele pede o **token de reserva** (o
 assistente mostra uma vez; ele também fica no `.env`).
+
+![Tela de login do painel, com o campo do token de acesso](docs/img/login.webp)
 
 ### Algo parece errado?
 
@@ -201,6 +225,40 @@ O painel tem 8 telas, listadas na coluna esquerda (ou nas teclas `1` a `8`).
 | **7 Relatórios** | Resumo de 7, 30, 90 dias ou de datas escolhidas, tabela por dia (fuso local) com disponibilidade e eventos; exportação CSV/JSON; impressão/PDF |
 | **8 Ajuda** | O que fazer em cada alerta, como ler o painel, atalhos, configuração ativa (só leitura), acesso ao servidor (linha do sudoers para copiar), versões e sessão |
 
+Cada tela, em imagem (com dados inventados, de um painel de teste):
+
+**1 Visão geral**
+
+<picture><source media="(prefers-color-scheme: dark)" srcset="docs/img/visao-geral-escuro.webp"><img src="docs/img/visao-geral-claro.webp" alt="Tela Visão geral: anel de saúde, frase de resumo, indicadores e telemetria"></picture>
+
+**2 Recursos**
+
+<picture><source media="(prefers-color-scheme: dark)" srcset="docs/img/recursos-escuro.webp"><img src="docs/img/recursos-claro.webp" alt="Tela Recursos: processador por tipo, carga, memória e temperatura"></picture>
+
+**3 Armazenamento**
+
+<picture><source media="(prefers-color-scheme: dark)" srcset="docs/img/armazenamento-escuro.webp"><img src="docs/img/armazenamento-claro.webp" alt="Tela Armazenamento: espaço por pasta, previsão de lotação e SMART"></picture>
+
+**4 Rede**
+
+<picture><source media="(prefers-color-scheme: dark)" srcset="docs/img/rede-escuro.webp"><img src="docs/img/rede-claro.webp" alt="Tela Rede: download, upload, volume do dia e tráfego no período"></picture>
+
+**5 Processos & serviços**
+
+<picture><source media="(prefers-color-scheme: dark)" srcset="docs/img/processos-escuro.webp"><img src="docs/img/processos-claro.webp" alt="Tela Processos e serviços: serviços ativos e processos que mais usam memória"></picture>
+
+**6 Eventos**
+
+<picture><source media="(prefers-color-scheme: dark)" srcset="docs/img/eventos-escuro.webp"><img src="docs/img/eventos-claro.webp" alt="Tela Eventos: disponibilidade de 90 dias e linha do tempo de alertas, quedas e anotações"></picture>
+
+**7 Relatórios**
+
+<picture><source media="(prefers-color-scheme: dark)" srcset="docs/img/relatorios-escuro.webp"><img src="docs/img/relatorios-claro.webp" alt="Tela Relatórios: resumo do período, tabela por dia e exportação"></picture>
+
+**8 Ajuda**
+
+<picture><source media="(prefers-color-scheme: dark)" srcset="docs/img/ajuda-escuro.webp"><img src="docs/img/ajuda-claro.webp" alt="Tela Ajuda: o que fazer em cada alerta, atalhos e configuração ativa"></picture>
+
 Dicas por tela:
 
 - **Visão geral** responde "está tudo bem?" em uma frase. Se não estiver, diz o porquê
@@ -230,6 +288,7 @@ Dicas por tela:
   última coleta e quanto ela custou ao servidor (tempo do SSH e tamanho da resposta).
 - **Celular**: o menu vira o botão ☰ no canto superior esquerdo.
 
+> [!NOTE]
 > A interatividade toda (filtros, zoom, ordenação) acontece **no seu navegador** —
 > o servidor não é incomodado por nada disso. A única "conversa" com ele
 > continua sendo 1 comando por minuto.

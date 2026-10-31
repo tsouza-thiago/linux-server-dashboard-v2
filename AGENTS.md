@@ -212,6 +212,11 @@ O teste `test/unit/docs.test.js` confere esta documentação contra o código.
   do mantenedor. Dúvidas e ideias vão para Discussions; vulnerabilidade, só pelo reporte
   privado do GitHub, nunca em issue pública. Exceções: PRs do Dependabot e o commit de
   versão.
+- **Imagens da documentação:** `docs/img/` tem só o que o `npm run capturar-telas` gera, do painel
+  de teste. Nunca use print de uma instalação real. Antes do commit, olhe cada imagem nova: nenhum
+  teste enxerga o que há dentro dela. Orçamento: 200 KB por arquivo e 3 MB na pasta
+  (`test/unit/docs.test.js`). Refaça só quando a tela mudar de forma visível: cada versão de
+  imagem fica no histórico para sempre.
 - **Testes no navegador** (ADR 0019): toda mudança de tela é conferida no navegador real,
   pela extensão Claude in Chrome, num painel de teste (`npm run painel-teste`). A bateria
   completa segue [docs/testes-no-navegador.md](docs/testes-no-navegador.md) e roda antes de
@@ -290,6 +295,7 @@ npm run test:seguranca          # só a rede de segurança (test/seguranca)
 npm run seguranca               # Semgrep, Gitleaks, ShellCheck, OSV, OWASP ZAP e mutação (Docker)
 npm run test:e2e                # ponta a ponta no Chromium (playwright-core; pula sem navegador; CHROMIUM=<caminho> escolhe outro)
 npm run capturar-amostra        # 1 coleta real → data/amostra-{bruta,anonima}.txt (fixtures)
+npm run capturar-telas          # refaz docs/img/ a partir do painel de teste (--sem-animacao pula a animação, que usa o ffmpeg)
 npm run migrar-v1 -- --verificar  # resume o data/history.json da V1 sem gravar nada
 npm run migrar-v1               # migra a V1 agora (o painel também migra sozinho ao iniciar)
 npm run soak                    # soak acelerado: 83 h de coletas simuladas e pedidos de 90 dias; confere RAM e vazamento
@@ -593,9 +599,11 @@ linux-server-dashboard-v2/
 │                           CODEOWNERS (ADR 0016)
 ├── docs/                   adr/, seguranca/ (análises e excecoes.json), allowed_signers,
 │                           testes-no-navegador.md (roteiro da bateria, ADR 0019),
-│                           ROADMAP.md e roadmap/ (planejamento de cada feature)
+│                           ROADMAP.md e roadmap/ (planejamento de cada feature),
+│                           img/ (prints e SVG do README e do TUTORIAL)
 ├── scripts/                check.mjs, seguranca.mjs, mutacao-seguranca.mjs, soak-acelerado.mjs,
-│                           capturar-amostra.mjs, painel-teste.mjs, node-runtime.sh, askpass.sh,
+│                           capturar-amostra.mjs, painel-teste.mjs, capturar-telas.mjs,
+│                           desenhar-graficos.mjs, node-runtime.sh, askpass.sh,
 │                           completar.bash (autocomplete do bash),
 │                           e2e-instalacao/
 ├── server/

@@ -31,6 +31,7 @@ import { normalizeTargets } from '../server/collector/builder.js';
 import { History } from '../server/storage/index.js';
 import { OutageLog } from '../server/storage/outages.js';
 import { createWizardApp } from '../server/setup/web.js';
+import { VERSION } from '../server/version.js';
 import { makeInstalacao, detectionWithSudo } from '../test-support/instalacao-fake.js';
 
 const ROOT = path.join(path.dirname(fileURLToPath(import.meta.url)), '..');
@@ -42,22 +43,28 @@ export const CENARIOS = ['normal', 'lacunas', 'offline', 'vazio'];
 // (configTargets); sem isso a Ajuda diria "nenhum disco em SMART_DEVS" (#57). O hash do
 // coletor não muda: SMART nos mesmos discos do I/O fica fora da conta.
 export const ALVOS = normalizeTargets({ netIf: 'enp0s7', mounts: ['/', '/mnt/sdb1', '/mnt/sdc1', '/mnt/sdc2'], devs: ['sda', 'sdb', 'sdc'], services: ['smbd'] });
-const FIXTURE = fs.readFileSync(path.join(ROOT, 'test', 'fixtures', 'coleta-v2', 'debian13-real.txt'), 'utf8');
+export const FIXTURE = fs.readFileSync(path.join(ROOT, 'test', 'fixtures', 'coleta-v2', 'debian13-real.txt'), 'utf8');
 
 /**
- * Coletor falso: a saída da fixture com os contadores avançando conforme o instante, para
- * as taxas (CPU, rede, disco) e o uptime terem valores. Mesma ideia do soak.
+ * Saída padrão do coletor falso: a fixture com os contadores avançando conforme o instante,
+ * para as taxas (CPU, rede, disco) e o uptime terem valores. Mesma ideia do soak.
  */
-export function coletorFalso() {
+function saidaFalsa(now) {
+  const min = Math.floor(now / MIN);
+  return FIXTURE
+    // 1 núcleo, 6000 tiques por minuto: ~5% usuário, 2% sistema, 1% espera de disco, resto ocioso.
+    .replace(/^cpu\s+(\d+) (\d+) (\d+) (\d+) (\d+)/m, (_, us, ni, sy, id, io) =>
+      `cpu  ${Number(us) + min * 300} ${ni} ${Number(sy) + min * 120} ${Number(id) + min * 5520} ${Number(io) + min * 60}`)
+    .replace(/(enp0s7:\s*)(\d+)/, (_, a, n) => `${a}${Number(n) + min * 750_000}`)
+    .replace(/(===UPTIME===\n)(\d+)/, (_, a, n) => `${a}${Number(n) + (min % 100000) * 60}`);
+}
+
+/** Coletor falso: `saida(now)` faz o papel do servidor. Quem devolve null simula uma queda. */
+export function coletorFalso(saida = saidaFalsa) {
   let prev = null;
   return async (now) => {
-    const min = Math.floor(now / MIN);
-    const stdout = FIXTURE
-      // 1 núcleo, 6000 tiques por minuto: ~5% usuário, 2% sistema, 1% espera de disco, resto ocioso.
-      .replace(/^cpu\s+(\d+) (\d+) (\d+) (\d+) (\d+)/m, (_, us, ni, sy, id, io) =>
-        `cpu  ${Number(us) + min * 300} ${ni} ${Number(sy) + min * 120} ${Number(id) + min * 5520} ${Number(io) + min * 60}`)
-      .replace(/(enp0s7:\s*)(\d+)/, (_, a, n) => `${a}${Number(n) + min * 750_000}`)
-      .replace(/(===UPTIME===\n)(\d+)/, (_, a, n) => `${a}${Number(n) + (min % 100000) * 60}`);
+    const stdout = saida(now);
+    if (stdout === null) return { ok: false, error: 'teste: servidor desligado' };
     const r = await collect({ host: 'servidor', prev, targets: ALVOS, now, runner: async () => ({ stdout, stderr: '', code: 0 }) });
     if (r.ok) prev = r.sample;
     return r;
@@ -71,9 +78,9 @@ const diaHora = (agora, dias, hora) => { const d = new Date(agora - dias * DAY);
  * Grava em `dir` (o data/ do painel de teste) os dados do cenário. `opcoes` encurta os
  * períodos nos testes. Devolve o coletor falso, para a coleta ao vivo continuar de onde parou.
  */
-export async function semear(dir, cenario, { agora = Date.now(), horasBrutas = 72, diasAntigos = 10 } = {}) {
+export async function semear(dir, cenario, { agora = Date.now(), horasBrutas = 72, diasAntigos = 10, coletor = coletorFalso() } = {}) {
   if (!CENARIOS.includes(cenario)) throw new Error(`cenário desconhecido: ${cenario} (use ${CENARIOS.join(', ')})`);
-  const coletar = coletorFalso();
+  const coletar = coletor;
   const h = new History({ dataDir: dir, log: () => {} });
   const quedas = new OutageLog({ file: path.join(dir, 'outages.ndjson'), log: () => {} });
   const guardar = async (de, ate, passo) => {
@@ -110,9 +117,9 @@ const opcao = (nome, padrao) => {
 
 /**
  * O painel (createApp) sobre os dados de `dir`, sem token. `coletar` é o coletor falso de
- * semear(); no cenário offline, toda coleta falha.
+ * semear(); no cenário offline, toda coleta falha. `extra` vai direto para o createApp.
  */
-export function criarPainel(dir, cenario, coletar) {
+export function criarPainel(dir, cenario, coletar, extra = {}) {
   // offline: toda coleta falha (o motor abre a queda depois de 2 falhas seguidas).
   const coleta = cenario === 'offline'
     ? async () => ({ ok: false, error: 'teste: servidor desligado' })
@@ -121,7 +128,7 @@ export function criarPainel(dir, cenario, coletar) {
   return createApp({
     dataDir: dir, historyFile: arq('history.json'), alertsFile: arq('alerts.json'), annotationsFile: arq('annotations.json'),
     outagesFile: arq('outages.ndjson'), sessionsFile: arq('sessions.json'), dashToken: '', sshHost: 'servidor',
-    targets: ALVOS, pollInterval: 60000, collect: coleta, log: () => {},
+    targets: ALVOS, pollInterval: 60000, collect: coleta, log: () => {}, ...extra,
   });
 }
 
@@ -130,6 +137,9 @@ export function criarAssistente() {
   const fake = makeInstalacao({ detection: detectionWithSudo('pede-senha') });
   // A chave "falta" no agente só na 1ª conferência: assim dá para ver o ssh-add e o Tentar de novo.
   fake.srv.agentHasKey = false;
+  // Nome genérico: o preparo mostra o nome do computador, e os prints saem daqui.
+  fake.inst.deps.hostname = () => 'notebook-a';
+  fake.inst.deps.versionStatus = () => ({ ok: true, tag: `v${VERSION.app}` });
   const conferir = fake.inst.deps.checkAgentKey;
   fake.inst.deps.checkAgentKey = async (o) => {
     const r = await conferir(o);
