@@ -9,6 +9,15 @@ diante: `PATCH` corrige, `MINOR` acrescenta sem quebrar e `MAJOR` quebra.
 
 ## [Não publicado]
 
+## [2.4.0] — 2026-10-31
+
+Versão estável com o comando `dashboard` no PATH: ele roda de qualquer pasta, sem `./`, e completa
+comandos e opções com Tab no bash. O README e o TUTORIAL agora têm prints e ilustrações. Nada muda
+na configuração, no formato de `data/` nem no acesso do painel ao servidor: atualize com
+`./dashboard atualizar` e, para criar o link e o autocomplete, rode `./dashboard reconfigurar`. Quem
+está na 2.1.0 ou anterior faz antes, uma vez, o passo manual das notas da 2.1.1 (a chave de
+assinatura mudou).
+
 ### Adicionado
 
 - README e TUTORIAL ilustrados (#106): prints das 8 telas nos 2 temas, conforme o tema do leitor,
@@ -1155,7 +1164,8 @@ Documentados no plano da V2 (seção 2.2, B1–B12), entre eles: alerta SMART fa
 rede zerada com contadores grandes, alerta duplicado a cada coleta e reescrita completa do
 histórico a cada minuto.
 
-[Não publicado]: https://github.com/tsouza-thiago/linux-server-dashboard-v2/compare/v2.3.0...HEAD
+[Não publicado]: https://github.com/tsouza-thiago/linux-server-dashboard-v2/compare/v2.4.0...HEAD
+[2.4.0]: https://github.com/tsouza-thiago/linux-server-dashboard-v2/compare/v2.3.0...v2.4.0
 [2.3.0]: https://github.com/tsouza-thiago/linux-server-dashboard-v2/compare/v2.2.4...v2.3.0
 [2.2.4]: https://github.com/tsouza-thiago/linux-server-dashboard-v2/compare/v2.2.3...v2.2.4
 [2.2.3]: https://github.com/tsouza-thiago/linux-server-dashboard-v2/compare/v2.2.2...v2.2.3
