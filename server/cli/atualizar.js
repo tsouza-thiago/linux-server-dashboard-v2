@@ -6,7 +6,8 @@ import { spawnSync } from 'node:child_process';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import { SIGNERS, compareVersions, signedReleaseTags } from '../setup/assinatura.js';
+import { SIGNERS, newestSignedTag } from '../setup/assinatura.js';
+import { versaoDaPasta } from '../atualizacao/procurar.js';
 import { installService, situacaoDoLink } from '../setup/local.js';
 import { otherServiceRoot, panelPort, panelStatus, startPanel, stopPanel, unitPath, waitForPort, systemctlUser, UNIT_NAME } from './servico.js';
 import { parseFlags } from './instalar.js';
@@ -19,11 +20,6 @@ function git(root, args, run = spawnSync) {
   const r = run('git', ['-C', root, ...args], { encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'], timeout: 120000 });
   return { status: r.status ?? -1, stdout: (r.stdout || '').trim(), stderr: (r.stderr || '').trim() };
 }
-
-// Versão instalada como tag ("v2.0.1"), lida do package.json da pasta (muda com o checkout).
-const versionOf = (root) => {
-  try { return `v${JSON.parse(fs.readFileSync(path.join(root, 'package.json'), 'utf8')).version}`; } catch { return 'v0.0.0'; }
-};
 
 /** Copia data/ para .backups/<data>-<versão>/ (0700) e mantém só os 3 mais novos. */
 export function backupData(root, label, now = new Date()) {
@@ -127,7 +123,7 @@ export async function atualizar({ out, root, args = [], home = os.homedir(), dep
     out.explain('o atualizar troca de versão com o git.', `baixe de novo com o comando do README e importe os dados: ${out.cmd} instalar --importar-v1 não serve aqui; copie a pasta data/.`);
     return 1;
   }
-  const current = versionOf(root);
+  const current = versaoDaPasta(root);
   const oldRef = git(root, ['rev-parse', 'HEAD'], run).stdout;
   const fetched = git(root, ['fetch', '--quiet', '--tags', 'origin'], run);
   if (fetched.status !== 0) {
@@ -140,14 +136,12 @@ export async function atualizar({ out, root, args = [], home = os.homedir(), dep
   fs.copyFileSync(SIGNERS(root), signers);
   // Pré-versões só para quem já está numa ou pediu --pre (AGENTS, "Versões").
   const pre = current.includes('-') || Boolean(flags.pre);
-  const newer = signedReleaseTags(root, { signersFile: signers, includePre: pre, run: deps.gitRun })
-    .filter((t) => compareVersions(t, current) > 0);
+  const target = newestSignedTag(root, { current, signersFile: signers, includePre: pre, run: deps.gitRun });
   fs.rmSync(path.dirname(signers), { recursive: true, force: true });
-  if (!newer.length) {
+  if (!target) {
     out.ok(`você já está na versão mais nova (${current})`);
     return 0;
   }
-  const target = newer[0];
   out.ok(`versão nova encontrada: ${target}`, 'assinatura conferida com a chave da versão instalada');
   // Arquivo do painel alterado à mão: o checkout apagaria a alteração, então para aqui.
   const dirty = git(root, ['status', '--porcelain', '--untracked-files=no'], run).stdout;

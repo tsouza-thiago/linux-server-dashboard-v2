@@ -66,6 +66,8 @@ const MUTACOES = [
   { nome: 'apelido com ProxyJump/ProxyCommand aceito', arquivo: 'server/setup/remoto.js', de: "    if (v && v !== 'none') {\n", para: "    if (false) {\n", testes: ['test/unit/setup-chave-ssh.test.js'] },
   { nome: 'apelido virando opção do ssh (-oProxyCommand)', arquivo: 'server/setup/remoto.js', de: "/^[A-Za-z0-9_][A-Za-z0-9_.-]{0,63}$/.test(s)", para: "s.length > 0", testes: ['test/unit/setup-chave-ssh.test.js'] },
   { nome: 'senha do sudo indo para a conexão SSH no modo chave', arquivo: 'server/setup/instalacao.js', de: "    if (this.acesso.modo === 'chave') senha = '';\n", para: '', testes: ['test/unit/setup-chave-ssh.test.js'] },
+  { nome: 'aviso de versão sem conferir a assinatura da tag', arquivo: 'server/setup/assinatura.js', de: 'if (verifyTag(root, t, { signersFile, run }).ok) return t;', para: 'return t;', testes: ['test/integration/atualizacao.test.js'] },
+  { nome: '"procurar agora" sem limite de 1 por minuto', arquivo: 'server/atualizacao/index.js', de: 'if (this.agora() - this.manualEm < MANUAL_MS) return null;\n', para: '', testes: ['test/integration/atualizacao.test.js'] },
   { nome: 'exec com shell importado', arquivo: 'server/cli/servico.js', de: "import { spawn, spawnSync } from 'node:child_process';", para: "import { exec, spawn, spawnSync } from 'node:child_process';" },
 ];
 

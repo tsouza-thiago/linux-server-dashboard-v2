@@ -46,6 +46,7 @@
         <span class="live" id="mobileLive"></span>
       </header>
       <div class="strip" id="strip" aria-label="Estado da coleta" data-state="coletando"></div>
+      <div class="aviso-versao" id="avisoVersao" role="status" hidden></div>
       <div class="visually-hidden" id="liveRegion" role="status" aria-live="polite"></div>
       <div class="page">
         <header class="page-head">
@@ -54,6 +55,10 @@
             <div class="page-actions-extra" id="viewActions"></div>
             <div class="segmented" id="periodToggle" role="group" aria-label="Período dos gráficos"></div>
             <button id="themeToggle" class="icon-btn" type="button" aria-label="Alternar tema claro/escuro (T)" title="Alternar tema (T)"></button>
+            <div class="manut">
+              <button id="manutBtn" class="icon-btn" type="button" aria-label="Manutenção do painel" title="Manutenção" aria-haspopup="true" aria-expanded="false" aria-controls="manutMenu"></button>
+              <div class="manut-menu" id="manutMenu" hidden></div>
+            </div>
           </div>
         </header>
         <main id="view" tabindex="-1"></main>
@@ -62,6 +67,7 @@
   </div>
 
   <div id="toasts" class="toasts" aria-live="polite"></div>
+  <dialog class="dialogo" id="novidadesDialog" aria-labelledby="novidadesTitulo"></dialog>
 
   <div id="login" class="login" hidden>
     <div class="login-brand">

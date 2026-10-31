@@ -71,13 +71,28 @@ export function currentVersionStatus(root, { run } = {}) {
   return first;
 }
 
+// Tags com nome de versão, da mais nova para a mais antiga, ainda sem conferir a assinatura.
+function releaseTags(root, { includePre, run }) {
+  return git(root, ['tag', '--list', 'v2.*'], run).stdout.split('\n')
+    .filter((t) => RELEASE_TAG.test(t) && (includePre || !t.includes('-')))
+    .sort((a, b) => compareVersions(b, a));
+}
+
 /** Tags de release assinadas, da mais nova para a mais antiga. */
 export function signedReleaseTags(root, { signersFile, includePre = true, run } = {}) {
-  const all = git(root, ['tag', '--list', 'v2.*'], run).stdout.split('\n').filter((t) => RELEASE_TAG.test(t));
-  return all
-    .filter((t) => includePre || !t.includes('-'))
-    .sort((a, b) => compareVersions(b, a))
-    .filter((t) => verifyTag(root, t, { signersFile, run }).ok);
+  return releaseTags(root, { includePre, run }).filter((t) => verifyTag(root, t, { signersFile, run }).ok);
+}
+
+/**
+ * A tag assinada mais nova, se for mais nova que `current`; senão null. Confere só as tags acima
+ * de `current`, até achar uma válida: a verificação diária não gasta uma conferência por versão.
+ */
+export function newestSignedTag(root, { current, signersFile, includePre = false, run } = {}) {
+  for (const t of releaseTags(root, { includePre, run })) {
+    if (compareVersions(t, current) <= 0) return null;
+    if (verifyTag(root, t, { signersFile, run }).ok) return t;
+  }
+  return null;
 }
 
 /**

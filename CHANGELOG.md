@@ -9,6 +9,17 @@ diante: `PATCH` corrige, `MINOR` acrescenta sem quebrar e `MAJOR` quebra.
 
 ## [Não publicado]
 
+### Adicionado
+
+- Aviso de versão nova (#90, 1ª entrega da F7). O painel procura 1 vez por dia, só por tag assinada,
+  e mostra uma faixa no topo com as novidades da versão. A engrenagem no topo abre o menu de
+  manutenção, com a versão instalada, a última procura e "Procurar agora". A troca de versão
+  continua com `./dashboard atualizar`, no terminal. É a 1ª vez que o painel acessa a internet: só
+  com `git fetch` para o `origin` do clone (ADR 0030).
+- Rotas `/api/atualizacao` e `/api/atualizacao/verificar`, evento SSE `atualizacao` e o arquivo
+  `data/atualizacao.json`.
+- `npm run painel-teste -- --versao-nova`: mostra o aviso no painel de teste.
+
 ## [2.4.1] — 2026-10-31
 
 Versão de correção. A previsão de lotação não mostra mais texto errado durante a carga, e o

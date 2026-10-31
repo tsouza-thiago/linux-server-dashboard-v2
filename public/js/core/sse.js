@@ -4,7 +4,7 @@
 import { api } from './api.js';
 
 // Eventos que o servidor manda (AGENTS, rota /api/stream).
-const EVENTS = ['hello', 'sample', 'alerts', 'annotations', 'status'];
+const EVENTS = ['hello', 'sample', 'alerts', 'annotations', 'status', 'atualizacao'];
 
 /** Abre a conexão e repassa cada evento (dados já em objeto) e o estado dela. */
 export function connect({ onEvent, onState, onAuthLost } = {}) {

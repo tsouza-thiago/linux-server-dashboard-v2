@@ -193,6 +193,11 @@ coleta) e explica cada problema com "O que aconteceu" e "Como resolver".
 ./dashboard desinstalar    # remove daqui e oferece limpar a parte deste computador no servidor
 ```
 
+**Como saber que há versão nova?** O painel procura 1 vez por dia e mostra uma faixa no topo da
+tela. Clique em **Ver novidades** para ler o que mudou. Feche a faixa, se quiser: ela só volta na
+versão seguinte. A engrenagem no topo mostra a versão instalada e a data da última procura, e tem o
+botão **Procurar agora**. Para atualizar, rode o `./dashboard atualizar`.
+
 **Rode na pasta da instalação.** O `atualizar` só vale na pasta onde o painel foi instalado.
 Numa cópia sem `.env`, ou com o serviço em outra pasta, ele para sem alterar nada e mostra a pasta
 certa. Para o serviço mudar de pasta de propósito, rode `./dashboard reconfigurar` na pasta nova.

@@ -306,6 +306,55 @@ pre.code {
 .toast .btn-link { margin-left: auto; }
 @keyframes toast-in { from { opacity: 0; transform: translateY(8px); } }
 
+/* ---------------- Manutenção: engrenagem, aviso de versão e novidades (ADR 0030) ---------------- */
+.manut { position: relative; }
+.manut .icon-btn.tem-novidade { position: relative; }
+.manut .icon-btn.tem-novidade::after {
+  content: ""; position: absolute; top: 6px; right: 6px; width: 8px; height: 8px; border-radius: 50%;
+  background: var(--accent-text); box-shadow: 0 0 0 2px var(--surface);
+}
+.manut-menu {
+  position: absolute; z-index: 30; top: calc(100% + 8px); right: 0; width: 300px; max-width: calc(100vw - 32px);
+  display: flex; flex-direction: column; gap: 12px; padding: 16px; border-radius: 14px;
+  background: var(--surface-2); border: 1px solid var(--border-strong); box-shadow: var(--shadow-pop);
+}
+.manut-menu[hidden] { display: none; }
+.manut-titulo { margin: 0; font-size: 14px; font-weight: 600; }
+.manut-dados { display: flex; flex-direction: column; gap: 6px; margin: 0; font-size: 13px; }
+.manut-dados div { display: flex; justify-content: space-between; gap: 12px; }
+.manut-dados dt { color: var(--text-3); }
+.manut-dados dd { margin: 0; color: var(--text); text-align: right; }
+.manut-erro { margin: 0; font-size: 13px; color: var(--warn-ink); }
+.aviso-versao {
+  display: flex; align-items: center; gap: 10px; min-height: 40px; padding: 4px 40px;
+  background: var(--side); border-bottom: 1px solid var(--border); font-size: 13px; color: var(--text-2);
+}
+.aviso-versao[hidden] { display: none; }
+.aviso-versao b { font-weight: 400; color: var(--text); }
+.aviso-versao .aviso-fechar { width: 32px; height: 32px; flex: 0 0 32px; margin-left: auto; border: 0; background: transparent; }
+.dialogo {
+  width: min(640px, calc(100vw - 32px)); max-height: calc(100vh - 64px); padding: 0; border-radius: 14px;
+  background: var(--surface-2); color: var(--text); border: 1px solid var(--border-strong); box-shadow: var(--shadow-pop);
+}
+.dialogo::backdrop { background: rgba(0, 0, 0, 0.5); }
+.dialogo-corpo { display: flex; flex-direction: column; gap: 14px; max-height: calc(100vh - 66px); padding: 20px; }
+.dialogo-corpo h2 { margin: 0; font-size: 18px; font-weight: 600; }
+.dialogo-corpo p { margin: 0; }
+.dialogo-aviso { display: flex; align-items: flex-start; gap: 8px; font-size: 13px; color: var(--warn-ink); }
+.dialogo-aviso svg { flex: 0 0 auto; margin-top: 2px; }
+.dialogo-comando { font-size: 13px; color: var(--text-2); }
+.dialogo-comando .mono { color: var(--text); }
+.dialogo-acoes { display: flex; justify-content: flex-end; }
+.novidades { flex: 1 1 auto; min-height: 0; overflow-y: auto; display: flex; flex-direction: column; gap: 16px; font-size: 14px; line-height: 1.5; color: var(--text-2); }
+.novidades-secao { display: flex; flex-direction: column; gap: 8px; }
+.novidades h3 { margin: 0; font-size: 15px; font-weight: 600; color: var(--text); }
+.novidades h4 { margin: 6px 0 0; font-size: 13px; font-weight: 600; color: var(--text); }
+.novidades-data { font-size: 12px; font-weight: 400; color: var(--text-3); }
+.novidades-item { padding-left: 14px; position: relative; }
+.novidades-item::before { content: "·"; position: absolute; left: 3px; color: var(--text-3); }
+.novidades code { font-family: var(--mono); font-size: 0.92em; color: var(--text); }
+.novidades-corte { font-size: 13px; color: var(--text-3); }
+
 /* ---------------- Carregando (blocos no formato final) ---------------- */
 .skel {
   border-radius: var(--r-1); background: var(--surface-3);

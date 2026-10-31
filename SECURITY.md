@@ -287,6 +287,18 @@ Inclua: o passo a passo para reproduzir, o impacto estimado e a versão afetada
   repositório, antes do commit) e `scripts/seguranca.mjs` (Gitleaks). Análise do que o
   histórico já expõe: [linha de base](docs/seguranca/2026-10-16-linha-de-base.md#osint-o-que-o-repositório-público-revela).
 
+### 21. Saída do painel para a internet (ADR 0030)
+- **Ameaça:** a procura diária de versão nova é a única conexão do painel além do SSH da coleta. Ela
+  poderia aceitar uma versão adulterada, abrir uma pergunta de senha, segurar o painel ou ser
+  disparada por outro site.
+- **Mitigação:** só `git fetch --tags` para o `origin` do clone, sem API de terceiros e sem
+  telemetria. Só vale tag assinada, conferida com a lista de chaves da versão instalada; a tag nova
+  não se autoaprova. Roda em processo à parte, com `nice`, teto de tempo e sem perguntas. O "Procurar
+  agora" exige sessão, passa pelo CSRF e aceita 1 pedido por minuto. As novidades são texto de uma
+  tag assinada e passam pelo template `html`. A procura não troca de versão: a tela só avisa.
+- **Verificado por:** `test/integration/atualizacao.test.js`, `test/unit/atualizacao.test.js` e
+  `scripts/mutacao-seguranca.mjs` (aviso sem conferir a assinatura, "procurar agora" sem limite).
+
 ---
 
 ## OWASP Top 10:2025
