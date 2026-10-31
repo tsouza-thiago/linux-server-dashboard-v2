@@ -12,6 +12,23 @@
   2. Versão que muda o script de coleta: aviso antes, por um marcador no CHANGELOG (item 9
      da decisão).
 
+## Entregas
+
+Decidido em 31/10/2026: a F7 sai em 3 PRs, todos com `Refs #90`; o último fecha a issue.
+
+| Entrega | Etapas | Situação |
+|---|---|---|
+| 1. Aviso de versão nova | 1 (só "procurar versão"), 3, 4, 5, parte da 9 | ADR 0030 |
+| 2. Atualizar pelo botão | 1 (`--registro`), 2, 6, 7, resto da 9 (I11) | a fazer |
+| 3. Fechamento | 8, 10, 11 | a fazer |
+
+Mudanças em relação ao plano abaixo, na entrega 1:
+
+- A procura inteira roda em processo à parte, não só o `git fetch` (ADR 0030, item 2).
+- O campo `modo` de `/api/atualizacao` fica para a entrega 2: ele só serve ao executor.
+- Até a entrega 2, o diálogo mostra o comando do terminal no lugar do botão "Atualizar".
+- O `bloqueio` ganhou `outra-pasta`: a mesma conferência do `dashboard atualizar` (#118).
+
 ## Objetivo
 
 1. Avisar na tela quando há versão nova, com as novidades dela.

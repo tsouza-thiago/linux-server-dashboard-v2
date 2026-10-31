@@ -136,6 +136,13 @@ O teste `test/unit/docs.test.js` confere esta documentação contra o código.
   do arquivo de login. `test/unit/autocomplete.test.js` confere comandos e opções contra o código.
 - **Versões assinadas** (ADR 0012): o instalador e o `./dashboard atualizar` só aceitam
   tags assinadas por uma chave de `docs/allowed_signers`.
+- **Versão nova** (ADR 0030): o painel procura 1 vez por dia, em processo à parte
+  (`server/atualizacao/procurar.js`, `nice -n 19`), com `git fetch --tags origin`, sem perguntas
+  (`GIT_TERMINAL_PROMPT=0`, `BatchMode=yes`). É a única saída para a internet. Só vale tag assinada,
+  conferida com as chaves da versão instalada, pela mesma função do `dashboard atualizar`
+  (`newestSignedTag`). As novidades vêm do CHANGELOG da tag e vão para a tela como texto. O
+  `createApp` sem `procurarVersao` não sai da máquina: testes e painel de teste nunca fazem fetch.
+  Por enquanto a tela só avisa: a troca de versão continua no terminal.
 - **Code scanning** (CodeQL padrão do GitHub, a cada push): todo alerta é corrigido ou
   descartado como falso positivo com a análise em `docs/seguranca/` e, se possível, um
   teste que falhe na forma errada. Não aplique a sugestão do CodeQL sem conferir o formato
@@ -299,7 +306,7 @@ npm run capturar-telas          # refaz docs/img/ a partir do painel de teste (-
 npm run migrar-v1 -- --verificar  # resume o data/history.json da V1 sem gravar nada
 npm run migrar-v1               # migra a V1 agora (o painel também migra sozinho ao iniciar)
 npm run soak                    # soak acelerado: 83 h de coletas simuladas e pedidos de 90 dias; confere RAM e vazamento
-npm run painel-teste            # painel de teste com dados semeados (--cenario=normal|lacunas|offline|vazio, --porta=3943)
+npm run painel-teste            # painel de teste com dados semeados (--cenario=normal|lacunas|offline|vazio, --porta=3943, --versao-nova)
 scripts/e2e-instalacao/rodar.sh # instalação de ponta a ponta em contêineres Debian/Ubuntu
 ```
 
@@ -465,6 +472,7 @@ Tudo fica no disco local. Nada é gravado no servidor.
 | `data/outages.ndjson` | Quedas do servidor (`off`/`on`), 90 dias, separadas dos alertas (B9) |
 | `data/history.v1-migrado.json` | Backup do histórico da V1, feito pela migração (pode ser apagado) |
 | `data/sessions.json` | SHA-256 das sessões do navegador |
+| `data/atualizacao.json` | Última procura de versão nova: quando, versão achada, novidades, erro e bloqueio (ADR 0030) |
 | `data/entrar.json` | Hash do link de entrada de uso único (2 min no `./dashboard abrir`, 10 min no fim da instalação) |
 | `data/ssh/` | `config` e `known_hosts` próprios do painel (0700) |
 | `data/dashboard.log` | Log (gira em 5 MB para `dashboard.log.1`) |
@@ -503,6 +511,8 @@ segurança, rate limit das mutações e error handler sem stack trace. Com `DASH
 | `/api/status` | GET | Última amostra + meta (online, lastPollAt, nextPollAt, offlineSince) + saúde + alertas ativos |
 | `/api/history` | GET | `?limit=N&from=&to=` → amostras (reduzidas a `limit`: padrão 720, máximo 2000, com o pior caso de cada grupo; `topProcs` só na mais recente). `&formato=baldes` → `{from, to, step, buckets}` com mín/máx/média, até 90 dias |
 | `/api/config` | GET | Configuração ativa para a Ajuda: versões, alvos, modo de acesso, limiares (sem segredos) |
+| `/api/atualizacao` | GET | `{instalada, nova, novidades, verificadoEm, erro, bloqueio}`. `novidades` é `{secoes: [{versao, data, texto}], cortado}`; `erro` é `sem-acesso` ou `falhou`; `bloqueio` é `sem-login`, `sem-git`, `arquivos-alterados` ou `outra-pasta` |
+| `/api/atualizacao/verificar` | POST | Procura versão nova agora e devolve o mesmo estado. No máximo 1 por minuto (429 acima) |
 | `/api/outages` | GET | `?days=1..90` (padrão 30) → `{days, outages, monitored, uptime}`. `monitored` são os intervalos `{from, to}` em que o painel estava medindo; `uptime` conta só esse tempo (ADR 0018) |
 | `/api/alerts` | GET | `?status=&level=&limit=` → `{active, all}` |
 | `/api/alerts/:id/ack` | POST | Reconhece o alerta |
@@ -510,7 +520,7 @@ segurança, rate limit das mutações e error handler sem stack trace. Com `DASH
 | `/api/annotations` | GET / POST | Lista / cria anotação (`{ts, text, label}`) |
 | `/api/annotations/:id` | DELETE | Remove a anotação |
 | `/api/export` | GET | `?format=csv\|json&from=&to=` → download do relatório |
-| `/api/stream` | GET | SSE: `hello`, `sample` (`id` = instante), `alerts`, `annotations`, `status`. `Last-Event-ID` recupera até 2000 amostras |
+| `/api/stream` | GET | SSE: `hello`, `sample` (`id` = instante), `alerts`, `annotations`, `status`, `atualizacao`. `Last-Event-ID` recupera até 2000 amostras |
 | `/api/poll` | POST | Coleta agora (piso de 5 s entre coletas manuais) |
 
 Durante a instalação, o assistente (`server/setup/web.js`) roda num servidor temporário,
@@ -620,6 +630,7 @@ linux-server-dashboard-v2/
 │   ├── collector/          builder (script), parser (amostra v2), rates (taxas), index (1 SSH)
 │   ├── storage/            ndjson (72 h), rollup (5 min/90 d), buckets, migrate-v1, outages,
 │   │                       coverage (tempo medido), index
+│   ├── atualizacao/        index (agenda e estado), procurar (processo à parte), novidades
 │   └── alerts/             rules, health, engine
 ├── public/
 │   ├── index.html          casca das 8 telas, login e avisos
@@ -627,7 +638,8 @@ linux-server-dashboard-v2/
 │   ├── css/                tokens.css (escuro/claro), base, components, views, print
 │   ├── fonts/              Geist + Geist Mono 1.7.2 (OFL, SHA-256 em vendor/vendor.json)
 │   ├── vendor/             uPlot 1.6.32 (SHA-256 em vendor.json)
-│   └── js/                 main.js, locale-guard.js, core/, charts/, views/ (as 8 telas)
+│   └── js/                 main.js, locale-guard.js, core/, charts/, views/ (as 8 telas e a
+│                           manutenção: engrenagem, aviso de versão e novidades)
 ├── test/                   unit/, integration/, seguranca/, e2e/ e fixtures/ (node --test)
 └── test-support/           request.js (HTTP/SSE), sshd.js (sshd real), instalacao-fake.js,
                             rotas.js (rotas lidas do código), fonte.js (código sem comentários),

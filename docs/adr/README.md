@@ -34,3 +34,4 @@ Uma ADR aceita não é editada; se a decisão mudar, uma nova ADR a substitui.
 | [0027](0027-esqueleto-no-formato-final-so-em-espera-longa.md) | Esqueleto no formato final, só em espera longa | Aceita |
 | [0028](0028-comando-no-path-por-link-simbolico.md) | Comando no PATH por link simbólico | Aceita |
 | [0029](0029-autocomplete-estatico-do-bash.md) | Autocomplete estático do bash | Aceita |
+| [0030](0030-atualizacao-pelo-painel.md) | Atualização pelo painel: procura diária em processo à parte | Aceita |

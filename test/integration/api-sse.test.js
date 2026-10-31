@@ -36,9 +36,9 @@ const events = (data) => data.split('\n\n').filter((b) => b.includes('event: '))
 
 test('SSE: cada amostra ao vivo sai com id = instante dela', async (t) => {
   const s = await start(t);
-  // Teto folgado: a leitura termina assim que os 4 eventos chegam, e um teto curto (3 s)
+  // Teto folgado: a leitura termina assim que os 5 eventos chegam, e um teto curto (3 s)
   // podia vencer antes deles com a máquina carregada (#25).
-  const live = readSSE(s.port, { until: 4, timeoutMs: 15000 });
+  const live = readSSE(s.port, { until: 5, timeoutMs: 15000 });
   // Só coleta depois que a conexão SSE está registrada no hub. Uma espera fixa (50 ms)
   // perdia a amostra com a máquina carregada (ex.: suíte com cobertura).
   await esperarAte(() => s.sse.size >= 1);

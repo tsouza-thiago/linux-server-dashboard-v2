@@ -186,8 +186,8 @@ test('CWE-532: o log nunca recebe o ambiente nem o DASH_TOKEN', () => {
   assert.deepEqual(proibido(CODIGO, /(?:console\.\w+|\blog|out\.\w+)\([^;\n]*(?:\bprocess\.env\b(?!\.[A-Z_]+)|(?<!['"])\bDASH_TOKEN\b(?!['"]))/g), []);
 });
 
-test('CWE-922: o navegador guarda só o tema (nada de token ou dado no localStorage)', () => {
-  for (const a of procurar(FRONTEND, /(?:local|session)Storage\.setItem\([^;]*/g)) assert.match(a, /setItem\(THEME_KEY,/, a);
+test('CWE-922: o navegador guarda só o tema e a versão do aviso fechado (nada de token ou dado)', () => {
+  for (const a of procurar(FRONTEND, /(?:local|session)Storage\.setItem\([^;]*/g)) assert.match(a, /setItem\((?:THEME_KEY|DISPENSADA_KEY),/, a);
 });
 
 test('CWE-732: arquivos gravados pelo painel nascem 0600 e pastas 0700', () => {

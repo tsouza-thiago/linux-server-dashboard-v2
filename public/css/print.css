@@ -5,7 +5,7 @@
   --glow: 0; --shadow-hero: none; --shadow-s3: none; --halo-s1: none; --halo-s3: none;
 }
 body { background: #FFFFFF; color: #0B0F17; }
-.side, .scrim, .mobile-bar, .strip, .page-actions, .toasts, .skip-link, .no-print, .login { display: none !important; }
+.side, .scrim, .mobile-bar, .strip, .aviso-versao, .page-actions, .toasts, .skip-link, .no-print, .login { display: none !important; }
 .app { display: block; }
 .page { padding: 0; }
 .panel, .card { break-inside: avoid; box-shadow: none; }

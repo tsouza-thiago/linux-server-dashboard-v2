@@ -9,6 +9,7 @@ import path from 'node:path';
 import { createApp } from '../../server/index.js';
 import { listen, close } from '../../test-support/request.js';
 import { APERTADO, pressiona, semHover, sobe } from '../../test-support/hover.js';
+import { procurarFalso } from '../../scripts/painel-teste.mjs';
 
 let chromium = null;
 try { ({ chromium } = await import('playwright-core')); } catch { /* sem playwright-core */ }
@@ -105,6 +106,38 @@ test('e2e: visão geral mostra a manchete e os dados da última coleta', { skip:
 
 // Orçamento de desempenho (AGENTS): a página inicial transfere até 450 KB (HTML, CSS, JS, fontes,
 // uPlot e os dados das primeiras chamadas da API; o SSE fica de fora, ele não termina).
+test('e2e: versão nova — aviso, novidades com texto escapado, menu e fechar o aviso', { skip: !chromium && 'sem playwright-core' }, async (t) => {
+  const ctx = await setup(t, { procurarVersao: procurarFalso });
+  if (ctx.skip) return t.skip(ctx.skip);
+  const { app, page, base, problems } = ctx;
+  await page.goto(base);
+  await page.waitForSelector('#manutBtn svg');
+  assert.ok(await page.isHidden('#avisoVersao'), 'sem versão nova, sem aviso');
+  // A procura termina com a tela aberta: o aviso chega pelo SSE, sem recarregar.
+  await page.waitForFunction(() => document.getElementById('strip').textContent.length > 0);
+  await app.atualizacao.verificar();
+  await page.waitForSelector('#avisoVersao:not([hidden])');
+  assert.match(await page.textContent('#avisoVersao'), /v9\.9\.9/);
+  await page.click('#avisoVersao [data-manut="novidades"]');
+  await page.waitForSelector('#novidadesDialog[open]');
+  const novidades = await page.textContent('#novidadesDialog .novidades');
+  assert.match(novidades, /<b>HTML<\/b> no texto/, 'o HTML do CHANGELOG aparece como texto');
+  assert.equal(await page.locator('#novidadesDialog .novidades b').count(), 0);
+  assert.match(await page.textContent('#novidadesDialog'), /\.\/dashboard atualizar/);
+  await page.click('#novidadesDialog button[type="submit"]');
+  await page.click('#avisoVersao [data-manut="dispensar"]');
+  assert.ok(await page.isHidden('#avisoVersao'));
+  await page.reload();
+  await page.waitForSelector('#manutBtn.tem-novidade');
+  assert.ok(await page.isHidden('#avisoVersao'), 'a versão dispensada não volta ao recarregar');
+  await page.click('#manutBtn');
+  await page.waitForSelector('#manutMenu:not([hidden])');
+  assert.match(await page.textContent('#manutMenu'), /v9\.9\.9/, 'o menu continua mostrando a versão');
+  await page.keyboard.press('Escape');
+  assert.ok(await page.isHidden('#manutMenu'));
+  assert.deepEqual(problems, []);
+});
+
 test('e2e: a página inicial transfere até 450 KB (orçamento de desempenho)', { skip: !chromium && 'sem playwright-core' }, async (t) => {
   const s = await setup(t);
   if (s.skip) return t.skip(s.skip);

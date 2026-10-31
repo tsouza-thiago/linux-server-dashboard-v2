@@ -6,6 +6,7 @@
 //
 //   npm run painel-teste                              # cenário normal, porta 3943
 //   npm run painel-teste -- --cenario=lacunas --porta=3944
+//   npm run painel-teste -- --versao-nova             # com aviso de versão nova (falsa)
 //
 // Cenários:
 //   normal   10 dias de agregados + 72 h de amostras a cada minuto, sem queda; coleta ao vivo
@@ -132,6 +133,23 @@ export function criarPainel(dir, cenario, coletar, extra = {}) {
   });
 }
 
+/** Versão nova falsa para ver o aviso, o menu e as novidades: nada sai desta máquina. */
+export async function procurarFalso() {
+  return {
+    nova: 'v9.9.9',
+    novidades: {
+      cortado: false,
+      secoes: [{
+        versao: '9.9.9',
+        data: '2026-11-02',
+        texto: 'Versão de exemplo do painel de teste.\n\n### Adicionado\n\n- Item com `codigo` e **negrito** (#1).\n- Item longo que continua\n  na linha de baixo.\n\n### Corrigido\n\n- <b>HTML</b> no texto aparece como texto.',
+      }],
+    },
+    bloqueio: null,
+    erro: null,
+  };
+}
+
 /** O assistente com a instalação falsa: nada sai desta máquina (ver o cabeçalho). */
 export function criarAssistente() {
   const fake = makeInstalacao({ detection: detectionWithSudo('pede-senha') });
@@ -167,7 +185,9 @@ async function main() {
   }
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'dash-painel-teste-'));
   const { coletar } = await semear(dir, cenario);
-  const { app, runPoll, shutdown } = criarPainel(dir, cenario, coletar);
+  const versaoNova = process.argv.includes('--versao-nova');
+  const { app, runPoll, atualizacao, shutdown } = criarPainel(dir, cenario, coletar, versaoNova ? { procurarVersao: procurarFalso } : {});
+  if (versaoNova) await atualizacao.verificar();
   if (cenario === 'offline') { await runPoll(); await runPoll(); }
   // vazio fica sem coleta: é o estado do 1º uso, antes da 1ª amostra chegar.
   const timer = cenario === 'vazio' ? null : setInterval(runPoll, 60000);

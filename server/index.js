@@ -22,6 +22,7 @@ import { config, configWarnings, ROOT, isPlaceholderHost } from './config.js';
 import { hostCheck, csrfCheck, securityHeaders, makeRequireAuth, issueCsrfCookie, makeRateLimit, parseCookies } from './security.js';
 import { toCSV } from './csv.js';
 import { createLogFile } from './logfile.js';
+import { Atualizacao, procurarEmProcesso } from './atualizacao/index.js';
 
 /**
  * Monta o painel: stores, motor de alertas, sessões, SSE e o roteador com todas as rotas.
@@ -89,6 +90,17 @@ export function createApp(deps = {}) {
   function broadcast(event, data, id) {
     sse.send(event, data, id);
   }
+
+  // Versão nova (ADR 0030). Quem procura de verdade é o startServer: sem `procurarVersao`, os
+  // testes e o painel de teste nunca fazem git fetch.
+  const atualizacao = deps.atualizacao || new Atualizacao({
+    file: deps.atualizacaoFile ?? path.join(path.dirname(alertsStore.file), 'atualizacao.json'),
+    instalada: `v${VERSION.app}`,
+    loginExigido: Boolean(DASH_TOKEN),
+    procurar: deps.procurarVersao ?? (async () => ({})),
+    onChange: (estado) => broadcast('atualizacao', estado),
+    log,
+  });
 
   /** Alertas abertos + os 50 mais recentes, para as telas. */
   function broadcastAlerts() {
@@ -291,6 +303,18 @@ export function createApp(deps = {}) {
     });
   });
 
+  // Versão nova (ADR 0030): só o estado; nada aqui troca de versão.
+  app.get('/api/atualizacao', (req, res) => {
+    res.json(atualizacao.estado());
+  });
+
+  // "Procurar agora" espera a procura terminar: no máximo 1 por minuto (ela sai para a internet).
+  app.post('/api/atualizacao/verificar', async (req, res) => {
+    const procura = atualizacao.verificarAgora();
+    if (!procura) return res.status(429).json({ error: 'aguarde 1 minuto entre as procuras' });
+    res.json(await procura);
+  });
+
   // Quedas e disponibilidade (ADR 0006 e 0018): ?days=1..90 (padrão 30).
   app.get('/api/outages', (req, res) => {
     const days = Math.min(Math.max(parseInt(req.query.days, 10) || 30, 1), 90);
@@ -387,6 +411,7 @@ export function createApp(deps = {}) {
     const payload = statusPayload();
     initial.push(['hello', payload, sampleId(payload.sample)]);
     initial.push(['annotations', { annotations: annotationsStore.data.slice(-500).reverse() }]);
+    initial.push(['atualizacao', atualizacao.estado()]);
     sse.open(req, res, initial);
   });
 
@@ -417,10 +442,10 @@ export function createApp(deps = {}) {
   /** Grava tudo o que está pendente (histórico, alertas, anotações) antes de sair (B11). */
   async function shutdown() {
     sse.closeAll();
-    await Promise.all([store.flush?.(), alertsStore.flush?.(), annotationsStore.flush?.(), outages.flush(), sessions.flush()]);
+    await Promise.all([store.flush?.(), alertsStore.flush?.(), annotationsStore.flush?.(), outages.flush(), sessions.flush(), atualizacao.flush()]);
   }
 
-  return { app, state, store, alertsStore, annotationsStore, outages, engine, sessions, broadcast, runPoll, parseRange, statusPayload, sse, shutdown };
+  return { app, state, store, alertsStore, annotationsStore, outages, engine, sessions, atualizacao, broadcast, runPoll, parseRange, statusPayload, sse, shutdown };
 }
 
 /** O painel em produção: log em arquivo, escuta em 127.0.0.1, coleta a cada intervalo. */
@@ -439,7 +464,7 @@ function startServer() {
   };
   for (const w of configWarnings) log(`AVISO de configuração: ${w}`);
 
-  const { app, runPoll, shutdown: flushAll } = createApp({ log });
+  const { app, runPoll, atualizacao, shutdown: flushAll } = createApp({ log, procurarVersao: procurarEmProcesso });
 
   // 1ª coleta assim que o servidor sobe; depois, uma por intervalo.
   let pollTimer = null;
@@ -447,12 +472,14 @@ function startServer() {
     log(`dashboard em http://127.0.0.1:${PORT} — host: ${SSH_HOST}, intervalo: ${POLL_INTERVAL}ms`);
     runPoll();
     pollTimer = setInterval(runPoll, POLL_INTERVAL);
+    atualizacao.iniciar();
   });
 
   /** SIGINT/SIGTERM: para a coleta, grava o pendente (B11) e sai; no máximo 5 s. */
   async function shutdown() {
     log('encerrando...');
     if (pollTimer) clearInterval(pollTimer);
+    atualizacao.parar();
     setTimeout(() => process.exit(0), 5000).unref();
     server.close();
     try { await flushAll(); } catch (err) { log(`falha ao gravar no encerramento: ${err.message}`); }

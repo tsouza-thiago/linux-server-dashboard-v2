@@ -52,5 +52,7 @@ export const api = {
   removeAnnotation: (id) => request(`/api/annotations/${encodeURIComponent(id)}`, { method: 'DELETE' }),
   outages: (days = 90) => request(`/api/outages${qs({ days })}`),
   poll: () => request('/api/poll', { method: 'POST', body: {} }),
+  atualizacao: () => request('/api/atualizacao'),
+  verificarAtualizacao: () => request('/api/atualizacao/verificar', { method: 'POST', body: {} }),
   exportUrl: ({ format, from, to }) => `/api/export${qs({ format, from, to })}`,
 };

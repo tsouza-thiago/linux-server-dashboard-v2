@@ -25,6 +25,7 @@ import * as processos from './views/processos.js';
 import * as eventos from './views/eventos.js';
 import * as relatorios from './views/relatorios.js';
 import * as ajuda from './views/ajuda.js';
+import { iniciarManutencao } from './views/manutencao.js';
 
 // As 8 telas pelo id; as que usam os baldes do período; a chave do tema no navegador.
 const MODULES = {
@@ -39,7 +40,7 @@ const $ = (id) => document.getElementById(id);
 const route = parseHash(location.hash);
 const store = createStore({
   view: route.view, period: route.period, session: null, meta: null, sample: null, health: null,
-  alerts: { active: [], all: [] }, annotations: [], outages: null, config: null, buckets: [], live: 'conectando',
+  alerts: { active: [], all: [] }, annotations: [], outages: null, config: null, atualizacao: null, buckets: [], live: 'conectando',
   loading: true,
 });
 
@@ -446,6 +447,8 @@ function onEvent(name, data) {
     store.set({ alerts: { active: data.alerts || [], all: mergeAlerts(data.all, store.get().alerts.all) } });
   } else if (name === 'annotations') {
     store.set({ annotations: data.annotations || [] });
+  } else if (name === 'atualizacao') {
+    store.set({ atualizacao: data });
   }
 }
 
@@ -513,6 +516,7 @@ async function start() {
   store.set({ session });
   if (session && session.authRequired && !session.authenticated) { showLogin(); return; }
 
+  iniciarManutencao({ store, toast });
   window.addEventListener('hashchange', navigate);
   await navigate(); // esqueleto no formato final enquanto os dados chegam
   try {
