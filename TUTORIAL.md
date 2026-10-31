@@ -193,6 +193,10 @@ coleta) e explica cada problema com "O que aconteceu" e "Como resolver".
 ./dashboard desinstalar    # remove daqui e oferece limpar a parte deste computador no servidor
 ```
 
+**Rode na pasta da instalação.** O `atualizar` só vale na pasta onde o painel foi instalado.
+Numa cópia sem `.env`, ou com o serviço em outra pasta, ele para sem alterar nada e mostra a pasta
+certa. Para o serviço mudar de pasta de propósito, rode `./dashboard reconfigurar` na pasta nova.
+
 **Mais de um computador com o painel?** Pode. Cada computador tem a sua chave e a sua
 linha no servidor, e uma instalação não apaga a outra. Cada painel faz a sua coleta: com 2
 computadores, o servidor recebe 2 conexões por minuto. O `desinstalar` tira só a parte do
