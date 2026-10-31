@@ -10,6 +10,8 @@ import { listDays, readNdjson } from '../storage/ndjson.js';
 import { collect, runSSH } from '../collector/index.js';
 import { normalizeTargets } from '../collector/builder.js';
 import { panelStatus } from './servico.js';
+import { comandoDashboard, primeiroNoPath } from './saida.js';
+import { LINHA_PATH, situacaoDoComando } from '../setup/local.js';
 
 // "há 40 s", "há 12 min", "há 3 h"; e número com vírgula decimal.
 const ago = (ms) => (ms < 90e3 ? `${Math.round(ms / 1000)} s` : ms < 90 * 60e3 ? `${Math.round(ms / 60e3)} min` : `${Math.round(ms / 3600e3)} h`);
@@ -87,6 +89,32 @@ export function explainFailure(error) {
 }
 
 /**
+ * Confere o link e o PATH. Sem link é escolha da pessoa (--sem-link): não conta como aviso.
+ * Link criado que só vale no próximo login também não: a instalação já explicou.
+ */
+function conferirComando({ out, warn, root, home, env }) {
+  const c = situacaoDoComando({ root, home, env });
+  const cmd = comandoDashboard({ root, env });
+  if (c.estado === 'ausente') out.line(out.c.dim(`Comando dashboard no PATH: não criado. Para criar, rode ${cmd} reconfigurar.`));
+  else if (c.estado === 'outro-programa') out.line(out.c.dim('Comando dashboard no PATH: ~/.local/bin/dashboard é outro programa.'));
+  else if (c.estado === 'outra-pasta') {
+    warn('o comando dashboard vale para outra pasta', c.alvo);
+    out.explain('com 2 pastas na máquina, o comando vale para só uma.', 'nesta pasta, use ./dashboard; para trocar, rode ./dashboard reconfigurar.');
+  } else if (c.estado === 'quebrado') {
+    warn('o comando dashboard aponta para uma pasta que não existe mais', c.alvo);
+    out.explain('a pasta do painel mudou de lugar ou foi apagada.', `rode ${cmd} reconfigurar para refazer o link.`);
+  } else if (cmd === 'dashboard') out.ok('comando dashboard no PATH', '~/.local/bin/dashboard');
+  else if (c.noPath) {
+    warn('outro dashboard vem antes no PATH', primeiroNoPath(env) ?? '');
+    out.explain('esse outro programa roda no lugar do painel.', 'nesta pasta, use ./dashboard.');
+  } else if (c.cuidadoPor) out.ok('comando dashboard criado', 'vale no próximo login');
+  else {
+    warn('~/.local/bin não está no PATH', '~/.local/bin/dashboard existe, mas o terminal não acha');
+    out.explain('', `acrescente esta linha no ~/${c.arquivo}: ${LINHA_PATH}`);
+  }
+}
+
+/**
  * `./dashboard diagnosticar`: painel, permissões, acesso, chave, coleta, SMART e o custo da
  * última coleta, com "O que aconteceu / Como resolver" para cada problema. Devolve 0 sem
  * erros (avisos não contam) e 1 com erro.
@@ -102,7 +130,7 @@ export async function diagnosticar({ out, root, home = os.homedir(), deps = {} }
   const env = loadEnvFile(path.join(root, '.env'));
   if (!env.SSH_HOST || isPlaceholderHost(env.SSH_HOST)) {
     fail('ainda não instalado');
-    out.explain('não há servidor configurado nesta pasta.', 'rode ./dashboard instalar.');
+    out.explain('não há servidor configurado nesta pasta.', `rode ${out.cmd} instalar.`);
     out.line(out.c.bold(`Resultado: ${warns} aviso(s), ${errors} erro(s).`));
     return 1;
   }
@@ -111,8 +139,10 @@ export async function diagnosticar({ out, root, home = os.homedir(), deps = {} }
   if (st.running) out.ok('painel rodando', st.mode === 'servico' ? `serviço de usuário${st.enabled ? ', inicia com o computador' : ''}` : `segundo plano, PID ${st.pid}`);
   else {
     warn('painel parado');
-    out.explain('', 'inicie com ./dashboard iniciar (ou abra pelo atalho "Server Dashboard").');
+    out.explain('', `inicie com ${out.cmd} iniciar (ou abra pelo atalho "Server Dashboard").`);
   }
+
+  conferirComando({ out, warn, root, home, env: deps.env ?? process.env });
 
   const keyFile = keyFileFromConfig(root);
   const perms = permissionProblems(root, keyFile);

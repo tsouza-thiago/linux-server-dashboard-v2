@@ -115,6 +115,8 @@ test('passo 5 assistido → 6: prepara, testa a coleta, grava tudo e descarta a 
   assert.throws(() => inst.tokenReserva(), /já foi mostrado/);
   inst.concluir({ iniciarComComputador: true, atalho: true });
   assert.ok(fs.existsSync(path.join(home, '.local', 'share', 'applications', 'server-dashboard.desktop')));
+  assert.equal(fs.readlinkSync(path.join(home, '.local', 'bin', 'dashboard')), path.join(root, 'dashboard'), 'a instalação cria o comando no PATH');
+  assert.equal(inst.comando.estado, 'criado');
   const lig = await inst.ligarPainel({ iniciarComComputador: true });
   assert.equal(lig.ok, true);
   assert.equal(services[0].enable, true);
@@ -178,4 +180,59 @@ test('ligar o painel: sem "iniciar com o computador", o serviço existente fica 
   fs.writeFileSync(path.join(home, '.config', 'systemd', 'user', 'server-dashboard.service'), '');
   await inst.ligarPainel({ iniciarComComputador: false });
   assert.equal(services[0].enable, false);
+});
+
+test('concluir: --sem-link pula o comando, e sem o link nada que já exista é apagado', async (t) => {
+  const { inst, home } = setup(t);
+  await throughStep4(inst);
+  inst.definirEscolhas({ mounts: ['/'], smart: [], netIf: '', services: [] });
+  inst.planoPreparo();
+  await inst.prepararAssistido();
+  const link = path.join(home, '.local', 'bin', 'dashboard');
+  inst.semLink = true;
+  assert.equal(inst.verificarComputador().comando.liga, false);
+  inst.concluir({ link: true });
+  assert.equal(inst.comando, null);
+  assert.equal(fs.existsSync(path.dirname(link)), false, '--sem-link vale nos 3 modos');
+  inst.semLink = false;
+  inst.concluir({ link: true });
+  assert.equal(inst.comando.estado, 'criado');
+  inst.concluir({ link: false });
+  assert.ok(fs.lstatSync(link), 'reconfigurar sem o link não apaga o que já existe');
+});
+
+test('concluir: o sim do arquivo de login chega à edição; sem ele, nada muda', async (t) => {
+  const { inst, home } = setup(t);
+  await throughStep4(inst);
+  inst.definirEscolhas({ mounts: ['/'], smart: [], netIf: '', services: [] });
+  inst.planoPreparo();
+  await inst.prepararAssistido();
+  const profile = path.join(home, '.profile');
+  inst.concluir({ editarProfile: false });
+  assert.equal(fs.existsSync(profile), false);
+  inst.concluir({ editarProfile: true });
+  assert.match(fs.readFileSync(profile, 'utf8'), /server-dashboard/);
+});
+
+test('concluir: troca o link de outra pasta só quando a tela pediu', async (t) => {
+  const { inst, home, root } = setup(t);
+  await throughStep4(inst);
+  inst.definirEscolhas({ mounts: ['/'], smart: [], netIf: '', services: [] });
+  inst.planoPreparo();
+  await inst.prepararAssistido();
+  const outra = fs.mkdtempSync(path.join(os.tmpdir(), 'dash-outra-'));
+  t.after(() => fs.rmSync(outra, { recursive: true, force: true }));
+  fs.mkdirSync(path.join(outra, 'server', 'cli'), { recursive: true });
+  fs.writeFileSync(path.join(outra, 'server', 'cli', 'index.js'), '');
+  fs.writeFileSync(path.join(outra, 'dashboard'), '#!/bin/sh\n');
+  fs.writeFileSync(path.join(root, 'dashboard'), '#!/bin/sh\n');
+  const link = path.join(home, '.local', 'bin', 'dashboard');
+  fs.mkdirSync(path.dirname(link), { recursive: true });
+  fs.symlinkSync(path.join(outra, 'dashboard'), link);
+  inst.concluir({ trocarLink: false });
+  assert.equal(inst.comando.estado, 'outra-pasta');
+  assert.equal(fs.readlinkSync(link), path.join(outra, 'dashboard'));
+  inst.concluir();
+  assert.equal(inst.comando.estado, 'trocado');
+  assert.equal(fs.readlinkSync(link), path.join(root, 'dashboard'));
 });

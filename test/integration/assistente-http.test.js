@@ -118,7 +118,8 @@ test('assistente: os 6 passos pela rede até o link de entrada do painel', async
   const tok = await s.post('token', {});
   assert.ok(tok.json.token.length >= 40);
   assert.equal((await s.post('token', {})).status, 409, 'mostrado uma vez só');
-  const done = await s.post('concluir', { iniciarComComputador: false, atalho: true });
+  const done = await s.post('concluir', { iniciarComComputador: false, atalho: true, link: false });
+  assert.equal(s.inst.comando, null, 'a caixa do comando desligada chega à instalação');
   assert.match(done.json.url, /^\/entrar\?codigo=[\w-]{32}$/);
   await new Promise((r) => setImmediate(r));
   assert.deepEqual(s.finished, [{ iniciarComComputador: false, atalho: true }], 'o CLI só fecha depois da resposta');

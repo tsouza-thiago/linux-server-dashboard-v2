@@ -91,6 +91,41 @@ test('TUI: desmarcar "Iniciar com o computador" vale (o serviço não é habilit
   assert.match(o.text(), /painel rodando em segundo plano/);
 });
 
+test('TUI: passo 6 oferece o comando no PATH e o arquivo de login só muda com o sim', async (t) => {
+  const fake = makeInstalacao();
+  t.after(fake.cleanup);
+  const term = terminal();
+  const o = memOut();
+  const running = runTui({ out: o.out, inst: fake.inst, input: term.input, output: term.output });
+  term.keys(
+    'Enter', 'Enter', '192.0.2.10', 'Enter', 'maria', 'Enter', 'Enter', 's', 'certa', 'Enter',
+    'Enter', 'Enter', 'Enter', 'Enter',
+    'down', 'down', 'down', 'space', 'Enter', // 6: marca a 4ª caixa (pôr no PATH) e conclui
+  );
+  assert.equal(await running, 0, o.text());
+  const telas = term.screens.join('');
+  assert.match(telas, /\[x\] Comando dashboard no terminal \(roda de qualquer pasta, sem o \.\/\)/);
+  assert.match(telas, /\[x\] Pôr ~\/\.local\/bin no PATH/);
+  assert.match(fs.readFileSync(path.join(fake.home, '.profile'), 'utf8'), /server-dashboard/);
+  assert.match(o.text(), /✓ comando dashboard pronto/);
+  assert.match(o.text(), /✓ PATH acrescentado em ~\/\.profile \(arquivo novo\)/);
+});
+
+test('TUI: --sem-link deixa a caixa travada e não cria o comando', async (t) => {
+  const fake = makeInstalacao();
+  t.after(fake.cleanup);
+  fake.inst.semLink = true;
+  const term = terminal();
+  const o = memOut();
+  const running = runTui({ out: o.out, inst: fake.inst, input: term.input, output: term.output });
+  term.keys('Enter', 'Enter', '192.0.2.10', 'Enter', 'maria', 'Enter', 'Enter', 's', 'certa', 'Enter', 'Enter', 'Enter', 'Enter', 'Enter', 'down', 'down', 'space', 'Enter');
+  assert.equal(await running, 0, o.text());
+  assert.match(term.screens.join(''), /\[ \] Comando dashboard no terminal \(pulado pela opção --sem-link\)/);
+  assert.doesNotMatch(term.screens.join(''), /\[x\] Comando dashboard/, 'a caixa travada não muda');
+  assert.equal(fs.existsSync(path.join(fake.home, '.local', 'bin', 'dashboard')), false);
+  assert.doesNotMatch(o.text(), /comando dashboard/);
+});
+
 test('TUI modo chave (#61): apelido conferido, ssh-add quando falta e a senha do sudo à parte', async (t) => {
   const fake = makeInstalacao({ detection: detectionWithSudo('pede-senha') });
   t.after(fake.cleanup);
@@ -178,6 +213,43 @@ test('TUI: formulário com Tab, números e cores num terminal colorido', async (
   assert.deepEqual(state, { a: true, n: 85 });
   assert.match(term.screens.join(''), /\x1b\[36m❯/);
   sc.close();
+});
+
+test('sem interface: --sem-link pula o comando; --editar-profile é a única edição do arquivo de login', async (t) => {
+  const flags = { servidor: '192.0.2.10', usuario: 'maria', identidade: 'SHA256:8oOm2IqGGSLMQ94IC6SBJJ/EIGqCSF6BhAsYUkBWlXw', 'senha-stdin': true };
+  const roda = async (extra) => {
+    const fake = makeInstalacao();
+    t.after(fake.cleanup);
+    const o = memOut();
+    const code = await runHeadless({ out: o.out, inst: fake.inst, stdin: Readable.from(['certa\n']), flags: { ...flags, ...extra } });
+    assert.equal(code, 0, o.text());
+    return { ...fake, texto: o.text(), link: path.join(fake.home, '.local', 'bin', 'dashboard'), profile: path.join(fake.home, '.profile') };
+  };
+  const padrao = await roda({});
+  assert.ok(fs.lstatSync(padrao.link));
+  assert.equal(fs.existsSync(padrao.profile), false, 'sem perguntas, o padrão é não editar');
+  assert.match(padrao.texto, /▲ ~\/\.local\/bin não está no PATH/);
+  const semLink = await roda({ 'sem-link': true, 'editar-profile': true });
+  assert.equal(fs.existsSync(path.dirname(semLink.link)), false);
+  assert.equal(fs.existsSync(semLink.profile), false);
+  const editar = await roda({ 'editar-profile': true });
+  assert.match(fs.readFileSync(editar.profile, 'utf8'), /server-dashboard/);
+  assert.match(HEADLESS_HELP, /--sem-link[\s\S]*--editar-profile/);
+
+  // Sem perguntas, o link de outra pasta fica como está: ninguém disse sim.
+  const fake = makeInstalacao();
+  t.after(fake.cleanup);
+  const outra = path.join(fake.home, 'outra');
+  fs.mkdirSync(path.join(outra, 'server', 'cli'), { recursive: true });
+  fs.writeFileSync(path.join(outra, 'server', 'cli', 'index.js'), '');
+  fs.writeFileSync(path.join(outra, 'dashboard'), '#!/bin/sh\n');
+  const link = path.join(fake.home, '.local', 'bin', 'dashboard');
+  fs.mkdirSync(path.dirname(link), { recursive: true });
+  fs.symlinkSync(path.join(outra, 'dashboard'), link);
+  const o = memOut();
+  await runHeadless({ out: o.out, inst: fake.inst, stdin: Readable.from(['certa\n']), flags });
+  assert.equal(fs.readlinkSync(link), path.join(outra, 'dashboard'));
+  assert.match(o.text(), /▲ o comando dashboard continua na outra pasta/);
 });
 
 test('sem interface: exige identidade conferida, lê a senha do stdin e conclui', async (t) => {

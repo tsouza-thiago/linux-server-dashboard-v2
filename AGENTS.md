@@ -124,6 +124,11 @@ O teste `test/unit/docs.test.js` confere esta documentação contra o código.
   `pede-senha` da detecção) e vai só pelo stdin. O preparo começa por uma conferência só de
   leitura do sshd (`sshd -T -C user=dashmon,…`) que avisa o que barraria o `dashmon`; o
   painel nunca altera o `sshd_config`.
+- **Comando no PATH** (ADR 0028): o link `~/.local/bin/dashboard` nunca sobrescreve outro programa
+  e só troca o de outra pasta com o sim. O arquivo de login só muda com o sim (`--editar-profile` no
+  modo sem perguntas): cópia antes, bloco marcado e fixo, sem nenhum dado da configuração. O
+  `desinstalar` tira só o link desta pasta e só o bloco. As mensagens da CLI usam `out.cmd`
+  (`server/cli/saida.js`); as telas e os logs do painel seguem com `./dashboard`.
 - **Versões assinadas** (ADR 0012): o instalador e o `./dashboard atualizar` só aceitam
   tags assinadas por uma chave de `docs/allowed_signers`.
 - **Code scanning** (CodeQL padrão do GitHub, a cada push): todo alerta é corrigido ou
@@ -259,6 +264,8 @@ navegador. O backend só coleta, persiste e serve. O limite de 1 SSH por minuto 
 ./dashboard instalar            # assistente no navegador (--terminal: TUI; --sem-interface: sem perguntas)
 ./dashboard instalar --importar-v1 <pasta>   # upgrade V1 → V2 (para a V1, traz .env e data/)
 ./dashboard instalar --sem-assinatura        # só para desenvolvimento: pasta sem tag assinada (cópia, ramo)
+./dashboard instalar --sem-link              # não cria o comando dashboard (~/.local/bin/dashboard), nos 3 modos
+./dashboard instalar --sem-interface --editar-profile  # põe ~/.local/bin no PATH pelo arquivo de login, com cópia antes
 ./dashboard abrir               # abre o painel já logado (link de uso único)
 ./dashboard iniciar             # serviço de usuário ou segundo plano
 ./dashboard parar               # para só o processo do painel desta pasta (PID conferido, B12)
@@ -456,8 +463,10 @@ Tudo fica no disco local. Nada é gravado no servidor.
 
 Fora da pasta do projeto: a chave `~/.ssh/dashboard-<servidor>-<id>` (as instalações até a
 2.1.0 continuam com a `dashboard_ed25519` ou a `dashboard_v2_ed25519`), o serviço
-`~/.config/systemd/user/server-dashboard.service` e o atalho
-`~/.local/share/applications/server-dashboard.desktop`.
+`~/.config/systemd/user/server-dashboard.service`, o atalho
+`~/.local/share/applications/server-dashboard.desktop`, o comando `~/.local/bin/dashboard`
+(link para o `dashboard` desta pasta) e, só com o sim, um bloco marcado
+(`# >>> server-dashboard >>>`) no arquivo de login do bash, com a cópia `<arquivo>.dashboard-bak`.
 
 Ao encerrar (SIGINT/SIGTERM), o painel espera gravar histórico, alertas e anotações
 pendentes (B11).

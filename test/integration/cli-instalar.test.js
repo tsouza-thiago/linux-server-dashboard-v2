@@ -106,6 +106,8 @@ test('instalar: assistente abre na porta, aceita o código, conclui, fecha e lig
   assert.equal((await post('concluir', { iniciarComComputador: true, atalho: false })).status, 200);
   assert.equal(await running, 0);
   assert.match(o.text(), /✓ assistente concluído e desligado/);
+  assert.match(o.text(), /✓ comando dashboard pronto/);
+  assert.ok(fs.lstatSync(path.join(fake.home, '.local', 'bin', 'dashboard')));
   assert.match(o.text(), /✓ painel rodando em segundo plano/);
   assert.match(o.text(), /Tudo pronto\. Pode fechar esta janela\./);
   await assert.rejects(() => request(port, { path: '/configurar' }), 'o assistente não existe mais');
@@ -119,6 +121,17 @@ test('instalar: assistente parado por 1 hora fecha sozinho', async (t) => {
   assert.equal(code, 1);
   assert.match(o.text(), /Abra o endereço acima no navegador/);
   assert.match(o.text(), /assistente fechado depois de 1 hora parado/);
+});
+
+test('instalar: --sem-link vale para qualquer modo', async (t) => {
+  const fake = makeInstalacao();
+  t.after(fake.cleanup);
+  const root = copyVendor(t);
+  fs.writeFileSync(path.join(root, '.env'), `PORT=${await freePort()}\n`);
+  const o = memOut();
+  const code = await instalar({ out: o.out, root, home: root, args: ['--sem-assinatura', '--sem-link', '--sem-interface', '--ajuda'], deps: { inst: fake.inst } });
+  assert.equal(code, 0, o.text());
+  assert.equal(fake.inst.semLink, true);
 });
 
 test('instalar: painel já rodando → sugere reconfigurar; porta ocupada → explica', async (t) => {

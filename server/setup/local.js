@@ -1,6 +1,6 @@
 // Arquivos da instalação nesta máquina (zero sudo): tudo dentro da pasta do projeto, em
 // data/ (0700), exceto a chave do painel (~/.ssh/dashboard-<servidor>-<id>, 0600), o
-// serviço systemd de usuário e o atalho no menu de aplicativos.
+// serviço systemd de usuário, o atalho no menu de aplicativos e o comando no PATH.
 import { spawnSync } from 'node:child_process';
 import crypto from 'node:crypto';
 import fs from 'node:fs';
@@ -10,6 +10,7 @@ import { loadEnvFile } from '../config.js';
 import { KEY_COMMENT, NAME_PREFIX, installId, knownHostsName, machineLabel, sshConfigText, validHost, validPort } from './acesso.js';
 import { UNIT_NAME, unitPath, systemctlUser, hasSystemdUser } from '../cli/servico.js';
 import { PANEL_NODE_FLAGS } from '../node-flags.js';
+import { comandoDashboard, primeiroNoPath } from '../cli/saida.js';
 
 // Atalho do menu de aplicativos (~/.local/share/applications/).
 const DESKTOP_FILE = 'server-dashboard.desktop';
@@ -271,4 +272,179 @@ export function removeShortcut({ home = os.homedir() } = {}) {
   if (!fs.existsSync(file)) return false;
   fs.rmSync(file, { force: true });
   return true;
+}
+
+// Comando no PATH (ADR 0028): ~/.local/bin/dashboard → <pasta>/dashboard, sem sudo.
+const NOME_LINK = '~/.local/bin/dashboard';
+const binDir = (home) => path.join(home, '.local', 'bin');
+const linkPath = (home) => path.join(binDir(home), 'dashboard');
+// O bash de login lê só o 1º destes que existir.
+const LOGIN_FILES = ['.bash_profile', '.bash_login', '.profile'];
+const BLOCO_INICIO = '# >>> server-dashboard >>>';
+const BLOCO_FIM = '# <<< server-dashboard <<<';
+// POSIX: vale em qualquer shell que leia o arquivo; só age se a pasta ainda faltar no PATH.
+const BLOCO = [BLOCO_INICIO, 'case ":$PATH:" in *":$HOME/.local/bin:"*) ;; *) PATH="$HOME/.local/bin:$PATH"; export PATH;; esac', BLOCO_FIM].join('\n');
+const BLOCO_RE = /\n?# >>> server-dashboard >>>\n[\s\S]*?# <<< server-dashboard <<<\n?/g;
+/** A linha que a pessoa acrescenta à mão, quando não quis ou não pôde editar. */
+export const LINHA_PATH = 'export PATH="$HOME/.local/bin:$PATH"';
+
+// Caminho real do arquivo, ou null se ele não existir.
+const realpath = (file) => { try { return fs.realpathSync(file); } catch { return null; } };
+
+/**
+ * O que existe em ~/.local/bin/dashboard: `ausente`, `este` (esta pasta), `outra-pasta` (outra
+ * pasta do painel), `quebrado` (link de painel cujo destino sumiu) ou `outro-programa`.
+ */
+export function situacaoDoLink({ root, home = os.homedir() } = {}) {
+  const link = linkPath(home);
+  let destino;
+  try {
+    destino = path.resolve(path.dirname(link), fs.readlinkSync(link));
+  } catch (err) {
+    // EINVAL: arquivo comum; ENOTDIR: ~/.local ou bin é um arquivo. Nada disso é nosso.
+    return { estado: err.code === 'ENOENT' ? 'ausente' : 'outro-programa' };
+  }
+  const real = realpath(link);
+  if (!real) return { estado: path.basename(destino) === 'dashboard' ? 'quebrado' : 'outro-programa', alvo: destino };
+  if (real === realpath(path.join(root, 'dashboard'))) return { estado: 'este', alvo: real };
+  // Reconhece outra instalação pelo que só o painel tem ao lado do script.
+  const painel = path.basename(real) === 'dashboard' && fs.existsSync(path.join(path.dirname(real), 'server', 'cli', 'index.js'));
+  return { estado: painel ? 'outra-pasta' : 'outro-programa', alvo: real };
+}
+
+/**
+ * Cria o link, com as conferências de conflito (ADR 0028). Só troca o link de outra pasta com
+ * `trocar`; nunca sobrescreve outro programa. Devolve o `estado`: `criado`, `trocado`, `pronto`,
+ * `outra-pasta`, `outro-programa` ou `falhou`, e `outroAntes` se outro `dashboard` vier antes.
+ */
+export function criarLinkNoPath({ root, home = os.homedir(), env = process.env, trocar = false } = {}) {
+  const atual = situacaoDoLink({ root, home });
+  if (atual.estado === 'outro-programa') return { estado: atual.estado };
+  if (atual.estado === 'outra-pasta' && !trocar) return atual;
+  let estado = 'pronto';
+  if (atual.estado !== 'este') {
+    const link = linkPath(home);
+    const tmp = `${link}.tmp-${process.pid}`;
+    try {
+      fs.mkdirSync(binDir(home), { recursive: true });
+      // Link temporário + rename: a troca é atômica, e o comando nunca fica faltando.
+      fs.symlinkSync(path.resolve(root, 'dashboard'), tmp);
+      fs.renameSync(tmp, link);
+    } catch {
+      fs.rmSync(tmp, { force: true });
+      return { estado: 'falhou' };
+    }
+    estado = atual.estado === 'ausente' ? 'criado' : 'trocado';
+  }
+  const primeiro = primeiroNoPath(env);
+  const outroAntes = primeiro && comandoDashboard({ root, env }) !== 'dashboard' ? primeiro : null;
+  return { estado, outroAntes };
+}
+
+/** Apaga o link só se ele aponta para esta pasta. Devolve { removido, estado } (como estava). */
+export function removerLinkDoPath({ root, home = os.homedir() } = {}) {
+  const { estado, alvo } = situacaoDoLink({ root, home });
+  if (estado !== 'este') return { removido: false, estado, alvo };
+  fs.rmSync(linkPath(home), { force: true });
+  return { removido: true, estado };
+}
+
+// O texto do arquivo cita ~/.local/bin fora de comentário?
+function citaBin(file, home) {
+  let texto;
+  try { texto = fs.readFileSync(file, 'utf8'); } catch { return false; }
+  const util = texto.split('\n').filter((l) => !l.trimStart().startsWith('#')).join('\n');
+  return /(\$HOME|\$\{HOME\}|~)\/\.local\/bin/.test(util) || util.includes(binDir(home));
+}
+
+/**
+ * Situação do PATH: `noPath` (a pasta já está no PATH deste processo), `arquivo` (o arquivo de
+ * login do bash) e `cuidadoPor` (o arquivo que já põe a pasta no PATH no próximo login).
+ */
+export function situacaoDoPath({ home = os.homedir(), env = process.env } = {}) {
+  const noPath = String(env.PATH || '').split(':').some((d) => d && path.resolve(d) === binDir(home));
+  const arquivo = LOGIN_FILES.find((f) => fs.existsSync(path.join(home, f))) ?? '.profile';
+  // O .bashrc conta porque o Fedora cita a pasta lá, e o login dele lê esse arquivo.
+  const cuidadoPor = [arquivo, '.bashrc'].find((f) => citaBin(path.join(home, f), home)) ?? null;
+  return { noPath, arquivo, cuidadoPor };
+}
+
+// Texto do arquivo, ou null se ele não existir.
+function lerSeExistir(file) {
+  try {
+    return fs.readFileSync(file, 'utf8');
+  } catch (err) {
+    if (err.code === 'ENOENT') return null;
+    throw err;
+  }
+}
+
+/**
+ * Acrescenta o bloco marcado no arquivo de login, com cópia antes. Devolve o `estado`:
+ * `editado`, `ja-cuidado` (nada a fazer; rodar de novo não duplica) ou `sem-permissao`.
+ */
+export function editarArquivoDeLogin({ home = os.homedir(), env = process.env } = {}) {
+  const { arquivo, cuidadoPor } = situacaoDoPath({ home, env });
+  if (cuidadoPor) return { estado: 'ja-cuidado', arquivo: cuidadoPor };
+  const file = path.join(home, arquivo);
+  try {
+    // Lê direto, sem conferir antes: o arquivo pode mudar entre a conferência e a leitura.
+    const texto = lerSeExistir(file);
+    const existe = texto !== null;
+    if (existe) fs.copyFileSync(file, `${file}.dashboard-bak`);
+    const antes = !texto ? '' : texto.endsWith('\n') ? '\n' : '\n\n';
+    // Acréscimo direto (sem rename): segue o link de quem versiona os dotfiles e mantém o modo.
+    fs.appendFileSync(file, `${antes}${BLOCO}\n`, { mode: 0o644 });
+    return { estado: 'editado', arquivo, copia: existe ? `${arquivo}.dashboard-bak` : null };
+  } catch {
+    return { estado: 'sem-permissao', arquivo };
+  }
+}
+
+/** Tira só o bloco marcado. Devolve { removidos, falhas }, com os nomes dos arquivos. */
+export function removerBlocoDoLogin({ home = os.homedir() } = {}) {
+  const r = { removidos: [], falhas: [] };
+  for (const arquivo of LOGIN_FILES) {
+    const file = path.join(home, arquivo);
+    try {
+      const texto = fs.readFileSync(file, 'utf8');
+      const limpo = texto.replace(BLOCO_RE, '');
+      if (limpo === texto) continue;
+      fs.writeFileSync(file, limpo);
+      r.removidos.push(arquivo);
+    } catch (err) {
+      if (err.code !== 'ENOENT') r.falhas.push(arquivo);
+    }
+  }
+  return r;
+}
+
+/** Situação do comando e o que as telas oferecem: padrão, trava e texto do link e do PATH. */
+export function situacaoDoComando({ root, home = os.homedir(), env = process.env, semLink = false } = {}) {
+  const { estado, alvo } = situacaoDoLink({ root, home });
+  const caminho = situacaoDoPath({ home, env });
+  const detalhes = {
+    ausente: 'roda de qualquer pasta, sem o ./',
+    este: 'já criado para esta pasta',
+    quebrado: 'troca um link antigo, de uma pasta que não existe mais',
+    'outra-pasta': `hoje vale para ${alvo}; ligado, passa a valer para esta pasta`,
+    'outro-programa': `${NOME_LINK} já é outro programa e fica como está`,
+  };
+  const trava = semLink || estado === 'este' || estado === 'outro-programa';
+  return {
+    estado, alvo, semLink, ...caminho,
+    liga: !semLink && estado !== 'outra-pasta' && estado !== 'outro-programa',
+    trava,
+    detalhe: semLink ? 'pulado pela opção --sem-link' : detalhes[estado],
+    pedeEdicao: !caminho.noPath && !caminho.cuidadoPor && !semLink && estado !== 'outro-programa',
+  };
+}
+
+/** Passo da instalação: cria o link e, com o sim, edita o arquivo de login. Nunca lança. */
+export function prepararComando({ root, home = os.homedir(), env = process.env, trocar = false, editar = false } = {}) {
+  const link = criarLinkNoPath({ root, home, env, trocar });
+  const r = { nome: NOME_LINK, caminho: linkPath(home), linha: LINHA_PATH, ...link, ...situacaoDoPath({ home, env }) };
+  if (['outra-pasta', 'outro-programa', 'falhou'].includes(link.estado)) return r;
+  if (editar && !r.noPath && !r.cuidadoPor) r.edicao = editarArquivoDeLogin({ home, env });
+  return r;
 }

@@ -93,6 +93,10 @@ O `./dashboard instalar` confere a versão assinada, o Node e a porta, e abre o
 Sem tela? `./dashboard instalar --terminal` faz os mesmos passos no terminal. Para
 automatizar: `./dashboard instalar --sem-interface --ajuda`.
 
+A instalação também cria o comando `dashboard`, que roda de qualquer pasta e sem o `./`. Ele é um
+link em `~/.local/bin` e não pede sudo. Para pular, use `--sem-link`. Já tinha o painel instalado?
+Rode `./dashboard reconfigurar`: o assistente oferece criar o comando.
+
 ---
 
 ## Comandos
@@ -107,7 +111,7 @@ Na pasta do projeto:
 | `./dashboard diagnosticar` | Testa tudo e explica cada problema |
 | `./dashboard reconfigurar` | Reabre o assistente (outro servidor, disco novo, outro serviço) |
 | `./dashboard atualizar` | Instala a versão assinada mais nova, com backup; volta atrás se falhar |
-| `./dashboard desinstalar` | Remove o painel deste computador e oferece limpar a parte dele no servidor |
+| `./dashboard desinstalar` | Remove o painel e o comando deste computador e oferece limpar a parte dele no servidor |
 | `./dashboard versao` | Mostra a versão |
 
 Depois de instalado, o painel inicia com o computador (serviço systemd **de usuário**) e
