@@ -9,6 +9,13 @@ diante: `PATCH` corrige, `MINOR` acrescenta sem quebrar e `MAJOR` quebra.
 
 ## [Não publicado]
 
+### Corrigido
+
+- `./dashboard atualizar` não assume mais o serviço de outra pasta (#118). Numa pasta sem `.env`
+  ele para antes de mexer em tag, backup ou serviço e diz qual pasta é a instalação. Com o serviço
+  em outra pasta, ele para, mostra as 2 pastas e não reescreve o serviço. Para mudar de pasta de
+  propósito, use `./dashboard instalar` ou `./dashboard reconfigurar`.
+
 ## [2.4.0] — 2026-10-31
 
 Versão estável com o comando `dashboard` no PATH: ele roda de qualquer pasta, sem `./`, e completa

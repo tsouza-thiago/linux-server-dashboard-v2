@@ -282,7 +282,7 @@ navegador. O backend só coleta, persiste e serve. O limite de 1 SSH por minuto 
 ./dashboard status              # rodando ou parado
 ./dashboard diagnosticar        # explica cada problema; reaproveita a última amostra e só coleta se ela estiver velha
 ./dashboard reconfigurar        # reabre o assistente
-./dashboard atualizar           # tag assinada mais nova, backup de data/, volta atrás se falhar
+./dashboard atualizar           # tag assinada mais nova, backup de data/, volta atrás se falhar; só na pasta da instalação (com .env e dona do serviço)
 ./dashboard desinstalar         # remove daqui e oferece limpar a parte deste computador no servidor
 ./dashboard versao              # versão instalada
 npm start                       # o painel em primeiro plano (node --max-semi-space-size=2 --optimize-for-size server/index.js)

@@ -7,8 +7,8 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { SIGNERS, compareVersions, signedReleaseTags } from '../setup/assinatura.js';
-import { installService } from '../setup/local.js';
-import { panelPort, panelStatus, startPanel, stopPanel, unitPath, waitForPort, systemctlUser, UNIT_NAME } from './servico.js';
+import { installService, situacaoDoLink } from '../setup/local.js';
+import { otherServiceRoot, panelPort, panelStatus, startPanel, stopPanel, unitPath, waitForPort, systemctlUser, UNIT_NAME } from './servico.js';
 import { parseFlags } from './instalar.js';
 
 // Cópias de data/ guardadas em .backups/ (as mais antigas saem).
@@ -58,11 +58,48 @@ async function panelHealthy(port, { timeoutMs = 30000 } = {}) {
   }
 }
 
+// Pasta da instalação desta máquina, se for outra: a do serviço ou a do comando `dashboard`.
+function installedElsewhere(root, home) {
+  const service = otherServiceRoot(root, home);
+  if (service) return service;
+  const link = situacaoDoLink({ root, home });
+  return link.estado === 'outra-pasta' ? path.dirname(link.alvo) : null;
+}
+
+/**
+ * Esta pasta pode ser atualizada? Sem .env ela não é uma instalação, e o serviço de outra pasta
+ * não pode mudar para cá (#118): a pasta passaria a servir o painel sem login e sem o servidor.
+ * Devolve false depois de explicar; mudar de pasta de propósito é com o instalar/reconfigurar.
+ */
+function checkFolder({ out, root, home }) {
+  const installed = installedElsewhere(root, home);
+  if (!fs.existsSync(path.join(root, '.env'))) {
+    out.fail('esta pasta não é uma instalação do painel', 'não tem .env');
+    out.explain(`o atualizar só vale na pasta da instalação. Nada foi alterado em ${root}.`, installed
+      ? `a instalação está em ${installed}. Rode lá: cd "${installed}" && ./dashboard atualizar`
+      : `rode na pasta onde o painel foi instalado ou instale nesta com ${out.cmd} instalar.`);
+    return false;
+  }
+  const service = otherServiceRoot(root, home);
+  if (service) {
+    out.fail('o serviço do painel roda de outra pasta');
+    out.line(`  Serviço:     ${service}`);
+    out.line(`  Esta pasta:  ${root}`);
+    out.explain('atualizar daqui levaria o serviço para esta pasta. Nada foi alterado.',
+      `rode na pasta do serviço: cd "${service}" && ./dashboard atualizar. Para mudar o serviço para cá de propósito, rode ${out.cmd} reconfigurar nesta pasta.`);
+    return false;
+  }
+  return true;
+}
+
 /** Fase 2, rodada pela versão NOVA: refaz o serviço (Node pode ter mudado) e liga o painel. */
 export async function afterUpdate({ out, root, home = os.homedir(), deps = {} }) {
   const port = panelPort(root);
   const unit = unitPath(home);
   if (fs.existsSync(unit)) {
+    // A fase 1 já confere; aqui protege a fase 1 de uma versão anterior, que não conferia.
+    const other = otherServiceRoot(root, home);
+    if (other) { out.fail('o serviço do painel roda de outra pasta', other); return 1; }
     const enabled = (systemctlUser(['is-enabled', UNIT_NAME])?.stdout || '').trim() === 'enabled';
     const r = await (deps.installService ?? installService)({ root, home, enable: enabled });
     if (!r.ok) { out.fail('o serviço não subiu na versão nova', r.error); return 1; }
@@ -83,6 +120,7 @@ export async function atualizar({ out, root, args = [], home = os.homedir(), dep
   const flags = parseFlags(args);
   if (flags['pos-atualizacao']) return afterUpdate({ out, root, home, deps });
   out.title('Server Dashboard · atualizar');
+  if (!checkFolder({ out, root, home })) return 1;
   const run = deps.run ?? spawnSync;
   if (git(root, ['rev-parse', '--is-inside-work-tree'], run).status !== 0) {
     out.fail('esta pasta não veio de um git clone');

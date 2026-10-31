@@ -17,6 +17,26 @@ export const UNIT_NAME = 'server-dashboard.service';
 
 /** Onde fica o arquivo da unidade (~/.config/systemd/user/). */
 export const unitPath = (home = os.homedir()) => path.join(home, '.config', 'systemd', 'user', UNIT_NAME);
+
+/** Pasta do serviço instalado (WorkingDirectory da unidade, sem o escape %%); null sem unidade. */
+export function serviceRoot(home = os.homedir()) {
+  try {
+    const m = fs.readFileSync(unitPath(home), 'utf8').match(/^WorkingDirectory=(.+)$/m);
+    return m ? m[1].replace(/%%/g, '%') : null;
+  } catch {
+    return null;
+  }
+}
+
+// Caminho real da pasta (link simbólico não conta como outra pasta); sem a pasta, o texto dela.
+const realDir = (dir) => { try { return fs.realpathSync(dir); } catch { return path.resolve(dir); } };
+
+/** Pasta do serviço, se ele rodar de outra pasta que não `root`; null se for esta ou sem serviço. */
+export function otherServiceRoot(root, home = os.homedir()) {
+  const dir = serviceRoot(home);
+  return dir && realDir(dir) !== realDir(root) ? dir : null;
+}
+
 // PID do painel em segundo plano e o script que ele roda (para conferir que é ele mesmo).
 const pidFile = (root) => path.join(root, 'data', 'dashboard.pid');
 const serverScript = (root) => path.join(root, 'server', 'index.js');
