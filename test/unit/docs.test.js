@@ -37,6 +37,21 @@ function prose(md) {
   }).join('\n');
 }
 
+/**
+ * Tira o HTML de um título, como o GitHub faz nos ícones do README (fica o espaço depois
+ * deles, então a âncora começa com hífen). O laço vai até estabilizar: uma passada só deixaria
+ * sobrar uma tag montada com os restos de outra.
+ */
+function semTags(texto) {
+  let antes;
+  let depois = texto;
+  do {
+    antes = depois;
+    depois = antes.replace(/<[^>]*>/g, '');
+  } while (depois !== antes);
+  return depois;
+}
+
 /** Âncoras que o GitHub gera para os títulos (com -1, -2… nos repetidos). */
 function anchors(md) {
   const seen = new Map();
@@ -44,8 +59,7 @@ function anchors(md) {
   for (const line of prose(md).split('\n')) {
     const m = line.match(/^#{1,6}\s+(.*?)\s*#*\s*$/);
     if (!m) continue;
-    // O GitHub tira o HTML do título (os ícones do README), mas fica o espaço depois dele.
-    const text = m[1].replace(/<[^>]*>/g, '').replace(/`/g, '').replace(/\[([^\]]*)\]\([^)]*\)/g, '$1').replace(/[*_]{2}/g, '');
+    const text = semTags(m[1]).replace(/`/g, '').replace(/\[([^\]]*)\]\([^)]*\)/g, '$1').replace(/[*_]{2}/g, '');
     const base = text.toLowerCase().replace(/[^\p{L}\p{N}\s_-]/gu, '').replace(/\s/g, '-');
     const n = seen.get(base) ?? 0;
     seen.set(base, n + 1);
