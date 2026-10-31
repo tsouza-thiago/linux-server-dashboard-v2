@@ -12,7 +12,8 @@ import { diagnosticar, latestSample, permissionProblems, explainFailure, sshSett
 import { atualizar, afterUpdate, backupData, restoreData } from '../../server/cli/atualizar.js';
 import { importarV1, detectV1, v1Settings, v1Pid, stopV1 } from '../../server/cli/importar-v1.js';
 import { desinstalar } from '../../server/cli/desinstalar.js';
-import { LINHA_PATH, editarArquivoDeLogin } from '../../server/setup/local.js';
+import { LINHA_PATH, editarArquivoDeLogin, unitText } from '../../server/setup/local.js';
+import { unitPath } from '../../server/cli/servico.js';
 import { loadEnvFile } from '../../server/config.js';
 import { esperarAte } from '../../test-support/esperar.js';
 
@@ -172,6 +173,7 @@ function releaseRepos(t) {
   g(clone, 'checkout', '-q', '--detach', 'v2.0.0-alpha.8');
   fs.mkdirSync(path.join(clone, 'data'), { mode: 0o700 });
   fs.writeFileSync(path.join(clone, 'data', 'alerts.json'), '[]');
+  fs.writeFileSync(path.join(clone, '.env'), 'SSH_HOST=servidor\n', { mode: 0o600 });
   return { work, clone, release, g };
 }
 
@@ -179,20 +181,21 @@ const gitRun = (cmd, args, opts) => spawnSync(cmd, args, { ...opts, env: GIT_ENV
 
 test('atualizar: só tag assinada pela chave instalada; backup, troca e volta atrás se falhar', { skip: !hasGit }, async (t) => {
   const { clone, release, g } = releaseRepos(t);
+  const home = tmp(t, 'dash-upd-home-');
   const deps = { run: gitRun, gitRun, stopPanel: async () => ({}), startPanel: async () => ({ ok: true }), panelStatus: () => ({ running: true }) };
   const a = memOut();
-  assert.equal(await atualizar({ out: a.out, root: clone, deps: { ...deps, reexec: () => 0 } }), 0);
+  assert.equal(await atualizar({ out: a.out, root: clone, home, deps: { ...deps, reexec: () => 0 } }), 0);
   assert.match(a.text(), /você já está na versão mais nova \(v2\.0\.0-alpha\.8\)/);
 
   release('2.0.0-alpha.9', { key: 'outra' }); // assinada por outra chave: ignorada
   const b = memOut();
-  await atualizar({ out: b.out, root: clone, deps: { ...deps, reexec: () => 0 } });
+  await atualizar({ out: b.out, root: clone, home, deps: { ...deps, reexec: () => 0 } });
   assert.match(b.text(), /já está na versão mais nova/);
 
   release('2.0.0-alpha.10');
   const calls = [];
   const c = memOut();
-  const ok = await atualizar({ out: c.out, root: clone, deps: { ...deps, reexec: (args) => { calls.push(args); return 0; } } });
+  const ok = await atualizar({ out: c.out, root: clone, home, deps: { ...deps, reexec: (args) => { calls.push(args); return 0; } } });
   assert.equal(ok, 0, c.text());
   assert.match(c.text(), /✓ versão nova encontrada: v2\.0\.0-alpha\.10/);
   assert.match(c.text(), /✓ cópia de segurança de data\/ feita \(\.backups\/.*-v2\.0\.0-alpha\.8\)/);
@@ -203,7 +206,7 @@ test('atualizar: só tag assinada pela chave instalada; backup, troca e volta at
   release('2.0.0-alpha.11', { broken: true });
   const d = memOut();
   const bad = await atualizar({
-    out: d.out, root: clone,
+    out: d.out, root: clone, home,
     deps: {
       ...deps,
       reexec: () => {
@@ -222,16 +225,17 @@ test('atualizar: só tag assinada pela chave instalada; backup, troca e volta at
   fs.appendFileSync(path.join(clone, 'package.json'), ' ');
   release('2.0.0-alpha.12');
   const e = memOut();
-  assert.equal(await atualizar({ out: e.out, root: clone, deps: { ...deps, reexec: () => 0 } }), 1);
+  assert.equal(await atualizar({ out: e.out, root: clone, home, deps: { ...deps, reexec: () => 0 } }), 1);
   assert.match(e.text(), /há arquivos do painel alterados/);
 });
 
 test('atualizar: pasta sem git; fase 2 liga o painel e confere a saúde', async (t) => {
   const root = tmp(t, 'dash-upd-nogit-');
-  const a = memOut();
-  assert.equal(await atualizar({ out: a.out, root }), 1);
-  assert.match(a.text(), /não veio de um git clone/);
   const home = tmp(t, 'dash-upd-home-');
+  fs.writeFileSync(path.join(root, '.env'), 'SSH_HOST=servidor\n', { mode: 0o600 });
+  const a = memOut();
+  assert.equal(await atualizar({ out: a.out, root, home }), 1);
+  assert.match(a.text(), /não veio de um git clone/);
   const b = memOut();
   assert.equal(await afterUpdate({ out: b.out, root, home, deps: { startPanel: async () => ({ ok: true }), healthy: async () => true } }), 0);
   assert.match(b.text(), /versão nova no ar/);
@@ -247,6 +251,90 @@ test('atualizar: pasta sem git; fase 2 liga o painel e confere a saúde', async 
   fs.writeFileSync(path.join(root, 'data', 'a'), '2');
   restoreData(root, dirs[3]);
   assert.equal(fs.readFileSync(path.join(root, 'data', 'a'), 'utf8'), '1');
+});
+
+// Serviço instalado em `dir`, com a unidade que a instalação escreve de verdade.
+function serviceAt(home, dir) {
+  const file = unitPath(home);
+  fs.mkdirSync(path.dirname(file), { recursive: true });
+  fs.writeFileSync(file, unitText({ root: dir, nodeBin: '/usr/bin/node' }));
+  return file;
+}
+
+// Dependências que reprovam o teste se o atualizar tocar em git, painel ou serviço.
+const untouched = () => {
+  const stop = (name) => () => assert.fail(`o atualizar chamou ${name}`);
+  return { run: stop('git'), gitRun: stop('git'), panelStatus: stop('panelStatus'), stopPanel: stop('stopPanel'), startPanel: stop('startPanel'), reexec: stop('reexec'), installService: stop('installService') };
+};
+
+test('atualizar: pasta sem .env para antes de tudo e diz qual é a instalação (#118)', async (t) => {
+  const root = tmp(t, 'dash-upd-copia-');
+  const home = tmp(t, 'dash-upd-home-');
+
+  const semNada = memOut();
+  assert.equal(await atualizar({ out: semNada.out, root, home, deps: untouched() }), 1);
+  assert.match(semNada.text(), /✗ esta pasta não é uma instalação do painel \(não tem \.env\)/);
+  assert.match(semNada.text(), /instale nesta com/);
+
+  // Com o comando `dashboard` apontando para a instalação (sem serviço systemd).
+  const viaLink = tmp(t, 'dash-upd-link-');
+  fs.mkdirSync(path.join(viaLink, 'server', 'cli'), { recursive: true });
+  fs.writeFileSync(path.join(viaLink, 'server', 'cli', 'index.js'), '');
+  fs.writeFileSync(path.join(viaLink, 'dashboard'), '');
+  fs.mkdirSync(path.join(home, '.local', 'bin'), { recursive: true });
+  fs.symlinkSync(path.join(viaLink, 'dashboard'), path.join(home, '.local', 'bin', 'dashboard'));
+  const peloLink = memOut();
+  assert.equal(await atualizar({ out: peloLink.out, root, home, deps: untouched() }), 1);
+  assert.ok(peloLink.text().includes(`cd "${fs.realpathSync(viaLink)}" && ./dashboard atualizar`), peloLink.text());
+
+  // O serviço manda mais que o link, e a unidade fica exatamente como estava.
+  const instalada = tmp(t, 'dash-upd-instalada-');
+  const unit = serviceAt(home, instalada);
+  const antes = fs.readFileSync(unit, 'utf8');
+  const peloServico = memOut();
+  assert.equal(await atualizar({ out: peloServico.out, root, home, deps: untouched() }), 1);
+  assert.ok(peloServico.text().includes(`cd "${instalada}" && ./dashboard atualizar`), peloServico.text());
+  assert.equal(fs.readFileSync(unit, 'utf8'), antes);
+  assert.equal(fs.existsSync(path.join(root, '.backups')), false, 'sem backup');
+});
+
+test('atualizar: serviço de outra pasta para, mostra as 2 pastas e não reescreve (#118)', async (t) => {
+  const root = tmp(t, 'dash-upd-aqui-');
+  const home = tmp(t, 'dash-upd-home-');
+  // O % vira %% na unidade: a pasta mostrada é a de verdade.
+  const instalada = path.join(tmp(t, 'dash-upd-outra-'), 'painel 100%');
+  fs.mkdirSync(instalada);
+  fs.writeFileSync(path.join(root, '.env'), 'SSH_HOST=servidor\n', { mode: 0o600 });
+  const unit = serviceAt(home, instalada);
+  const antes = fs.readFileSync(unit, 'utf8');
+
+  const a = memOut();
+  assert.equal(await atualizar({ out: a.out, root, home, deps: untouched() }), 1);
+  assert.match(a.text(), /✗ o serviço do painel roda de outra pasta/);
+  assert.ok(a.text().includes(`Serviço:     ${instalada}`), a.text());
+  assert.ok(a.text().includes(`Esta pasta:  ${root}`), a.text());
+  assert.match(a.text(), /reconfigurar nesta pasta/);
+  assert.equal(fs.readFileSync(unit, 'utf8'), antes);
+  assert.equal(fs.existsSync(path.join(root, '.backups')), false, 'sem backup');
+
+  // A fase 2 também recusa: a fase 1 de uma versão anterior não conferia a pasta.
+  const b = memOut();
+  assert.equal(await afterUpdate({ out: b.out, root, home, deps: untouched() }), 1);
+  assert.match(b.text(), /✗ o serviço do painel roda de outra pasta/);
+  assert.equal(fs.readFileSync(unit, 'utf8'), antes);
+
+  // Serviço desta pasta, mesmo por um link simbólico: segue normal e refaz a unidade.
+  const atalho = path.join(tmp(t, 'dash-upd-atalho-'), 'atalho');
+  fs.symlinkSync(root, atalho);
+  serviceAt(home, atalho);
+  const refeitos = [];
+  const c = memOut();
+  const deps = { installService: async (o) => { refeitos.push(o.root); return { ok: true }; }, healthy: async () => true };
+  assert.equal(await afterUpdate({ out: c.out, root, home, deps }), 0, c.text());
+  assert.deepEqual(refeitos, [root]);
+  const d = memOut();
+  assert.equal(await atualizar({ out: d.out, root, home }), 1);
+  assert.match(d.text(), /não veio de um git clone/, 'passou da conferência da pasta');
 });
 
 // ---------------- V1 → V2 ----------------
