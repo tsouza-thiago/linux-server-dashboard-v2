@@ -369,6 +369,16 @@ export function situacaoDoPath({ home = os.homedir(), env = process.env } = {}) 
   return { noPath, arquivo, cuidadoPor };
 }
 
+// Texto do arquivo, ou null se ele não existir.
+function lerSeExistir(file) {
+  try {
+    return fs.readFileSync(file, 'utf8');
+  } catch (err) {
+    if (err.code === 'ENOENT') return null;
+    throw err;
+  }
+}
+
 /**
  * Acrescenta o bloco marcado no arquivo de login, com cópia antes. Devolve o `estado`:
  * `editado`, `ja-cuidado` (nada a fazer; rodar de novo não duplica) ou `sem-permissao`.
@@ -378,8 +388,9 @@ export function editarArquivoDeLogin({ home = os.homedir(), env = process.env } 
   if (cuidadoPor) return { estado: 'ja-cuidado', arquivo: cuidadoPor };
   const file = path.join(home, arquivo);
   try {
-    const existe = fs.existsSync(file);
-    const texto = existe ? fs.readFileSync(file, 'utf8') : '';
+    // Lê direto, sem conferir antes: o arquivo pode mudar entre a conferência e a leitura.
+    const texto = lerSeExistir(file);
+    const existe = texto !== null;
     if (existe) fs.copyFileSync(file, `${file}.dashboard-bak`);
     const antes = !texto ? '' : texto.endsWith('\n') ? '\n' : '\n\n';
     // Acréscimo direto (sem rename): segue o link de quem versiona os dotfiles e mantém o modo.
