@@ -25,14 +25,14 @@ risco de segurança, os testes novos e o que muda para quem já usa o painel.
 | 1 | Animação ao passar o mouse nos botões (hover) — **entregue na 2.2.3** | P | 2.2.3 | — | #84 | [f1-hover.md](roadmap/f1-hover.md) |
 | 2 | Animação de clique nos botões — **entregue na 2.3.0** | P | 2.3.0 | 1 (mesmos tokens) | #85 | [f2-clique.md](roadmap/f2-clique.md) |
 | 3 | Transição suave na troca de telas — **entregue na 2.3.0** | P | 2.3.0 | — | #86 | [f3-troca-de-tela.md](roadmap/f3-troca-de-tela.md) |
-| 4 | Link simbólico: `dashboard` sem `./` e fora da pasta | P–M | 2.4.0 | — | #87 | [f4-link-simbolico.md](roadmap/f4-link-simbolico.md) |
-| 5 | Autocomplete com Tab (bash) | M | 2.4.0 | 4 (para valer fora da pasta) | #88 | [f5-autocomplete.md](roadmap/f5-autocomplete.md) |
+| 4 | Link simbólico: `dashboard` sem `./` e fora da pasta — **entregue na 2.4.0** | P–M | 2.4.0 | — | #87 | [f4-link-simbolico.md](roadmap/f4-link-simbolico.md) |
+| 5 | Autocomplete com Tab (bash) — **entregue na 2.4.0** | M | 2.4.0 | 4 (para valer fora da pasta) | #88 | [f5-autocomplete.md](roadmap/f5-autocomplete.md) |
 | 6 | Skeleton em tudo o que carrega — **entregue na 2.3.0** | M | 2.3.0 | 3 (a entrada do conteúdo) | #89 | [f6-skeleton.md](roadmap/f6-skeleton.md) |
 | 7 | Atualização pelo painel, com aviso e log | G | 2.5.0 | — | #90 | [f7-atualizacao-pelo-painel.md](roadmap/f7-atualizacao-pelo-painel.md) |
 | 8 | Reconfigurar pelo painel | G | 2.5.0 | 7 (menu e executor) | #91 | [f8-reconfigurar-pela-tela.md](roadmap/f8-reconfigurar-pela-tela.md) |
 | 9 | Instalação em `/opt` por pacote `.deb` | GG | 2.6.0 | 4, 5, 7 e 8 | #92 | [f9-deb-e-opt.md](roadmap/f9-deb-e-opt.md) |
 | 10 | Hover mais visível em clicáveis, contêineres e gráficos — **entregue na 2.2.4** | M | 2.2.4 | 1 | #100 | [f10-hover-mais-visivel.md](roadmap/f10-hover-mais-visivel.md) |
-| 11 | README e TUTORIAL ilustrados com prints e elementos gráficos | M | 2.4.0 | 6 (prints da interface final) | #106 | [f11-documentacao-ilustrada.md](roadmap/f11-documentacao-ilustrada.md) |
+| 11 | README e TUTORIAL ilustrados com prints e elementos gráficos — **entregue na 2.4.0** | M | 2.4.0 | 6 (prints da interface final) | #106 | [f11-documentacao-ilustrada.md](roadmap/f11-documentacao-ilustrada.md) |
 
 A F8 é menos arriscada que a F7 (reaproveita o assistente e não acessa a internet), mas
 vem depois dela porque usa o menu e o executor que a F7 cria.
