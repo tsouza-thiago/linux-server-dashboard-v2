@@ -118,6 +118,16 @@ Nas imagens do README e do TUTORIAL (`docs/img/`):
   e olhe cada imagem nova antes do commit: só dados inventados, nada de IP real, nome de máquina
   ou pasta pessoal.
 
+## Atualização pelo painel
+
+Com `npm run painel-teste -- --versao-nova` (token `teste`), nos 2 temas:
+
+- **Atualizar agora** abre o progresso com o log ao vivo. No meio, o painel de teste cai por 3 s: a
+  tela mostra "Reiniciando o painel…", continua o log de onde parou e recarrega sozinha no fim.
+- O Esc não fecha o progresso. Recarregar a página no meio volta para o progresso.
+- Com `--resultado=voltou`, a tela diz que voltou para a versão anterior e não recarrega.
+- Com outro bloqueio, o botão fica desligado e o comando do terminal aparece.
+
 ## Como registrar
 
 - No PR: os cenários rodados, as telas conferidas e o que falhou.

@@ -9,7 +9,7 @@ import path from 'node:path';
 import { createApp } from '../../server/index.js';
 import { listen, close } from '../../test-support/request.js';
 import { APERTADO, pressiona, semHover, sobe } from '../../test-support/hover.js';
-import { procurarFalso } from '../../scripts/painel-teste.mjs';
+import { atualizacaoFalsa, procurarFalso } from '../../scripts/painel-teste.mjs';
 
 let chromium = null;
 try { ({ chromium } = await import('playwright-core')); } catch { /* sem playwright-core */ }
@@ -123,7 +123,9 @@ test('e2e: versão nova — aviso, novidades com texto escapado, menu e fechar o
   const novidades = await page.textContent('#novidadesDialog .novidades');
   assert.match(novidades, /<b>HTML<\/b> no texto/, 'o HTML do CHANGELOG aparece como texto');
   assert.equal(await page.locator('#novidadesDialog .novidades b').count(), 0);
+  // Sem login: o botão fica desligado e o comando do terminal aparece.
   assert.match(await page.textContent('#novidadesDialog'), /\.\/dashboard atualizar/);
+  assert.ok(await page.isDisabled('#novidadesDialog .dialogo-acoes .btn-primary'));
   await page.click('#novidadesDialog button[type="submit"]');
   await page.click('#avisoVersao [data-manut="dispensar"]');
   assert.ok(await page.isHidden('#avisoVersao'));
@@ -135,6 +137,62 @@ test('e2e: versão nova — aviso, novidades com texto escapado, menu e fechar o
   assert.match(await page.textContent('#manutMenu'), /v9\.9\.9/, 'o menu continua mostrando a versão');
   await page.keyboard.press('Escape');
   assert.ok(await page.isHidden('#manutMenu'));
+  assert.deepEqual(problems, []);
+});
+
+// O botão Atualizar (ADR 0031): o painel "cai" no meio (a leitura falha) e a tela continua sozinha.
+test('e2e: atualizar — botão, log ao vivo, painel fora do ar e recarga', { skip: !chromium && 'sem playwright-core' }, async (t) => {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'dash-e2e-troca-'));
+  t.after(() => fs.rmSync(dir, { recursive: true, force: true }));
+  let voltar;
+  const pausa = new Promise((r) => { voltar = r; });
+  const troca = atualizacaoFalsa(dir, { passoMs: 200, reiniciar: () => pausa });
+  const ctx = await setup(t, { procurarVersao: procurarFalso, ...troca, dashToken: 'e2e-teste' });
+  if (ctx.skip) return t.skip(ctx.skip);
+  const { app, page, base, problems } = ctx;
+  await page.request.post(`${base}/api/login`, { data: { token: 'e2e-teste' } });
+  await app.atualizacao.verificar();
+  await page.goto(base);
+  await page.waitForSelector('#avisoVersao:not([hidden])');
+  await page.click('#avisoVersao [data-manut="novidades"]');
+  await page.waitForSelector('#novidadesDialog[open]');
+  assert.doesNotMatch(await page.textContent('#novidadesDialog'), /\.\/dashboard atualizar/, 'com login, o botão no lugar do comando');
+  await page.evaluate(() => { window.semRecarregar = true; });
+  await page.click('[data-manut="atualizar"]');
+  await page.waitForSelector('#registroLog');
+  await page.waitForFunction(() => document.getElementById('registroLog').textContent.includes('cópia de segurança'));
+  // A fase "ligando" para aqui: o painel cai, a leitura falha e a tela avisa.
+  await page.route('**/api/atualizacao/registro*', (r) => r.abort());
+  await page.waitForFunction(() => document.getElementById('registroFase').textContent.includes('Reiniciando o painel'));
+  await page.keyboard.press('Escape');
+  assert.ok(await page.isVisible('#novidadesDialog[open]'), 'o Esc não fecha no meio da troca');
+  voltar();
+  await page.unroute('**/api/atualizacao/registro*');
+  // A página recarrega sozinha: a marca some, e a interface da "versão nova" está de pé.
+  await page.waitForFunction(() => document.getElementById('registroFase')?.textContent.includes('Atualizado para v9.9.9'));
+  assert.match(await page.textContent('#registroLog'), /cópia de segurança[\s\S]*atualizado de v/, 'o log continua de onde parou');
+  await page.waitForFunction(() => !window.semRecarregar, null, { timeout: 8000 });
+  await page.waitForSelector('#manutBtn svg');
+  const filtrados = problems.filter((p) => !/Failed to load resource|ERR_FAILED/.test(p));
+  assert.deepEqual(filtrados, []);
+});
+
+test('e2e: atualizar — voltou atrás mostra o resultado e não recarrega', { skip: !chromium && 'sem playwright-core' }, async (t) => {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'dash-e2e-volta-'));
+  t.after(() => fs.rmSync(dir, { recursive: true, force: true }));
+  const ctx = await setup(t, { procurarVersao: procurarFalso, ...atualizacaoFalsa(dir, { passoMs: 100, resultado: 'voltou' }), dashToken: 'e2e-teste' });
+  if (ctx.skip) return t.skip(ctx.skip);
+  const { app, page, base, problems } = ctx;
+  await page.request.post(`${base}/api/login`, { data: { token: 'e2e-teste' } });
+  await app.atualizacao.verificar();
+  await page.goto(base);
+  await page.click('#manutBtn');
+  await page.click('#manutMenu [data-manut="novidades"]');
+  await page.click('[data-manut="atualizar"]');
+  await page.waitForSelector('#novidadesDialog[data-resultado="voltou"]');
+  assert.match(await page.textContent('#registroFase'), /não funcionou aqui/);
+  await page.click('[data-manut="fechar"]');
+  assert.ok(await page.isHidden('#novidadesDialog'));
   assert.deepEqual(problems, []);
 });
 

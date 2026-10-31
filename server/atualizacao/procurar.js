@@ -14,7 +14,7 @@ import { recortarNovidades } from './novidades.js';
 
 const TETO_GIT_MS = 120000;
 // Sem pergunta nenhuma: o painel roda sem terminal, e uma janela de senha do ssh ficaria aberta.
-const GIT_ENV = { ...process.env, GIT_TERMINAL_PROMPT: '0', GIT_SSH_COMMAND: 'ssh -o BatchMode=yes' };
+export const GIT_ENV = { ...process.env, GIT_TERMINAL_PROMPT: '0', GIT_SSH_COMMAND: 'ssh -o BatchMode=yes' };
 
 /** Roda o git na pasta (argumentos em lista), sem perguntas, com teto de 2 min. */
 function git(root, args, run) {
@@ -29,7 +29,7 @@ export const versaoDaPasta = (root) => {
 
 // O que impediria o `dashboard atualizar` nesta pasta; null se nada impede. `--no-optional-locks`:
 // esta conferência não pode disputar o índice do git com um `dashboard atualizar` em andamento.
-function bloqueioDaPasta(root, home, run) {
+export function bloqueioDaPasta(root, home = os.homedir(), run = spawnSync) {
   if (!fs.existsSync(path.join(root, '.env')) || otherServiceRoot(root, home)) return 'outra-pasta';
   return git(root, ['--no-optional-locks', 'status', '--porcelain', '--untracked-files=no'], run).stdout.trim() ? 'arquivos-alterados' : null;
 }

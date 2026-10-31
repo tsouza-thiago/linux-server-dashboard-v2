@@ -18,7 +18,17 @@ diante: `PATCH` corrige, `MINOR` acrescenta sem quebrar e `MAJOR` quebra.
   com `git fetch` para o `origin` do clone (ADR 0030).
 - Rotas `/api/atualizacao` e `/api/atualizacao/verificar`, evento SSE `atualizacao` e o arquivo
   `data/atualizacao.json`.
-- `npm run painel-teste -- --versao-nova`: mostra o aviso no painel de teste.
+- `npm run painel-teste -- --versao-nova`: mostra o aviso no painel de teste e simula a troca de
+  versão, com login (token `teste`). `--resultado=voltou` simula a volta atrás.
+- Botão **Atualizar agora** no diálogo de novidades (#90, 2ª entrega da F7). A tela mostra o log ao
+  vivo, aguenta o painel fora do ar durante a troca e recarrega no fim. Se a versão nova falhar, a
+  tela diz que voltou para a anterior. Sem login, ou com outro bloqueio, o botão fica desligado e a
+  tela mostra o motivo e o comando do terminal (ADR 0031).
+- Rotas `POST /api/atualizacao/iniciar` e `GET /api/atualizacao/registro`, com `modo` e o bloqueio
+  `rodando` em `/api/atualizacao`.
+- Pasta `.atualizacao/`, com o log e o estado da atualização, e a invariante I11: nada da tela entra
+  no comando da troca de versão.
+- O `dashboard atualizar` recusa rodar junto com outra atualização na mesma pasta.
 
 ## [2.4.1] — 2026-10-31
 

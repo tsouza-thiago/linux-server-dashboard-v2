@@ -106,6 +106,7 @@ function opcoesLidas(...arquivos) {
   }
   nomes.delete('help'); // sinônimo de --ajuda, fora da lista de propósito
   nomes.delete('pos-atualizacao'); // interna
+  nomes.delete('registro'); // interna
   return [...nomes].map((n) => `--${n}`).sort();
 }
 

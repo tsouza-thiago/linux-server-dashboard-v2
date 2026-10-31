@@ -299,6 +299,22 @@ Inclua: o passo a passo para reproduzir, o impacto estimado e a versão afetada
 - **Verificado por:** `test/integration/atualizacao.test.js`, `test/unit/atualizacao.test.js` e
   `scripts/mutacao-seguranca.mjs` (aviso sem conferir a assinatura, "procurar agora" sem limite).
 
+### 22. Troca de versão pela tela (ADR 0031)
+- **Ameaça:** o botão Atualizar troca o código do painel. Um site de fora, outro programa da máquina
+  ou um pedido forjado poderia disparar a troca, escolher a versão, injetar argumentos no comando ou
+  rodar 2 trocas ao mesmo tempo. O log poderia vazar segredos.
+- **Mitigação:** invariante I11: a rota só compara a versão do pedido com a detectada (409 se
+  diferente), e o comando é fixo, em lista, sem shell. O executor procura de novo a tag assinada, com
+  as chaves da versão instalada, e só aceita versão mais nova. A rota exige sessão, passa pelo Host
+  check, pelo CSRF e pelo limite de mutações. Sem login, a troca pela tela não existe. Antes de
+  disparar, o painel confere de novo a pasta (só a da instalação, #118) e os arquivos alterados. A
+  trava com PID barra a 2ª troca, no terminal e na tela. `.atualizacao/` é 0700, os arquivos são 0600,
+  fica fora do git, e o log traz só as linhas do `atualizar`, que não imprime segredos.
+- **Verificado por:** `test/integration/atualizacao.test.js`, `test/unit/atualizacao-registro.test.js`,
+  `test/integration/cli-manutencao.test.js`, a regra I11 de `test/seguranca/invariantes-estaticas.test.js`
+  e `scripts/mutacao-seguranca.mjs` (versão da tela, sem sessão, rotas fora da sessão, 2 trocas juntas,
+  pasta aberta, executor filho do painel).
+
 ---
 
 ## OWASP Top 10:2025

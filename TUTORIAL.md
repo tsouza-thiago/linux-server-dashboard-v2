@@ -196,7 +196,13 @@ coleta) e explica cada problema com "O que aconteceu" e "Como resolver".
 **Como saber que há versão nova?** O painel procura 1 vez por dia e mostra uma faixa no topo da
 tela. Clique em **Ver novidades** para ler o que mudou. Feche a faixa, se quiser: ela só volta na
 versão seguinte. A engrenagem no topo mostra a versão instalada e a data da última procura, e tem o
-botão **Procurar agora**. Para atualizar, rode o `./dashboard atualizar`.
+botão **Procurar agora**.
+
+**Como atualizar pelo painel?** Em **Ver novidades**, clique em **Atualizar agora**. A tela mostra
+o que está acontecendo. O painel fica fora do ar por alguns segundos e volta sozinho. No fim, a
+página recarrega. Se a versão nova falhar, o painel volta para a versão anterior, com os dados de
+antes, e a tela avisa. O botão fica desligado quando o painel não tem login ou quando há arquivos
+alterados na pasta; nesse caso, a tela diz o motivo e mostra o comando `./dashboard atualizar`.
 
 **Rode na pasta da instalação.** O `atualizar` só vale na pasta onde o painel foi instalado.
 Numa cópia sem `.env`, ou com o serviço em outra pasta, ele para sem alterar nada e mostra a pasta

@@ -160,6 +160,7 @@ export async function desinstalar({ out, root, args = [], home = os.homedir(), d
   if (dropHistory) {
     fs.rmSync(path.join(root, 'data'), { recursive: true, force: true });
     fs.rmSync(path.join(root, '.backups'), { recursive: true, force: true });
+    fs.rmSync(path.join(root, '.atualizacao'), { recursive: true, force: true });
     out.ok('histórico apagado');
   } else {
     out.ok('histórico mantido em data/', 'apague a pasta quando quiser');

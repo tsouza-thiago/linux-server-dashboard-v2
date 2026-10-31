@@ -67,6 +67,12 @@ const MUTACOES = [
   { nome: 'apelido virando opção do ssh (-oProxyCommand)', arquivo: 'server/setup/remoto.js', de: "/^[A-Za-z0-9_][A-Za-z0-9_.-]{0,63}$/.test(s)", para: "s.length > 0", testes: ['test/unit/setup-chave-ssh.test.js'] },
   { nome: 'senha do sudo indo para a conexão SSH no modo chave', arquivo: 'server/setup/instalacao.js', de: "    if (this.acesso.modo === 'chave') senha = '';\n", para: '', testes: ['test/unit/setup-chave-ssh.test.js'] },
   { nome: 'aviso de versão sem conferir a assinatura da tag', arquivo: 'server/setup/assinatura.js', de: 'if (verifyTag(root, t, { signersFile, run }).ok) return t;', para: 'return t;', testes: ['test/integration/atualizacao.test.js'] },
+  { nome: 'botão Atualizar aceitando a versão da tela', arquivo: 'server/atualizacao/index.js', de: "if (!nova || versao !== nova) return", para: "if (!nova) return", testes: ['test/integration/atualizacao.test.js'] },
+  { nome: 'botão Atualizar sem sessão', arquivo: 'server/atualizacao/index.js', de: "if (!this.loginExigido) return 'sem-login';\n", para: '', testes: ['test/integration/atualizacao.test.js'] },
+  { nome: 'rotas de atualização fora da sessão', arquivo: 'server/security.js', de: "    if (!token) return next();\n", para: "    if (!token || req.path.startsWith('/api/atualizacao')) return next();\n", testes: ['test/integration/atualizacao.test.js'] },
+  { nome: '2 atualizações ao mesmo tempo', arquivo: 'server/atualizacao/registro.js', de: "    if (donoDaTrava(root, procDir)) return false;\n", para: '', testes: ['test/unit/atualizacao-registro.test.js', 'test/integration/cli-manutencao.test.js'] },
+  { nome: 'pasta .atualizacao sem 0700', arquivo: 'server/atualizacao/registro.js', de: "  fs.chmodSync(dir, 0o700);\n", para: '', testes: ['test/unit/atualizacao-registro.test.js'] },
+  { nome: 'executor filho do painel (morre no stopPanel)', arquivo: 'server/atualizacao/executor.js', de: "{ cwd: root, detached: true, stdio: 'ignore' }", para: "{ cwd: root, stdio: 'ignore' }", testes: ['test/unit/atualizacao-registro.test.js'] },
   { nome: '"procurar agora" sem limite de 1 por minuto', arquivo: 'server/atualizacao/index.js', de: 'if (this.agora() - this.manualEm < MANUAL_MS) return null;\n', para: '', testes: ['test/integration/atualizacao.test.js'] },
   { nome: 'exec com shell importado', arquivo: 'server/cli/servico.js', de: "import { spawn, spawnSync } from 'node:child_process';", para: "import { exec, spawn, spawnSync } from 'node:child_process';" },
 ];

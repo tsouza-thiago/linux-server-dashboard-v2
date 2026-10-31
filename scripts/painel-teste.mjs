@@ -6,7 +6,9 @@
 //
 //   npm run painel-teste                              # cenário normal, porta 3943
 //   npm run painel-teste -- --cenario=lacunas --porta=3944
-//   npm run painel-teste -- --versao-nova             # com aviso de versão nova (falsa)
+//   npm run painel-teste -- --versao-nova             # com aviso de versão nova (falsa) e troca simulada
+//   npm run painel-teste -- --versao-nova --resultado=voltou  # a troca simulada volta atrás
+//   (com --versao-nova o painel tem login: o token é "teste")
 //
 // Cenários:
 //   normal   10 dias de agregados + 72 h de amostras a cada minuto, sem queda; coleta ao vivo
@@ -33,6 +35,7 @@ import { History } from '../server/storage/index.js';
 import { OutageLog } from '../server/storage/outages.js';
 import { createWizardApp } from '../server/setup/web.js';
 import { VERSION } from '../server/version.js';
+import { abrirRegistro, lerEstado, pegarTrava, soltarTrava } from '../server/atualizacao/registro.js';
 import { makeInstalacao, detectionWithSudo } from '../test-support/instalacao-fake.js';
 
 const ROOT = path.join(path.dirname(fileURLToPath(import.meta.url)), '..');
@@ -133,6 +136,49 @@ export function criarPainel(dir, cenario, coletar, extra = {}) {
   });
 }
 
+/**
+ * Troca de versão falsa, para ver o progresso: escreve o registro como o `dashboard atualizar
+ * --registro` faria, com um processo imaginário em `<dir>/proc` segurando a trava. Nada sai da
+ * máquina e nenhum arquivo do painel muda. `reiniciar` derruba o servidor no meio, como a troca.
+ */
+export function atualizacaoFalsa(dir, { resultado = 'atualizado', passoMs = 700, reiniciar = async () => {} } = {}) {
+  const procDir = path.join(dir, 'proc');
+  fs.mkdirSync(path.join(procDir, '4242'), { recursive: true });
+  fs.writeFileSync(path.join(procDir, '4242', 'cmdline'), 'node\0/painel/server/cli/index.js\0atualizar\0--registro\0');
+  const espera = () => new Promise((r) => { setTimeout(r, passoMs); });
+  const executar = async () => {
+    const registro = abrirRegistro(dir);
+    pegarTrava(dir, { pid: 4242, procDir });
+    const escrever = (linha) => registro.stream.write(`${linha}\n`);
+    const { de } = lerEstado(dir);
+    (async () => {
+      registro.marcar({ fase: 'procurando' });
+      escrever('Server Dashboard · atualizar');
+      await espera();
+      escrever('✓ versão nova encontrada: v9.9.9 (assinatura conferida com a chave da versão instalada)');
+      registro.marcar({ fase: 'trocando' });
+      await espera();
+      escrever('✓ cópia de segurança de data/ feita (.backups/teste)');
+      registro.marcar({ fase: 'ligando' });
+      await reiniciar();
+      if (resultado === 'voltou') {
+        registro.marcar({ fase: 'voltando', resultado: 'voltou' });
+        escrever(`✗ a versão v9.9.9 não funcionou aqui: voltando para ${de}`);
+        await espera();
+        escrever(`✓ de volta à ${de}, com os dados de antes da atualização`);
+      } else {
+        escrever('✓ versão nova no ar');
+        escrever(`✓ atualizado de ${de} para v9.9.9`);
+      }
+      soltarTrava(dir);
+      registro.fim(resultado === 'voltou' ? 1 : 0);
+    })();
+    return { ok: true };
+  };
+  // Com login: sem sessão, o botão fica desligado (a senha do painel de teste é "teste").
+  return { dashToken: 'teste', pastaAtualizacao: dir, procDirAtualizacao: procDir, executarAtualizacao: executar, modoAtualizacao: 'segundo-plano' };
+}
+
 /** Versão nova falsa para ver o aviso, o menu e as novidades: nada sai desta máquina. */
 export async function procurarFalso() {
   return {
@@ -186,13 +232,21 @@ async function main() {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'dash-painel-teste-'));
   const { coletar } = await semear(dir, cenario);
   const versaoNova = process.argv.includes('--versao-nova');
-  const { app, runPoll, atualizacao, shutdown } = criarPainel(dir, cenario, coletar, versaoNova ? { procurarVersao: procurarFalso } : {});
+  let server;
+  // "Reinício" no meio da troca: fecha as conexões e volta a escutar 3 s depois.
+  const reiniciar = () => new Promise((pronto) => {
+    server.close();
+    server.closeAllConnections();
+    setTimeout(() => { server.listen(porta, '127.0.0.1', pronto); }, 3000);
+  });
+  const troca = versaoNova ? atualizacaoFalsa(dir, { resultado: opcao('resultado', 'atualizado'), reiniciar }) : {};
+  const { app, runPoll, atualizacao, shutdown } = criarPainel(dir, cenario, coletar, versaoNova ? { procurarVersao: procurarFalso, ...troca } : {});
   if (versaoNova) await atualizacao.verificar();
   if (cenario === 'offline') { await runPoll(); await runPoll(); }
   // vazio fica sem coleta: é o estado do 1º uso, antes da 1ª amostra chegar.
   const timer = cenario === 'vazio' ? null : setInterval(runPoll, 60000);
   // Só 127.0.0.1 (I6), como o painel de verdade.
-  const server = app.listen(porta, '127.0.0.1', () => {
+  server = app.listen(porta, '127.0.0.1', () => {
     console.log(`painel de teste (${cenario}) em http://127.0.0.1:${porta} — dados em ${dir}`);
     console.log('Ctrl+C encerra e apaga os dados de teste.');
   });

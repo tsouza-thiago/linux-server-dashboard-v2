@@ -344,7 +344,15 @@ pre.code {
 .dialogo-aviso svg { flex: 0 0 auto; margin-top: 2px; }
 .dialogo-comando { font-size: 13px; color: var(--text-2); }
 .dialogo-comando .mono { color: var(--text); }
-.dialogo-acoes { display: flex; justify-content: flex-end; }
+.dialogo-acoes { display: flex; justify-content: flex-end; gap: 8px; }
+.dialogo-acoes:empty { display: none; }
+.registro-fase { display: flex; align-items: center; gap: 8px; font-size: 14px; color: var(--text); }
+.registro {
+  flex: 1 1 auto; min-height: 180px; max-height: 50vh; margin: 0; padding: 12px; overflow: auto;
+  border: 1px solid var(--border); border-radius: 8px; background: var(--surface); color: var(--text-2);
+  font-size: 12px; line-height: 1.5; white-space: pre-wrap; overflow-wrap: anywhere;
+}
+.registro:empty::before { content: "Aguardando as primeiras linhas…"; color: var(--text-3); }
 .novidades { flex: 1 1 auto; min-height: 0; overflow-y: auto; display: flex; flex-direction: column; gap: 16px; font-size: 14px; line-height: 1.5; color: var(--text-2); }
 .novidades-secao { display: flex; flex-direction: column; gap: 8px; }
 .novidades h3 { margin: 0; font-size: 15px; font-weight: 600; color: var(--text); }

@@ -56,7 +56,7 @@ mudar o formato de `data/` para quem já usa, ela vira MAJOR (3.0.0) e este road
 
 ## Regras que valem para todas as features
 
-1. As invariantes I1–I10 do [AGENTS.md](../AGENTS.md) continuam valendo. Nenhuma feature
+1. As invariantes I1–I11 do [AGENTS.md](../AGENTS.md) continuam valendo. Nenhuma feature
    abre SSH para o servidor nem grava nada nele.
 2. **Orçamento da página inicial:** 450 KB transferidos; hoje são 293 KB. Sobram ~157 KB
    para as próximas features. Cada PR de tela mede o tamanho no `test/e2e/telas.test.js`.

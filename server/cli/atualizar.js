@@ -1,23 +1,26 @@
 // `dashboard atualizar` (ADR 0012): git fetch → tag assinada mais nova (conferida com a
 // lista de chaves da versão QUE JÁ ESTÁ instalada: a nova não se autoaprova) → backup de
 // data/ → troca de versão → a versão nova liga o painel e confere a saúde → se algo
-// falhar, volta sozinha para a versão anterior com o data/ do backup.
+// falhar, volta sozinha para a versão anterior com o data/ do backup. Com --registro (quem
+// roda é o painel, ADR 0031), as linhas e as fases vão para .atualizacao/ em vez do terminal.
 import { spawnSync } from 'node:child_process';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { SIGNERS, newestSignedTag } from '../setup/assinatura.js';
-import { versaoDaPasta } from '../atualizacao/procurar.js';
+import { GIT_ENV, versaoDaPasta } from '../atualizacao/procurar.js';
+import { abrirRegistro, pegarTrava, soltarTrava } from '../atualizacao/registro.js';
 import { installService, situacaoDoLink } from '../setup/local.js';
 import { otherServiceRoot, panelPort, panelStatus, startPanel, stopPanel, unitPath, waitForPort, systemctlUser, UNIT_NAME } from './servico.js';
 import { parseFlags } from './instalar.js';
+import { makeOutput } from './saida.js';
 
 // Cópias de data/ guardadas em .backups/ (as mais antigas saem).
 const KEEP_BACKUPS = 3;
 
 /** Roda o git na pasta do painel (argumentos em lista, teto de 2 min) e devolve o resultado. */
-function git(root, args, run = spawnSync) {
-  const r = run('git', ['-C', root, ...args], { encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'], timeout: 120000 });
+function git(root, args, run = spawnSync, env = process.env) {
+  const r = run('git', ['-C', root, ...args], { encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'], timeout: 120000, env });
   return { status: r.status ?? -1, stdout: (r.stdout || '').trim(), stderr: (r.stderr || '').trim() };
 }
 
@@ -109,23 +112,17 @@ export async function afterUpdate({ out, root, home = os.homedir(), deps = {} })
 }
 
 /**
- * `./dashboard atualizar`. Opções: --pre (aceita pré-versão) e --pos-atualizacao (interna:
- * a 2ª fase, rodada pela versão nova). Devolve 0 atualizado ou já na mais nova, 1 falha.
+ * A troca de versão em si, com a trava já pega. `registro` só existe quando quem roda é o painel:
+ * as fases vão para a tela, a fase 2 escreve no mesmo log e o git não pode perguntar nada.
  */
-export async function atualizar({ out, root, args = [], home = os.homedir(), deps = {} }) {
-  const flags = parseFlags(args);
-  if (flags['pos-atualizacao']) return afterUpdate({ out, root, home, deps });
-  out.title('Server Dashboard · atualizar');
-  if (!checkFolder({ out, root, home })) return 1;
-  const run = deps.run ?? spawnSync;
-  if (git(root, ['rev-parse', '--is-inside-work-tree'], run).status !== 0) {
-    out.fail('esta pasta não veio de um git clone');
-    out.explain('o atualizar troca de versão com o git.', `baixe de novo com o comando do README e importe os dados: ${out.cmd} instalar --importar-v1 não serve aqui; copie a pasta data/.`);
-    return 1;
-  }
+async function trocarDeVersao({ out, root, home, deps, flags, run, registro }) {
+  const marcar = registro?.marcar ?? (() => {});
+  const stdio = registro ? ['ignore', registro.fd, registro.fd] : 'inherit';
+  const reexec = deps.reexec ?? ((a) => spawnSync(path.join(root, 'dashboard'), a, { stdio }).status);
+  marcar({ fase: 'procurando' });
   const current = versaoDaPasta(root);
   const oldRef = git(root, ['rev-parse', 'HEAD'], run).stdout;
-  const fetched = git(root, ['fetch', '--quiet', '--tags', 'origin'], run);
+  const fetched = git(root, ['fetch', '--quiet', '--tags', 'origin'], run, registro ? GIT_ENV : process.env);
   if (fetched.status !== 0) {
     out.fail('não consegui buscar as versões novas', fetched.stderr.split('\n').pop());
     out.explain('sem acesso ao GitHub agora.', 'confira a internet e rode de novo.');
@@ -140,9 +137,11 @@ export async function atualizar({ out, root, args = [], home = os.homedir(), dep
   fs.rmSync(path.dirname(signers), { recursive: true, force: true });
   if (!target) {
     out.ok(`você já está na versão mais nova (${current})`);
+    marcar({ resultado: 'ja-na-mais-nova' });
     return 0;
   }
   out.ok(`versão nova encontrada: ${target}`, 'assinatura conferida com a chave da versão instalada');
+  marcar({ alvo: target, de: current });
   // Arquivo do painel alterado à mão: o checkout apagaria a alteração, então para aqui.
   const dirty = git(root, ['status', '--porcelain', '--untracked-files=no'], run).stdout;
   if (dirty) {
@@ -150,6 +149,7 @@ export async function atualizar({ out, root, args = [], home = os.homedir(), dep
     out.explain('trocar de versão apagaria essas alterações.', `guarde ou desfaça as alterações (git status) e rode de novo.`);
     return 1;
   }
+  marcar({ fase: 'trocando' });
   const wasRunning = (deps.panelStatus ?? panelStatus)({ root, home }).running;
   await (deps.stopPanel ?? stopPanel)({ root, home });
   const backup = backupData(root, current);
@@ -161,20 +161,70 @@ export async function atualizar({ out, root, args = [], home = os.homedir(), dep
     return 1;
   }
   // A versão nova liga o painel (o ./dashboard dela garante o Node que ela pede).
-  const second = (deps.reexec ?? ((a) => spawnSync(path.join(root, 'dashboard'), a, { stdio: 'inherit' }).status))(['atualizar', '--pos-atualizacao']);
+  marcar({ fase: 'ligando' });
+  const second = reexec(['atualizar', '--pos-atualizacao']);
   if (second === 0) {
     out.ok(`atualizado de ${current} para ${target}`);
     if (!wasRunning) out.line(out.c.dim('O painel estava parado antes; ele foi ligado para conferir a versão nova.'));
     return 0;
   }
   // A versão nova não subiu: volta o código e os dados, e a versão anterior se liga de novo.
+  marcar({ fase: 'voltando', resultado: 'voltou' });
   out.fail(`a versão ${target} não funcionou aqui: voltando para ${current}`);
   await (deps.stopPanel ?? stopPanel)({ root, home });
   git(root, ['-c', 'advice.detachedHead=false', 'checkout', '--quiet', '--detach', oldRef], run);
   restoreData(root, backup);
-  const back = (deps.reexec ?? ((a) => spawnSync(path.join(root, 'dashboard'), a, { stdio: 'inherit' }).status))(['atualizar', '--pos-atualizacao']);
+  const back = reexec(['atualizar', '--pos-atualizacao']);
   if (back === 0) out.ok(`de volta à ${current}, com os dados de antes da atualização`);
   else out.fail('a versão anterior também não subiu', `rode ${out.cmd} diagnosticar`);
   out.explain(`a versão ${target} não ligou o painel nesta máquina.`, `nada foi perdido. Rode ${out.cmd} diagnosticar e, se quiser, avise no GitHub do projeto.`);
   return 1;
+}
+
+/** As conferências da pasta e a trava: 2 atualizações ao mesmo tempo trocariam o código uma da outra. */
+async function atualizarAqui({ out, root, home, deps, flags, registro }) {
+  out.title('Server Dashboard · atualizar');
+  if (!checkFolder({ out, root, home })) return 1;
+  const run = deps.run ?? spawnSync;
+  if (git(root, ['rev-parse', '--is-inside-work-tree'], run).status !== 0) {
+    out.fail('esta pasta não veio de um git clone');
+    out.explain('o atualizar troca de versão com o git.', `baixe de novo com o comando do README e importe os dados: ${out.cmd} instalar --importar-v1 não serve aqui; copie a pasta data/.`);
+    return 1;
+  }
+  if (!pegarTrava(root, deps.trava)) {
+    out.fail('já há uma atualização rodando nesta pasta');
+    out.explain('2 atualizações ao mesmo tempo trocariam o código uma da outra.', 'espere ela terminar. O painel mostra o andamento.');
+    return 1;
+  }
+  try {
+    return await trocarDeVersao({ out, root, home, deps, flags, run, registro });
+  } finally {
+    soltarTrava(root);
+  }
+}
+
+// Rodado pelo painel (ADR 0031): sem terminal, tudo vai para .atualizacao/.
+async function comRegistro({ root, home, deps, flags }) {
+  const registro = abrirRegistro(root);
+  const out = makeOutput({ stream: registro.stream, root });
+  let codigo = 1;
+  try {
+    codigo = await atualizarAqui({ out, root, home, deps, flags, registro });
+  } catch (err) {
+    out.fail('a atualização parou', err.message);
+  }
+  registro.fim(codigo);
+  return codigo;
+}
+
+/**
+ * `./dashboard atualizar`. Opções: --pre (aceita pré-versão), --registro (interna: escreve em
+ * .atualizacao/, usada pelo painel) e --pos-atualizacao (interna: a 2ª fase, rodada pela versão
+ * nova). Devolve 0 atualizado ou já na mais nova, 1 falha.
+ */
+export async function atualizar({ out, root, args = [], home = os.homedir(), deps = {} }) {
+  const flags = parseFlags(args);
+  if (flags['pos-atualizacao']) return afterUpdate({ out, root, home, deps });
+  if (flags.registro) return comRegistro({ root, home, deps, flags });
+  return atualizarAqui({ out, root, home, deps, flags });
 }

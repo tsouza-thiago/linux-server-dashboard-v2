@@ -104,6 +104,19 @@ test('CWE-78: o SSH sempre com BatchMode e ConnectTimeout; nunca sem conferir a 
   assert.deepEqual(proibido(CODIGO, /StrictHostKeyChecking[ =](?:no|accept-new)|UserKnownHostsFile[ =]\/dev\/null/gi), []);
 });
 
+test('I11: nada da tela entra no comando da troca de versão', () => {
+  const rotas = semComentarios(ler('server/index.js'));
+  assert.match(rotas, /atualizacao\.trocarVersao\(req\.body\?\.versao\)/, 'a rota só entrega a versão para ser comparada');
+  assert.equal((rotas.match(/executarForaDoServico\(/g) || []).length, 1);
+  assert.match(rotas, /executarForaDoServico\(\{ root: ROOT, modo \}\)/, 'só a pasta e o modo, nada do pedido');
+  const dono = semComentarios(ler('server/atualizacao/index.js'));
+  assert.match(dono, /this\.executar\(\)/, 'o executor não recebe argumento');
+  assert.match(dono, /versao !== nova/, 'a versão do pedido só é comparada');
+  const exec = semComentarios(ler('server/atualizacao/executor.js'));
+  assert.match(exec, /const COMANDO = \['atualizar', '--registro'\];/, 'comando fixo');
+  assert.doesNotMatch(exec, /\breq\b|versao|process\.env/);
+});
+
 test('CWE-1333: new RegExp só com texto escapado ou fixo (sem ReDoS nem injeção de regex)', () => {
   const ESCAPE = /\.replace\(\/\[\.\*\+\?\^\$\{\}\(\)\|\[\\\]\\\\\]\/g, '\\\\\$&'\)/;
   const FIXOS = {
