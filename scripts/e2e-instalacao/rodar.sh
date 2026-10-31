@@ -97,7 +97,8 @@ confere "A: 2 coletas pelo painel" espera_coletas e2e-cli-deb linux-server-dashb
 em e2e-cli-deb "cd linux-server-dashboard-v2 && ./dashboard diagnosticar" | tee "$OUT/A-diagnosticar.txt" || true
 confere "A: diagnóstico sem avisos nem erros" grep -q "nenhum aviso, nenhum erro" "$OUT/A-diagnosticar.txt"
 confere "A: dashmon no servidor só com a chave restrita" docker exec e2e-srv-deb sh -c 'grep -q "^restrict,from=\"127.0.0.1\",command=" /home/dashmon/.ssh/authorized_keys'
-confere "A: linha e sudoers com o computador e o ID da instalação (ADR 0020)" docker exec e2e-srv-deb sh -c 'grep -Eq " dashboard@[a-z0-9-]+:[0-9a-f]{8}\$" /home/dashmon/.ssh/authorized_keys && ls /etc/sudoers.d/dashboard-*-* >/dev/null'
+confere "A: linha com o computador e o ID da instalação (ADR 0020)" docker exec e2e-srv-deb sh -c 'grep -Eq " dashboard@[a-z0-9-]+:[0-9a-f]{8}\$" /home/dashmon/.ssh/authorized_keys'
+confere "A: sem SMART, nenhuma regra de sudo no servidor" bash -c "! docker exec e2e-srv-deb sh -c 'ls /etc/sudoers.d/dashboard-*'"
 confere "A: comando dashboard de outra pasta, num shell de login" em e2e-cli-deb "cd /tmp && dashboard versao"
 # O caminho da v2.0.0: da pré-versão para a estável assinada (a v2.0.1 sem assinatura é ignorada).
 cd "$GIT/release" && versao 2.0.0 && git commit -qam "e2e: 2.0.0" && assina v2.0.0 && git tag v2.0.1 && cd "$REPO"
@@ -108,6 +109,9 @@ confere "A: painel de volta depois de atualizar" espera_coletas e2e-cli-deb linu
 cd "$GIT/release" && versao 2.0.1-rc.1 && git commit -qam "e2e: 2.0.1-rc.1" && assina v2.0.1-rc.1 && cd "$REPO"
 em e2e-cli-deb "cd linux-server-dashboard-v2 && ./dashboard atualizar" | tee "$OUT/A-atualizar-estavel.txt"
 confere "A: na estável, a rc assinada não é instalada sem --pre" grep -q "versão mais nova (v2.0.0)" "$OUT/A-atualizar-estavel.txt"
+# O contêiner não tem disco físico: sem SMART, o preparo não cria sudoers. Este arquivo tem o nome
+# real da instalação (ADR 0020) e prova que o desinstalar acha o sudoers pelo ID.
+confere "A: sudoers com o nome desta instalação" docker exec e2e-srv-deb sh -c 'n=$(grep -Eo "dashboard@[a-z0-9-]+:[0-9a-f]{8}\$" /home/dashmon/.ssh/authorized_keys | tr "@:" "--") && [ -n "$n" ] && printf "# e2e\n" > "/etc/sudoers.d/$n" && chmod 440 "/etc/sudoers.d/$n"'
 em e2e-cli-deb "cd linux-server-dashboard-v2 && echo senha-de-teste | ./dashboard desinstalar --sim --limpar-servidor --usuario maria --senha-stdin" | tee "$OUT/A-desinstalar.txt"
 confere "A: servidor limpo pelo desinstalar" bash -c "! docker exec e2e-srv-deb id dashmon"
 confere "A: sudoers da instalação apagado" bash -c "! docker exec e2e-srv-deb sh -c 'ls /etc/sudoers.d/dashboard-*'"
@@ -153,7 +157,7 @@ confere "C: pasta da V1 intacta (pronta para voltar)" docker exec e2e-cli-v1 sh 
 FP=$(identidade 2203)
 ANTES=$(docker exec e2e-cli-v1 sh -c 'grep -c "poll OK" /home/ana/linux-server-dashboard-v2/data/dashboard.log')
 em e2e-cli-v1 "cd linux-server-dashboard-v2 && echo senha-de-teste | ./dashboard reconfigurar --sem-interface --servidor 127.0.0.1 --porta 2203 --usuario maria --identidade '$FP' --senha-stdin --smart nenhum" | tee "$OUT/C-reconfigurar.txt"
-confere "C: reconfigurado para a chave restrita (chave nova, não a da V1)" docker exec e2e-cli-v1 sh -c 'grep -q "^SSH_ACESSO=restrito" /home/ana/linux-server-dashboard-v2/.env && grep -q dashboard_v2_ed25519 /home/ana/linux-server-dashboard-v2/data/ssh/config'
+confere "C: reconfigurado para a chave restrita (chave nova, não a da V1)" docker exec e2e-cli-v1 sh -c 'grep -q "^SSH_ACESSO=restrito" /home/ana/linux-server-dashboard-v2/.env && grep -Eq "/\.ssh/dashboard-[a-z0-9-]+-[0-9a-f]{8}" /home/ana/linux-server-dashboard-v2/data/ssh/config'
 confere "C: coleta pela chave restrita" espera_coletas e2e-cli-v1 linux-server-dashboard-v2 $((ANTES + 1))
 em e2e-cli-v1 "cd linux-server-dashboard-v2 && ./dashboard diagnosticar" | tee "$OUT/C-diagnosticar.txt" || true
 confere "C: diagnóstico sem erros depois do upgrade" grep -q "nenhum erro" "$OUT/C-diagnosticar.txt"
