@@ -26,6 +26,12 @@ diante: `PATCH` corrige, `MINOR` acrescenta sem quebrar e `MAJOR` quebra.
   bloco, e o `diagnosticar` mostra a linha `source` que falta. Quem já tem o painel instalado cria o
   autocomplete com `./dashboard reconfigurar`.
 
+### Alterado
+
+- O `npm run seguranca` ficou cerca de 50 s mais rápido no CI (#104): a mutação roda o teste
+  `fonte: tirar comentários…` só no controle, em vez de repeti-lo a cada uma das 30 mutações.
+  Nenhuma ferramenta, regra ou mutação saiu, e as acusações de cada mutação ficaram iguais.
+
 ## [2.3.0] — 2026-10-30
 
 Versão estável com a interface mais responsiva: botões que respondem ao clique, entrada suave na

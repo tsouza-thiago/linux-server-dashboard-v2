@@ -23,6 +23,11 @@ const ROOT = path.join(path.dirname(fileURLToPath(import.meta.url)), '..');
 const SEG = ['test/seguranca/invariantes-estaticas.test.js', 'test/seguranca/superficie-ataque.test.js',
   'test/seguranca/payloads-owasp.test.js', 'test/seguranca/cadeia-suprimentos.test.js'];
 
+// Roda só no controle (#104): abre 1 `node --check` por arquivo e gasta ~2/3 de cada rodada.
+// Ele confere o semComentarios contra o código de todo o repositório, sem olhar guarda nenhum.
+// Se uma mutação depender dele um dia, ela sobrevive e reprova: o buraco não fica escondido.
+const SO_NO_CONTROLE = '^fonte: tirar comentários não muda a sintaxe';
+
 /**
  * { nome, arquivo, de, para, testes? }: troca o trecho `de` (que precisa aparecer UMA vez)
  * por `para`. `testes` acrescenta arquivos de teste além da rede de segurança.
@@ -90,13 +95,13 @@ function copiar() {
 let copiados = 0;
 
 /** Roda a rede de segurança (mais `extras`) na cópia; devolve o resultado do node --test. */
-function rodarTestes(dir, extras = []) {
+function rodarTestes(dir, extras = [], pular = []) {
   // Sem NODE_TEST_CONTEXT: se este script rodar dentro de um `node --test`, o filho não
   // pode se achar um subteste (ele precisa devolver o próprio código de saída).
   const env = { ...process.env };
   delete env.NODE_TEST_CONTEXT;
   const inicio = Date.now();
-  const r = spawnSync(process.execPath, ['--test', '--test-reporter=spec', ...SEG, ...extras], { cwd: dir, encoding: 'utf8', env });
+  const r = spawnSync(process.execPath, ['--test', '--test-reporter=spec', ...pular, ...SEG, ...extras], { cwd: dir, encoding: 'utf8', env });
   const conta = (rotulo) => Number((r.stdout.match(new RegExp(`ℹ ${rotulo} (\\d+)`)) || [])[1] || 0);
   return { status: r.status, testes: conta('tests'), falhas: conta('fail'), segundos: ((Date.now() - inicio) / 1000).toFixed(1), saida: `${r.stdout}${r.stderr}` };
 }
@@ -127,7 +132,7 @@ function main() {
         continue;
       }
       fs.writeFileSync(arquivo, original.replace(m.de, m.para));
-      const r = rodarTestes(dir, m.testes);
+      const r = rodarTestes(dir, m.testes, [`--test-skip-pattern=${SO_NO_CONTROLE}`]);
       fs.writeFileSync(arquivo, original);
       // Só conta como acusada se um teste FALHOU de verdade (asserção), não se o processo
       // caiu por outro motivo.
