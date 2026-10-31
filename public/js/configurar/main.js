@@ -53,7 +53,7 @@ const st = {
   prep: { state: 'revisar', feitos: [], error: '', precisaSenha: false },
   manual: { tests: {}, errors: {}, busy: '' },
   result: null,
-  prefs: { boot: true, shortcut: true, link: true, editar: false, notify: false },
+  prefs: { boot: true, shortcut: true, link: true, editar: false, bashrc: false, notify: false },
   token: '',
   opening: false,
   pastHelp: false,
@@ -544,6 +544,7 @@ function viewStep6() {
         <label class="wz-switch"><span><span>Atalho no menu de aplicativos</span><span>"Server Dashboard", com ícone</span></span><input type="checkbox" role="switch" data-pref="shortcut" ${st.prefs.shortcut ? raw('checked') : ''}></label>
         <label class="wz-switch"><span><span>Comando <span class="mono">dashboard</span> no terminal</span><span>${cmd.detalhe}</span></span><input type="checkbox" role="switch" data-pref="link" ${st.prefs.link ? raw('checked') : ''} ${cmd.trava ? raw('disabled') : ''}></label>
         ${cmd.pedeEdicao && st.prefs.link ? html`<label class="wz-switch"><span><span>Pôr <span class="mono">~/.local/bin</span> no PATH</span><span>acrescenta um bloco no <span class="mono">~/${cmd.arquivo}</span>, com cópia antes</span></span><input type="checkbox" role="switch" data-pref="editar" ${st.prefs.editar ? raw('checked') : ''}></label>` : ''}
+        ${cmd.pedeBashrc && st.prefs.link ? html`<label class="wz-switch"><span><span>Autocomplete com Tab</span><span>acrescenta um bloco no <span class="mono">~/.bashrc</span>, com cópia antes</span></span><input type="checkbox" role="switch" data-pref="bashrc" ${st.prefs.bashrc ? raw('checked') : ''}></label>` : ''}
         <label class="wz-switch"><span><span>Avisar no navegador quando algo for crítico</span><span>o navegador vai pedir permissão</span></span><input type="checkbox" role="switch" data-pref="notify" ${st.prefs.notify ? raw('checked') : ''}></label>
       </section>
       <section class="wz-box" aria-label="O que foi criado"><h2>O que foi criado</h2>
@@ -724,7 +725,7 @@ async function openPanel() {
   render();
   let url;
   try {
-    url = (await api('concluir', { iniciarComComputador: st.prefs.boot, atalho: st.prefs.shortcut, link: st.prefs.link, editarProfile: st.prefs.editar })).url;
+    url = (await api('concluir', { iniciarComComputador: st.prefs.boot, atalho: st.prefs.shortcut, link: st.prefs.link, editarProfile: st.prefs.editar, editarBashrc: st.prefs.bashrc })).url;
   } catch (err) {
     st.opening = false;
     st.error = err.message;

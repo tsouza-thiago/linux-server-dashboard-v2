@@ -212,6 +212,10 @@ test('concluir: o sim do arquivo de login chega à edição; sem ele, nada muda'
   assert.equal(fs.existsSync(profile), false);
   inst.concluir({ editarProfile: true });
   assert.match(fs.readFileSync(profile, 'utf8'), /server-dashboard/);
+  const bashrc = path.join(home, '.bashrc');
+  assert.equal(fs.existsSync(bashrc), false, 'o sim do PATH não vale para o ~/.bashrc');
+  inst.concluir({ editarBashrc: true });
+  assert.match(fs.readFileSync(bashrc, 'utf8'), /server-dashboard/);
 });
 
 test('concluir: troca o link de outra pasta só quando a tela pediu', async (t) => {

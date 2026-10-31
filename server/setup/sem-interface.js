@@ -25,8 +25,9 @@ export const HEADLESS_HELP = `Uso: ./dashboard instalar --sem-interface --servid
   --sem-origem            não limita a chave a este computador (sem from=)
   --sem-inicio-automatico não liga o serviço ao iniciar o computador
   --sem-atalho            não cria o atalho no menu
-  --sem-link              não cria o comando dashboard (~/.local/bin/dashboard)
-  --editar-profile        põe ~/.local/bin no PATH pelo arquivo de login do bash, com cópia antes
+  --sem-link              não cria o comando dashboard (~/.local/bin/dashboard) nem o autocomplete
+  --editar-profile        põe ~/.local/bin no PATH pelo arquivo de login do bash e, sem o pacote
+                          bash-completion, carrega o autocomplete pelo ~/.bashrc, com cópia antes
 `;
 
 // Lista de uma opção: ausente = undefined (usa a recomendação); a palavra `none` = vazia.
@@ -113,7 +114,7 @@ export async function runHeadless({ out, inst, flags, stdin = process.stdin }) {
     const t = inst.resumoTeste();
     out.ok('primeira coleta', `${t.duracaoMs ?? '?'} ms · ${t.bytes ?? '?'} bytes`);
     // Sem perguntas: não troca o link de outra pasta e só edita o arquivo de login com a opção.
-    inst.concluir({ iniciarComComputador: !flags['sem-inicio-automatico'], atalho: !flags['sem-atalho'], link: !flags['sem-link'], trocarLink: false, editarProfile: Boolean(flags['editar-profile']) });
+    inst.concluir({ iniciarComComputador: !flags['sem-inicio-automatico'], atalho: !flags['sem-atalho'], link: !flags['sem-link'], trocarLink: false, editarProfile: Boolean(flags['editar-profile']), editarBashrc: Boolean(flags['editar-profile']) });
     mostrarComando(out, inst.comando);
     const lig = await inst.ligarPainel({ iniciarComComputador: !flags['sem-inicio-automatico'] });
     if (!lig.ok) return fail(`o painel não subiu: ${lig.erro}`, `rode ${out.cmd} diagnosticar.`);

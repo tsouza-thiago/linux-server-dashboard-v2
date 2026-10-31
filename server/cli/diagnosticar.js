@@ -11,7 +11,7 @@ import { collect, runSSH } from '../collector/index.js';
 import { normalizeTargets } from '../collector/builder.js';
 import { panelStatus } from './servico.js';
 import { comandoDashboard, primeiroNoPath } from './saida.js';
-import { LINHA_PATH, situacaoDoComando } from '../setup/local.js';
+import { LINHA_PATH, situacaoDoAutocomplete, situacaoDoComando } from '../setup/local.js';
 
 // "há 40 s", "há 12 min", "há 3 h"; e número com vírgula decimal.
 const ago = (ms) => (ms < 90e3 ? `${Math.round(ms / 1000)} s` : ms < 90 * 60e3 ? `${Math.round(ms / 60e3)} min` : `${Math.round(ms / 3600e3)} h`);
@@ -89,12 +89,25 @@ export function explainFailure(error) {
 }
 
 /**
+ * Confere o autocomplete de quem tem o comando nesta pasta. Nada aqui conta como aviso: faltar o
+ * pacote bash-completion ou o sim para o ~/.bashrc não atrapalha o painel.
+ */
+function conferirAutocomplete({ out, root, home, env, cmd, pacotes }) {
+  const a = situacaoDoAutocomplete({ root, home, env, pacotes });
+  if (a.estado === 'outro-programa') out.line(out.c.dim(`Autocomplete com Tab: ${a.nome} é outro arquivo.`));
+  else if (a.estado !== 'este') out.line(out.c.dim(`Autocomplete com Tab: não criado para esta pasta. Para criar, rode ${cmd} reconfigurar.`));
+  else if (a.carrega) out.ok('autocomplete com Tab', a.nome);
+  else out.line(out.c.dim(`Autocomplete com Tab: falta o pacote bash-completion. Instale o pacote ou acrescente esta linha no ~/.bashrc: ${a.linha}`));
+}
+
+/**
  * Confere o link e o PATH. Sem link é escolha da pessoa (--sem-link): não conta como aviso.
  * Link criado que só vale no próximo login também não: a instalação já explicou.
  */
-function conferirComando({ out, warn, root, home, env }) {
-  const c = situacaoDoComando({ root, home, env });
+function conferirComando({ out, warn, root, home, env, pacotes }) {
+  const c = situacaoDoComando({ root, home, env, pacotes });
   const cmd = comandoDashboard({ root, env });
+  if (c.estado === 'este') conferirAutocomplete({ out, root, home, env, cmd, pacotes });
   if (c.estado === 'ausente') out.line(out.c.dim(`Comando dashboard no PATH: não criado. Para criar, rode ${cmd} reconfigurar.`));
   else if (c.estado === 'outro-programa') out.line(out.c.dim('Comando dashboard no PATH: ~/.local/bin/dashboard é outro programa.'));
   else if (c.estado === 'outra-pasta') {
@@ -142,7 +155,7 @@ export async function diagnosticar({ out, root, home = os.homedir(), deps = {} }
     out.explain('', `inicie com ${out.cmd} iniciar (ou abra pelo atalho "Server Dashboard").`);
   }
 
-  conferirComando({ out, warn, root, home, env: deps.env ?? process.env });
+  conferirComando({ out, warn, root, home, env: deps.env ?? process.env, pacotes: deps.pacotes });
 
   const keyFile = keyFileFromConfig(root);
   const perms = permissionProblems(root, keyFile);

@@ -141,6 +141,11 @@ completo que a instalação mostrou. Se `~/.local/bin` não estiver no seu PATH,
 se pode acrescentar a pasta no arquivo de login, e guarda uma cópia antes. Instalou antes desta
 versão? Rode `./dashboard reconfigurar`: o último passo oferece criar o comando.
 
+Num terminal novo, a tecla **Tab** completa os comandos e as opções: `dashboard atu` + Tab vira
+`dashboard atualizar`. Em `--chave-ssh`, ela sugere os apelidos do seu `~/.ssh/config` (só desse
+arquivo, sem os de `Include`). Sem o pacote `bash-completion`, a instalação pergunta se pode
+acrescentar um bloco no `~/.bashrc`, e guarda uma cópia antes. Só funciona no bash.
+
 O painel só existe **neste computador** (`http://127.0.0.1:3000`): ninguém mais na rede
 consegue abrir, de propósito. Em outro navegador, ele pede o **token de reserva** (o
 assistente mostra uma vez; ele também fica no `.env`).
@@ -323,6 +328,14 @@ Comece sempre por `./dashboard diagnosticar`: ele aponta o problema e diz como r
 - Rode `./dashboard diagnosticar` na pasta do projeto. Ele mostra se o link existe e se
   `~/.local/bin` está no PATH, e diz a linha que falta.
 - Dentro da pasta do projeto, `./dashboard` sempre funciona.
+
+### A tecla Tab não completa o comando
+
+- Abra um terminal novo: o autocomplete não vale no terminal em que você instalou.
+- Rode `dashboard diagnosticar`. Ele mostra se o autocomplete existe e diz a linha `source` que
+  falta no `~/.bashrc`.
+- O pacote está instalado e o Tab continua sem completar? Algumas versões do Debian trazem a
+  carga do pacote comentada no `~/.bashrc`. Acrescente essa mesma linha `source`.
 
 ### A porta 3000 já está em uso
 

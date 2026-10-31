@@ -280,6 +280,7 @@ const binDir = (home) => path.join(home, '.local', 'bin');
 const linkPath = (home) => path.join(binDir(home), 'dashboard');
 // O bash de login lê só o 1º destes que existir.
 const LOGIN_FILES = ['.bash_profile', '.bash_login', '.profile'];
+const BASHRC = '.bashrc';
 const BLOCO_INICIO = '# >>> server-dashboard >>>';
 const BLOCO_FIM = '# <<< server-dashboard <<<';
 // POSIX: vale em qualquer shell que leia o arquivo; só age se a pasta ainda faltar no PATH.
@@ -291,12 +292,8 @@ export const LINHA_PATH = 'export PATH="$HOME/.local/bin:$PATH"';
 // Caminho real do arquivo, ou null se ele não existir.
 const realpath = (file) => { try { return fs.realpathSync(file); } catch { return null; } };
 
-/**
- * O que existe em ~/.local/bin/dashboard: `ausente`, `este` (esta pasta), `outra-pasta` (outra
- * pasta do painel), `quebrado` (link de painel cujo destino sumiu) ou `outro-programa`.
- */
-export function situacaoDoLink({ root, home = os.homedir() } = {}) {
-  const link = linkPath(home);
+// O que existe no lugar de um link do painel para `alvo` (relativo à pasta do painel).
+function lerLinkDoPainel(link, root, alvo) {
   let destino;
   try {
     destino = path.resolve(path.dirname(link), fs.readlinkSync(link));
@@ -304,12 +301,39 @@ export function situacaoDoLink({ root, home = os.homedir() } = {}) {
     // EINVAL: arquivo comum; ENOTDIR: ~/.local ou bin é um arquivo. Nada disso é nosso.
     return { estado: err.code === 'ENOENT' ? 'ausente' : 'outro-programa' };
   }
+  const fim = `${path.sep}${alvo}`;
   const real = realpath(link);
-  if (!real) return { estado: path.basename(destino) === 'dashboard' ? 'quebrado' : 'outro-programa', alvo: destino };
-  if (real === realpath(path.join(root, 'dashboard'))) return { estado: 'este', alvo: real };
+  if (!real) return { estado: destino.endsWith(fim) ? 'quebrado' : 'outro-programa', alvo: destino };
+  if (real === realpath(path.join(root, alvo))) return { estado: 'este', alvo: real };
   // Reconhece outra instalação pelo que só o painel tem ao lado do script.
-  const painel = path.basename(real) === 'dashboard' && fs.existsSync(path.join(path.dirname(real), 'server', 'cli', 'index.js'));
+  const painel = real.endsWith(fim) && fs.existsSync(path.join(real.slice(0, -fim.length), 'server', 'cli', 'index.js'));
   return { estado: painel ? 'outra-pasta' : 'outro-programa', alvo: real };
+}
+
+// Cria ou troca o link com as regras de conflito (ADR 0028). Devolve `criado`, `trocado`,
+// `pronto`, `falhou` ou o estado que impede: `outra-pasta` sem `trocar` ou `outro-programa`.
+function aplicarLink(link, destino, atual, trocar) {
+  if (atual.estado === 'outro-programa' || (atual.estado === 'outra-pasta' && !trocar)) return atual.estado;
+  if (atual.estado === 'este') return 'pronto';
+  const tmp = `${link}.tmp-${process.pid}`;
+  try {
+    fs.mkdirSync(path.dirname(link), { recursive: true });
+    // Link temporário + rename: a troca é atômica, e o comando nunca fica faltando.
+    fs.symlinkSync(destino, tmp);
+    fs.renameSync(tmp, link);
+  } catch {
+    fs.rmSync(tmp, { force: true });
+    return 'falhou';
+  }
+  return atual.estado === 'ausente' ? 'criado' : 'trocado';
+}
+
+/**
+ * O que existe em ~/.local/bin/dashboard: `ausente`, `este` (esta pasta), `outra-pasta` (outra
+ * pasta do painel), `quebrado` (link de painel cujo destino sumiu) ou `outro-programa`.
+ */
+export function situacaoDoLink({ root, home = os.homedir() } = {}) {
+  return lerLinkDoPainel(linkPath(home), root, 'dashboard');
 }
 
 /**
@@ -319,23 +343,9 @@ export function situacaoDoLink({ root, home = os.homedir() } = {}) {
  */
 export function criarLinkNoPath({ root, home = os.homedir(), env = process.env, trocar = false } = {}) {
   const atual = situacaoDoLink({ root, home });
-  if (atual.estado === 'outro-programa') return { estado: atual.estado };
-  if (atual.estado === 'outra-pasta' && !trocar) return atual;
-  let estado = 'pronto';
-  if (atual.estado !== 'este') {
-    const link = linkPath(home);
-    const tmp = `${link}.tmp-${process.pid}`;
-    try {
-      fs.mkdirSync(binDir(home), { recursive: true });
-      // Link temporário + rename: a troca é atômica, e o comando nunca fica faltando.
-      fs.symlinkSync(path.resolve(root, 'dashboard'), tmp);
-      fs.renameSync(tmp, link);
-    } catch {
-      fs.rmSync(tmp, { force: true });
-      return { estado: 'falhou' };
-    }
-    estado = atual.estado === 'ausente' ? 'criado' : 'trocado';
-  }
+  const estado = aplicarLink(linkPath(home), path.resolve(root, 'dashboard'), atual, trocar);
+  if (estado === 'outra-pasta') return atual;
+  if (estado === 'outro-programa' || estado === 'falhou') return { estado };
   const primeiro = primeiroNoPath(env);
   const outroAntes = primeiro && comandoDashboard({ root, env }) !== 'dashboard' ? primeiro : null;
   return { estado, outroAntes };
@@ -349,11 +359,18 @@ export function removerLinkDoPath({ root, home = os.homedir() } = {}) {
   return { removido: true, estado };
 }
 
+// Texto do arquivo sem as linhas de comentário ('' se não der para ler).
+function textoUtil(file) {
+  try {
+    return fs.readFileSync(file, 'utf8').split('\n').filter((l) => !l.trimStart().startsWith('#')).join('\n');
+  } catch {
+    return '';
+  }
+}
+
 // O texto do arquivo cita ~/.local/bin fora de comentário?
 function citaBin(file, home) {
-  let texto;
-  try { texto = fs.readFileSync(file, 'utf8'); } catch { return false; }
-  const util = texto.split('\n').filter((l) => !l.trimStart().startsWith('#')).join('\n');
+  const util = textoUtil(file);
   return /(\$HOME|\$\{HOME\}|~)\/\.local\/bin/.test(util) || util.includes(binDir(home));
 }
 
@@ -379,13 +396,8 @@ function lerSeExistir(file) {
   }
 }
 
-/**
- * Acrescenta o bloco marcado no arquivo de login, com cópia antes. Devolve o `estado`:
- * `editado`, `ja-cuidado` (nada a fazer; rodar de novo não duplica) ou `sem-permissao`.
- */
-export function editarArquivoDeLogin({ home = os.homedir(), env = process.env } = {}) {
-  const { arquivo, cuidadoPor } = situacaoDoPath({ home, env });
-  if (cuidadoPor) return { estado: 'ja-cuidado', arquivo: cuidadoPor };
+// Acrescenta um bloco no fim do arquivo pessoal, com cópia antes.
+function acrescentarBloco(home, arquivo, bloco) {
   const file = path.join(home, arquivo);
   try {
     // Lê direto, sem conferir antes: o arquivo pode mudar entre a conferência e a leitura.
@@ -394,17 +406,27 @@ export function editarArquivoDeLogin({ home = os.homedir(), env = process.env } 
     if (existe) fs.copyFileSync(file, `${file}.dashboard-bak`);
     const antes = !texto ? '' : texto.endsWith('\n') ? '\n' : '\n\n';
     // Acréscimo direto (sem rename): segue o link de quem versiona os dotfiles e mantém o modo.
-    fs.appendFileSync(file, `${antes}${BLOCO}\n`, { mode: 0o644 });
+    fs.appendFileSync(file, `${antes}${bloco}\n`, { mode: 0o644 });
     return { estado: 'editado', arquivo, copia: existe ? `${arquivo}.dashboard-bak` : null };
   } catch {
     return { estado: 'sem-permissao', arquivo };
   }
 }
 
-/** Tira só o bloco marcado. Devolve { removidos, falhas }, com os nomes dos arquivos. */
+/**
+ * Acrescenta o bloco marcado no arquivo de login, com cópia antes. Devolve o `estado`:
+ * `editado`, `ja-cuidado` (nada a fazer; rodar de novo não duplica) ou `sem-permissao`.
+ */
+export function editarArquivoDeLogin({ home = os.homedir(), env = process.env } = {}) {
+  const { arquivo, cuidadoPor } = situacaoDoPath({ home, env });
+  if (cuidadoPor) return { estado: 'ja-cuidado', arquivo: cuidadoPor };
+  return acrescentarBloco(home, arquivo, BLOCO);
+}
+
+/** Tira só os blocos marcados. Devolve { removidos, falhas }, com os nomes dos arquivos. */
 export function removerBlocoDoLogin({ home = os.homedir() } = {}) {
   const r = { removidos: [], falhas: [] };
-  for (const arquivo of LOGIN_FILES) {
+  for (const arquivo of [...LOGIN_FILES, BASHRC]) {
     const file = path.join(home, arquivo);
     try {
       const texto = fs.readFileSync(file, 'utf8');
@@ -419,12 +441,64 @@ export function removerBlocoDoLogin({ home = os.homedir() } = {}) {
   return r;
 }
 
+// Autocomplete do bash (F5, ADR 0029): link para scripts/completar.bash, na pasta que o pacote
+// bash-completion consulta sozinho na 1ª vez que se aperta Tab depois de `dashboard`.
+const SCRIPT_COMPLETAR = path.join('scripts', 'completar.bash');
+// Onde o pacote deixa o carregador, no Debian, no Ubuntu e no Fedora.
+const PACOTE_BASH_COMPLETION = ['/usr/share/bash-completion/bash_completion', '/etc/bash_completion'];
+// Fixo e sem dado da configuração: repete em shell a conta de `linkAutocomplete`.
+const BLOCO_BASHRC = [BLOCO_INICIO, '_dash_c="${BASH_COMPLETION_USER_DIR:-${XDG_DATA_HOME:-$HOME/.local/share}/bash-completion}/completions/dashboard"; [ -r "$_dash_c" ] && . "$_dash_c"; unset _dash_c', BLOCO_FIM].join('\n');
+
+// A mesma conta do bash-completion: a 1ª pasta de BASH_COMPLETION_USER_DIR ou a do XDG.
+function linkAutocomplete(home, env) {
+  const base = env.BASH_COMPLETION_USER_DIR?.split(':')[0] || path.join(env.XDG_DATA_HOME || path.join(home, '.local', 'share'), 'bash-completion');
+  return path.join(path.resolve(base), 'completions', 'dashboard');
+}
+
+/**
+ * O que existe no lugar do link do autocomplete (os estados de `situacaoDoLink`), `pacote` (o
+ * bash-completion está instalado) e `carrega` (o bash vai achar o link: pelo pacote ou pelo
+ * ~/.bashrc). `linha` é o que a pessoa acrescenta à mão, sem o pacote.
+ */
+export function situacaoDoAutocomplete({ root, home = os.homedir(), env = process.env, pacotes = PACOTE_BASH_COMPLETION } = {}) {
+  const link = linkAutocomplete(home, env);
+  const noHome = link.startsWith(`${home}${path.sep}`);
+  const pacote = pacotes.some((f) => fs.existsSync(f));
+  return {
+    ...lerLinkDoPainel(link, root, SCRIPT_COMPLETAR), pacote,
+    carrega: pacote || /completions\/dashboard|completar\.bash/.test(textoUtil(path.join(home, BASHRC))),
+    nome: noHome ? `~${link.slice(home.length)}` : link,
+    linha: `source "${noHome ? `$HOME${link.slice(home.length)}` : link}"`,
+  };
+}
+
+/**
+ * Cria o link do autocomplete com as regras do link do comando e, com `editar`, carrega o
+ * arquivo pelo ~/.bashrc se faltar o pacote. Devolve a situação, com o `estado` de `aplicarLink`.
+ */
+export function criarAutocomplete({ root, home = os.homedir(), env = process.env, trocar = false, editar = false, pacotes } = {}) {
+  const atual = situacaoDoAutocomplete({ root, home, env, pacotes });
+  const estado = aplicarLink(linkAutocomplete(home, env), path.resolve(root, SCRIPT_COMPLETAR), atual, trocar);
+  const r = { ...atual, estado };
+  if (editar && !r.carrega && ['criado', 'trocado', 'pronto'].includes(estado)) r.edicao = acrescentarBloco(home, BASHRC, BLOCO_BASHRC);
+  return r;
+}
+
+/** Apaga o link do autocomplete só se ele aponta para esta pasta. Devolve { removido, nome }. */
+export function removerAutocomplete({ root, home = os.homedir(), env = process.env } = {}) {
+  const { estado, nome } = situacaoDoAutocomplete({ root, home, env });
+  if (estado !== 'este') return { removido: false, nome };
+  fs.rmSync(linkAutocomplete(home, env), { force: true });
+  return { removido: true, nome };
+}
+
 /** Situação do comando e o que as telas oferecem: padrão, trava e texto do link e do PATH. */
-export function situacaoDoComando({ root, home = os.homedir(), env = process.env, semLink = false } = {}) {
+export function situacaoDoComando({ root, home = os.homedir(), env = process.env, semLink = false, pacotes } = {}) {
   const { estado, alvo } = situacaoDoLink({ root, home });
   const caminho = situacaoDoPath({ home, env });
+  const auto = situacaoDoAutocomplete({ root, home, env, pacotes });
   const detalhes = {
-    ausente: 'roda de qualquer pasta, sem o ./',
+    ausente: 'roda de qualquer pasta, sem o ./, e completa com Tab',
     este: 'já criado para esta pasta',
     quebrado: 'troca um link antigo, de uma pasta que não existe mais',
     'outra-pasta': `hoje vale para ${alvo}; ligado, passa a valer para esta pasta`,
@@ -437,14 +511,16 @@ export function situacaoDoComando({ root, home = os.homedir(), env = process.env
     trava,
     detalhe: semLink ? 'pulado pela opção --sem-link' : detalhes[estado],
     pedeEdicao: !caminho.noPath && !caminho.cuidadoPor && !semLink && estado !== 'outro-programa',
+    pedeBashrc: !auto.carrega && !semLink && estado !== 'outro-programa' && auto.estado !== 'outro-programa',
   };
 }
 
-/** Passo da instalação: cria o link e, com o sim, edita o arquivo de login. Nunca lança. */
-export function prepararComando({ root, home = os.homedir(), env = process.env, trocar = false, editar = false } = {}) {
+/** Passo da instalação: cria os links e, com o sim, edita o arquivo de login e o ~/.bashrc. Nunca lança. */
+export function prepararComando({ root, home = os.homedir(), env = process.env, trocar = false, editar = false, editarBashrc = false, pacotes } = {}) {
   const link = criarLinkNoPath({ root, home, env, trocar });
   const r = { nome: NOME_LINK, caminho: linkPath(home), linha: LINHA_PATH, ...link, ...situacaoDoPath({ home, env }) };
   if (['outra-pasta', 'outro-programa', 'falhou'].includes(link.estado)) return r;
+  r.autocomplete = criarAutocomplete({ root, home, env, trocar, editar: editarBashrc, pacotes });
   if (editar && !r.noPath && !r.cuidadoPor) r.edicao = editarArquivoDeLogin({ home, env });
   return r;
 }

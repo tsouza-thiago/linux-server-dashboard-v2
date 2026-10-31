@@ -108,6 +108,9 @@ No assistente (`--assistente`), nos 2 temas:
   endereço, porta, usuário, chave e agente. No passo 3 não há campo de senha; o 1º
   Conectar mostra o `ssh-add -t 15m …` e "Tentar de novo"; o 2º conecta. No passo 5 aparece
   o campo "Senha de maria para o sudo" (`certa`), com a nota de que não é a passphrase.
+- **Comando e autocomplete:** no passo 6, "Pôr `~/.local/bin` no PATH" e "Autocomplete com Tab"
+  começam desligados e somem quando "Comando `dashboard` no terminal" é desligado. O assistente de
+  teste roda sempre como se faltasse o pacote `bash-completion`.
 
 ## Como registrar
 

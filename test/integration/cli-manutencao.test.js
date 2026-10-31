@@ -428,9 +428,9 @@ function comLink(t) {
   fs.symlinkSync(path.join(inst.root, 'dashboard'), path.join(bin, 'dashboard'));
   return { ...inst, bin };
 }
-const diagComando = async ({ root, home }, env) => {
+const diagComando = async ({ root, home }, env, pacotes = []) => {
   const o = memOut();
-  await diagnosticar({ out: o.out, root, home, deps: { env, now: Date.now(), panelStatus: () => ({ running: false }), collect: async () => ({ ok: false, error: 'x' }) } });
+  await diagnosticar({ out: o.out, root, home, deps: { env, pacotes, now: Date.now(), panelStatus: () => ({ running: false }), collect: async () => ({ ok: false, error: 'x' }) } });
   return o.text();
 };
 const seca = { stopPanel: async () => ({}), removeService: () => false, interactive: false };
@@ -473,6 +473,42 @@ test('desinstalar: arquivo de login sem escrita vira aviso, e a desinstalação 
   const o = memOut();
   assert.equal(await desinstalar({ out: o.out, root, home, args: ['--sim'], deps: seca }), 0, o.text());
   assert.match(o.text(), /▲ não consegui editar o ~\/\.profile \(apague à mão o bloco server-dashboard\)/);
+});
+
+// Pasta do autocomplete, com o link desta instalação (como a instalação deixa).
+function comAutocomplete({ root, home }) {
+  fs.mkdirSync(path.join(root, 'scripts'), { recursive: true });
+  fs.writeFileSync(path.join(root, 'scripts', 'completar.bash'), '');
+  const dir = path.join(home, '.local', 'share', 'bash-completion', 'completions');
+  fs.mkdirSync(dir, { recursive: true });
+  fs.symlinkSync(path.join(root, 'scripts', 'completar.bash'), path.join(dir, 'dashboard'));
+  return path.join(dir, 'dashboard');
+}
+
+test('desinstalar: remove o link do autocomplete e o bloco do ~/.bashrc', async (t) => {
+  const { root, home } = comLink(t);
+  const link = comAutocomplete({ root, home });
+  fs.writeFileSync(path.join(home, '.bashrc'), 'alias l=ls\n\n# >>> server-dashboard >>>\nx\n# <<< server-dashboard <<<\n');
+  const o = memOut();
+  assert.equal(await desinstalar({ out: o.out, root, home, args: ['--sim'], deps: { ...seca, env: {} } }), 0, o.text());
+  assert.equal(fs.existsSync(link), false);
+  assert.equal(fs.readFileSync(path.join(home, '.bashrc'), 'utf8'), 'alias l=ls\n');
+  assert.match(o.text(), /✓ autocomplete removido/);
+  assert.match(o.text(), /✓ autocomplete retirado do ~\/\.bashrc/);
+});
+
+test('diagnosticar: mostra o autocomplete e a linha do source, sem contar aviso', async (t) => {
+  const c = comLink(t);
+  const env = { PATH: c.bin };
+  assert.match(await diagComando(c, env), /Autocomplete com Tab: não criado para esta pasta\. Para criar, rode dashboard reconfigurar\./);
+  const link = comAutocomplete(c);
+  const sem = await diagComando(c, env);
+  assert.match(sem, /Autocomplete com Tab: falta o pacote bash-completion.*source "\$HOME\/\.local\/share\/bash-completion\/completions\/dashboard"/);
+  assert.doesNotMatch(sem, /▲.*utocomplete/);
+  assert.match(await diagComando(c, env, ['/']), /✓ autocomplete com Tab \(~\/\.local\/share/, 'com o pacote');
+  fs.rmSync(link);
+  fs.writeFileSync(link, 'do usuário');
+  assert.match(await diagComando(c, env), /Autocomplete com Tab: ~\/\.local\/share\/bash-completion\/completions\/dashboard é outro arquivo/);
 });
 
 test('diagnosticar: confere o link e o PATH', async (t) => {

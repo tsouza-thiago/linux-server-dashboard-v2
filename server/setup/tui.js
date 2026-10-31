@@ -494,7 +494,7 @@ async function step6(sc, inst) {
   sc.step = 6;
   const r = inst.resumoTeste() || {};
   const { systemd, comando } = inst.verificarComputador();
-  const prefs = { boot: systemd, shortcut: true, link: comando.liga, editar: false };
+  const prefs = { boot: systemd, shortcut: true, link: comando.liga, editar: false, bashrc: false };
   const res = await sc.form({
     title: 'Tudo pronto. A primeira coleta já deu certo.',
     lines: [
@@ -508,6 +508,7 @@ async function step6(sc, inst) {
         { type: 'check', label: 'Atalho no menu de aplicativos', get: () => prefs.shortcut, toggle: () => { prefs.shortcut = !prefs.shortcut; } },
         { type: 'check', label: `Comando dashboard no terminal (${comando.detalhe})`, disabled: comando.trava, get: () => prefs.link, toggle: () => { prefs.link = !prefs.link; } },
         ...(comando.pedeEdicao ? [{ type: 'check', label: `Pôr ~/.local/bin no PATH (acrescenta um bloco no ~/${comando.arquivo}, com cópia antes)`, get: () => prefs.editar, toggle: () => { prefs.editar = !prefs.editar; } }] : []),
+        ...(comando.pedeBashrc ? [{ type: 'check', label: 'Autocomplete com Tab (acrescenta um bloco no ~/.bashrc, com cópia antes)', get: () => prefs.bashrc, toggle: () => { prefs.bashrc = !prefs.bashrc; } }] : []),
       ],
     }],
     footer: ['No servidor: usuário dashmon, chave restrita e (se escolheu SMART) a regra de sudo para smartctl -H.', 'Para desfazer tudo, aqui e no servidor: dashboard desinstalar', 'Aperte "t" para ver o token de reserva (uma vez só).'],
@@ -517,7 +518,7 @@ async function step6(sc, inst) {
   sc.close();
   // `concluir` devolve as preferências no formato que `ligarPainel` lê
   // ({ iniciarComComputador, atalho }), igual ao assistente web.
-  const escolhas = inst.concluir({ iniciarComComputador: prefs.boot, atalho: prefs.shortcut, link: prefs.link, editarProfile: prefs.editar });
+  const escolhas = inst.concluir({ iniciarComComputador: prefs.boot, atalho: prefs.shortcut, link: prefs.link, editarProfile: prefs.editar, editarBashrc: prefs.bashrc });
   return { prefs: escolhas, token: prefs.token };
 }
 

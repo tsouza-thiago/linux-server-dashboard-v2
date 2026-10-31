@@ -129,6 +129,11 @@ O teste `test/unit/docs.test.js` confere esta documentação contra o código.
   modo sem perguntas): cópia antes, bloco marcado e fixo, sem nenhum dado da configuração. O
   `desinstalar` tira só o link desta pasta e só o bloco. As mensagens da CLI usam `out.cmd`
   (`server/cli/saida.js`); as telas e os logs do painel seguem com `./dashboard`.
+- **Autocomplete** (ADR 0029): `scripts/completar.bash` é estático, lê o `~/.ssh/config` sem rodar
+  `ssh` e só sugere nomes `[A-Za-z0-9_.-]`, sem passar o arquivo pelo `compgen -W` (ele expandiria
+  `$(...)`). O link segue as regras do link do comando. O `~/.bashrc` só muda sem o pacote
+  `bash-completion` e com o sim (`--editar-profile` no modo sem perguntas), com as mesmas garantias
+  do arquivo de login. `test/unit/autocomplete.test.js` confere comandos e opções contra o código.
 - **Versões assinadas** (ADR 0012): o instalador e o `./dashboard atualizar` só aceitam
   tags assinadas por uma chave de `docs/allowed_signers`.
 - **Code scanning** (CodeQL padrão do GitHub, a cada push): todo alerta é corrigido ou
@@ -264,8 +269,8 @@ navegador. O backend só coleta, persiste e serve. O limite de 1 SSH por minuto 
 ./dashboard instalar            # assistente no navegador (--terminal: TUI; --sem-interface: sem perguntas)
 ./dashboard instalar --importar-v1 <pasta>   # upgrade V1 → V2 (para a V1, traz .env e data/)
 ./dashboard instalar --sem-assinatura        # só para desenvolvimento: pasta sem tag assinada (cópia, ramo)
-./dashboard instalar --sem-link              # não cria o comando dashboard (~/.local/bin/dashboard), nos 3 modos
-./dashboard instalar --sem-interface --editar-profile  # põe ~/.local/bin no PATH pelo arquivo de login, com cópia antes
+./dashboard instalar --sem-link              # não cria o comando dashboard (~/.local/bin/dashboard) nem o autocomplete, nos 3 modos
+./dashboard instalar --sem-interface --editar-profile  # põe ~/.local/bin no PATH pelo arquivo de login e, sem o bash-completion, carrega o autocomplete pelo ~/.bashrc, com cópia antes
 ./dashboard abrir               # abre o painel já logado (link de uso único)
 ./dashboard iniciar             # serviço de usuário ou segundo plano
 ./dashboard parar               # para só o processo do painel desta pasta (PID conferido, B12)
@@ -465,8 +470,11 @@ Fora da pasta do projeto: a chave `~/.ssh/dashboard-<servidor>-<id>` (as instala
 2.1.0 continuam com a `dashboard_ed25519` ou a `dashboard_v2_ed25519`), o serviço
 `~/.config/systemd/user/server-dashboard.service`, o atalho
 `~/.local/share/applications/server-dashboard.desktop`, o comando `~/.local/bin/dashboard`
-(link para o `dashboard` desta pasta) e, só com o sim, um bloco marcado
-(`# >>> server-dashboard >>>`) no arquivo de login do bash, com a cópia `<arquivo>.dashboard-bak`.
+(link para o `dashboard` desta pasta), o autocomplete
+`~/.local/share/bash-completion/completions/dashboard` (link para `scripts/completar.bash`; respeita
+`BASH_COMPLETION_USER_DIR` e `XDG_DATA_HOME`) e, só com o sim, um bloco marcado
+(`# >>> server-dashboard >>>`) no arquivo de login do bash e, sem o pacote `bash-completion`, outro
+no `~/.bashrc`, com a cópia `<arquivo>.dashboard-bak`.
 
 Ao encerrar (SIGINT/SIGTERM), o painel espera gravar histórico, alertas e anotações
 pendentes (B11).
@@ -588,6 +596,7 @@ linux-server-dashboard-v2/
 │                           ROADMAP.md e roadmap/ (planejamento de cada feature)
 ├── scripts/                check.mjs, seguranca.mjs, mutacao-seguranca.mjs, soak-acelerado.mjs,
 │                           capturar-amostra.mjs, painel-teste.mjs, node-runtime.sh, askpass.sh,
+│                           completar.bash (autocomplete do bash),
 │                           e2e-instalacao/
 ├── server/
 │   ├── index.js            rotas, loop de coleta, export

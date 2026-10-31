@@ -18,6 +18,13 @@ diante: `PATCH` corrige, `MINOR` acrescenta sem quebrar e `MAJOR` quebra.
   perguntas). As mensagens do terminal citam `dashboard` quando ele vale, o `desinstalar` remove o
   link e o bloco, o `diagnosticar` confere os 2 e o `status` mostra a pasta. Quem já tem o painel
   instalado cria o link com `./dashboard reconfigurar`.
+- Autocomplete com Tab no bash (#88, ADR 0029): completa os comandos, as opções de cada comando, as
+  pastas de `--importar-v1`, os apelidos do `~/.ssh/config` em `--chave-ssh` e o valor de `--modo`.
+  A instalação cria o link na pasta do `bash-completion`, sem sudo, junto com o comando (`--sem-link`
+  pula os 2). Sem o pacote, ela pergunta e, com o sim, acrescenta um bloco marcado no `~/.bashrc`,
+  com cópia antes (`--editar-profile` no modo sem perguntas). O `desinstalar` remove o link e o
+  bloco, e o `diagnosticar` mostra a linha `source` que falta. Quem já tem o painel instalado cria o
+  autocomplete com `./dashboard reconfigurar`.
 
 ## [2.3.0] — 2026-10-30
 

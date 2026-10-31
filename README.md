@@ -94,8 +94,10 @@ Sem tela? `./dashboard instalar --terminal` faz os mesmos passos no terminal. Pa
 automatizar: `./dashboard instalar --sem-interface --ajuda`.
 
 A instalação também cria o comando `dashboard`, que roda de qualquer pasta e sem o `./`. Ele é um
-link em `~/.local/bin` e não pede sudo. Para pular, use `--sem-link`. Já tinha o painel instalado?
-Rode `./dashboard reconfigurar`: o assistente oferece criar o comando.
+link em `~/.local/bin` e não pede sudo. Ela liga também o autocomplete do bash: `dashboard atu` +
+Tab vira `dashboard atualizar`, e as opções completam do mesmo jeito. Para pular os 2, use
+`--sem-link`. Já tinha o painel instalado? Rode `./dashboard reconfigurar`: o assistente oferece
+criar o comando.
 
 ---
 
