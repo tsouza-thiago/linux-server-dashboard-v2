@@ -112,6 +112,12 @@ No assistente (`--assistente`), nos 2 temas:
   começam desligados e somem quando "Comando `dashboard` no terminal" é desligado. O assistente de
   teste roda sempre como se faltasse o pacote `bash-completion`.
 
+Nas imagens do README e do TUTORIAL (`docs/img/`):
+
+- **Prints:** compare com as telas de agora. Mudou de forma visível? Rode `npm run capturar-telas`
+  e olhe cada imagem nova antes do commit: só dados inventados, nada de IP real, nome de máquina
+  ou pasta pessoal.
+
 ## Como registrar
 
 - No PR: os cenários rodados, as telas conferidas e o que falhou.

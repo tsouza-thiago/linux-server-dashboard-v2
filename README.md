@@ -1,6 +1,10 @@
+<img src="docs/img/banner.svg" alt="Server Dashboard: painel em tempo real do seu servidor Linux">
+
 # Server Dashboard
 
 **Painel em tempo real do seu servidor Linux, no navegador. Nada é instalado no servidor.**
+
+<picture><source media="(prefers-color-scheme: dark)" srcset="docs/img/visao-geral-escuro.webp"><img src="docs/img/visao-geral-claro.webp" alt="Visão geral do painel: saúde 100 de 100, servidor saudável, disponibilidade e indicadores de processador, memória, disco, temperatura e rede"></picture>
 
 Uma vez por minuto, o painel conecta no servidor por SSH, lê dezenas de métricas e mostra
 tudo em gráficos. Ele roda no **seu computador**: o servidor só responde 1 comando de
@@ -10,18 +14,13 @@ leitura por minuto. Funciona até em hardware muito limitado (1 núcleo, pouca R
 > [docs/adr/](docs/adr/README.md). A V1 continua na tag
 > [`v1.0.0`](https://github.com/tsouza-thiago/linux-server-dashboard-v2/releases/tag/v1.0.0).
 
-```
-  [seu computador]                                   [servidor Linux]
-  ./dashboard  ── painel em http://127.0.0.1:3000    nada instalado nele
-       │                                                    ▲
-       └──────── 1 comando SSH por minuto (só leitura) ─────┘
-```
+<picture><source media="(prefers-color-scheme: dark)" srcset="docs/img/arquitetura-escuro.svg"><img src="docs/img/arquitetura-claro.svg" alt="Diagrama: no seu computador, o navegador mostra as telas, o painel coleta e a pasta data/ guarda o histórico. O painel faz 1 comando SSH de leitura por minuto no servidor Linux, onde nada é instalado"></picture>
 
 **Novo por aqui?** Siga o [Tutorial passo a passo](TUTORIAL.md).
 
 ---
 
-## Garantias
+## <picture><source media="(prefers-color-scheme: dark)" srcset="docs/img/icones/garantias-escuro.svg"><img src="docs/img/icones/garantias-claro.svg" alt="" width="24" height="24"></picture> Garantias
 
 - **O servidor só é lido.** O painel não instala, não grava e não roda nada além do
   comando de leitura. Nada de agente, serviço ou script deixado lá.
@@ -39,7 +38,7 @@ Detalhes e modelo de ameaças: [SECURITY.md](SECURITY.md).
 
 ---
 
-## O que ele mostra
+## <picture><source media="(prefers-color-scheme: dark)" srcset="docs/img/icones/telas-escuro.svg"><img src="docs/img/icones/telas-claro.svg" alt="" width="24" height="24"></picture> O que ele mostra
 
 | Tela | O que mostra |
 |---|---|
@@ -55,9 +54,21 @@ Detalhes e modelo de ameaças: [SECURITY.md](SECURITY.md).
 Histórico: 72 horas detalhadas (1 ponto por minuto) e 90 dias resumidos (a cada 5 min).
 Tema escuro e claro.
 
+<table>
+<tr><td width="50%" align="center"><strong>Recursos</strong><br><picture><source media="(prefers-color-scheme: dark)" srcset="docs/img/recursos-escuro.webp"><img src="docs/img/recursos-claro.webp" alt="Tela Recursos: processador por tipo, carga, memória e temperatura"></picture></td><td width="50%" align="center"><strong>Armazenamento</strong><br><picture><source media="(prefers-color-scheme: dark)" srcset="docs/img/armazenamento-escuro.webp"><img src="docs/img/armazenamento-claro.webp" alt="Tela Armazenamento: espaço por pasta e previsão de quando o disco enche"></picture></td></tr>
+<tr><td width="50%" align="center"><strong>Rede</strong><br><picture><source media="(prefers-color-scheme: dark)" srcset="docs/img/rede-escuro.webp"><img src="docs/img/rede-claro.webp" alt="Tela Rede: download, upload e tráfego no período"></picture></td><td width="50%" align="center"><strong>Eventos</strong><br><picture><source media="(prefers-color-scheme: dark)" srcset="docs/img/eventos-escuro.webp"><img src="docs/img/eventos-claro.webp" alt="Tela Eventos: disponibilidade de 90 dias e linha do tempo de alertas, quedas e anotações"></picture></td></tr>
+</table>
+
+Trocar de tela e percorrer um gráfico acontece no navegador, sem nenhuma conexão a mais com o
+servidor:
+
+<img src="docs/img/animacao.webp" alt="Animação: o mouse passa pelo menu, troca entre Recursos, Armazenamento e Rede e percorre um gráfico" width="720">
+
+Todas as imagens saem de um painel de teste, com dados inventados.
+
 ---
 
-## Requisitos
+## <picture><source media="(prefers-color-scheme: dark)" srcset="docs/img/icones/requisitos-escuro.svg"><img src="docs/img/icones/requisitos-claro.svg" alt="" width="24" height="24"></picture> Requisitos
 
 - **Este computador:** Linux (Debian, Ubuntu, Mint ou Fedora; ADR 0013) com `git`:
   ```bash
@@ -73,7 +84,7 @@ dentro da pasta (`.runtime/`) e confere o SHA-256. Não precisa de `npm install`
 
 ---
 
-## Instalar
+## <picture><source media="(prefers-color-scheme: dark)" srcset="docs/img/icones/instalar-escuro.svg"><img src="docs/img/icones/instalar-claro.svg" alt="" width="24" height="24"></picture> Instalar
 
 ```bash
 git clone https://github.com/tsouza-thiago/linux-server-dashboard-v2.git && cd linux-server-dashboard-v2 && ./dashboard instalar
@@ -101,7 +112,7 @@ criar o comando.
 
 ---
 
-## Comandos
+## <picture><source media="(prefers-color-scheme: dark)" srcset="docs/img/icones/comandos-escuro.svg"><img src="docs/img/icones/comandos-claro.svg" alt="" width="24" height="24"></picture> Comandos
 
 Na pasta do projeto:
 
@@ -121,7 +132,7 @@ aparece no menu como **Server Dashboard**.
 
 ---
 
-## Vindo da V1
+## <picture><source media="(prefers-color-scheme: dark)" srcset="docs/img/icones/v1-escuro.svg"><img src="docs/img/icones/v1-claro.svg" alt="" width="24" height="24"></picture> Vindo da V1
 
 Clone a V2 numa pasta nova e rode:
 
@@ -138,7 +149,7 @@ inicia mais com o computador) e, na pasta da V1, `./start.sh --background`.
 
 ---
 
-## Problemas?
+## <picture><source media="(prefers-color-scheme: dark)" srcset="docs/img/icones/problemas-escuro.svg"><img src="docs/img/icones/problemas-claro.svg" alt="" width="24" height="24"></picture> Problemas?
 
 1. Rode `./dashboard diagnosticar`. Ele diz o que aconteceu e como resolver.
 2. Veja a seção [Solução de problemas](TUTORIAL.md#9-solução-de-problemas) do tutorial.
@@ -146,7 +157,7 @@ inicia mais com o computador) e, na pasta da V1, `./start.sh --background`.
 
 ---
 
-## Perguntas frequentes
+## <picture><source media="(prefers-color-scheme: dark)" srcset="docs/img/icones/perguntas-escuro.svg"><img src="docs/img/icones/perguntas-claro.svg" alt="" width="24" height="24"></picture> Perguntas frequentes
 
 **Pesa no servidor?** Não. Ele responde 1 comando leve por minuto (cerca de 1 segundo
 num servidor de 1 núcleo). Gráficos, histórico e alertas rodam no seu computador.
@@ -165,7 +176,7 @@ de propósito. Para acesso remoto, use VPN ou túnel SSH.
 
 ---
 
-## Documentação
+## <picture><source media="(prefers-color-scheme: dark)" srcset="docs/img/icones/documentacao-escuro.svg"><img src="docs/img/icones/documentacao-claro.svg" alt="" width="24" height="24"></picture> Documentação
 
 | Documento | Para quem |
 |---|---|
@@ -175,6 +186,6 @@ de propósito. Para acesso remoto, use VPN ou túnel SSH.
 | [CHANGELOG.md](CHANGELOG.md) | Mudanças de cada versão |
 | [docs/adr/](docs/adr/README.md) | Decisões de projeto (ADRs) e análises de segurança em `docs/seguranca/` |
 
-## Licença
+## <picture><source media="(prefers-color-scheme: dark)" srcset="docs/img/icones/licenca-escuro.svg"><img src="docs/img/icones/licenca-claro.svg" alt="" width="24" height="24"></picture> Licença
 
 **MIT**: use, modifique e compartilhe com atribuição (veja `LICENSE`).

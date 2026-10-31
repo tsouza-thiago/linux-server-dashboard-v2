@@ -11,6 +11,11 @@ diante: `PATCH` corrige, `MINOR` acrescenta sem quebrar e `MAJOR` quebra.
 
 ### Adicionado
 
+- README e TUTORIAL ilustrados (#106): prints das 8 telas nos 2 temas, conforme o tema do leitor,
+  login e os 6 passos do assistente, além de banner, diagrama da arquitetura, ícones nos títulos,
+  blocos de aviso e uma animação curta. `npm run capturar-telas` refaz tudo em `docs/img/` a partir
+  do painel de teste, com dados inventados, e falha se o texto da tela tiver um dado da máquina. O
+  `test/unit/docs.test.js` confere se as imagens existem, têm texto alternativo e cabem no orçamento.
 - Comando `dashboard` sem `./`, de qualquer pasta (#87, ADR 0028): a instalação cria o link
   `~/.local/bin/dashboard`, sem sudo, nos 3 modos. `--sem-link` pula. Ela confere conflitos de nome
   e nunca sobrescreve outro programa. Sem `~/.local/bin` no PATH, ela pergunta e, com o sim,
