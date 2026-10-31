@@ -5,6 +5,7 @@ import os from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { Instalacao } from '../server/setup/instalacao.js';
+import { prepararComando, situacaoDoComando } from '../server/setup/local.js';
 import { parseOutput } from '../server/collector/parser.js';
 import { targetsHash } from '../server/collector/builder.js';
 
@@ -96,6 +97,9 @@ export function makeInstalacao(serverOpts = {}) {
     root,
     home,
     deps: {
+      // Sem o pacote bash-completion e sem o XDG da máquina: o teste só escreve na home temporária.
+      prepararComando: (o) => prepararComando({ ...o, env: { PATH: process.env.PATH }, pacotes: [] }),
+      situacaoDoComando: (o) => situacaoDoComando({ ...o, env: { PATH: process.env.PATH }, pacotes: [] }),
       probePort: async (host) => (host === '192.0.2.99' ? { ok: false, reason: 'sem-resposta' } : { ok: true, ms: 3 }),
       scanHostKeys: async () => [{ type: 'ssh-ed25519', key: ED, fingerprint: 'SHA256:8oOm2IqGGSLMQ94IC6SBJJ/EIGqCSF6BhAsYUkBWlXw' }],
       runAdmin: srv.runAdmin,

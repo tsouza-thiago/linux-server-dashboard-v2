@@ -43,7 +43,7 @@ const IMG = {
 };
 
 const SEMGREP_REGRAS = ['p/owasp-top-ten', 'p/nodejs', 'p/javascript', 'p/xss', 'p/command-injection', 'p/secrets'];
-const SHELL_SCRIPTS = ['dashboard', 'scripts/node-runtime.sh', 'scripts/askpass.sh', 'scripts/e2e-instalacao/rodar.sh'];
+const SHELL_SCRIPTS = ['dashboard', 'scripts/node-runtime.sh', 'scripts/askpass.sh', 'scripts/completar.bash', 'scripts/e2e-instalacao/rodar.sh'];
 
 // ---------------------------------------------------------------- utilidades
 

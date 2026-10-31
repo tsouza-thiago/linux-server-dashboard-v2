@@ -22,7 +22,7 @@ const HELP = `Uso: ./dashboard <comando>
                     --sem-interface  sem perguntas, por opções (veja --sem-interface --ajuda)
                     --importar-v1 <pasta>  traz configuração e histórico da V1 (e para a V1)
                     --pre            aceita pré-versão (rc); sem ela, fica na estável
-                    --sem-link       não cria o comando dashboard (~/.local/bin/dashboard)
+                    --sem-link       não cria o comando dashboard (~/.local/bin/dashboard) nem o autocomplete
   abrir           abre o painel no navegador, já logado
   iniciar         inicia o painel (serviço de usuário ou segundo plano)
   parar           para o painel

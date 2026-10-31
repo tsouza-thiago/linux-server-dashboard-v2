@@ -100,14 +100,17 @@ test('TUI: passo 6 oferece o comando no PATH e o arquivo de login só muda com o
   term.keys(
     'Enter', 'Enter', '192.0.2.10', 'Enter', 'maria', 'Enter', 'Enter', 's', 'certa', 'Enter',
     'Enter', 'Enter', 'Enter', 'Enter',
-    'down', 'down', 'down', 'space', 'Enter', // 6: marca a 4ª caixa (pôr no PATH) e conclui
+    'down', 'down', 'down', 'space', 'down', 'space', 'Enter', // 6: marca a 4ª e a 5ª caixa (PATH e ~/.bashrc) e conclui
   );
   assert.equal(await running, 0, o.text());
   const telas = term.screens.join('');
-  assert.match(telas, /\[x\] Comando dashboard no terminal \(roda de qualquer pasta, sem o \.\/\)/);
+  assert.match(telas, /\[x\] Comando dashboard no terminal \(roda de qualquer pasta, sem o \.\/, e completa com Tab\)/);
   assert.match(telas, /\[x\] Pôr ~\/\.local\/bin no PATH/);
+  assert.match(telas, /\[x\] Autocomplete com Tab/);
   assert.match(fs.readFileSync(path.join(fake.home, '.profile'), 'utf8'), /server-dashboard/);
+  assert.match(fs.readFileSync(path.join(fake.home, '.bashrc'), 'utf8'), /server-dashboard/);
   assert.match(o.text(), /✓ comando dashboard pronto/);
+  assert.match(o.text(), /✓ autocomplete com Tab acrescentado em ~\/\.bashrc/);
   assert.match(o.text(), /✓ PATH acrescentado em ~\/\.profile \(arquivo novo\)/);
 });
 
@@ -122,6 +125,7 @@ test('TUI: --sem-link deixa a caixa travada e não cria o comando', async (t) =>
   assert.equal(await running, 0, o.text());
   assert.match(term.screens.join(''), /\[ \] Comando dashboard no terminal \(pulado pela opção --sem-link\)/);
   assert.doesNotMatch(term.screens.join(''), /\[x\] Comando dashboard/, 'a caixa travada não muda');
+  assert.doesNotMatch(term.screens.join(''), /Autocomplete com Tab/);
   assert.equal(fs.existsSync(path.join(fake.home, '.local', 'bin', 'dashboard')), false);
   assert.doesNotMatch(o.text(), /comando dashboard/);
 });
@@ -228,12 +232,18 @@ test('sem interface: --sem-link pula o comando; --editar-profile é a única edi
   const padrao = await roda({});
   assert.ok(fs.lstatSync(padrao.link));
   assert.equal(fs.existsSync(padrao.profile), false, 'sem perguntas, o padrão é não editar');
+  assert.equal(fs.existsSync(path.join(padrao.home, '.bashrc')), false);
+  assert.ok(fs.lstatSync(path.join(padrao.home, '.local', 'share', 'bash-completion', 'completions', 'dashboard')));
+  assert.match(padrao.texto, /▲ falta o pacote bash-completion/);
   assert.match(padrao.texto, /▲ ~\/\.local\/bin não está no PATH/);
   const semLink = await roda({ 'sem-link': true, 'editar-profile': true });
   assert.equal(fs.existsSync(path.dirname(semLink.link)), false);
   assert.equal(fs.existsSync(semLink.profile), false);
+  assert.equal(fs.existsSync(path.join(semLink.home, '.local', 'share', 'bash-completion')), false, '--sem-link pula o autocomplete');
+  assert.equal(fs.existsSync(path.join(semLink.home, '.bashrc')), false);
   const editar = await roda({ 'editar-profile': true });
   assert.match(fs.readFileSync(editar.profile, 'utf8'), /server-dashboard/);
+  assert.match(fs.readFileSync(path.join(editar.home, '.bashrc'), 'utf8'), /server-dashboard/);
   assert.match(HEADLESS_HELP, /--sem-link[\s\S]*--editar-profile/);
 
   // Sem perguntas, o link de outra pasta fica como está: ninguém disse sim.

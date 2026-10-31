@@ -10,7 +10,7 @@ import path from 'node:path';
 import readline from 'node:readline';
 import { removalScript, remainingLines, assistedScript, completedSteps } from '../setup/preparo.js';
 import { runAdmin, describeAdminError, resolveAlias, checkAgentKey } from '../setup/remoto.js';
-import { removeService, removeShortcut, removerBlocoDoLogin, removerLinkDoPath } from '../setup/local.js';
+import { removeService, removeShortcut, removerAutocomplete, removerBlocoDoLogin, removerLinkDoPath } from '../setup/local.js';
 import { currentServer } from '../setup/instalacao.js';
 import { validUser, installId, validPublicKey, NAME_PREFIX, PANEL_USER } from '../setup/acesso.js';
 import { stopPanel } from './servico.js';
@@ -137,11 +137,13 @@ export async function desinstalar({ out, root, args = [], home = os.homedir(), d
   if (removeShortcut({ home })) out.ok('atalho do menu removido');
   const link = removerLinkDoPath({ root, home });
   if (link.removido) out.ok('comando dashboard removido', '~/.local/bin/dashboard');
-  // O bloco do PATH é da máquina: a outra pasta que tem o link ainda precisa dele.
+  const auto = removerAutocomplete({ root, home, env: deps.env ?? process.env });
+  if (auto.removido) out.ok('autocomplete removido', auto.nome);
+  // Os blocos são da máquina: a outra pasta que tem o link ainda precisa dele.
   if (link.estado === 'outra-pasta') out.line(out.c.dim(`O comando dashboard continua: ele vale para ${link.alvo}.`));
   else {
     const bloco = removerBlocoDoLogin({ home });
-    for (const f of bloco.removidos) out.ok(`PATH retirado do ~/${f}`, 'só o bloco do painel');
+    for (const f of bloco.removidos) out.ok(`${f === '.bashrc' ? 'autocomplete' : 'PATH'} retirado do ~/${f}`, 'só o bloco do painel');
     for (const f of bloco.falhas) out.warn(`não consegui editar o ~/${f}`, 'apague à mão o bloco server-dashboard');
   }
   // Só apaga a chave se ela for do painel (nome dashboard*): nunca a chave pessoal de alguém.

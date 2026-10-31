@@ -71,10 +71,21 @@ export function makeOutput({ stream = process.stdout, env = process.env, root = 
   };
 }
 
+/** O que a instalação fez com o autocomplete (`autocomplete` de `prepararComando`). */
+function mostrarAutocomplete(out, a) {
+  if (!a) return;
+  if (a.estado === 'outro-programa') out.warn('o autocomplete não foi criado', `${a.nome} já é outro arquivo e ficou como está`);
+  else if (a.estado === 'outra-pasta') out.line(out.c.dim(`O autocomplete continua na outra pasta: ${a.alvo}.`));
+  else if (a.estado === 'falhou') out.warn('não consegui criar o autocomplete', a.nome);
+  else if (a.edicao?.estado === 'editado') out.ok(`autocomplete com Tab acrescentado em ~/${a.edicao.arquivo}`, a.edicao.copia ? `cópia em ~/${a.edicao.copia}` : 'arquivo novo');
+  else if (a.carrega) out.ok('autocomplete com Tab pronto', 'vale num terminal novo');
+  else out.warn('falta o pacote bash-completion para o autocomplete', `instale o pacote ou acrescente esta linha no ~/.bashrc: ${a.linha}`);
+}
+
 /** O que a instalação fez com o comando no PATH, a partir do resultado de `prepararComando`. */
 export function mostrarComando(out, r) {
   if (!r) return;
-  const { nome, caminho, estado, alvo, outroAntes, noPath, cuidadoPor, edicao, arquivo, linha } = r;
+  const { nome, caminho, estado, alvo, outroAntes, noPath, cuidadoPor, edicao, arquivo, linha, autocomplete } = r;
   if (estado === 'outro-programa') {
     out.warn('o comando dashboard não foi criado', `${nome} já é outro programa e ficou como está`);
     return;
@@ -91,6 +102,7 @@ export function mostrarComando(out, r) {
   if (estado === 'trocado') out.ok('comando dashboard trocado', 'agora vale para esta pasta');
   else out.ok('comando dashboard pronto', nome);
   if (outroAntes) out.warn('outro dashboard vem antes no PATH', `vai rodar ${outroAntes}`);
+  mostrarAutocomplete(out, autocomplete);
   if (noPath) return;
   if (edicao?.estado === 'editado') {
     out.ok(`PATH acrescentado em ~/${edicao.arquivo}`, edicao.copia ? `cópia em ~/${edicao.copia}` : 'arquivo novo');

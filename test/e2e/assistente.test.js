@@ -138,15 +138,19 @@ test('assistente e2e: modo assistido do passo 1 ao "Abrir o painel"', async (t) 
   assert.equal(await s.page.isChecked('[data-pref="link"]'), true);
   assert.equal(await s.page.isChecked('[data-pref="editar"]'), false);
   await s.page.uncheck('[data-pref="link"]');
-  assert.equal(await s.page.locator('[data-pref="editar"]').count(), 0, 'sem o link, nada a editar');
+  assert.equal(await s.page.locator('[data-pref="editar"], [data-pref="bashrc"]').count(), 0, 'sem o link, nada a editar');
   await s.page.check('[data-pref="link"]');
   await s.page.check('[data-pref="editar"]');
+  // Autocomplete: o ~/.bashrc também só com o sim (o teste roda sem o pacote bash-completion).
+  assert.equal(await s.page.isChecked('[data-pref="bashrc"]'), false);
+  await s.page.check('[data-pref="bashrc"]');
   await s.page.click('[data-act="abrir"]');
   await s.page.waitForFunction(() => document.querySelector('[data-act="abrir"]')?.disabled);
   await s.page.waitForTimeout(300);
   assert.deepEqual(s.finished, [{ iniciarComComputador: true, atalho: false }]);
   assert.equal(s.inst.comando.estado, 'criado');
   assert.match(fs.readFileSync(path.join(s.home, '.profile'), 'utf8'), /server-dashboard/, 'o sim chegou até o arquivo');
+  assert.match(fs.readFileSync(path.join(s.home, '.bashrc'), 'utf8'), /server-dashboard/, 'o sim chegou até o ~/.bashrc');
   // 400 e 422 acima são os erros provocados de propósito (endereço e senha errados).
   assert.deepEqual(s.problems.filter((p) => !/status of 4(00|22)/.test(p)), []);
 });

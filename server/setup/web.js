@@ -133,7 +133,7 @@ export function createWizardApp({ inst, code, onFinish = () => {}, onActivity = 
 
   app.post('/api/configurar/concluir', async (req, res) => {
     try {
-      const prefs = inst.concluir({ iniciarComComputador: req.body?.iniciarComComputador !== false, atalho: req.body?.atalho !== false, link: req.body?.link !== false, editarProfile: req.body?.editarProfile === true });
+      const prefs = inst.concluir({ iniciarComComputador: req.body?.iniciarComComputador !== false, atalho: req.body?.atalho !== false, link: req.body?.link !== false, editarProfile: req.body?.editarProfile === true, editarBashrc: req.body?.editarBashrc === true });
       // Link de entrada criado antes de fechar: o painel o aceita assim que subir.
       const codigo = createLoginCode(path.join(inst.root, 'data'), { ttlMs: 10 * 60 * 1000 });
       res.on('finish', () => onFinish(prefs));

@@ -79,7 +79,7 @@ export class Instalacao {
     this.root = root;
     this.home = home;
     this.deps = {
-      probePort, scanHostKeys, runAdmin, resolveAlias, checkAgentKey, collect: collectV2, runSSH, ensureKey, installService, installShortcut, prepararComando,
+      probePort, scanHostKeys, runAdmin, resolveAlias, checkAgentKey, collect: collectV2, runSSH, ensureKey, installService, installShortcut, prepararComando, situacaoDoComando,
       startPanel, hasSystemdUser, versionStatus: () => currentVersionStatus(root), spawnSync, hostname: os.hostname,
       ...deps,
     };
@@ -146,7 +146,7 @@ export class Instalacao {
       porta: panelPort(this.root),
       reconfigurar: Boolean(env.SSH_HOST && env.SSH_ACESSO),
       servidorAtual: currentServer(this.root),
-      comando: situacaoDoComando({ root: this.root, home: this.home, semLink: this.semLink }),
+      comando: this.deps.situacaoDoComando({ root: this.root, home: this.home, semLink: this.semLink }),
     };
   }
 
@@ -543,11 +543,11 @@ export class Instalacao {
 
   /**
    * Conclui: grava o .env final, cria o token (se faltar), aplica as preferências (serviço
-   * que inicia com o computador, atalho, comando no PATH) e devolve o link de entrada de uso
+   * que inicia com o computador, atalho, comando no PATH e autocomplete) e devolve o link de entrada de uso
    * único. O resultado do comando fica em `this.comando`, para quem chama mostrar. Quem
    * chama (web/TUI) fecha o assistente e só então liga o painel, que usa a mesma porta.
    */
-  concluir({ iniciarComComputador = true, atalho = true, link = true, trocarLink = true, editarProfile = false } = {}) {
+  concluir({ iniciarComComputador = true, atalho = true, link = true, trocarLink = true, editarProfile = false, editarBashrc = false } = {}) {
     if (!this.preparo.concluido) fail('Termine a preparação primeiro.');
     this.#configurarLocal();
     ensureToken(this.root);
@@ -556,7 +556,7 @@ export class Instalacao {
     else removeShortcut({ home: this.home });
     // Sem o link, nada muda: reconfigurar nunca apaga um link que já existe.
     this.comando = link && !this.semLink
-      ? this.deps.prepararComando({ root: this.root, home: this.home, trocar: trocarLink, editar: editarProfile })
+      ? this.deps.prepararComando({ root: this.root, home: this.home, trocar: trocarLink, editar: editarProfile, editarBashrc })
       : null;
     return { iniciarComComputador: Boolean(iniciarComComputador), atalho: Boolean(atalho) };
   }

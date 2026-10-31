@@ -31,6 +31,8 @@ ok() { printf '\033[32m✓\033[0m %s\n' "$*"; PASSOU+=("$*"); }
 falha() { printf '\033[31m✗\033[0m %s\n' "$*"; FALHOU+=("$*"); }
 confere() { local desc="$1"; shift; if "$@" >>"$OUT/log.txt" 2>&1; then ok "$desc"; else falha "$desc"; fi; }
 em() { local c="$1"; shift; docker exec -u ana "$c" bash -lc "$*"; }
+# Tab de verdade, num shell interativo: Ctrl-A volta ao início e põe o echo antes da linha.
+tab_completa() { printf 'dashboard atu\t\001echo COMPLETOU: \nexit\n' | docker exec -i -e TERM=dumb -u ana "$1" script -qc 'bash -il' /dev/null | tr -d '\r' | grep -a '^COMPLETOU: dashboard atualizar' >/dev/null; }
 envs=()
 if [ -n "$PROXY" ]; then envs=(-e "https_proxy=$PROXY" -e "HTTPS_PROXY=$PROXY" -e "NODE_EXTRA_CA_CERTS=/usr/local/share/ca-certificates/proxy.crt"); fi
 
@@ -88,7 +90,7 @@ servidor e2e-srv-deb dash-e2e-servidor-debian 2201
 cliente e2e-cli-deb dash-e2e-cliente-debian
 FP=$(identidade 2201)
 confere "A: computador sem Node" bash -c "! docker exec e2e-cli-deb sh -c 'command -v node'"
-em e2e-cli-deb "git clone -q git://127.0.0.1:9418/release linux-server-dashboard-v2 && cd linux-server-dashboard-v2 && printf 'PORT=3101\n' > .env && echo senha-de-teste | ./dashboard instalar --sem-interface --servidor 127.0.0.1 --porta 2201 --usuario maria --identidade '$FP' --senha-stdin --smart nenhum" | tee "$OUT/A-instalar.txt"
+em e2e-cli-deb "git clone -q git://127.0.0.1:9418/release linux-server-dashboard-v2 && cd linux-server-dashboard-v2 && printf 'PORT=3101\n' > .env && echo senha-de-teste | ./dashboard instalar --sem-interface --servidor 127.0.0.1 --porta 2201 --usuario maria --identidade '$FP' --senha-stdin --smart nenhum --editar-profile" | tee "$OUT/A-instalar.txt"
 confere "A: fixou na versão assinada mais nova" grep -q "usando a versão assinada mais nova: v2.0.0-beta.2" "$OUT/A-instalar.txt"
 confere "A: assinatura conferida" grep -q "assinatura conferida" "$OUT/A-instalar.txt"
 confere "A: Node 24 baixado e conferido" grep -q "baixado para .runtime/ e conferido" "$OUT/A-instalar.txt"
@@ -100,6 +102,7 @@ confere "A: dashmon no servidor só com a chave restrita" docker exec e2e-srv-de
 confere "A: linha com o computador e o ID da instalação (ADR 0020)" docker exec e2e-srv-deb sh -c 'grep -Eq " dashboard@[a-z0-9-]+:[0-9a-f]{8}\$" /home/dashmon/.ssh/authorized_keys'
 confere "A: sem SMART, nenhuma regra de sudo no servidor" bash -c "! docker exec e2e-srv-deb sh -c 'ls /etc/sudoers.d/dashboard-*'"
 confere "A: comando dashboard de outra pasta, num shell de login" em e2e-cli-deb "cd /tmp && dashboard versao"
+confere "A: sem o bash-completion, o Tab completa pelo ~/.bashrc" tab_completa e2e-cli-deb
 # O caminho da v2.0.0: da pré-versão para a estável assinada (a v2.0.1 sem assinatura é ignorada).
 cd "$GIT/release" && versao 2.0.0 && git commit -qam "e2e: 2.0.0" && assina v2.0.0 && git tag v2.0.1 && cd "$REPO"
 em e2e-cli-deb "cd linux-server-dashboard-v2 && ./dashboard atualizar && ./dashboard versao" | tee "$OUT/A-atualizar.txt"
@@ -116,6 +119,7 @@ em e2e-cli-deb "cd linux-server-dashboard-v2 && echo senha-de-teste | ./dashboar
 confere "A: servidor limpo pelo desinstalar" bash -c "! docker exec e2e-srv-deb id dashmon"
 confere "A: sudoers da instalação apagado" bash -c "! docker exec e2e-srv-deb sh -c 'ls /etc/sudoers.d/dashboard-*'"
 confere "A: o desinstalar removeu o comando" bash -c "! docker exec e2e-cli-deb test -e /home/ana/.local/bin/dashboard"
+confere "A: o desinstalar removeu o autocomplete" bash -c "! docker exec e2e-cli-deb sh -c 'test -e /home/ana/.local/share/bash-completion/completions/dashboard || grep -q server-dashboard /home/ana/.bashrc'"
 confere "A: chave e configuração locais apagadas" bash -c "! docker exec e2e-cli-deb sh -c 'ls /home/ana/.ssh/dashboard-* /home/ana/linux-server-dashboard-v2/.env'"
 
 # ------------------------------------------------------------------ B · Ubuntu 24.04
@@ -133,6 +137,8 @@ confere "B: o terminal registrou o fim do assistente" grep -q "Tudo pronto. Pode
 em e2e-cli-ubu "cd linux-server-dashboard-v2 && ./dashboard diagnosticar" | tee "$OUT/B-diagnosticar.txt" || true
 confere "B: diagnóstico sem erros" grep -q "nenhum erro" "$OUT/B-diagnosticar.txt"
 confere "B: comando dashboard de outra pasta, num shell de login" em e2e-cli-ubu "cd /tmp && dashboard versao"
+confere "B: com o bash-completion, o Tab completa sem editar o ~/.bashrc" tab_completa e2e-cli-ubu
+confere "B: ~/.bashrc intacto" bash -c "! docker exec e2e-cli-ubu grep -q server-dashboard /home/ana/.bashrc"
 
 # ------------------------------------------------------------------ C · V1 → V2
 log "C · upgrade V1 → V2 (a V1 roda de verdade e gera o data/ dela)"
