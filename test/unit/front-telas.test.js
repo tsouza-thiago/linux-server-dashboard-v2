@@ -561,3 +561,5 @@ test('relatórios (#54): sem dado de rede, o cartão Rede diz "sem dados", não 
   });
   assert.match(text('#rl-cards'), /Rede\s*0 B\s*↓ 0 B · ↑ 0 B/);
 });
+
+test.todo('previsão de lotação (#116): enquanto o histórico carrega, a tela não diz "~1 dia"');
