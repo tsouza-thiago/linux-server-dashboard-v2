@@ -474,6 +474,37 @@ test('e2e: esqueleto — nas 8 telas fica no formato final: o conteúdo entra se
   assert.deepEqual(s.problems, []);
 });
 
+test('e2e: previsão de lotação (#116) — durante a carga dos 30 dias, a tela não diz "~1 dia"', { skip: !chromium && 'sem playwright-core' }, async (t) => {
+  const s = await setup(t);
+  if (s.skip) return t.skip(s.skip);
+  // Segura só os 30 dias da previsão: o período da tela e o resto da carga seguem normais.
+  const trintaDias = (url) => url.pathname === '/api/history' && Date.now() - Date.parse(url.searchParams.get('from')) > 20 * 86400e3;
+  const telas = [
+    ['armazenamento', '#ar-mounts .mount-card', /previsão…/],
+    ['visao-geral', '.card-meter-foot', /previsão…/],
+  ];
+  for (const [id, pronto, neutro] of telas) {
+    let solta;
+    const portao = new Promise((r) => { solta = r; });
+    await s.page.route(trintaDias, async (rota) => { await portao; await rota.continue(); });
+    await s.page.goto(`${s.base}/#/${id}`, { waitUntil: 'load' });
+    await s.page.reload({ waitUntil: 'load' });
+    await s.page.waitForSelector(pronto);
+    const texto = await s.page.locator('.view').innerText();
+    assert.doesNotMatch(texto, /~1 dia/, `${id}: carga em andamento não afirma nada`);
+    assert.match(texto, neutro, `${id}: estado neutro no lugar do selo`);
+    const antes = await blocos(s.page);
+    solta();
+    // O e2e tem só 2 h de amostras: depois da carga, falta histórico de verdade.
+    await s.page.waitForFunction(() => document.querySelector('.view').innerText.includes('~1 dia'));
+    await s.page.unroute(trintaDias);
+    const depois = await blocos(s.page);
+    assert.equal(depois.length, antes.length, `${id}: mesmos blocos`);
+    depois.forEach((b, i) => assert.ok(Math.abs(b.top - antes[i].top) <= 2, `${id}: ${b.nome} pulou de ${antes[i].top} para ${b.top}`));
+  }
+  assert.deepEqual(s.problems, []);
+});
+
 // Grava na página cada vez que surge ou some um esqueleto visível ou o "atualizando".
 const gravaEsperas = (page) => page.addInitScript(() => {
   window.esperas = [];

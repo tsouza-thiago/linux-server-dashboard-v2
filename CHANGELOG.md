@@ -9,6 +9,13 @@ diante: `PATCH` corrige, `MINOR` acrescenta sem quebrar e `MAJOR` quebra.
 
 ## [Não publicado]
 
+### Corrigido
+
+- Armazenamento e Visão geral: enquanto os 30 dias de histórico carregam, a tela não diz mais
+  `previsão em ~1 dia` nem que a previsão aparece depois de ~1 dia de histórico. Esse texto agora só
+  aparece depois da carga, quando falta histórico de verdade. Se a busca falhar, ele também não
+  aparece. O painel de previsão também não pula mais de tamanho no fim da carga (#116).
+
 ## [2.4.0] — 2026-10-31
 
 Versão estável com o comando `dashboard` no PATH: ele roda de qualquer pasta, sem `./`, e completa

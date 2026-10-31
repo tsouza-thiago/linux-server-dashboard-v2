@@ -6,7 +6,7 @@
 import { html, mount } from '../core/html.js';
 import * as f from '../core/format.js';
 import {
-  headline, fullestDisk, diskEta, timeline, isOffline, healthLevel, levelOf, viewOfKey, peakOf,
+  headline, fullestDisk, diskEta, etaPendente, timeline, isOffline, healthLevel, levelOf, viewOfKey, peakOf,
   dailyTraffic, series, outageOf, cpuState,
 } from '../core/analysis.js';
 import { PERIODS } from '../core/router.js';
@@ -52,9 +52,10 @@ function narrative(state, local = {}) {
   const disk = fullestDisk(s);
   const parts = [];
   if (disk) {
-    const eta = diskEta(local.disk30 || state.buckets || [], disk.mount);
+    const eta = etaPendente(diskEta(local.disk30 || state.buckets || [], disk.mount), local.disk30);
     if (eta.status === 'enchendo') parts.push(html`No ritmo atual, <b>${disk.mount} enche em ${f.days(eta.days)}</b>.`);
     else if (eta.status === 'estavel') parts.push(html`O disco mais cheio, <b>${disk.mount}</b>, está com ${f.pct(disk.pct)} e uso estável.`);
+    else if (eta.status === 'carregando') parts.push(html`O disco mais cheio, <b>${disk.mount}</b>, está com ${f.pct(disk.pct)}.`);
     else parts.push(html`O disco mais cheio, <b>${disk.mount}</b>, está com ${f.pct(disk.pct)}. A previsão de lotação aparece depois de ~1 dia de histórico.`);
   }
   const recent = (state.alerts?.all || []).find((a) => a.status === 'resolved' && Date.now() - Date.parse(a.ts) < 48 * 3600e3);
@@ -145,7 +146,7 @@ function cardContent(ctx) {
   const ramPct = s?.ram?.total ? (s.ram.used / s.ram.total) * 100 : null;
   const load1 = s?.load?.[0];
   const disk = fullestDisk(s);
-  const eta = disk ? diskEta(ctx.local.disk30 || state.buckets || [], disk.mount) : null;
+  const eta = disk ? etaPendente(diskEta(ctx.local.disk30 || state.buckets || [], disk.mount), ctx.local.disk30) : null;
   const tempPeak = peakOf(state.buckets, 'tempC');
   const today = dailyTraffic((state.buckets || []).filter((b) => b.t >= new Date().setHours(0, 0, 0, 0)), state.meta?.pollIntervalMs);
   const todayBytes = today.length ? today[0].rx + today[0].tx : null;
@@ -165,11 +166,11 @@ function cardContent(ctx) {
     },
     disk: {
       label: 'Disco mais cheio',
-      pill: !eta || eta.status === 'cedo' ? '' : eta.status === 'enchendo' ? pill(eta.days < 30 ? 'warn' : 'neutral', f.days(eta.days)) : pill('neutral', 'estável'),
+      pill: eta?.status === 'enchendo' ? pill(eta.days < 30 ? 'warn' : 'neutral', f.days(eta.days)) : eta?.status === 'estavel' ? pill('neutral', 'estável') : '',
       value: big(n0(disk?.pct), '%'),
       note: disk ? `${disk.mount} · ${f.bytes(disk.usedBytes)} de ${f.bytes(disk.sizeBytes)}` : 'nenhum disco',
       viz: disk ? html`<div class="card-meter">${meter({ pct: disk.pct, color: 's3', glow: true }, { size: 'lg' })}
-        <div class="card-meter-foot"><span>${eta?.status === 'enchendo' ? `+${f.bytes(eta.perDayBytes)}/dia` : eta?.status === 'estavel' ? 'uso estável' : 'previsão: ~1 dia'}</span><span>alerta em ${f.pct(t.diskPct)}</span></div></div>` : '',
+        <div class="card-meter-foot"><span>${eta?.status === 'enchendo' ? `+${f.bytes(eta.perDayBytes)}/dia` : eta?.status === 'estavel' ? 'uso estável' : eta?.status === 'carregando' ? 'previsão…' : 'previsão: ~1 dia'}</span><span>alerta em ${f.pct(t.diskPct)}</span></div></div>` : '',
     },
     temp: {
       label: 'Temperatura',

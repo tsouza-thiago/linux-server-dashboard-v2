@@ -325,6 +325,8 @@ pre.code {
 .esqueleto { display: contents; }
 .esqueleto.oculto { visibility: hidden; }
 #ar-fc-skel:empty { display: none; }
+/* Vazio, o gráfico ainda somaria 1 vão do painel, e o que vem abaixo pularia ao fim da carga (#116). */
+#ar-fc-skel:not(:empty) + .chart { display: none; }
 
 /* Troca de período (ADR 0027): os dados velhos esmaecem e uma faixa fina corre no topo. */
 .atualizando .chart > .uplot { opacity: 0.5; transition: opacity var(--t-fast); }

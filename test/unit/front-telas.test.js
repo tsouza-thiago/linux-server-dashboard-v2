@@ -3,7 +3,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {
   timeline, levelOf, viewOfKey, offlineMsIn, outagesIn, uptimeIn, dayStatuses, trafficOf, dailyTraffic, monitoredMsIn, reportDays,
-  peakOf, meanOf, trendOf, topPeaks, diskEta, diskForecast, healthLevel, outageOf, cpuState, reportRequests, reportStepMin,
+  peakOf, meanOf, trendOf, topPeaks, diskEta, diskForecast, etaPendente, healthLevel, outageOf, cpuState, reportRequests, reportStepMin,
 } from '../../public/js/core/analysis.js';
 import fs from 'node:fs';
 import os from 'node:os';
@@ -562,4 +562,32 @@ test('relatórios (#54): sem dado de rede, o cartão Rede diz "sem dados", não 
   assert.match(text('#rl-cards'), /Rede\s*0 B\s*↓ 0 B · ↑ 0 B/);
 });
 
-test.todo('previsão de lotação (#116): enquanto o histórico carrega, a tela não diz "~1 dia"');
+test('previsão de lotação (#116): enquanto o histórico carrega, a tela não diz "~1 dia"', async () => {
+  assert.equal(etaPendente({ status: 'cedo' }, undefined).status, 'carregando', 'sem os 30 dias, faltar ponto não diz nada');
+  assert.equal(etaPendente({ status: 'cedo' }, []).status, 'cedo', 'carregado e vazio: falta histórico de verdade');
+  assert.equal(etaPendente({ status: 'estavel' }, undefined).status, 'estavel', 'o período aberto já bastou para a previsão');
+
+  const armazenamento = await import('../../public/js/views/armazenamento.js');
+  const textos = (local) => {
+    const { el, text } = fakeScreen();
+    globalThis.uPlot = class { setData() {} setScale() {} };
+    try {
+      armazenamento.update({
+        el, charts: new Map(), local: { mount: '/d', devs: '', ...local },
+        state: { buckets: [], meta: { thresholds: { diskPct: 90 } }, sample: { disks: [{ mount: '/d', pct: 40, dev: 'sda' }] } },
+      });
+    } finally {
+      delete globalThis.uPlot;
+    }
+    return `${text('#ar-mounts')} ${text('#ar-fc-head')}`;
+  };
+  assert.doesNotMatch(textos({}), /~1 dia/, 'carga em andamento');
+  assert.match(textos({}), /previsão…/);
+  assert.doesNotMatch(textos({ disk30: [], disk30Ok: false }), /~1 dia/, 'a busca falhou: não se sabe quanto histórico há');
+  assert.match(textos({ disk30: [], disk30Ok: true }), /previsão em ~1 dia.*depois de ~1 dia de histórico/, 'carregou e falta histórico');
+
+  // Sem pasta, o gráfico nunca é desenhado: um esqueleto no lugar dele faria o painel encolher.
+  const { el, text } = fakeScreen();
+  armazenamento.update({ el, charts: new Map(), local: { devs: '' }, state: { buckets: [], meta: {}, sample: { disks: [] } } });
+  assert.equal(text('#ar-fc-skel'), '');
+});
