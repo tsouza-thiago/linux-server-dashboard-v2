@@ -36,7 +36,7 @@ O teste `test/unit/docs.test.js` confere esta documentação contra o código.
   Dado ausente é `null`, nunca zero inventado.
 - O painel escuta só em `127.0.0.1`.
 
-### Invariantes (citadas no código como I1–I10)
+### Invariantes (citadas no código como I1–I11)
 
 | # | Invariante | Como é garantida |
 |---|---|---|
@@ -50,6 +50,7 @@ O teste `test/unit/docs.test.js` confere esta documentação contra o código.
 | I8 | Nada da configuração vira comando | `sanitizeToken`/`sanitizeHost` + fuzz e payloads |
 | I9 | Proteções HTTP (Host, CSRF, CSP, escape, CSV, permissões, token, limites, erros) | `test/integration/http-seguranca.test.js` (caracterização) e `test/seguranca/` |
 | I10 | Interatividade toda no navegador | nenhuma ação da tela abre SSH, exceto "coletar agora" |
+| I11 | A tela só dispara a atualização para a versão assinada mais nova já detectada; nenhum dado da tela entra no comando | a rota só compara a versão (409 se diferente), comando fixo em lista e regra estática, além das mutações |
 
 ### Regras de segurança (security by design)
 
@@ -142,7 +143,12 @@ O teste `test/unit/docs.test.js` confere esta documentação contra o código.
   conferida com as chaves da versão instalada, pela mesma função do `dashboard atualizar`
   (`newestSignedTag`). As novidades vêm do CHANGELOG da tag e vão para a tela como texto. O
   `createApp` sem `procurarVersao` não sai da máquina: testes e painel de teste nunca fazem fetch.
-  Por enquanto a tela só avisa: a troca de versão continua no terminal.
+- **Troca de versão pela tela** (ADR 0031, I11): `POST /api/atualizacao/iniciar` só compara a versão
+  do pedido com a detectada e dispara o comando fixo `dashboard atualizar --registro` (opção interna)
+  fora do serviço: `systemd-run --user` ou, sem o serviço, `spawn` com `detached`. Sem shell e sem
+  dado da tela. Exige sessão e confere a pasta de novo (só a da instalação, #118). Log, estado e
+  trava com PID ficam em `.atualizacao/`, fora de `data/`, porque a volta atrás apaga `data/`. O
+  terminal e o painel respeitam a mesma trava. A tela lê o log a cada 1 s e aguenta a queda do painel.
 - **Code scanning** (CodeQL padrão do GitHub, a cada push): todo alerta é corrigido ou
   descartado como falso positivo com a análise em `docs/seguranca/` e, se possível, um
   teste que falhe na forma errada. Não aplique a sugestão do CodeQL sem conferir o formato
@@ -479,6 +485,7 @@ Tudo fica no disco local. Nada é gravado no servidor.
 | `data/dashboard.pid`, `data/dashboard-erros.log` | Modo segundo plano (sem systemd): PID e erros de inicialização |
 | `.runtime/node/` | Node 24 baixado pelo `./dashboard`, se o do sistema faltar |
 | `.backups/` | Cópias de `data/` feitas pelo `atualizar` (as 3 mais novas, 0700) |
+| `.atualizacao/` | `ultima.log`, `estado.json` e `trava.pid` da atualização pelo painel (0700, fora do git). Fica fora de `data/` porque a volta atrás apaga `data/` (ADR 0031) |
 
 Fora da pasta do projeto: a chave `~/.ssh/dashboard-<servidor>-<id>` (as instalações até a
 2.1.0 continuam com a `dashboard_ed25519` ou a `dashboard_v2_ed25519`), o serviço
@@ -511,8 +518,10 @@ segurança, rate limit das mutações e error handler sem stack trace. Com `DASH
 | `/api/status` | GET | Última amostra + meta (online, lastPollAt, nextPollAt, offlineSince) + saúde + alertas ativos |
 | `/api/history` | GET | `?limit=N&from=&to=` → amostras (reduzidas a `limit`: padrão 720, máximo 2000, com o pior caso de cada grupo; `topProcs` só na mais recente). `&formato=baldes` → `{from, to, step, buckets}` com mín/máx/média, até 90 dias |
 | `/api/config` | GET | Configuração ativa para a Ajuda: versões, alvos, modo de acesso, limiares (sem segredos) |
-| `/api/atualizacao` | GET | `{instalada, nova, novidades, verificadoEm, erro, bloqueio}`. `novidades` é `{secoes: [{versao, data, texto}], cortado}`; `erro` é `sem-acesso` ou `falhou`; `bloqueio` é `sem-login`, `sem-git`, `arquivos-alterados` ou `outra-pasta` |
+| `/api/atualizacao` | GET | `{instalada, nova, novidades, verificadoEm, erro, modo, bloqueio}`. `novidades` é `{secoes: [{versao, data, texto}], cortado}`; `erro` é `sem-acesso` ou `falhou`; `modo` é `systemd`, `segundo-plano` ou `null`; `bloqueio` é `sem-login`, `rodando`, `sem-git`, `arquivos-alterados` ou `outra-pasta` |
 | `/api/atualizacao/verificar` | POST | Procura versão nova agora e devolve o mesmo estado. No máximo 1 por minuto (429 acima) |
+| `/api/atualizacao/iniciar` | POST | `{versao}` igual à versão nova detectada → 202 `{alvo}`; senão, com `bloqueio` ou sem executor (testes e painel de teste), 409. Se o executor não subir, 503 (I11) |
+| `/api/atualizacao/registro` | GET | `?desde=<byte>` → `{texto, proximo, fase, alvo, de, inicio, fim, resultado, rodando}`: o pedaço novo do log, em linhas inteiras, até 64 KB. `fase`: `iniciando`, `procurando`, `trocando`, `ligando`, `voltando` ou `fim`; `resultado`: `atualizado`, `ja-na-mais-nova`, `voltou`, `falhou` ou `interrompida` |
 | `/api/outages` | GET | `?days=1..90` (padrão 30) → `{days, outages, monitored, uptime}`. `monitored` são os intervalos `{from, to}` em que o painel estava medindo; `uptime` conta só esse tempo (ADR 0018) |
 | `/api/alerts` | GET | `?status=&level=&limit=` → `{active, all}` |
 | `/api/alerts/:id/ack` | POST | Reconhece o alerta |
@@ -630,7 +639,8 @@ linux-server-dashboard-v2/
 │   ├── collector/          builder (script), parser (amostra v2), rates (taxas), index (1 SSH)
 │   ├── storage/            ndjson (72 h), rollup (5 min/90 d), buckets, migrate-v1, outages,
 │   │                       coverage (tempo medido), index
-│   ├── atualizacao/        index (agenda e estado), procurar (processo à parte), novidades
+│   ├── atualizacao/        index (agenda e estado), procurar (processo à parte), novidades,
+│   │                       registro (.atualizacao/), executor (fora do serviço)
 │   └── alerts/             rules, health, engine
 ├── public/
 │   ├── index.html          casca das 8 telas, login e avisos

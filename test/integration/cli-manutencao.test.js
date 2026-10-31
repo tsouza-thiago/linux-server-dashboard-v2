@@ -229,6 +229,93 @@ test('atualizar: só tag assinada pela chave instalada; backup, troca e volta at
   assert.match(e.text(), /há arquivos do painel alterados/);
 });
 
+test('atualizar --registro: log e estado em .atualizacao/, sem nada no terminal, sem o token e sem cor', { skip: !hasGit }, async (t) => {
+  const { clone, release, g } = releaseRepos(t);
+  const home = tmp(t, 'dash-upd-home-');
+  fs.writeFileSync(path.join(clone, '.env'), `SSH_HOST=servidor\nDASH_TOKEN=${'x'.repeat(43)}\n`, { mode: 0o600 });
+  release('2.0.0-alpha.9');
+  const fases = [];
+  const silencioso = memOut();
+  const ler = () => JSON.parse(fs.readFileSync(path.join(clone, '.atualizacao', 'estado.json'), 'utf8'));
+  const deps = {
+    run: gitRun, gitRun, startPanel: async () => ({ ok: true }), panelStatus: () => ({ running: true }),
+    stopPanel: async () => { fases.push(ler().fase); return {}; },
+    reexec: (a) => { fases.push(ler().fase); assert.deepEqual(a, ['atualizar', '--pos-atualizacao']); return 0; },
+  };
+  assert.equal(await atualizar({ out: silencioso.out, root: clone, home, args: ['--registro'], deps }), 0);
+  assert.equal(silencioso.text(), '', 'o registro não escreve no terminal');
+  assert.deepEqual(fases, ['trocando', 'ligando']);
+  const log = fs.readFileSync(path.join(clone, '.atualizacao', 'ultima.log'), 'utf8');
+  assert.match(log, /✓ versão nova encontrada: v2\.0\.0-alpha\.9/);
+  assert.match(log, /✓ atualizado de v2\.0\.0-alpha\.8 para v2\.0\.0-alpha\.9/);
+  assert.ok(!log.includes('x'.repeat(43)), 'o token não vai para o log');
+  assert.ok(!log.includes('\x1b['), 'sem cor');
+  const e = ler();
+  assert.equal(e.fase, 'fim');
+  assert.equal(e.resultado, 'atualizado');
+  assert.equal(e.alvo, 'v2.0.0-alpha.9');
+  assert.equal(e.de, 'v2.0.0-alpha.8');
+  assert.ok(e.fim);
+  assert.equal(fs.existsSync(path.join(clone, '.atualizacao', 'trava.pid')), false, 'a trava sai no fim');
+  assert.equal(g(clone, 'status', '--porcelain', '--untracked-files=no'), '', 'a pasta nova não suja o git');
+});
+
+test('atualizar --registro: a volta atrás não apaga o log e fica no estado', { skip: !hasGit }, async (t) => {
+  const { clone, release, g } = releaseRepos(t);
+  const home = tmp(t, 'dash-upd-home-');
+  release('2.0.0-alpha.9', { broken: true });
+  const deps = {
+    run: gitRun, gitRun, startPanel: async () => ({ ok: true }), panelStatus: () => ({ running: true }), stopPanel: async () => ({}),
+    reexec: () => (fs.readFileSync(path.join(clone, 'quebrada'), 'utf8') === 'sim' ? 1 : 0),
+  };
+  assert.equal(await atualizar({ out: memOut().out, root: clone, home, args: ['--registro'], deps }), 1);
+  assert.equal(g(clone, 'describe', '--tags', '--exact-match'), 'v2.0.0-alpha.8');
+  assert.equal(JSON.parse(fs.readFileSync(path.join(clone, '.atualizacao', 'estado.json'), 'utf8')).resultado, 'voltou');
+  assert.match(fs.readFileSync(path.join(clone, '.atualizacao', 'ultima.log'), 'utf8'), /✗ a versão v2\.0\.0-alpha\.9 não funcionou aqui/);
+});
+
+test('atualizar --registro: já na mais nova e falha da pasta têm resultado próprio', { skip: !hasGit }, async (t) => {
+  const { clone } = releaseRepos(t);
+  const home = tmp(t, 'dash-upd-home-');
+  const deps = { run: gitRun, gitRun };
+  const ler = () => JSON.parse(fs.readFileSync(path.join(clone, '.atualizacao', 'estado.json'), 'utf8'));
+  assert.equal(await atualizar({ out: memOut().out, root: clone, home, args: ['--registro'], deps }), 0);
+  assert.equal(ler().resultado, 'ja-na-mais-nova');
+  fs.rmSync(path.join(clone, '.atualizacao'), { recursive: true });
+  fs.rmSync(path.join(clone, '.env'));
+  assert.equal(await atualizar({ out: memOut().out, root: clone, home, args: ['--registro'], deps }), 1);
+  assert.equal(ler().resultado, 'falhou');
+});
+
+test('atualizar: 2 ao mesmo tempo não andam juntas, no terminal e pelo painel', { skip: !hasGit }, async (t) => {
+  const { clone, release, g } = releaseRepos(t);
+  const home = tmp(t, 'dash-upd-home-');
+  release('2.0.0-alpha.9');
+  const procDir = path.join(tmp(t, 'dash-upd-proc-'), 'proc');
+  fs.mkdirSync(path.join(procDir, '700'), { recursive: true });
+  fs.writeFileSync(path.join(procDir, '700', 'cmdline'), 'node\0/p/server/cli/index.js\0atualizar\0');
+  fs.mkdirSync(path.join(clone, '.atualizacao'));
+  fs.writeFileSync(path.join(clone, '.atualizacao', 'trava.pid'), '700\n');
+  const deps = { run: gitRun, gitRun, trava: { procDir } };
+  const o = memOut();
+  assert.equal(await atualizar({ out: o.out, root: clone, home, deps }), 1);
+  assert.match(o.text(), /já há uma atualização rodando/);
+  assert.equal(g(clone, 'describe', '--tags', '--exact-match'), 'v2.0.0-alpha.8');
+  assert.equal(await atualizar({ out: memOut().out, root: clone, home, args: ['--registro'], deps }), 1);
+  assert.match(fs.readFileSync(path.join(clone, '.atualizacao', 'ultima.log'), 'utf8'), /já há uma atualização rodando/);
+  assert.equal(fs.readFileSync(path.join(clone, '.atualizacao', 'trava.pid'), 'utf8'), '700\n', 'a trava dos outros fica');
+});
+
+test('atualizar --registro: o git do painel não pergunta nada', { skip: !hasGit }, async (t) => {
+  const { clone } = releaseRepos(t);
+  const home = tmp(t, 'dash-upd-home-');
+  const envs = [];
+  const run = (cmd, args, opts) => { if (args.includes('fetch')) envs.push(opts.env); return gitRun(cmd, args, opts); };
+  await atualizar({ out: memOut().out, root: clone, home, args: ['--registro'], deps: { run, gitRun } });
+  assert.equal(envs[0].GIT_TERMINAL_PROMPT, '0');
+  assert.match(envs[0].GIT_SSH_COMMAND, /BatchMode=yes/);
+});
+
 test('atualizar: pasta sem git; fase 2 liga o painel e confere a saúde', async (t) => {
   const root = tmp(t, 'dash-upd-nogit-');
   const home = tmp(t, 'dash-upd-home-');

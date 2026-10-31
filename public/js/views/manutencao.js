@@ -1,6 +1,7 @@
 // Manutenção do painel (ADR 0030): a engrenagem no topo com a versão instalada e "Procurar
-// agora", o aviso de versão nova e o diálogo com as novidades. Não é uma tela: fica por cima de
-// todas. Só mostra e procura; a troca de versão continua no terminal.
+// agora", o aviso de versão nova, o diálogo com as novidades e o botão Atualizar, com o progresso
+// (ADR 0031). Não é uma tela: fica por cima de todas. A tela só pede a troca da versão detectada:
+// quem troca é o `dashboard atualizar --registro`, fora do serviço (I11).
 import { api } from '../core/api.js';
 import { html, mount } from '../core/html.js';
 import { blocosDeNovidade } from '../core/novidades.js';
@@ -10,12 +11,26 @@ import { icon, withBusy } from './common.js';
 // Versão cujo aviso foi fechado neste navegador: ela só volta a aparecer no menu.
 const DISPENSADA_KEY = 'dash_versao_dispensada';
 const COMANDO = './dashboard atualizar';
-// Por que o comando do terminal vai parar, para dizer antes de a pessoa tentar.
+// Leitura do progresso: a cada 1 s, e até ~3 min de painel fora do ar antes de sugerir o terminal.
+const LEITURA_MS = 1000;
+const MAX_FALHAS = 180;
+const RECARGA_MS = 3000;
+// Por que não dá para atualizar, para dizer antes de a pessoa tentar.
 const BLOQUEIOS = {
+  'sem-login': 'Este painel não tem login. Sem sessão, o botão ficaria aberto a qualquer programa desta máquina.',
+  rodando: 'Já há uma atualização rodando nesta pasta.',
   'arquivos-alterados': 'Há arquivos do painel alterados nesta pasta. Guarde ou desfaça as alterações antes de atualizar.',
   'sem-git': 'Esta pasta não veio de um git clone. Instale de novo pelo comando do README.',
   'outra-pasta': 'Este painel não roda da pasta da instalação. Rode o comando na pasta da instalação.',
 };
+const FASES = {
+  iniciando: 'Iniciando a atualização…',
+  procurando: 'Conferindo a versão e a assinatura…',
+  trocando: 'Copiando os dados e trocando de versão…',
+  ligando: 'Ligando a versão nova…',
+  voltando: 'A versão nova falhou. Voltando para a anterior…',
+};
+const REINICIANDO = 'Reiniciando o painel…';
 const ERROS = {
   'sem-acesso': 'Sem acesso ao GitHub na última procura. Tento de novo amanhã.',
   falhou: 'A última procura falhou. Tento de novo amanhã.',
@@ -45,13 +60,15 @@ export function iniciarManutencao({ store, toast }) {
   const aviso = $('avisoVersao');
   const dialogo = $('novidadesDialog');
   mount(botao, icon('gear', 18));
+  // Há uma leitura de progresso ligada nesta aba.
+  let acompanhando = false;
 
   const fecharMenu = () => {
     menu.hidden = true;
     botao.setAttribute('aria-expanded', 'false');
   };
 
-  /** O diálogo com as novidades da versão nova e o comando para atualizar. */
+  /** O diálogo com as novidades da versão nova e o botão, ou o motivo e o comando do terminal. */
   function abrirNovidades() {
     const { nova, novidades, bloqueio } = store.get().atualizacao || {};
     if (!nova) return;
@@ -63,10 +80,114 @@ export function iniciarManutencao({ store, toast }) {
         ${novidades?.cortado ? html`<p class="novidades-corte">O texto é longo. O restante está no CHANGELOG da versão.</p>` : ''}
       </div>
       ${BLOQUEIOS[bloqueio] ? html`<p class="dialogo-aviso">${icon('warn', 16)}<span>${BLOQUEIOS[bloqueio]}</span></p>` : ''}
-      <p class="dialogo-comando">Para atualizar, rode no terminal, na pasta do painel: <span class="mono">${COMANDO}</span></p>
-      <div class="dialogo-acoes"><button class="btn btn-primary" type="submit" autofocus>Fechar</button></div>
+      ${bloqueio && bloqueio !== 'rodando' ? html`<p class="dialogo-comando">Para atualizar, rode no terminal, na pasta do painel: <span class="mono">${COMANDO}</span></p>`
+    : bloqueio ? '' : html`<p class="dialogo-comando">O painel fica fora do ar por alguns segundos. Os dados ganham uma cópia antes da troca, e o painel volta sozinho para a versão atual se a nova falhar.</p>`}
+      <div class="dialogo-acoes">
+        <button class="btn btn-soft" type="submit" autofocus>Fechar</button>
+        ${bloqueio ? html`<button class="btn btn-primary" type="button" disabled>Atualizar agora</button>`
+    : html`<button class="btn btn-primary" type="button" data-manut="atualizar">Atualizar agora</button>`}
+      </div>
     </form>`);
-    dialogo.showModal();
+    if (!dialogo.open) dialogo.showModal();
+  }
+
+  /** Busca o estado de novo; se falhar, fica o que veio do SSE. */
+  async function recarregarEstado() {
+    try { store.set({ atualizacao: await api.atualizacao() }); } catch { /* painel fora do ar */ }
+  }
+
+  /** Mostra o resultado. Com a versão nova no ar, recarrega para carregar a interface dela. */
+  function terminar(r, fase, acoes) {
+    acompanhando = false;
+    const textos = {
+      atualizado: `Atualizado para ${r.alvo}. Recarregando a página…`,
+      'ja-na-mais-nova': 'Você já está na versão mais nova.',
+      voltou: `A versão ${r.alvo} não funcionou aqui. O painel voltou para a versão ${r.de}, com os dados de antes.`,
+      falhou: 'A atualização parou. Veja o motivo no registro acima.',
+      interrompida: 'A atualização foi interrompida antes de terminar. Rode `./dashboard diagnosticar` no terminal.',
+    };
+    $('novidadesTitulo').textContent = 'Fim da atualização';
+    mount(fase, html`<span>${textos[r.resultado] ?? textos.falhou}</span>`);
+    dialogo.dataset.resultado = r.resultado ?? 'falhou';
+    if (r.resultado === 'atualizado') {
+      mount(acoes, html`<button class="btn btn-primary" type="button" data-manut="recarregar" autofocus>Recarregar agora</button>`);
+      setTimeout(() => location.reload(), RECARGA_MS);
+    } else {
+      mount(acoes, html`<button class="btn btn-primary" type="button" data-manut="fechar" autofocus>Fechar</button>`);
+      recarregarEstado();
+    }
+    acoes.querySelector('button').focus();
+  }
+
+  /**
+   * Progresso da atualização: lê o registro a cada 1 s. Leitura periódica sobrevive à queda do
+   * painel no meio da troca, e o log continua de onde parou: ele fica fora de data/.
+   */
+  function acompanhar(alvo) {
+    acompanhando = true;
+    delete dialogo.dataset.resultado;
+    mount(dialogo, html`<div class="dialogo-corpo">
+      <h2 id="novidadesTitulo">Atualizando para ${alvo}</h2>
+      <p class="registro-fase" id="registroFase" role="status"><span class="spinner"></span><span>${FASES.iniciando}</span></p>
+      <pre class="registro mono" id="registroLog" tabindex="0"></pre>
+      <div class="dialogo-acoes" id="registroAcoes"></div>
+    </div>`);
+    if (!dialogo.open) dialogo.showModal();
+    const fase = $('registroFase');
+    const log = $('registroLog');
+    const mostrarFase = (texto) => { fase.lastElementChild.textContent = texto; };
+    let desde = 0;
+    let falhas = 0;
+    const ler = async () => {
+      let r;
+      try {
+        r = await api.registroAtualizacao(desde);
+      } catch (err) {
+        // Sessão perdida: o login aparece, e ele não fura o diálogo.
+        if (err.status === 401) { acompanhando = false; dialogo.close(); return; }
+        falhas += 1;
+        mostrarFase(falhas > MAX_FALHAS ? 'O painel não voltou. Rode ./dashboard diagnosticar no terminal.' : REINICIANDO);
+        setTimeout(ler, LEITURA_MS);
+        return;
+      }
+      falhas = 0;
+      if (r.texto) {
+        log.textContent += r.texto;
+        log.scrollTop = log.scrollHeight;
+      }
+      desde = r.proximo;
+      if (r.fase === 'fim') { terminar(r, fase, $('registroAcoes')); return; }
+      mostrarFase(FASES[r.fase] ?? FASES.iniciando);
+      setTimeout(ler, LEITURA_MS);
+    };
+    ler();
+  }
+
+  /** Pede a troca da versão detectada. O bloqueio pode ter mudado: em 409, o diálogo se refaz. */
+  async function atualizarAgora(el) {
+    const { nova } = store.get().atualizacao || {};
+    // Antes do pedido: o SSE "rodando" pode chegar antes da resposta.
+    acompanhando = true;
+    try {
+      await withBusy(el, api.iniciarAtualizacao(nova));
+    } catch (err) {
+      acompanhando = false;
+      toast(err.message, { level: 'warn' });
+      await recarregarEstado();
+      abrirNovidades();
+      return;
+    }
+    acompanhar(nova);
+  }
+
+  // Atualização pedida em outra aba ou antes de recarregar a página: continua aqui. A do terminal
+  // só trava o botão; ela não escreve o registro.
+  async function retomar() {
+    acompanhando = true;
+    let r = null;
+    try { r = await api.registroAtualizacao(0); } catch { /* o painel caiu: a próxima procura decide */ }
+    if (r?.rodando && r.fase && r.fase !== 'fim') acompanhar(r.alvo);
+    else acompanhando = false;
   }
 
   /** Conteúdo do menu: versão instalada, última procura, versão nova e "Procurar agora". */
@@ -95,6 +216,7 @@ export function iniciarManutencao({ store, toast }) {
         <button class="icon-btn aviso-fechar" type="button" data-manut="dispensar" aria-label="Fechar o aviso da versão ${a.nova}">${icon('fechar', 14)}</button>`);
     }
     if (!menu.hidden) renderMenu();
+    if (a?.bloqueio === 'rodando' && !acompanhando) retomar();
   }
 
   async function procurarAgora(el) {
@@ -113,6 +235,9 @@ export function iniciarManutencao({ store, toast }) {
     const acao = el.dataset.manut;
     if (acao === 'novidades') abrirNovidades();
     else if (acao === 'procurar') procurarAgora(el);
+    else if (acao === 'atualizar') atualizarAgora(el);
+    else if (acao === 'recarregar') location.reload();
+    else if (acao === 'fechar') dialogo.close();
     else if (acao === 'dispensar') { gravarDispensada(store.get().atualizacao?.nova); render(); }
   }
 
@@ -126,6 +251,9 @@ export function iniciarManutencao({ store, toast }) {
   });
   menu.addEventListener('click', onAcao);
   aviso.addEventListener('click', onAcao);
+  dialogo.addEventListener('click', onAcao);
+  // Durante a troca, o Esc não fecha: o resultado e a recarga precisam aparecer.
+  dialogo.addEventListener('cancel', (e) => { if (acompanhando) e.preventDefault(); });
   document.addEventListener('click', (e) => { if (!menu.hidden && !e.target.closest('.manut')) fecharMenu(); });
   document.addEventListener('keydown', (e) => {
     if (e.key === 'Escape' && !menu.hidden) { fecharMenu(); botao.focus(); }

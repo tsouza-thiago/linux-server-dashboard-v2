@@ -72,10 +72,11 @@ const steps = [
     },
   },
   {
-    name: 'segredos fora do git (.env e data/)',
+    name: 'segredos fora do git (.env, data/ e .atualizacao/)',
     fn() {
-      // O .env e o data/ nunca podem estar no git (segredos e telemetria da rede interna).
-      const r = run('git', ['ls-files', '--', '.env', 'data']);
+      // O .env e o data/ nunca podem estar no git (segredos e telemetria da rede interna), e o
+      // log da atualização cita caminhos da máquina.
+      const r = run('git', ['ls-files', '--', '.env', 'data', '.atualizacao']);
       const tracked = (r.stdout || '').trim();
       return { ok: r.status === 0 && tracked === '', detail: tracked ? `rastreados: ${tracked}` : 'nada rastreado' };
     },

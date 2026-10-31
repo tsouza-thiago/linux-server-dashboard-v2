@@ -54,5 +54,7 @@ export const api = {
   poll: () => request('/api/poll', { method: 'POST', body: {} }),
   atualizacao: () => request('/api/atualizacao'),
   verificarAtualizacao: () => request('/api/atualizacao/verificar', { method: 'POST', body: {} }),
+  iniciarAtualizacao: (versao) => request('/api/atualizacao/iniciar', { method: 'POST', body: { versao } }),
+  registroAtualizacao: (desde) => request(`/api/atualizacao/registro${qs({ desde })}`),
   exportUrl: ({ format, from, to }) => `/api/export${qs({ format, from, to })}`,
 };

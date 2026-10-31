@@ -23,6 +23,8 @@ import { hostCheck, csrfCheck, securityHeaders, makeRequireAuth, issueCsrfCookie
 import { toCSV } from './csv.js';
 import { createLogFile } from './logfile.js';
 import { Atualizacao, procurarEmProcesso } from './atualizacao/index.js';
+import { executarForaDoServico, modoDoExecutor } from './atualizacao/executor.js';
+import { bloqueioDaPasta } from './atualizacao/procurar.js';
 
 /**
  * Monta o painel: stores, motor de alertas, sessões, SSE e o roteador com todas as rotas.
@@ -91,13 +93,18 @@ export function createApp(deps = {}) {
     sse.send(event, data, id);
   }
 
-  // Versão nova (ADR 0030). Quem procura de verdade é o startServer: sem `procurarVersao`, os
-  // testes e o painel de teste nunca fazem git fetch.
+  // Versão nova (ADR 0030 e 0031). Quem procura e troca de verdade é o startServer: sem
+  // `procurarVersao` e `executarAtualizacao`, os testes e o painel de teste nunca saem daqui.
   const atualizacao = deps.atualizacao || new Atualizacao({
     file: deps.atualizacaoFile ?? path.join(path.dirname(alertsStore.file), 'atualizacao.json'),
     instalada: `v${VERSION.app}`,
     loginExigido: Boolean(DASH_TOKEN),
     procurar: deps.procurarVersao ?? (async () => ({})),
+    root: deps.pastaAtualizacao ?? ROOT,
+    modo: deps.modoAtualizacao ?? null,
+    executar: deps.executarAtualizacao ?? null,
+    conferirPasta: deps.conferirPasta,
+    procDir: deps.procDirAtualizacao,
     onChange: (estado) => broadcast('atualizacao', estado),
     log,
   });
@@ -303,7 +310,7 @@ export function createApp(deps = {}) {
     });
   });
 
-  // Versão nova (ADR 0030): só o estado; nada aqui troca de versão.
+  // Versão nova (ADR 0030): só o estado.
   app.get('/api/atualizacao', (req, res) => {
     res.json(atualizacao.estado());
   });
@@ -313,6 +320,17 @@ export function createApp(deps = {}) {
     const procura = atualizacao.verificarAgora();
     if (!procura) return res.status(429).json({ error: 'aguarde 1 minuto entre as procuras' });
     res.json(await procura);
+  });
+
+  // O botão Atualizar (ADR 0031, I11): só a versão detectada; o texto do pedido não vira comando.
+  app.post('/api/atualizacao/iniciar', async (req, res) => {
+    const { status, corpo } = await atualizacao.trocarVersao(req.body?.versao);
+    res.status(status).json(corpo);
+  });
+
+  // Tela de progresso: o pedaço do log depois de `desde` e o estado (lido a cada 1 s).
+  app.get('/api/atualizacao/registro', (req, res) => {
+    res.json(atualizacao.registro(Math.max(parseInt(req.query.desde, 10) || 0, 0)));
   });
 
   // Quedas e disponibilidade (ADR 0006 e 0018): ?days=1..90 (padrão 30).
@@ -464,7 +482,14 @@ function startServer() {
   };
   for (const w of configWarnings) log(`AVISO de configuração: ${w}`);
 
-  const { app, runPoll, atualizacao, shutdown: flushAll } = createApp({ log, procurarVersao: procurarEmProcesso });
+  const modo = modoDoExecutor();
+  const { app, runPoll, atualizacao, shutdown: flushAll } = createApp({
+    log,
+    procurarVersao: procurarEmProcesso,
+    modoAtualizacao: modo,
+    executarAtualizacao: () => executarForaDoServico({ root: ROOT, modo }),
+    conferirPasta: () => bloqueioDaPasta(ROOT),
+  });
 
   // 1ª coleta assim que o servidor sobe; depois, uma por intervalo.
   let pollTimer = null;

@@ -8,6 +8,7 @@ import os from 'node:os';
 import path from 'node:path';
 import { createApp } from '../../server/index.js';
 import { procurar } from '../../server/atualizacao/procurar.js';
+import { abrirRegistro, pegarTrava } from '../../server/atualizacao/registro.js';
 import { newestSignedTag } from '../../server/setup/assinatura.js';
 import { listen, close, request, readSSE } from '../../test-support/request.js';
 
@@ -34,7 +35,7 @@ test('rotas: sem sessão, 401; com sessão, o estado sem segredo', async (t) => 
   assert.equal((await request(port, { method: 'POST', path: '/api/atualizacao/verificar', body: {} })).status, 401);
   const r = await request(port, { path: '/api/atualizacao', headers: bearer });
   assert.equal(r.status, 200);
-  assert.deepEqual(Object.keys(r.json).sort(), ['bloqueio', 'erro', 'instalada', 'nova', 'novidades', 'verificadoEm']);
+  assert.deepEqual(Object.keys(r.json).sort(), ['bloqueio', 'erro', 'instalada', 'modo', 'nova', 'novidades', 'verificadoEm']);
   assert.ok(!JSON.stringify(r.json).includes(TOKEN));
   assert.equal(fs.existsSync(path.join(dir, 'atualizacao.json')), false, 'ler não grava nada');
 });
@@ -170,4 +171,117 @@ test('procura: não há pergunta de senha nem o git espera o terminal', { skip: 
   assert.equal(vistos[0].env.GIT_TERMINAL_PROMPT, '0');
   assert.match(vistos[0].env.GIT_SSH_COMMAND, /BatchMode=yes/);
   assert.equal(vistos[0].stdio[0], 'ignore');
+});
+
+// O botão Atualizar (ADR 0031). O executor é falso: as rotas só precisam dizer se ele foi chamado.
+async function comBotao(t, extra = {}) {
+  const chamadas = [];
+  const executarAtualizacao = extra.executarAtualizacao ?? (async () => { chamadas.push('executou'); return { ok: true }; });
+  const pastaAtualizacao = extra.pastaAtualizacao ?? fs.mkdtempSync(path.join(os.tmpdir(), 'dash-atu-botao-'));
+  t.after(() => fs.rmSync(pastaAtualizacao, { recursive: true, force: true }));
+  const p = await painel(t, { procurarVersao: async () => NOVA, modoAtualizacao: 'systemd', ...extra, pastaAtualizacao, executarAtualizacao });
+  await p.app.atualizacao.verificar();
+  return { ...p, chamadas, pastaAtualizacao };
+}
+const pedir = (port, headers, body) => request(port, { method: 'POST', path: '/api/atualizacao/iniciar', headers: { 'Content-Type': 'application/json', ...headers }, body });
+
+test('iniciar: sem sessão, 401, e nada roda', async (t) => {
+  const { port, chamadas } = await comBotao(t);
+  assert.equal((await pedir(port, {}, { versao: 'v9.9.9' })).status, 401);
+  assert.equal((await request(port, { path: '/api/atualizacao/registro' })).status, 401);
+  assert.deepEqual(chamadas, []);
+});
+
+test('iniciar: versão diferente da detectada é 409, e o texto não chega ao executor (I11)', async (t) => {
+  const { port, bearer, chamadas } = await comBotao(t);
+  for (const versao of ['v1.0.0', 'v9.9.9; rm -rf /', '--upload-pack=x', '', null, 9, ['v9.9.9'], { a: 1 }]) {
+    assert.equal((await pedir(port, bearer, { versao })).status, 409, JSON.stringify(versao));
+  }
+  assert.equal((await pedir(port, bearer, {})).status, 409);
+  assert.deepEqual(chamadas, []);
+});
+
+test('iniciar: a versão detectada roda o executor sem argumento nenhum e trava o botão', async (t) => {
+  const recebidos = [];
+  const { port, bearer, app } = await comBotao(t, { executarAtualizacao: async (...a) => { recebidos.push(a); return { ok: true }; } });
+  assert.equal((await pedir(port, bearer, { versao: 'v9.9.9' })).status, 202);
+  assert.deepEqual(recebidos, [[]]);
+  const e = await request(port, { path: '/api/atualizacao', headers: bearer });
+  assert.equal(e.json.bloqueio, 'rodando');
+  assert.equal(e.json.modo, 'systemd');
+  assert.equal((await pedir(port, bearer, { versao: 'v9.9.9' })).status, 409, '2º pedido não passa');
+  assert.equal(recebidos.length, 1);
+  assert.equal(app.atualizacao.registro(0).fase, 'iniciando');
+});
+
+test('iniciar: 2 pedidos ao mesmo tempo disparam 1 só', async (t) => {
+  const { port, bearer, chamadas } = await comBotao(t);
+  const r = await Promise.all([pedir(port, bearer, { versao: 'v9.9.9' }), pedir(port, bearer, { versao: 'v9.9.9' }), pedir(port, bearer, { versao: 'v9.9.9' })]);
+  assert.deepEqual(r.map((x) => x.status).sort(), [202, 409, 409]);
+  assert.equal(chamadas.length, 1);
+});
+
+test('iniciar: com a trava de outra atualização, 409', async (t) => {
+  const pastaAtualizacao = fs.mkdtempSync(path.join(os.tmpdir(), 'dash-atu-trava-'));
+  t.after(() => fs.rmSync(pastaAtualizacao, { recursive: true, force: true }));
+  const procDir = path.join(pastaAtualizacao, 'proc');
+  fs.mkdirSync(path.join(procDir, '700'), { recursive: true });
+  fs.writeFileSync(path.join(procDir, '700', 'cmdline'), 'node\0/p/server/cli/index.js\0atualizar\0');
+  pegarTrava(pastaAtualizacao, { pid: 700, procDir });
+  const { port, bearer, chamadas } = await comBotao(t, { pastaAtualizacao, procDirAtualizacao: procDir });
+  const r = await pedir(port, bearer, { versao: 'v9.9.9' });
+  assert.equal(r.status, 409);
+  assert.equal(r.json.bloqueio, 'rodando');
+  assert.deepEqual(chamadas, []);
+});
+
+test('iniciar: sem login nunca roda (sem sessão, qualquer programa da máquina pediria)', async (t) => {
+  const { port, chamadas } = await comBotao(t, { dashToken: '' });
+  const r = await pedir(port, {}, { versao: 'v9.9.9' });
+  assert.equal(r.status, 409);
+  assert.equal(r.json.bloqueio, 'sem-login');
+  assert.deepEqual(chamadas, []);
+});
+
+test('iniciar: confere a pasta de novo (#118); arquivo alterado depois da procura barra e aparece', async (t) => {
+  const { port, bearer, chamadas } = await comBotao(t, { conferirPasta: () => 'outra-pasta' });
+  const r = await pedir(port, bearer, { versao: 'v9.9.9' });
+  assert.equal(r.status, 409);
+  assert.equal(r.json.bloqueio, 'outra-pasta');
+  assert.equal((await request(port, { path: '/api/atualizacao', headers: bearer })).json.bloqueio, 'outra-pasta');
+  assert.deepEqual(chamadas, []);
+});
+
+test('iniciar: sem executor (testes, painel de teste) responde 409 e não grava nada', async (t) => {
+  const { port, bearer, app } = await painel(t, { procurarVersao: async () => NOVA, pastaAtualizacao: fs.mkdtempSync(path.join(os.tmpdir(), 'dash-atu-sem-')) });
+  await app.atualizacao.verificar();
+  assert.equal((await pedir(port, bearer, { versao: 'v9.9.9' })).status, 409);
+  assert.equal(fs.existsSync(path.join(app.atualizacao.root, '.atualizacao')), false);
+  fs.rmSync(app.atualizacao.root, { recursive: true, force: true });
+});
+
+test('iniciar: executor que não sobe libera o botão e deixa o motivo no registro', async (t) => {
+  const { port, bearer } = await comBotao(t, { executarAtualizacao: async () => ({ ok: false }) });
+  assert.equal((await pedir(port, bearer, { versao: 'v9.9.9' })).status, 503);
+  const reg = await request(port, { path: '/api/atualizacao/registro', headers: bearer });
+  assert.equal(reg.json.resultado, 'falhou');
+  assert.match(reg.json.texto, /não consegui iniciar/);
+  assert.equal((await request(port, { path: '/api/atualizacao', headers: bearer })).json.bloqueio, null);
+});
+
+test('registro: `desde` inválido vira 0; o log só sai com sessão e sem o token', async (t) => {
+  const { port, bearer, pastaAtualizacao } = await comBotao(t);
+  await pedir(port, bearer, { versao: 'v9.9.9' });
+  const r = abrirRegistro(pastaAtualizacao);
+  r.stream.write('✓ linha um\n');
+  r.fim(0);
+  for (const q of ['', '?desde=abc', '?desde=-5', '?desde=999999999999999999999']) {
+    const x = await request(port, { path: `/api/atualizacao/registro${q}`, headers: bearer });
+    assert.equal(x.status, 200);
+    assert.equal(x.json.texto, '✓ linha um\n', q);
+  }
+  const fim = await request(port, { path: '/api/atualizacao/registro?desde=11', headers: bearer });
+  assert.equal(fim.json.resultado, 'atualizado');
+  assert.equal(fim.json.alvo, 'v9.9.9');
+  assert.ok(!JSON.stringify(fim.json).includes(TOKEN));
 });

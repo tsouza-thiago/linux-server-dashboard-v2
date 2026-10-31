@@ -19,7 +19,7 @@ Decidido em 31/10/2026: a F7 sai em 3 PRs, todos com `Refs #90`; o último fecha
 | Entrega | Etapas | Situação |
 |---|---|---|
 | 1. Aviso de versão nova | 1 (só "procurar versão"), 3, 4, 5, parte da 9 | ADR 0030 |
-| 2. Atualizar pelo botão | 1 (`--registro`), 2, 6, 7, resto da 9 (I11) | a fazer |
+| 2. Atualizar pelo botão | 1 (`--registro`), 2, 6, 7, resto da 9 (I11) | ADR 0031 |
 | 3. Fechamento | 8, 10, 11 | a fazer |
 
 Mudanças em relação ao plano abaixo, na entrega 1:
@@ -28,6 +28,12 @@ Mudanças em relação ao plano abaixo, na entrega 1:
 - O campo `modo` de `/api/atualizacao` fica para a entrega 2: ele só serve ao executor.
 - Até a entrega 2, o diálogo mostra o comando do terminal no lugar do botão "Atualizar".
 - O `bloqueio` ganhou `outra-pasta`: a mesma conferência do `dashboard atualizar` (#118).
+
+Mudanças em relação ao plano abaixo, na entrega 2:
+
+- Sem plano B do `systemd-run` para o `setsid` com o serviço instalado (ADR 0031, item 2): o
+  `setsid` só vale sem o serviço. Fora isso, o item "Riscos" continua.
+- A trava só existe com o executor de pé. Até lá, o painel marca a fase `iniciando`.
 
 ## Objetivo
 

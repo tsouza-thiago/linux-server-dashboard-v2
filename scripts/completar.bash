@@ -3,7 +3,7 @@
 # os valores de --importar-v1, --chave-ssh e --modo. Arquivo estático: chamar a CLI custaria
 # dezenas de ms a cada Tab. test/unit/autocomplete.test.js confere as listas contra o código.
 
-# Comandos, sem os apelidos (help, -h, versão). A opção interna --pos-atualizacao fica de fora.
+# Comandos, sem os apelidos (help, -h, versão). As opções internas --pos-atualizacao e --registro ficam de fora.
 _DASHBOARD_COMANDOS='instalar abrir iniciar parar status diagnosticar reconfigurar atualizar desinstalar versao ajuda'
 
 # Opções de um comando. Só instalar e reconfigurar têm o modo sem perguntas.

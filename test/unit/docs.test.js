@@ -20,7 +20,7 @@ const ADRS = fs.readdirSync(path.join(ROOT, 'docs', 'adr')).filter((f) => f.ends
 
 function allMarkdown(dir = ROOT, out = []) {
   for (const e of fs.readdirSync(dir, { withFileTypes: true })) {
-    if (['.git', 'node_modules', 'data', '.runtime', '.backups'].includes(e.name)) continue;
+    if (['.git', 'node_modules', 'data', '.runtime', '.backups', '.atualizacao'].includes(e.name)) continue;
     const p = path.join(dir, e.name);
     if (e.isDirectory()) allMarkdown(p, out);
     else if (e.name.endsWith('.md')) out.push(path.relative(ROOT, p));

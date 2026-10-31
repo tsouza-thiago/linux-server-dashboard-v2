@@ -128,8 +128,8 @@ Na pasta do projeto:
 | `./dashboard versao` | Mostra a versão |
 
 Quando sai uma versão nova, o painel avisa no topo da tela, com as novidades. Para isso ele roda
-`git fetch` das tags 1 vez por dia: é a única conexão dele além do SSH da coleta. A troca de versão
-é com o `./dashboard atualizar`.
+`git fetch` das tags 1 vez por dia: é a única conexão dele além do SSH da coleta. Para trocar de
+versão, clique em **Atualizar agora** nas novidades ou rode o `./dashboard atualizar`.
 
 Depois de instalado, o painel inicia com o computador (serviço systemd **de usuário**) e
 aparece no menu como **Server Dashboard**.

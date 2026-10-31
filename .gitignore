@@ -32,6 +32,9 @@ id_ed25519*
 .runtime/
 .backups/
 
+# Log e estado da atualização pelo painel (cita caminhos da máquina; ADR 0031)
+.atualizacao/
+
 # Relatórios brutos do npm run seguranca (podem citar trechos do código e do histórico)
 .seguranca/
 

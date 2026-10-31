@@ -1,12 +1,14 @@
 // Atualização pelo painel (ADR 0030): procura versão nova 1 vez por dia, guarda o resultado em
 // data/atualizacao.json e avisa as telas. O trabalho pesado fica em procurar.js, num processo à
-// parte; aqui só há a agenda e o estado.
+// parte; aqui só há a agenda e o estado. A troca de versão só é disparada daqui (ADR 0031): quem
+// a faz é o `dashboard atualizar --registro`, num processo fora do serviço.
 import { spawn } from 'node:child_process';
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { JsonStore } from '../stores.js';
 import { compareVersions } from '../setup/assinatura.js';
+import { emAndamento, lerRegistro, prepararRegistro, registrarFalha } from './registro.js';
 
 const DIA_MS = 24 * 3600000;
 // 1º teste ~5 min depois de o painel ligar, com até 1 h de atraso aleatório: as instalações
@@ -57,10 +59,15 @@ class ArquivoDeEstado extends JsonStore {
 
 /** Estado da verificação de versão, com a agenda diária. */
 export class Atualizacao {
-  constructor({ file, instalada, loginExigido, procurar, onChange = () => {}, log = () => {}, agora = Date.now, aleatorio = Math.random }) {
+  constructor({ file, instalada, loginExigido, procurar, root = path.dirname(file), modo = null, executar = null, conferirPasta = () => null, procDir = '/proc', onChange = () => {}, log = () => {}, agora = Date.now, aleatorio = Math.random }) {
     this.instalada = instalada;
     this.loginExigido = loginExigido;
     this.procurar = procurar;
+    this.root = root;
+    this.modo = modo;
+    this.executar = executar;
+    this.conferirPasta = conferirPasta;
+    this.procDir = procDir;
     this.onChange = onChange;
     this.log = log;
     this.agora = agora;
@@ -81,9 +88,54 @@ export class Atualizacao {
       novidades: temNova ? d.novidades ?? null : null,
       verificadoEm: d.verificadoEm ?? null,
       erro: d.erro ?? null,
-      // Sem login não há sessão, e qualquer programa da máquina poderia pedir a troca de versão.
-      bloqueio: this.loginExigido ? d.bloqueio ?? null : 'sem-login',
+      modo: this.modo,
+      bloqueio: this.bloqueio(),
     };
+  }
+
+  /** Por que a tela não pode trocar de versão agora; null se pode. */
+  bloqueio() {
+    // Sem login não há sessão, e qualquer programa da máquina poderia pedir a troca de versão.
+    if (!this.loginExigido) return 'sem-login';
+    if (emAndamento(this.root, { agora: this.agora(), procDir: this.procDir })) return 'rodando';
+    return this.arquivo.data.bloqueio ?? null;
+  }
+
+  /**
+   * O botão Atualizar (I11): a versão do pedido só é comparada com a detectada, e nada dela vai
+   * para o comando. Até o `prepararRegistro` não há `await`: 2 pedidos seguidos não passam
+   * juntos. Devolve `{ status, corpo }`.
+   */
+  async trocarVersao(versao) {
+    if (!this.executar) return { status: 409, corpo: { error: 'este painel não atualiza pela tela' } };
+    const { nova, instalada, bloqueio } = this.estado();
+    if (bloqueio) return { status: 409, corpo: { error: 'não dá para atualizar agora', bloqueio } };
+    if (!nova || versao !== nova) return { status: 409, corpo: { error: 'esta não é a versão nova detectada' } };
+    // O bloqueio guardado é da última procura: a pasta pode ter mudado de lá para cá.
+    const agoraNaPasta = this.conferirPasta();
+    if (agoraNaPasta) {
+      this.arquivo.data = { ...this.arquivo.data, bloqueio: agoraNaPasta };
+      await this.arquivo.save();
+      this.onChange(this.estado());
+      return { status: 409, corpo: { error: 'não dá para atualizar agora', bloqueio: agoraNaPasta } };
+    }
+    prepararRegistro(this.root, { alvo: nova, de: instalada, agora: this.agora() });
+    this.onChange(this.estado());
+    let iniciou;
+    try { iniciou = await this.executar(); } catch { iniciou = { ok: false }; }
+    if (!iniciou?.ok) {
+      registrarFalha(this.root, 'não consegui iniciar a atualização', this.agora());
+      this.log('[atualização] não consegui iniciar a troca de versão');
+      this.onChange(this.estado());
+      return { status: 503, corpo: { error: 'não consegui iniciar a atualização' } };
+    }
+    this.log(`[atualização] troca de versão iniciada: ${nova}`);
+    return { status: 202, corpo: { alvo: nova } };
+  }
+
+  /** O pedaço novo do log e o estado da troca de versão, para a tela de progresso. */
+  registro(desde) {
+    return lerRegistro(this.root, desde, { agora: this.agora(), procDir: this.procDir });
   }
 
   /** Uma procura; pedidos durante outra esperam a mesma. Nunca rejeita. */
