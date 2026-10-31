@@ -57,6 +57,14 @@ export function diskEta(buckets, mount, { minSpanMs = 24 * 3600e3 } = {}) {
 }
 
 /**
+ * Previsão para a tela. `cedo` só vale com os 30 dias em mãos: sem eles (carga em andamento ou
+ * busca que falhou), a falta de pontos não diz nada sobre o histórico e vira `carregando` (#116).
+ */
+export function etaPendente(eta, temHistorico) {
+  return !temHistorico && eta.status === 'cedo' ? { ...eta, status: 'carregando' } : eta;
+}
+
+/**
  * Resumo por dia LOCAL (fuso do navegador; antes era UTC — B5) a partir de baldes de 1 h.
  * @returns {{day: string, n: number, m: Object<string, {min: number, max: number, avg: number}>}[]}
  */

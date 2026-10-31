@@ -11,6 +11,10 @@ diante: `PATCH` corrige, `MINOR` acrescenta sem quebrar e `MAJOR` quebra.
 
 ### Corrigido
 
+- Armazenamento e Visão geral: enquanto os 30 dias de histórico carregam, a tela não diz mais
+  `previsão em ~1 dia` nem que a previsão aparece depois de ~1 dia de histórico. Esse texto agora só
+  aparece depois da carga, quando falta histórico de verdade. Se a busca falhar, ele também não
+  aparece. O painel de previsão também não pula mais de tamanho no fim da carga (#116).
 - `./dashboard atualizar` não assume mais o serviço de outra pasta (#118). Numa pasta sem `.env`
   ele para antes de mexer em tag, backup ou serviço e diz qual pasta é a instalação. Com o serviço
   em outra pasta, ele para, mostra as 2 pastas e não reescreve o serviço. Para mudar de pasta de

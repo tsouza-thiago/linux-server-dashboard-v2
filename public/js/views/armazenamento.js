@@ -3,7 +3,7 @@
 // sincronizadas e a saúde SMART com o histórico de 90 dias.
 import { html, mount } from '../core/html.js';
 import * as f from '../core/format.js';
-import { diskEta, diskForecast, fullestDisk, keysWith } from '../core/analysis.js';
+import { diskEta, diskForecast, etaPendente, fullestDisk, keysWith } from '../core/analysis.js';
 import {
   $, chip, big, meter, chartBox, drawCharts, drawStrips, panelHead, icon, smartOf, onClick, carregarRegiao, skelCabeca, skelFaixas, skelGrafico, skelLinha,
   skelRegiao, skelTabela,
@@ -40,7 +40,7 @@ function mountCards(ctx) {
   if (!disks.length) return html`<p class="empty">Nenhum ponto de montagem coletado ainda (DISK_MOUNTS no .env).</p>`;
   const hot = hotMount(ctx);
   return html`${disks.map((d) => {
-    const eta = diskEta(history(ctx), d.mount);
+    const eta = etaPendente(diskEta(history(ctx), d.mount), ctx.local.disk30Ok);
     const sm = (s.smart || []).find((x) => x.dev === d.dev);
     const smi = sm ? smartOf(sm.status) : null;
     const isHot = d.mount === hot;
@@ -51,7 +51,7 @@ function mountCards(ctx) {
       <div class="row-between ink-2"><span>${f.bytes(d.usedBytes)} de ${f.bytes(d.sizeBytes)}</span><span>livre ${f.bytes(d.availBytes)}</span></div>
       <div class="chips">
         <span class="chip">inodes ${f.pct(d.inodesPct)}</span>
-        <span class="chip${eta.status === 'enchendo' ? ' ink-text' : ''}">${eta.status === 'enchendo' ? `enche em ${f.days(eta.days)}` : eta.status === 'estavel' ? 'estável' : 'previsão em ~1 dia'}</span>
+        <span class="chip${eta.status === 'enchendo' ? ' ink-text' : ''}">${eta.status === 'enchendo' ? `enche em ${f.days(eta.days)}` : eta.status === 'estavel' ? 'estável' : eta.status === 'carregando' ? 'previsão…' : 'previsão em ~1 dia'}</span>
         ${smi ? chip(smi.level, `SMART ${sm.dev}${smi.level === 'ok' ? '' : ` · ${smi.text}`}`) : ''}
       </div>
     </article>`;
@@ -62,7 +62,7 @@ function mountCards(ctx) {
 const ALTURA_PREVISAO = 220;
 
 function forecastOf(ctx, mountPoint) {
-  return diskForecast(history(ctx), mountPoint, { alertPct: thr(ctx.state).diskPct ?? 90 });
+  return etaPendente(diskForecast(history(ctx), mountPoint, { alertPct: thr(ctx.state).diskPct ?? 90 }), ctx.local.disk30Ok);
 }
 
 /** Título do painel de previsão, com a data estimada. */
@@ -71,7 +71,8 @@ function forecastHead(ctx) {
   const sel = ctx.local.mount;
   const fc = forecastOf(ctx, sel);
   const note = fc.status === 'enchendo' ? `últimos 30 dias (linha cheia) e projeção no ritmo atual de +${f.bytes(fc.perDayBytes)}/dia (tracejada)`
-    : fc.status === 'estavel' ? 'últimos 30 dias · uso estável, sem projeção de lotação' : 'últimos 30 dias · a previsão aparece depois de ~1 dia de histórico';
+    : fc.status === 'estavel' ? 'últimos 30 dias · uso estável, sem projeção de lotação'
+      : fc.status === 'carregando' ? 'últimos 30 dias' : 'últimos 30 dias · a previsão aparece depois de ~1 dia de histórico';
   return panelHead(`Previsão de lotação · ${sel || '—'}`, note,
     disks.length > 1 ? html`<div class="segmented on-bg" role="group" aria-label="Disco">${disks.map((d) => html`<button type="button" data-mount="${d.mount}" aria-pressed="${d.mount === sel}">${d.mount}</button>`)}</div>` : '');
 }
@@ -216,7 +217,7 @@ export function render(ctx) {
 function loadDisk30(ctx) {
   carregarRegiao(ctx, update,
     () => ctx.api.buckets({ from: new Date(Date.now() - 30 * DAY).toISOString(), to: new Date().toISOString(), limit: 720 }),
-    (r) => { ctx.local.disk30 = r?.buckets || []; });
+    (r) => { ctx.local.disk30 = r?.buckets || []; ctx.local.disk30Ok = Boolean(r); });
 }
 
 /** Atualiza só o que muda com os dados novos. */
@@ -226,7 +227,8 @@ export function update(ctx) {
   mount($('#ar-mounts', ctx.el), mountCards(ctx));
   mount($('#ar-fc-head', ctx.el), forecastHead(ctx));
   mount($('#ar-fc-chips', ctx.el), forecastChips(ctx));
-  mount($('#ar-fc-skel', ctx.el), ctx.local.disk30 ? '' : skelRegiao(ctx, skelGrafico(ALTURA_PREVISAO)));
+  // Sem pasta não há gráfico a esperar: o esqueleto só faria o painel encolher ao fim da carga.
+  mount($('#ar-fc-skel', ctx.el), ctx.local.disk30 || !ctx.local.mount ? '' : skelRegiao(ctx, skelGrafico(ALTURA_PREVISAO)));
   if (ctx.local.mount && ctx.local.disk30) drawCharts(ctx, ctx.el, [forecastSpec(ctx)], ctx.local.disk30);
   const list = devs(ctx);
   drawStrips(ctx, ctx.el, 'ar-io', list.map((dev) => ({
