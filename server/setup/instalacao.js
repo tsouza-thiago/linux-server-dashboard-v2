@@ -21,6 +21,7 @@ import {
 } from './remoto.js';
 import {
   ensureDataDirs, ensureKey, writeKnownHosts, writeSshConfig, updateEnv, ensureToken, installService, installShortcut, removeShortcut,
+  prepararComando, situacaoDoComando,
 } from './local.js';
 import { currentVersionStatus, describeVersion } from './assinatura.js';
 import { createLoginCode } from '../http/entrar.js';
@@ -78,7 +79,7 @@ export class Instalacao {
     this.root = root;
     this.home = home;
     this.deps = {
-      probePort, scanHostKeys, runAdmin, resolveAlias, checkAgentKey, collect: collectV2, runSSH, ensureKey, installService, installShortcut,
+      probePort, scanHostKeys, runAdmin, resolveAlias, checkAgentKey, collect: collectV2, runSSH, ensureKey, installService, installShortcut, prepararComando,
       startPanel, hasSystemdUser, versionStatus: () => currentVersionStatus(root), spawnSync, hostname: os.hostname,
       ...deps,
     };
@@ -145,6 +146,7 @@ export class Instalacao {
       porta: panelPort(this.root),
       reconfigurar: Boolean(env.SSH_HOST && env.SSH_ACESSO),
       servidorAtual: currentServer(this.root),
+      comando: situacaoDoComando({ root: this.root, home: this.home, semLink: this.semLink }),
     };
   }
 
@@ -541,16 +543,21 @@ export class Instalacao {
 
   /**
    * Conclui: grava o .env final, cria o token (se faltar), aplica as preferências (serviço
-   * que inicia com o computador, atalho) e devolve o link de entrada de uso único. Quem
+   * que inicia com o computador, atalho, comando no PATH) e devolve o link de entrada de uso
+   * único. O resultado do comando fica em `this.comando`, para quem chama mostrar. Quem
    * chama (web/TUI) fecha o assistente e só então liga o painel, que usa a mesma porta.
    */
-  concluir({ iniciarComComputador = true, atalho = true } = {}) {
+  concluir({ iniciarComComputador = true, atalho = true, link = true, trocarLink = true, editarProfile = false } = {}) {
     if (!this.preparo.concluido) fail('Termine a preparação primeiro.');
     this.#configurarLocal();
     ensureToken(this.root);
     this.esquecerSenha();
     if (atalho) this.deps.installShortcut({ root: this.root, home: this.home });
     else removeShortcut({ home: this.home });
+    // Sem o link, nada muda: reconfigurar nunca apaga um link que já existe.
+    this.comando = link && !this.semLink
+      ? this.deps.prepararComando({ root: this.root, home: this.home, trocar: trocarLink, editar: editarProfile })
+      : null;
     return { iniciarComComputador: Boolean(iniciarComComputador), atalho: Boolean(atalho) };
   }
 

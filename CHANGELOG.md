@@ -9,6 +9,16 @@ diante: `PATCH` corrige, `MINOR` acrescenta sem quebrar e `MAJOR` quebra.
 
 ## [Não publicado]
 
+### Adicionado
+
+- Comando `dashboard` sem `./`, de qualquer pasta (#87, ADR 0028): a instalação cria o link
+  `~/.local/bin/dashboard`, sem sudo, nos 3 modos. `--sem-link` pula. Ela confere conflitos de nome
+  e nunca sobrescreve outro programa. Sem `~/.local/bin` no PATH, ela pergunta e, com o sim,
+  acrescenta um bloco marcado no arquivo de login, com cópia antes (`--editar-profile` no modo sem
+  perguntas). As mensagens do terminal citam `dashboard` quando ele vale, o `desinstalar` remove o
+  link e o bloco, o `diagnosticar` confere os 2 e o `status` mostra a pasta. Quem já tem o painel
+  instalado cria o link com `./dashboard reconfigurar`.
+
 ## [2.3.0] — 2026-10-30
 
 Versão estável com a interface mais responsiva: botões que respondem ao clique, entrada suave na

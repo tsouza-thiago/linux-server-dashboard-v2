@@ -83,7 +83,7 @@ export async function importarV1({ out, root, dir, home = os.homedir(), deps = {
   const det = detectV1(v1);
   if (!det.ok) {
     out.fail('essa pasta não é uma instalação da V1', v1);
-    out.explain('procurei o package.json 1.x do linux-server-dashboard e o server/index.js.', 'passe a pasta onde você clonou a V1, por exemplo: ./dashboard instalar --importar-v1 ~/linux-server-dashboard');
+    out.explain('procurei o package.json 1.x do linux-server-dashboard e o server/index.js.', `passe a pasta onde você clonou a V1, por exemplo: ${out.cmd} instalar --importar-v1 ~/linux-server-dashboard`);
     return 1;
   }
   if (path.resolve(root) === v1) { out.fail('a pasta da V1 é esta mesma'); return 1; }
@@ -95,7 +95,7 @@ export async function importarV1({ out, root, dir, home = os.homedir(), deps = {
   const settings = v1Settings(loadEnvFile(path.join(v1, '.env')));
   if (!settings.SSH_HOST) {
     out.fail('a V1 não tinha servidor configurado (SSH_HOST)');
-    out.explain('', 'rode ./dashboard instalar sem --importar-v1 para configurar pelo assistente.');
+    out.explain('', `rode ${out.cmd} instalar sem --importar-v1 para configurar pelo assistente.`);
     return 1;
   }
   ensureDataDirs(root);
@@ -130,10 +130,10 @@ export async function importarV1({ out, root, dir, home = os.homedir(), deps = {
   out.ok(`V2 no ar em http://127.0.0.1:${port}`, servico && servico.ok ? 'serviço de usuário' : 'segundo plano');
   out.line();
   out.warn('a V2 ainda usa o acesso completo da V1 ao servidor');
-  out.explain('', 'quando puder, rode ./dashboard reconfigurar: ele cria o usuário dashmon com a chave restrita à coleta.');
+  out.explain('', `quando puder, rode ${out.cmd} reconfigurar: ele cria o usuário dashmon com a chave restrita à coleta.`);
   // Como serviço, `parar` não basta: a V2 voltaria com o computador e as duas fariam 2
   // conexões por minuto ao servidor (I1). Por isso o recado manda desligar o serviço.
-  const pararV2 = servico && servico.ok ? `systemctl --user disable --now ${UNIT_NAME}` : './dashboard parar';
+  const pararV2 = servico && servico.ok ? `systemctl --user disable --now ${UNIT_NAME}` : `${out.cmd} parar`;
   out.line(out.c.dim(`Para voltar à V1: ${pararV2} e, na pasta ${v1}, ./start.sh --background${stopped.includes('servico-desligado') ? ` (ou systemctl --user enable --now ${V1_UNIT})` : ''}.`));
   return 0;
 }

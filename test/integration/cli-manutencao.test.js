@@ -12,6 +12,7 @@ import { diagnosticar, latestSample, permissionProblems, explainFailure, sshSett
 import { atualizar, afterUpdate, backupData, restoreData } from '../../server/cli/atualizar.js';
 import { importarV1, detectV1, v1Settings, v1Pid, stopV1 } from '../../server/cli/importar-v1.js';
 import { desinstalar } from '../../server/cli/desinstalar.js';
+import { LINHA_PATH, editarArquivoDeLogin } from '../../server/setup/local.js';
 import { loadEnvFile } from '../../server/config.js';
 import { esperarAte } from '../../test-support/esperar.js';
 
@@ -414,4 +415,104 @@ test('desinstalar: limpa só a parte desta instalação no servidor e remove os 
   }), 0);
   assert.equal(calls.length, 0, 'nenhuma conexão com o servidor');
   assert.match(sp.text(), /o servidor não foi alterado \(não achei a chave pública deste painel/);
+});
+
+// ---------------- comando no PATH (F4) ----------------
+
+// Link ~/.local/bin/dashboard criado de verdade; `env` é o PATH do diagnóstico.
+function comLink(t) {
+  const inst = installedRoot(t);
+  const bin = path.join(inst.home, '.local', 'bin');
+  fs.writeFileSync(path.join(inst.root, 'dashboard'), '#!/bin/sh\n', { mode: 0o755 });
+  fs.mkdirSync(bin, { recursive: true });
+  fs.symlinkSync(path.join(inst.root, 'dashboard'), path.join(bin, 'dashboard'));
+  return { ...inst, bin };
+}
+const diagComando = async ({ root, home }, env) => {
+  const o = memOut();
+  await diagnosticar({ out: o.out, root, home, deps: { env, now: Date.now(), panelStatus: () => ({ running: false }), collect: async () => ({ ok: false, error: 'x' }) } });
+  return o.text();
+};
+const seca = { stopPanel: async () => ({}), removeService: () => false, interactive: false };
+
+test('desinstalar: tira o link e só o bloco do arquivo de login', async (t) => {
+  const { root, home } = comLink(t);
+  const profile = path.join(home, '.profile');
+  fs.writeFileSync(profile, 'umask 022\n');
+  editarArquivoDeLogin({ home, env: {} });
+  const o = memOut();
+  assert.equal(await desinstalar({ out: o.out, root, home, args: ['--sim'], deps: seca }), 0, o.text());
+  assert.equal(fs.existsSync(path.join(home, '.local', 'bin', 'dashboard')), false);
+  assert.equal(fs.readFileSync(profile, 'utf8'), 'umask 022\n');
+  assert.match(o.text(), /✓ comando dashboard removido/);
+  assert.match(o.text(), /✓ PATH retirado do ~\/\.profile/);
+});
+
+test('desinstalar: com o link em outra pasta, o link e o bloco ficam', async (t) => {
+  const { root, home } = installedRoot(t);
+  const outra = tmp(t, 'dash-outra-');
+  fs.mkdirSync(path.join(outra, 'server', 'cli'), { recursive: true });
+  fs.writeFileSync(path.join(outra, 'server', 'cli', 'index.js'), '');
+  fs.writeFileSync(path.join(outra, 'dashboard'), '#!/bin/sh\n', { mode: 0o755 });
+  const bin = path.join(home, '.local', 'bin');
+  fs.mkdirSync(bin, { recursive: true });
+  fs.symlinkSync(path.join(outra, 'dashboard'), path.join(bin, 'dashboard'));
+  editarArquivoDeLogin({ home, env: {} });
+  const o = memOut();
+  assert.equal(await desinstalar({ out: o.out, root, home, args: ['--sim'], deps: seca }), 0, o.text());
+  assert.ok(fs.lstatSync(path.join(bin, 'dashboard')));
+  assert.match(fs.readFileSync(path.join(home, '.profile'), 'utf8'), /server-dashboard/);
+  assert.ok(o.text().includes(`O comando dashboard continua: ele vale para ${fs.realpathSync(outra)}`), o.text());
+});
+
+test('desinstalar: arquivo de login sem escrita vira aviso, e a desinstalação termina', { skip: process.getuid?.() === 0 && 'root ignora a permissão' }, async (t) => {
+  const { root, home } = comLink(t);
+  editarArquivoDeLogin({ home, env: {} });
+  const profile = path.join(home, '.profile');
+  fs.chmodSync(profile, 0o444);
+  const o = memOut();
+  assert.equal(await desinstalar({ out: o.out, root, home, args: ['--sim'], deps: seca }), 0, o.text());
+  assert.match(o.text(), /▲ não consegui editar o ~\/\.profile \(apague à mão o bloco server-dashboard\)/);
+});
+
+test('diagnosticar: confere o link e o PATH', async (t) => {
+  const c = comLink(t);
+  assert.match(await diagComando(c, { PATH: c.bin }), /✓ comando dashboard no PATH/);
+
+  const login = await diagComando(c, { PATH: '/usr/bin' });
+  assert.match(login, /▲ ~\/\.local\/bin não está no PATH/);
+  assert.ok(login.includes(`no ~/.profile: ${LINHA_PATH}`), login);
+
+  fs.writeFileSync(path.join(c.home, '.profile'), 'PATH="$HOME/.local/bin:$PATH"\n');
+  const proximo = await diagComando(c, { PATH: '/usr/bin' });
+  assert.match(proximo, /✓ comando dashboard criado \(vale no próximo login\)/);
+  assert.doesNotMatch(proximo, /não está no PATH/, 'não conta como aviso: a instalação já explicou');
+
+  const antes = tmp(t, 'dash-antes-');
+  fs.writeFileSync(path.join(antes, 'dashboard'), '#!/bin/sh\n', { mode: 0o755 });
+  assert.ok((await diagComando(c, { PATH: `${antes}:${c.bin}` })).includes(`▲ outro dashboard vem antes no PATH (${path.join(antes, 'dashboard')})`));
+});
+
+test('diagnosticar: sem link é escolha, não aviso; link estranho é explicado', async (t) => {
+  const c = installedRoot(t);
+  const link = path.join(c.home, '.local', 'bin', 'dashboard');
+  const sem = await diagComando(c, { PATH: '/usr/bin' });
+  assert.match(sem, /Comando dashboard no PATH: não criado\. Para criar, rode \.\/dashboard reconfigurar\./);
+  assert.doesNotMatch(sem, /▲.*comando/i);
+
+  fs.mkdirSync(path.dirname(link), { recursive: true });
+  fs.writeFileSync(link, 'outro\n');
+  assert.match(await diagComando(c, { PATH: '/usr/bin' }), /é outro programa/);
+
+  fs.rmSync(link);
+  fs.symlinkSync('/nao/existe/dashboard', link);
+  assert.match(await diagComando(c, { PATH: '/usr/bin' }), /▲ o comando dashboard aponta para uma pasta que não existe mais \(\/nao\/existe\/dashboard\)/);
+
+  const outra = tmp(t, 'dash-outra-');
+  fs.mkdirSync(path.join(outra, 'server', 'cli'), { recursive: true });
+  fs.writeFileSync(path.join(outra, 'server', 'cli', 'index.js'), '');
+  fs.writeFileSync(path.join(outra, 'dashboard'), '#!/bin/sh\n', { mode: 0o755 });
+  fs.rmSync(link);
+  fs.symlinkSync(path.join(outra, 'dashboard'), link);
+  assert.match(await diagComando(c, { PATH: '/usr/bin' }), /▲ o comando dashboard vale para outra pasta/);
 });

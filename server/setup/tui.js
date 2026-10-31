@@ -3,6 +3,7 @@
 // setas, espaço, Tab e Enter; funciona sem cores (NO_COLOR ou terminal simples).
 // Usa os mesmos métodos do assistente no navegador (instalacao.js).
 import readline from 'node:readline';
+import { mostrarComando } from '../cli/saida.js';
 import { STEPS } from './instalacao.js';
 
 // Tamanho em base 1000 com vírgula ("1,8 TB"), como os fabricantes de disco anunciam.
@@ -488,12 +489,12 @@ async function step5(sc, inst, form) {
   }
 }
 
-/** Passo 6: resultado da 1ª coleta, preferências (início automático, atalho) e o token. */
+/** Passo 6: resultado da 1ª coleta, preferências (início automático, atalho, comando) e o token. */
 async function step6(sc, inst) {
   sc.step = 6;
   const r = inst.resumoTeste() || {};
-  const systemd = inst.verificarComputador().systemd;
-  const prefs = { boot: systemd, shortcut: true };
+  const { systemd, comando } = inst.verificarComputador();
+  const prefs = { boot: systemd, shortcut: true, link: comando.liga, editar: false };
   const res = await sc.form({
     title: 'Tudo pronto. A primeira coleta já deu certo.',
     lines: [
@@ -505,6 +506,8 @@ async function step6(sc, inst) {
       rows: [
         { type: 'check', label: systemd ? 'Iniciar com o computador' : 'Iniciar com o computador (sem systemd de usuário neste sistema)', disabled: !systemd, get: () => prefs.boot, toggle: () => { prefs.boot = !prefs.boot; } },
         { type: 'check', label: 'Atalho no menu de aplicativos', get: () => prefs.shortcut, toggle: () => { prefs.shortcut = !prefs.shortcut; } },
+        { type: 'check', label: `Comando dashboard no terminal (${comando.detalhe})`, disabled: comando.trava, get: () => prefs.link, toggle: () => { prefs.link = !prefs.link; } },
+        ...(comando.pedeEdicao ? [{ type: 'check', label: `Pôr ~/.local/bin no PATH (acrescenta um bloco no ~/${comando.arquivo}, com cópia antes)`, get: () => prefs.editar, toggle: () => { prefs.editar = !prefs.editar; } }] : []),
       ],
     }],
     footer: ['No servidor: usuário dashmon, chave restrita e (se escolheu SMART) a regra de sudo para smartctl -H.', 'Para desfazer tudo, aqui e no servidor: dashboard desinstalar', 'Aperte "t" para ver o token de reserva (uma vez só).'],
@@ -514,7 +517,7 @@ async function step6(sc, inst) {
   sc.close();
   // `concluir` devolve as preferências no formato que `ligarPainel` lê
   // ({ iniciarComComputador, atalho }), igual ao assistente web.
-  const escolhas = inst.concluir({ iniciarComComputador: prefs.boot, atalho: prefs.shortcut });
+  const escolhas = inst.concluir({ iniciarComComputador: prefs.boot, atalho: prefs.shortcut, link: prefs.link, editarProfile: prefs.editar });
   return { prefs: escolhas, token: prefs.token };
 }
 
@@ -522,7 +525,7 @@ async function step6(sc, inst) {
 export async function runTui({ out, inst, input = process.stdin, output = process.stdout, open }) {
   if (!input.isTTY && input === process.stdin) {
     out.fail('a TUI precisa de um terminal interativo');
-    out.explain('a entrada não é um terminal (veio de um pipe ou script).', 'para automatizar, use ./dashboard instalar --sem-interface (veja ./dashboard ajuda).');
+    out.explain('a entrada não é um terminal (veio de um pipe ou script).', `para automatizar, use ${out.cmd} instalar --sem-interface (veja ${out.cmd} ajuda).`);
     return 2;
   }
   // Terminal em modo "cru": cada tecla chega na hora, sem esperar Enter.
@@ -557,6 +560,7 @@ export async function runTui({ out, inst, input = process.stdin, output = proces
   output.write('\x1b[2J\x1b[H');
   out.title('Server Dashboard · instalação');
   out.ok('configuração concluída');
+  mostrarComando(out, inst.comando);
   if (result.token) {
     out.line(`  Token de reserva (aparece só agora): ${out.c.bold(result.token)}`);
     out.line();
@@ -568,7 +572,7 @@ export async function runTui({ out, inst, input = process.stdin, output = proces
   if (!opened) {
     out.step('para abrir o painel já logado, use este link (vale uma vez, por 2 minutos):');
     out.line(`\n  ${lig.url}\n`);
-    out.line(out.c.dim('Depois, use ./dashboard abrir para gerar outro.'));
+    out.line(out.c.dim(`Depois, use ${out.cmd} abrir para gerar outro.`));
   } else out.ok('painel aberto no navegador');
   return 0;
 }

@@ -110,3 +110,17 @@ test('./dashboard chama a CLI com o Node 24 e informa de onde ele veio', { skip:
     assert.match(help.stdout, new RegExp(`\\n  ${cmd} `), `ajuda lista "${cmd}"`);
   }
 });
+
+// F4: o script resolve a própria pasta pelo link, de qualquer pasta e sem o ./.
+test('dashboard pelo link: roda de outra pasta e cita o comando sem o ./', (t) => {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'dash-link-'));
+  t.after(() => fs.rmSync(dir, { recursive: true, force: true }));
+  fs.symlinkSync(path.join(ROOT, 'dashboard'), path.join(dir, 'dashboard'));
+  const env = { ...process.env, PATH: `${dir}:${process.env.PATH}` };
+  const roda = (arg) => spawnSync('bash', ['-c', `dashboard ${arg}`], { cwd: os.tmpdir(), env, encoding: 'utf8' });
+  const v = roda('versao');
+  assert.equal(v.status, 0, v.stderr);
+  assert.equal(v.stdout.trim(), `Server Dashboard ${JSON.parse(fs.readFileSync(path.join(ROOT, 'package.json'), 'utf8')).version}`);
+  assert.match(roda('ajuda').stdout, /^Uso: dashboard <comando>/);
+  assert.match(roda('status').stdout, new RegExp(`pasta: ${fs.realpathSync(ROOT).replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}`));
+});

@@ -86,7 +86,7 @@ export async function atualizar({ out, root, args = [], home = os.homedir(), dep
   const run = deps.run ?? spawnSync;
   if (git(root, ['rev-parse', '--is-inside-work-tree'], run).status !== 0) {
     out.fail('esta pasta não veio de um git clone');
-    out.explain('o atualizar troca de versão com o git.', 'baixe de novo com o comando do README e importe os dados: ./dashboard instalar --importar-v1 não serve aqui; copie a pasta data/.');
+    out.explain('o atualizar troca de versão com o git.', `baixe de novo com o comando do README e importe os dados: ${out.cmd} instalar --importar-v1 não serve aqui; copie a pasta data/.`);
     return 1;
   }
   const current = versionOf(root);
@@ -142,7 +142,7 @@ export async function atualizar({ out, root, args = [], home = os.homedir(), dep
   restoreData(root, backup);
   const back = (deps.reexec ?? ((a) => spawnSync(path.join(root, 'dashboard'), a, { stdio: 'inherit' }).status))(['atualizar', '--pos-atualizacao']);
   if (back === 0) out.ok(`de volta à ${current}, com os dados de antes da atualização`);
-  else out.fail('a versão anterior também não subiu', 'rode ./dashboard diagnosticar');
-  out.explain(`a versão ${target} não ligou o painel nesta máquina.`, 'nada foi perdido. Rode ./dashboard diagnosticar e, se quiser, avise no GitHub do projeto.');
+  else out.fail('a versão anterior também não subiu', `rode ${out.cmd} diagnosticar`);
+  out.explain(`a versão ${target} não ligou o painel nesta máquina.`, `nada foi perdido. Rode ${out.cmd} diagnosticar e, se quiser, avise no GitHub do projeto.`);
   return 1;
 }

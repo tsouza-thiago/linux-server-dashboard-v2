@@ -1,4 +1,4 @@
-// `dashboard desinstalar`: remove o serviço, o atalho e os arquivos locais e
+// `dashboard desinstalar`: remove o serviço, o atalho, o comando e os arquivos locais e
 // oferece limpar o servidor — só a parte desta instalação (a linha da chave e a regra de
 // sudo dela; o usuário dashmon sai só se nenhum outro computador o usar, ADR 0020) — com
 // os comandos exibidos antes e a senha usada uma vez, como no assistente. Servidor que só
@@ -10,7 +10,7 @@ import path from 'node:path';
 import readline from 'node:readline';
 import { removalScript, remainingLines, assistedScript, completedSteps } from '../setup/preparo.js';
 import { runAdmin, describeAdminError, resolveAlias, checkAgentKey } from '../setup/remoto.js';
-import { removeService, removeShortcut } from '../setup/local.js';
+import { removeService, removeShortcut, removerBlocoDoLogin, removerLinkDoPath } from '../setup/local.js';
 import { currentServer } from '../setup/instalacao.js';
 import { validUser, installId, validPublicKey, NAME_PREFIX, PANEL_USER } from '../setup/acesso.js';
 import { stopPanel } from './servico.js';
@@ -87,7 +87,7 @@ const yes = (a) => /^(s|sim|y|yes)$/i.test(String(a || '').trim());
 
 /**
  * `./dashboard desinstalar`: pede confirmação (ou --sim), oferece limpar o servidor, remove o
- * serviço, o atalho, a chave e a configuração local, e pergunta se apaga o histórico.
+ * serviço, o atalho, o comando no PATH, a chave e a configuração local, e pergunta se apaga o histórico.
  * Opções: --sim, --limpar-servidor, --usuario, --chave-ssh, --senha-stdin, --apagar-historico.
  */
 export async function desinstalar({ out, root, args = [], home = os.homedir(), deps = {} }) {
@@ -99,7 +99,7 @@ export async function desinstalar({ out, root, args = [], home = os.homedir(), d
     out.fail('confirme com --sim para desinstalar sem perguntas');
     return 2;
   }
-  if (!flags.sim && !yes(await askFn('Remover o painel desta máquina (serviço, atalho, chave e configuração)? [s/N] '))) {
+  if (!flags.sim && !yes(await askFn('Remover o painel desta máquina (serviço, atalho, comando, chave e configuração)? [s/N] '))) {
     out.ok('nada foi removido');
     return 0;
   }
@@ -135,6 +135,15 @@ export async function desinstalar({ out, root, args = [], home = os.homedir(), d
   out.ok('painel parado');
   if ((deps.removeService ?? removeService)({ home })) out.ok('serviço de usuário removido');
   if (removeShortcut({ home })) out.ok('atalho do menu removido');
+  const link = removerLinkDoPath({ root, home });
+  if (link.removido) out.ok('comando dashboard removido', '~/.local/bin/dashboard');
+  // O bloco do PATH é da máquina: a outra pasta que tem o link ainda precisa dele.
+  if (link.estado === 'outra-pasta') out.line(out.c.dim(`O comando dashboard continua: ele vale para ${link.alvo}.`));
+  else {
+    const bloco = removerBlocoDoLogin({ home });
+    for (const f of bloco.removidos) out.ok(`PATH retirado do ~/${f}`, 'só o bloco do painel');
+    for (const f of bloco.falhas) out.warn(`não consegui editar o ~/${f}`, 'apague à mão o bloco server-dashboard');
+  }
   // Só apaga a chave se ela for do painel (nome dashboard*): nunca a chave pessoal de alguém.
   if (key && path.basename(key).startsWith('dashboard') && fs.existsSync(key)) {
     fs.rmSync(key, { force: true });
