@@ -40,3 +40,4 @@ Uma ADR aceita não é editada; se a decisão mudar, uma nova ADR a substitui.
 | [0033](0033-esqueleto-lembra-o-formato-no-navegador.md) | Esqueleto lembra o formato do servidor no navegador | Aceita |
 | [0034](0034-reconfigurar-pela-tela-processo-a-parte.md) | Reconfigurar pela tela: assistente em processo à parte e volta garantida | Aceita |
 | [0035](0035-copia-da-configuracao-fica-na-memoria.md) | Reconfigurar pela tela: a cópia fica na memória até o painel novo responder | Aceita |
+| [0036](0036-reconfigurar-pela-tela-disparo-pelo-painel.md) | Reconfigurar pela tela: o disparo pelo painel | Aceita |

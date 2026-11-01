@@ -7,7 +7,7 @@
 #       (Chromium daqui dirigindo os 6 passos) até o painel coletando
 #   C · upgrade V1 → V2: a V1 (tag v1.0.0) roda de verdade e gera o data/ dela; a V2
 #       importa (--importar-v1) e depois troca para a chave restrita (reconfigurar)
-#   D · botão Atualizar: computador com systemd (systemd-run --user) e sem systemd (segundo
+#   D · botões Atualizar e Reconfigurar: computador com systemd (systemd-run --user) e sem systemd (segundo
 #       plano), na atualização que dá certo e na que volta atrás
 #
 # Os "computadores" não têm Node: o ./dashboard baixa o Node 24 oficial e confere a soma.
@@ -190,6 +190,12 @@ botao() {
   node "$HERE/botao.mjs" "http://127.0.0.1:$2" "$token" "$3" "$4" "$5"
 }
 versao_instalada() { em "$1" "cd linux-server-dashboard-v2 && ./dashboard versao" | grep -q "$2"; }
+# reconfigura <contêiner> <porta>: o botão Reconfigurar, até cancelar e o painel voltar.
+reconfigura() {
+  local token
+  token=$(docker exec "$1" sh -c "grep '^DASH_TOKEN=' /home/ana/linux-server-dashboard-v2/.env | cut -d= -f2-")
+  node "$HERE/reconfigurar.mjs" "http://127.0.0.1:$2" "$token"
+}
 # 2 instalações na mesma rede, cada uma com a sua porta e a sua chave.
 instala_bot() { em "$1" "git clone -q git://127.0.0.1:9418/release linux-server-dashboard-v2 && cd linux-server-dashboard-v2 && printf 'PORT=$2\n' > .env && echo senha-de-teste | ./dashboard instalar --sem-interface --servidor 127.0.0.1 --porta 2204 --usuario maria --identidade '$FP' --senha-stdin --smart nenhum" > "$OUT/D-$1-instalar.txt"; }
 instala_bot e2e-cli-sd 3104
@@ -197,6 +203,10 @@ instala_bot e2e-cli-bot 3105
 sd_ativo() { docker exec -u ana e2e-cli-sd bash -lc "systemctl --user is-active $1"; }
 confere "D: serviço do usuário no computador com systemd" sd_ativo server-dashboard
 cd "$GIT/release" && versao 2.0.2 && git commit -qam "e2e: 2.0.2" && assina v2.0.2 && cd "$REPO"
+confere "D: systemd-run --user: Reconfigurar abre o assistente e cancelar religa o painel" reconfigura e2e-cli-sd 3104
+confere "D: systemd-run --user: serviço de volta depois de cancelar" sd_ativo server-dashboard
+confere "D: systemd-run --user: a unidade do assistente sumiu sozinha" bash -c "! docker exec -u ana e2e-cli-sd bash -lc 'systemctl --user is-active server-dashboard-reconfigurar'"
+confere "D: segundo plano: Reconfigurar abre o assistente e cancelar religa o painel" reconfigura e2e-cli-bot 3105
 confere "D: systemd-run --user: atualizou pelo botão" botao e2e-cli-sd 3104 v2.0.2 systemd atualizado
 confere "D: systemd-run --user: versão nova no disco" versao_instalada e2e-cli-sd 2.0.2
 confere "D: systemd-run --user: serviço de volta" sd_ativo server-dashboard

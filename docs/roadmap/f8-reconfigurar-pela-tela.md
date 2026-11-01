@@ -80,9 +80,10 @@ e sem deixar uma janela de terminal aberta até o fim.
 2. **Feita (ADR 0035).** A cópia fica na memória até o painel novo responder em `/api/session`.
    Se ele não subir, o comando volta à configuração anterior, religa o painel, sai com código 1
    e deixa o motivo em `data/reconfigurar.log`. A etapa 5 mostra esse motivo na tela.
-3. `POST /api/reconfigurar/iniciar`, com o código de `criarCodigoPelaTela`, e o executor da F7
-   para o comando fixo `reconfigurar --pela-tela`. A pasta sem tag assinada vira bloqueio aqui:
-   o comando fixo não leva `--sem-assinatura`, então ele recusaria com o painel já esperando.
+3. **Feita (ADR 0036).** `POST /api/reconfigurar/iniciar`, com o código de `criarCodigoPelaTela`, e
+   o executor da F7 para o comando fixo `reconfigurar --pela-tela`. Antes de disparar, a rota barra
+   a pasta sem tag assinada, a pasta fora da instalação, a atualização em andamento e o painel sem
+   login. Depois de disparar, nada mais dispara por 1 min, e a atualização também espera.
 4. Item "Reconfigurar" no menu de manutenção e o diálogo de explicação.
 5. Espera do assistente e entrada automática com o código; volta ao painel no fim. O botão
    Cancelar do assistente entra aqui, só no modo `--pela-tela`, e espera o painel voltar. Os

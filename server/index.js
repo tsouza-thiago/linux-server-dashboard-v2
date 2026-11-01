@@ -23,8 +23,8 @@ import { hostCheck, csrfCheck, securityHeaders, makeRequireAuth, issueCsrfCookie
 import { toCSV } from './csv.js';
 import { createLogFile } from './logfile.js';
 import { Atualizacao, procurarEmProcesso } from './atualizacao/index.js';
-import { executarForaDoServico, modoDoExecutor } from './atualizacao/executor.js';
-import { bloqueioDaPasta } from './atualizacao/procurar.js';
+import { executarForaDoServico, modoDoExecutor, reconfigurarForaDoServico } from './atualizacao/executor.js';
+import { bloqueioDaPasta, bloqueioDaReconfiguracao } from './atualizacao/procurar.js';
 
 /**
  * Monta o painel: stores, motor de alertas, sessões, SSE e o roteador com todas as rotas.
@@ -94,7 +94,8 @@ export function createApp(deps = {}) {
   }
 
   // Versão nova (ADR 0030 e 0031). Quem procura e troca de verdade é o startServer: sem
-  // `procurarVersao` e `executarAtualizacao`, os testes e o painel de teste nunca saem daqui.
+  // `procurarVersao`, `executarAtualizacao` e `executarReconfiguracao`, os testes e o painel de teste
+  // nunca saem daqui.
   const atualizacao = deps.atualizacao || new Atualizacao({
     file: deps.atualizacaoFile ?? path.join(path.dirname(alertsStore.file), 'atualizacao.json'),
     instalada: `v${VERSION.app}`,
@@ -105,6 +106,8 @@ export function createApp(deps = {}) {
     modo: deps.modoAtualizacao ?? null,
     executar: deps.executarAtualizacao ?? null,
     conferirPasta: deps.conferirPasta,
+    executarReconfiguracao: deps.executarReconfiguracao ?? null,
+    conferirReconfiguracao: deps.conferirReconfiguracao,
     procDir: deps.procDirAtualizacao,
     onChange: (estado) => broadcast('atualizacao', estado),
     log,
@@ -334,6 +337,12 @@ export function createApp(deps = {}) {
     res.json(atualizacao.registro(Math.max(parseInt(req.query.desde, 10) || 0, 0)));
   });
 
+  // O botão Reconfigurar (ADR 0034 e 0036, I11): nada do pedido é lido.
+  app.post('/api/reconfigurar/iniciar', async (req, res) => {
+    const { status, corpo } = await atualizacao.reconfigurar();
+    res.status(status).json(corpo);
+  });
+
   // Quedas e disponibilidade (ADR 0006 e 0018): ?days=1..90 (padrão 30).
   app.get('/api/outages', (req, res) => {
     const days = Math.min(Math.max(parseInt(req.query.days, 10) || 30, 1), 90);
@@ -490,6 +499,8 @@ function startServer() {
     modoAtualizacao: modo,
     executarAtualizacao: () => executarForaDoServico({ root: ROOT, modo }),
     conferirPasta: () => bloqueioDaPasta(ROOT),
+    executarReconfiguracao: () => reconfigurarForaDoServico({ root: ROOT, modo }),
+    conferirReconfiguracao: () => bloqueioDaReconfiguracao(ROOT),
   });
 
   // 1ª coleta assim que o servidor sobe; depois, uma por intervalo.

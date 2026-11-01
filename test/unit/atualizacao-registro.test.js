@@ -9,7 +9,7 @@ import path from 'node:path';
 import {
   abrirRegistro, cancelarPre, donoDaTrava, emAndamento, garantirPasta, lerEstado, lerRegistro, liberarPre, pegarTrava, preLiberada, prepararRegistro, registrarFalha, soltarTrava,
 } from '../../server/atualizacao/registro.js';
-import { executarForaDoServico, modoDoExecutor } from '../../server/atualizacao/executor.js';
+import { executarForaDoServico, modoDoExecutor, reconfigurarForaDoServico } from '../../server/atualizacao/executor.js';
 
 function pasta(t) {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), 'dash-registro-'));
@@ -195,6 +195,18 @@ test('executor: segundo plano → sessão própria e sem prender o painel', asyn
   assert.equal(chamadas[0].unref, true);
   const erro = espiao((f) => f.emit('error', new Error('sem arquivo')));
   assert.deepEqual(await executarForaDoServico({ root: '/opt/painel', modo: 'segundo-plano', spawnFn: erro.spawnFn }), { ok: false });
+});
+
+test('executor: reconfigurar usa outra unidade e o comando fixo, nos 2 modos (I11)', async () => {
+  const unidade = espiao((f) => f.emit('close', 0));
+  assert.deepEqual(await reconfigurarForaDoServico({ root: '/opt/painel', modo: 'systemd', spawnFn: unidade.spawnFn }), { ok: true });
+  assert.equal(unidade.chamadas[0].cmd, 'systemd-run');
+  assert.deepEqual(unidade.chamadas[0].args, ['--user', '--unit=server-dashboard-reconfigurar', '--collect', '--quiet', '--working-directory=/opt/painel', '/opt/painel/dashboard', 'reconfigurar', '--pela-tela']);
+  const solto = espiao((f) => f.emit('spawn'));
+  assert.deepEqual(await reconfigurarForaDoServico({ root: '/opt/painel', modo: 'segundo-plano', spawnFn: solto.spawnFn }), { ok: true });
+  assert.equal(solto.chamadas[0].cmd, '/opt/painel/dashboard');
+  assert.deepEqual(solto.chamadas[0].args, ['reconfigurar', '--pela-tela']);
+  assert.equal(solto.chamadas[0].opts.detached, true);
 });
 
 test('--pre pela tela: arquivo 0600, vale por um tempo e sai quando pedem', (t) => {
