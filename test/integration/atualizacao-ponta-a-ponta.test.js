@@ -7,6 +7,7 @@ import assert from 'node:assert/strict';
 import { spawnSync } from 'node:child_process';
 import fs from 'node:fs';
 import path from 'node:path';
+import { consumeLoginCode } from '../../server/http/entrar.js';
 import { esperarAte } from '../../test-support/esperar.js';
 import { instalacaoReal, TOKEN } from '../../test-support/instalacao-real.js';
 
@@ -55,11 +56,10 @@ test('ponta a ponta: com tela, só abre o painel; sem tela ou com o painel parad
   assert.equal(git(pasta, 'describe', '--tags', '--exact-match'), 'v2.90.0', 'quem troca é o clique na tela');
   assert.ok(await esperarAte(() => fs.existsSync(abertos)), 'o xdg-open não rodou');
   const url = fs.readFileSync(abertos, 'utf8').trim();
-  assert.match(url, new RegExp(`^http://127\\.0\\.0\\.1:${porta}/entrar\\?codigo=[\\w-]+#/visao-geral\\?atualizar=1$`));
-  const entrada = await fetch(url, { redirect: 'manual' });
-  assert.equal(entrada.status, 302);
-  assert.match(entrada.headers.get('set-cookie'), /dash_session=/, 'o link entra logado');
-  assert.equal((await fetch(url, { redirect: 'manual' })).headers.get('set-cookie')?.includes('dash_session') ?? false, false, 'o link vale 1 vez');
+  const [, codigo] = new RegExp(`^http://127\\.0\\.0\\.1:${porta}/entrar\\?codigo=([\\w-]+)#/visao-geral\\?atualizar=1$`).exec(url);
+  // A rota /entrar e o fragmento ficam no e2e: aqui, o código é o que o painel aceitaria.
+  assert.equal(consumeLoginCode(path.join(pasta, 'data'), codigo), true, 'o link entra logado');
+  assert.equal(consumeLoginCode(path.join(pasta, 'data'), codigo), false, 'o link vale 1 vez');
 
   const semTela = dash(['atualizar']);
   assert.equal(semTela.codigo, 0, semTela.texto);
