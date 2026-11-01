@@ -324,14 +324,20 @@ function firstUse(state) {
   </section>`;
 }
 
-/** Aviso de configuração desatualizada (chave do servidor, SMART). */
+/** Aviso de script desatualizado no servidor, com o passo a passo (depois de atualizar ou de mudar o .env). */
 function configWarning(state) {
   const c = state.sample?.collector;
   if (!c?.hashMismatch) return '';
   return html`<section class="panel notice notice-warn" aria-label="Aviso de configuração">
     <div class="notice-row">${iconBox('warn', 'key', 'lg')}<div>
       <h2>A configuração no servidor está desatualizada</h2>
-      <p>Você mudou os alvos da coleta no <span class="mono">.env</span>, mas a linha restrita no <span class="mono">authorized_keys</span> do servidor ainda é a antiga. O painel continua coletando o que já estava liberado. Veja em Ajuda › Acesso ao servidor.</p>
+      <p>O script de coleta guardado no servidor não é o que este painel espera. Isso acontece depois de uma versão que muda a coleta ou de mudar os alvos no <span class="mono">.env</span>. O painel continua coletando o que a linha antiga permite, e alguns dados podem faltar.</p>
+      <ol class="notice-passos">
+        <li>Abra um terminal nesta máquina, na pasta do painel.</li>
+        <li>Rode <span class="mono">./dashboard reconfigurar</span>.</li>
+        <li>Confirme o passo "Preparar o servidor". Ele pede a senha do administrador do servidor.</li>
+        <li>Espere a próxima coleta. Este aviso some sozinho.</li>
+      </ol>
     </div></div>
     <span class="note mono">esperado ${c.expectedHash || '—'} · servidor ${c.hash || '—'}</span>
   </section>`;

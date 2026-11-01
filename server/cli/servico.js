@@ -10,6 +10,7 @@ import net from 'node:net';
 import os from 'node:os';
 import path from 'node:path';
 import { clampInt, loadEnvFile } from '../config.js';
+import { createLoginCode } from '../http/entrar.js';
 import { PANEL_NODE_FLAGS } from '../node-flags.js';
 
 /** Nome do serviço systemd de usuário do painel (o docs.test confere contra a documentação). */
@@ -188,6 +189,18 @@ export async function stopPanel({ root, home = os.homedir(), procDir = '/proc', 
   }
   fs.rmSync(pidFile(root), { force: true });
   return { ok: true, wasRunning: true, mode: 'processo', pid, forced };
+}
+
+/**
+ * Endereço para abrir o painel: com DASH_TOKEN, um link de entrada de uso único. `fragmento` é o
+ * `#...` da tela: o navegador o mantém no redirecionamento do /entrar, que não tem fragmento.
+ */
+export function panelUrl(root, port, fragmento = '') {
+  const env = loadEnvFile(path.join(root, '.env'));
+  const base = `http://127.0.0.1:${port}`;
+  if (!env.DASH_TOKEN) return { url: `${base}/${fragmento}`, oneTime: false };
+  const code = createLoginCode(path.join(root, 'data'));
+  return { url: `${base}/entrar?codigo=${code}${fragmento}`, oneTime: true };
 }
 
 /** Abre uma URL no navegador da sessão gráfica (false se não houver tela). */

@@ -14,6 +14,9 @@ import { importarV1, detectV1, v1Settings, v1Pid, stopV1 } from '../../server/cl
 import { desinstalar } from '../../server/cli/desinstalar.js';
 import { LINHA_PATH, editarArquivoDeLogin, unitText } from '../../server/setup/local.js';
 import { unitPath } from '../../server/cli/servico.js';
+import { preLiberada } from '../../server/atualizacao/registro.js';
+import { MARCADOR_RECONFIGURAR } from '../../server/atualizacao/novidades.js';
+import { consumeLoginCode } from '../../server/http/entrar.js';
 import { loadEnvFile } from '../../server/config.js';
 import { esperarAte } from '../../test-support/esperar.js';
 
@@ -314,6 +317,113 @@ test('atualizar --registro: o git do painel não pergunta nada', { skip: !hasGit
   await atualizar({ out: memOut().out, root: clone, home, args: ['--registro'], deps: { run, gitRun } });
   assert.equal(envs[0].GIT_TERMINAL_PROMPT, '0');
   assert.match(envs[0].GIT_SSH_COMMAND, /BatchMode=yes/);
+});
+
+// O caminho padrão (ADR 0032): com tela, login e painel no ar, o comando só abre o navegador.
+function comTela(t, { abre = true, ...extra } = {}) {
+  const repos = releaseRepos(t);
+  fs.appendFileSync(path.join(repos.clone, '.env'), 'DASH_TOKEN=abc\nPORT=3311\n');
+  const urls = [];
+  const deps = {
+    run: gitRun, gitRun, env: { DISPLAY: ':0' }, panelStatus: () => ({ running: true }), healthy: async () => true,
+    openBrowser: (url) => { urls.push(url); return abre; }, stopPanel: async () => ({}), startPanel: async () => ({ ok: true }), reexec: () => 0, ...extra,
+  };
+  return { ...repos, urls, deps, home: tmp(t, 'dash-upd-home-') };
+}
+
+test('atualizar: com tela, abre o painel já logado no diálogo e não troca nada aqui', { skip: !hasGit }, async (t) => {
+  const { clone, release, g, urls, deps, home } = comTela(t);
+  release('2.0.0-alpha.9');
+  const m = memOut();
+  assert.equal(await atualizar({ out: m.out, root: clone, home, deps }), 0, m.text());
+  assert.match(m.text(), /painel aberto no navegador/);
+  assert.match(m.text(), /atualizar --terminal/);
+  const [, codigo] = /^http:\/\/127\.0\.0\.1:3311\/entrar\?codigo=([\w-]+)#\/visao-geral\?atualizar=1$/.exec(urls[0]);
+  assert.equal(consumeLoginCode(path.join(clone, 'data'), codigo), true, 'link de uso único, como o dashboard abrir');
+  assert.equal(g(clone, 'describe', '--tags', '--exact-match'), 'v2.0.0-alpha.8');
+  assert.equal(fs.existsSync(path.join(clone, '.atualizacao', 'trava.pid')), false, 'quem pega a trava é o executor');
+});
+
+test('atualizar: sem tela, sem login, painel parado ou sem navegador, avisa e segue no terminal', { skip: !hasGit }, async (t) => {
+  const casos = [
+    [{ env: {} }, /não há tela gráfica nesta sessão/],
+    [{ env: { WAYLAND_DISPLAY: 'wayland-0' }, panelStatus: () => ({ running: false }) }, /o painel está parado/],
+    [{ healthy: async () => false }, /o painel está parado/],
+    [{ abre: false }, /não consegui abrir o navegador/],
+  ];
+  for (const [extra, aviso] of casos) {
+    const { clone, release, g, deps, home } = comTela(t, extra);
+    release('2.0.0-alpha.9');
+    const m = memOut();
+    assert.equal(await atualizar({ out: m.out, root: clone, home, deps }), 0, m.text());
+    assert.match(m.text(), aviso);
+    assert.match(m.text(), /sigo aqui no terminal/);
+    assert.equal(g(clone, 'describe', '--tags', '--exact-match'), 'v2.0.0-alpha.9');
+  }
+  const { clone, deps, home, urls } = comTela(t);
+  fs.writeFileSync(path.join(clone, '.env'), 'SSH_HOST=servidor\n');
+  const m = memOut();
+  assert.equal(await atualizar({ out: m.out, root: clone, home, deps }), 0, m.text());
+  assert.match(m.text(), /este painel não tem login/);
+  assert.deepEqual(urls, [], 'sem login, a tela só mandaria a pessoa de volta para o terminal');
+});
+
+test('atualizar: --terminal nunca abre o navegador', { skip: !hasGit }, async (t) => {
+  const { clone, release, g, urls, deps, home } = comTela(t);
+  release('2.0.0-alpha.9');
+  const m = memOut();
+  assert.equal(await atualizar({ out: m.out, root: clone, home, args: ['--terminal'], deps }), 0, m.text());
+  assert.deepEqual(urls, []);
+  assert.doesNotMatch(m.text(), /sigo aqui/);
+  assert.equal(g(clone, 'describe', '--tags', '--exact-match'), 'v2.0.0-alpha.9');
+});
+
+test('atualizar: pasta errada para antes de abrir o painel (#118)', async (t) => {
+  const root = tmp(t, 'dash-upd-sem-env-');
+  const urls = [];
+  const m = memOut();
+  const deps = { env: { DISPLAY: ':0' }, openBrowser: (u) => { urls.push(u); return true; } };
+  assert.equal(await atualizar({ out: m.out, root, home: tmp(t, 'dash-upd-home-'), deps }), 1);
+  assert.deepEqual(urls, []);
+});
+
+test('atualizar --pre: pela tela, o executor aceita a rc só com a liberação do dono da pasta', { skip: !hasGit }, async (t) => {
+  const { clone, release, g, deps, home } = comTela(t);
+  release('2.0.0');
+  assert.equal(await atualizar({ out: memOut().out, root: clone, home, args: ['--terminal'], deps }), 0);
+  release('2.0.1-rc.1');
+  // A tela sozinha: o comando do executor é fixo e não leva o --pre.
+  assert.equal(await atualizar({ out: memOut().out, root: clone, home, args: ['--registro'], deps }), 0);
+  assert.equal(g(clone, 'describe', '--tags', '--exact-match'), 'v2.0.0');
+
+  assert.equal(await atualizar({ out: memOut().out, root: clone, home, args: ['--pre', '--terminal'], deps: { ...deps, reexec: () => 1 } }), 1);
+  assert.equal(preLiberada(clone), false, 'no terminal, o --pre vale só para este comando');
+  assert.equal(await atualizar({ out: memOut().out, root: clone, home, args: ['--pre'], deps }), 0);
+  assert.equal(preLiberada(clone), true);
+  assert.equal(g(clone, 'describe', '--tags', '--exact-match'), 'v2.0.0', 'abrir o painel não troca nada');
+  assert.equal(await atualizar({ out: memOut().out, root: clone, home, args: ['--registro'], deps }), 0);
+  assert.equal(g(clone, 'describe', '--tags', '--exact-match'), 'v2.0.1-rc.1');
+  assert.equal(preLiberada(clone), false, 'a liberação vale 1 vez');
+
+  const sem = comTela(t, { abre: false });
+  assert.equal(await atualizar({ out: memOut().out, root: sem.clone, home: sem.home, args: ['--pre'], deps: sem.deps }), 0);
+  assert.equal(preLiberada(sem.clone), false, 'navegador que não abriu não deixa liberação para trás');
+});
+
+test('atualizar: no terminal, a versão que muda a coleta avisa, só no acesso restrito', { skip: !hasGit }, async (t) => {
+  const { clone, work, release, deps, home } = comTela(t);
+  fs.writeFileSync(path.join(work, 'CHANGELOG.md'), `## [2.0.0-alpha.9] — 2026-11-02\n\n${MARCADOR_RECONFIGURAR}\n`);
+  release('2.0.0-alpha.9');
+  const direto = memOut();
+  assert.equal(await atualizar({ out: direto.out, root: clone, home, args: ['--terminal'], deps }), 0);
+  assert.doesNotMatch(direto.text(), /exige reconfigurar/);
+
+  fs.writeFileSync(path.join(work, 'CHANGELOG.md'), `## [2.0.0-alpha.10] — 2026-11-03\n\n${MARCADOR_RECONFIGURAR}\n`);
+  release('2.0.0-alpha.10');
+  fs.appendFileSync(path.join(clone, '.env'), 'SSH_ACESSO=restrito\n');
+  const restrito = memOut();
+  assert.equal(await atualizar({ out: restrito.out, root: clone, home, args: ['--terminal'], deps }), 0);
+  assert.match(restrito.text(), /esta versão exige reconfigurar o acesso ao servidor/);
 });
 
 test('atualizar: pasta sem git; fase 2 liga o painel e confere a saúde', async (t) => {

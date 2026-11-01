@@ -30,6 +30,9 @@ export function parseHash(hash) {
   return { view, period: Object.hasOwn(PERIODS, p || '') ? p : DEFAULT_PERIOD };
 }
 
+/** A página veio do `dashboard atualizar` (ADR 0032)? Só abre o diálogo: quem troca de versão é o clique. */
+export const veioDoAtualizar = (hash) => new URLSearchParams(String(hash || '').split('?')[1] ?? '').get('atualizar') === '1';
+
 /** Monta o hash (o período padrão não aparece na URL). */
 export function buildHash({ view = DEFAULT_VIEW, period = DEFAULT_PERIOD } = {}) {
   return period === DEFAULT_PERIOD ? `#/${view}` : `#/${view}?p=${period}`;

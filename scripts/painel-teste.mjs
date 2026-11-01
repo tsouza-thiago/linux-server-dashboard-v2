@@ -8,6 +8,7 @@
 //   npm run painel-teste -- --cenario=lacunas --porta=3944
 //   npm run painel-teste -- --versao-nova             # com aviso de versão nova (falsa) e troca simulada
 //   npm run painel-teste -- --versao-nova --resultado=voltou  # a troca simulada volta atrás
+//   npm run painel-teste -- --versao-nova --exige-reconfigurar  # versão que muda a coleta, com o aviso
 //   (com --versao-nova o painel tem login: o token é "teste")
 //
 // Cenários:
@@ -111,6 +112,12 @@ export async function semear(dir, cenario, { agora = Date.now(), horasBrutas = 7
   await h.flush();
   await quedas.flush();
   return { coletar };
+}
+
+/** A mesma versão falsa, com o marcador do CHANGELOG que muda o script de coleta. */
+async function procurarQueExigeReconfigurar() {
+  const r = await procurarFalso();
+  return { ...r, novidades: { ...r.novidades, exigeReconfigurar: true } };
 }
 
 /** Lê --nome=valor da linha de comando. */
@@ -230,7 +237,9 @@ async function main() {
     return;
   }
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'dash-painel-teste-'));
-  const { coletar } = await semear(dir, cenario);
+  const reconfigurar = process.argv.includes('--exige-reconfigurar');
+  // Outro hash na resposta do "servidor": é o que a coleta vê depois de uma versão que muda o script.
+  const { coletar } = await semear(dir, cenario, reconfigurar ? { coletor: coletorFalso((now) => saidaFalsa(now).replace(/(===VER===\n\d+ )\w+/, '$1000000000000')) } : {});
   const versaoNova = process.argv.includes('--versao-nova');
   let server;
   // "Reinício" no meio da troca: fecha as conexões e volta a escutar 3 s depois.
@@ -240,7 +249,7 @@ async function main() {
     setTimeout(() => { server.listen(porta, '127.0.0.1', pronto); }, 3000);
   });
   const troca = versaoNova ? atualizacaoFalsa(dir, { resultado: opcao('resultado', 'atualizado'), reiniciar }) : {};
-  const { app, runPoll, atualizacao, shutdown } = criarPainel(dir, cenario, coletar, versaoNova ? { procurarVersao: procurarFalso, ...troca } : {});
+  const { app, runPoll, atualizacao, shutdown } = criarPainel(dir, cenario, coletar, versaoNova ? { procurarVersao: reconfigurar ? procurarQueExigeReconfigurar : procurarFalso, sshAccess: reconfigurar ? 'restrito' : undefined, ...troca } : {});
   if (versaoNova) await atualizacao.verificar();
   if (cenario === 'offline') { await runPoll(); await runPoll(); }
   // vazio fica sem coleta: é o estado do 1º uso, antes da 1ª amostra chegar.

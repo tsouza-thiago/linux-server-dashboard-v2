@@ -123,13 +123,15 @@ Na pasta do projeto:
 | `./dashboard iniciar` / `./dashboard parar` | Liga ou desliga o painel (o servidor não é afetado) |
 | `./dashboard diagnosticar` | Testa tudo e explica cada problema |
 | `./dashboard reconfigurar` | Reabre o assistente (outro servidor, disco novo, outro serviço) |
-| `./dashboard atualizar` | Instala a versão assinada mais nova, com backup; volta atrás se falhar |
+| `./dashboard atualizar` | Abre o painel já logado, no diálogo da versão nova. Com `--terminal`, sem tela ou com o painel parado, faz tudo no terminal |
 | `./dashboard desinstalar` | Remove o painel e o comando deste computador e oferece limpar a parte dele no servidor |
 | `./dashboard versao` | Mostra a versão |
 
 Quando sai uma versão nova, o painel avisa no topo da tela, com as novidades. Para isso ele roda
 `git fetch` das tags 1 vez por dia: é a única conexão dele além do SSH da coleta. Para trocar de
-versão, clique em **Atualizar agora** nas novidades ou rode o `./dashboard atualizar`.
+versão, clique em **Atualizar agora** nas novidades. O `./dashboard atualizar` abre esse mesmo diálogo,
+e o `./dashboard atualizar --terminal` faz tudo no terminal. Os 2 caminhos fazem backup e voltam atrás
+se a versão nova falhar.
 
 Depois de instalado, o painel inicia com o computador (serviço systemd **de usuário**) e
 aparece no menu como **Server Dashboard**.

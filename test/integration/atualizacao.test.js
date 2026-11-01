@@ -8,7 +8,7 @@ import os from 'node:os';
 import path from 'node:path';
 import { createApp } from '../../server/index.js';
 import { procurar } from '../../server/atualizacao/procurar.js';
-import { abrirRegistro, pegarTrava } from '../../server/atualizacao/registro.js';
+import { abrirRegistro, cancelarPre, liberarPre, pegarTrava } from '../../server/atualizacao/registro.js';
 import { newestSignedTag } from '../../server/setup/assinatura.js';
 import { listen, close, request, readSSE } from '../../test-support/request.js';
 
@@ -35,7 +35,7 @@ test('rotas: sem sessão, 401; com sessão, o estado sem segredo', async (t) => 
   assert.equal((await request(port, { method: 'POST', path: '/api/atualizacao/verificar', body: {} })).status, 401);
   const r = await request(port, { path: '/api/atualizacao', headers: bearer });
   assert.equal(r.status, 200);
-  assert.deepEqual(Object.keys(r.json).sort(), ['bloqueio', 'erro', 'instalada', 'modo', 'nova', 'novidades', 'verificadoEm']);
+  assert.deepEqual(Object.keys(r.json).sort(), ['bloqueio', 'erro', 'exigeReconfigurar', 'instalada', 'modo', 'nova', 'novidades', 'verificadoEm']);
   assert.ok(!JSON.stringify(r.json).includes(TOKEN));
   assert.equal(fs.existsSync(path.join(dir, 'atualizacao.json')), false, 'ler não grava nada');
 });
@@ -51,6 +51,16 @@ test('rotas: procurar agora devolve a versão, avisa pelo SSE e limita a 1 por m
   assert.match((await sse).data, /event: atualizacao\ndata: .*v9\.9\.9/);
   const de = await request(port, { method: 'POST', path: '/api/atualizacao/verificar', body: {}, headers: bearer });
   assert.equal(de.status, 429);
+});
+
+test('rotas: o aviso de reconfigurar só vale no acesso restrito', async (t) => {
+  const novidades = { ...NOVA.novidades, exigeReconfigurar: true };
+  const restrito = await painel(t, { sshAccess: 'restrito', procurarVersao: async () => ({ ...NOVA, novidades }) });
+  const direto = await painel(t, { sshAccess: 'direto', procurarVersao: async () => ({ ...NOVA, novidades }) });
+  await restrito.app.atualizacao.verificar();
+  await direto.app.atualizacao.verificar();
+  assert.equal((await request(restrito.port, { path: '/api/atualizacao', headers: restrito.bearer })).json.exigeReconfigurar, true);
+  assert.equal((await request(direto.port, { path: '/api/atualizacao', headers: direto.bearer })).json.exigeReconfigurar, false);
 });
 
 test('rotas: procurar agora de outra origem é recusado antes de sair para a internet', async (t) => {
@@ -140,6 +150,19 @@ test('procura: pré-versão só para quem já está numa', { skip: !hasTools }, 
   assina('v2.5.0-rc.1');
   assert.equal(procurar(pasta, { home }).nova, null);
   assert.equal(newestSignedTag(pasta, { current: 'v2.4.0', includePre: true }), 'v2.5.0-rc.1');
+});
+
+test('procura: o --pre do terminal libera a pré-versão, e só enquanto vale', { skip: !hasTools }, (t) => {
+  const { pasta, home, versao, assina } = clone(t);
+  versao('2.5.0-rc.1', 'pré');
+  assina('v2.5.0-rc.1');
+  liberarPre(pasta);
+  assert.equal(procurar(pasta, { home }).nova, 'v2.5.0-rc.1');
+  liberarPre(pasta, Date.now() - 31 * 60000);
+  assert.equal(procurar(pasta, { home }).nova, null, 'a liberação vence sozinha');
+  liberarPre(pasta);
+  cancelarPre(pasta);
+  assert.equal(procurar(pasta, { home }).nova, null);
 });
 
 test('procura: sem origem acessível, avisa e continua com as tags que já estão aqui', { skip: !hasTools }, (t) => {

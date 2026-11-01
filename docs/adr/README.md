@@ -36,3 +36,4 @@ Uma ADR aceita não é editada; se a decisão mudar, uma nova ADR a substitui.
 | [0029](0029-autocomplete-estatico-do-bash.md) | Autocomplete estático do bash | Aceita |
 | [0030](0030-atualizacao-pelo-painel.md) | Atualização pelo painel: procura diária em processo à parte | Aceita |
 | [0031](0031-botao-atualizar-executor-fora-do-servico.md) | Botão Atualizar: executor fora do serviço e registro fora de `data/` | Aceita |
+| [0032](0032-dashboard-atualizar-abre-o-painel.md) | `dashboard atualizar` abre o painel, e o `--pre` passa pelo dono da pasta | Aceita |

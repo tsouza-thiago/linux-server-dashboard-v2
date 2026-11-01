@@ -11,6 +11,7 @@ import { fileURLToPath } from 'node:url';
 import { newestSignedTag } from '../setup/assinatura.js';
 import { otherServiceRoot } from '../cli/servico.js';
 import { recortarNovidades } from './novidades.js';
+import { preLiberada } from './registro.js';
 
 const TETO_GIT_MS = 120000;
 // Sem pergunta nenhuma: o painel roda sem terminal, e uma janela de senha do ssh ficaria aberta.
@@ -46,7 +47,7 @@ export function procurar(root, { run = spawnSync, home = os.homedir() } = {}) {
   const erro = git(root, ['fetch', '--quiet', '--tags', 'origin'], run).status === 0 ? null : 'sem-acesso';
   const instalada = versaoDaPasta(root);
   // A lista de chaves é a desta pasta, a da versão instalada: nada mudou de versão aqui.
-  const nova = newestSignedTag(root, { current: instalada, includePre: instalada.includes('-'), run });
+  const nova = newestSignedTag(root, { current: instalada, includePre: instalada.includes('-') || preLiberada(root), run });
   const changelog = nova ? git(root, ['show', `${nova}:CHANGELOG.md`], run) : null;
   const novidades = changelog?.status === 0 ? recortarNovidades(changelog.stdout, { de: instalada, ate: nova }) : null;
   return { nova, novidades, bloqueio: bloqueioDaPasta(root, home, run), erro };

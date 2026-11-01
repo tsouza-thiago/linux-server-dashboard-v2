@@ -15,7 +15,7 @@ _dashboard_opcoes() {
         --sem-atalho --sem-inicio-automatico --sem-interface --sem-link --sem-origem
         --senha-stdin --servicos --servidor --smart --temperatura --terminal --usuario'
       ;;
-    atualizar) echo '--pre' ;;
+    atualizar) echo '--pre --terminal' ;;
     desinstalar) echo '--apagar-historico --chave-ssh --limpar-servidor --senha-stdin --sim --usuario' ;;
   esac
 }

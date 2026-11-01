@@ -9,13 +9,13 @@ import os from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import {
-  isOurProcess, readPid, runningPid, panelStatus, panelPort, startPanel, stopPanel, portFree, waitForPort, openBrowser, hasSystemdUser,
+  isOurProcess, readPid, runningPid, panelStatus, panelPort, panelUrl, startPanel, stopPanel, portFree, waitForPort, openBrowser, hasSystemdUser,
 } from '../../server/cli/servico.js';
 import { createLoginCode, consumeLoginCode } from '../../server/http/entrar.js';
 import { PANEL_NODE_FLAGS } from '../../server/node-flags.js';
 import { unitText } from '../../server/setup/local.js';
 import { rotateIfNeeded, createLogFile } from '../../server/logfile.js';
-import { main, isConfigured, panelUrl } from '../../server/cli/index.js';
+import { main, isConfigured } from '../../server/cli/index.js';
 import { lerComModo } from '../../test-support/arquivos.js';
 import { esperarAte } from '../../test-support/esperar.js';
 
@@ -216,6 +216,7 @@ test('cli: ajuda, versão, comando desconhecido e "ainda não instalado"', async
   assert.match(link.url, /^http:\/\/127\.0\.0\.1:3000\/entrar\?codigo=[\w-]{32}$/);
   fs.writeFileSync(path.join(root, '.env'), 'SSH_HOST=servidor\n');
   assert.deepEqual(panelUrl(root, 3001), { url: 'http://127.0.0.1:3001/', oneTime: false });
+  assert.deepEqual(panelUrl(root, 3001, '#/visao-geral?atualizar=1').url, 'http://127.0.0.1:3001/#/visao-geral?atualizar=1');
 });
 
 test('saída: símbolos sem cor fora do terminal; com cor num TTY', () => {

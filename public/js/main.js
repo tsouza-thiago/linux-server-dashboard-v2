@@ -11,7 +11,7 @@
 import { createStore } from './core/store.js';
 import { api, onAuthRequired } from './core/api.js';
 import { connect } from './core/sse.js';
-import { VIEWS, PERIODS, parseHash, buildHash, viewByKey } from './core/router.js';
+import { VIEWS, PERIODS, parseHash, buildHash, veioDoAtualizar, viewByKey } from './core/router.js';
 import { html, mount } from './core/html.js';
 import { isOffline, mergeAlerts } from './core/analysis.js';
 import { esperaVisivel } from './core/espera.js';
@@ -516,7 +516,10 @@ async function start() {
   store.set({ session });
   if (session && session.authRequired && !session.authenticated) { showLogin(); return; }
 
-  iniciarManutencao({ store, toast });
+  const pedidoDoTerminal = veioDoAtualizar(location.hash);
+  // O pedido vale 1 vez: recarregar a página não abre o diálogo de novo.
+  if (pedidoDoTerminal) history.replaceState(null, '', buildHash(parseHash(location.hash)));
+  iniciarManutencao({ store, toast, pedidoDoTerminal });
   window.addEventListener('hashchange', navigate);
   await navigate(); // esqueleto no formato final enquanto os dados chegam
   try {

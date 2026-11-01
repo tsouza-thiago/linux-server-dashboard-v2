@@ -6,11 +6,13 @@ import { compareVersions } from '../setup/assinatura.js';
 // Teto do texto mandado à tela: pular várias versões não pode virar uma resposta enorme.
 const MAX_TEXTO = 32 * 1024;
 const SECAO = /^## \[(\d+\.\d+\.\d+(?:-[a-z]+\.\d+)?)\](?:\s+[—-]\s+(\d{4}-\d{2}-\d{2}))?/;
+// Linha que a versão traz no CHANGELOG quando muda o script de coleta (AGENTS, "Publicar uma versão").
+export const MARCADOR_RECONFIGURAR = '**Exige reconfigurar o acesso ao servidor.**';
 
 /**
  * Seções do CHANGELOG `md` depois de `de` e até `ate` (inclusive), da mais nova para a mais
- * antiga. Devolve `{ secoes: [{ versao, data, texto }], cortado }`; `cortado` diz que o teto
- * deixou texto de fora.
+ * antiga. Devolve `{ secoes: [{ versao, data, texto }], cortado, exigeReconfigurar }`; `cortado`
+ * diz que o teto deixou texto de fora, e `exigeReconfigurar` vale para qualquer seção, cortada ou não.
  */
 export function recortarNovidades(md, { de, ate }) {
   const secoes = [];
@@ -25,6 +27,7 @@ export function recortarNovidades(md, { de, ate }) {
       atual.linhas.push(linha);
     }
   }
+  const exigeReconfigurar = secoes.some((s) => s.linhas.some((l) => l.includes(MARCADOR_RECONFIGURAR)));
   let resta = MAX_TEXTO;
   let cortado = false;
   const saida = [];
@@ -35,5 +38,5 @@ export function recortarNovidades(md, { de, ate }) {
     saida.push({ versao: s.versao, data: s.data, texto: texto.slice(0, resta) });
     resta -= texto.length;
   }
-  return { secoes: saida, cortado };
+  return { secoes: saida, cortado, exigeReconfigurar };
 }

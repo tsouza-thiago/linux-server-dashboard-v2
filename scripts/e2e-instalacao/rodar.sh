@@ -7,6 +7,8 @@
 #       (Chromium daqui dirigindo os 6 passos) até o painel coletando
 #   C · upgrade V1 → V2: a V1 (tag v1.0.0) roda de verdade e gera o data/ dela; a V2
 #       importa (--importar-v1) e depois troca para a chave restrita (reconfigurar)
+#   D · botão Atualizar: computador com systemd (systemd-run --user) e sem systemd (segundo
+#       plano), na atualização que dá certo e na que volta atrás
 #
 # Os "computadores" não têm Node: o ./dashboard baixa o Node 24 oficial e confere a soma.
 # A release é uma cópia do HEAD com uma tag assinada por uma chave de TESTE (nada é
@@ -37,7 +39,7 @@ envs=()
 if [ -n "$PROXY" ]; then envs=(-e "https_proxy=$PROXY" -e "HTTPS_PROXY=$PROXY" -e "NODE_EXTRA_CA_CERTS=/usr/local/share/ca-certificates/proxy.crt"); fi
 
 limpar() {
-  docker rm -f e2e-srv-deb e2e-srv-ubu e2e-srv-v1 e2e-cli-deb e2e-cli-ubu e2e-cli-v1 >/dev/null 2>&1 || true
+  docker rm -f e2e-srv-deb e2e-srv-ubu e2e-srv-v1 e2e-srv-bot e2e-cli-deb e2e-cli-ubu e2e-cli-v1 e2e-cli-bot e2e-cli-sd >/dev/null 2>&1 || true
   [ -f "$OUT/gitd.pid" ] && kill "$(cat "$OUT/gitd.pid")" 2>/dev/null || true
 }
 trap limpar EXIT
@@ -57,6 +59,9 @@ for base in debian:12@sha256:2c037a04925515fdd6ea85ea14a682d0e79931f5e9f5d07b6db
     fi
   done
 done
+if [ -n "${E2E_RECONSTRUIR:-}" ] || ! docker image inspect dash-e2e-cliente-systemd >/dev/null 2>&1; then
+  docker build -q --network host --build-arg SYSTEMD=1 --build-arg PROXY="$PROXY" -f "$CTX/cliente.Dockerfile" -t dash-e2e-cliente-systemd "$CTX" >/dev/null
+fi
 ok "imagens prontas"
 
 log "Release de teste: cópia do HEAD com tag assinada por uma chave de teste"
@@ -81,6 +86,9 @@ ok "release v2.0.0-beta.2 assinada em git://127.0.0.1:9418/release"
 
 servidor() { docker run -d --init --name "$1" --network host "$2" /usr/sbin/sshd -D -e -p "$3" >/dev/null; }
 cliente() { docker run -d --init --name "$1" --network host "${envs[@]}" "$2" sleep infinity >/dev/null; }
+# systemd de verdade sem --privileged: nada do computador real fica ao alcance do contêiner. O
+# cgroup dele é privado (--cgroupns), e só ele vira escrita, antes do init.
+cliente_systemd() { docker run -d --name "$1" --network host --cgroupns=private --cap-add SYS_ADMIN --security-opt seccomp=unconfined --security-opt apparmor=unconfined --tmpfs /run --tmpfs /run/lock --tmpfs /tmp -u root --stop-signal SIGRTMIN+3 "${envs[@]}" --entrypoint sh "$2" -c 'mount -o remount,rw /sys/fs/cgroup && exec /sbin/init' >/dev/null; }
 identidade() { ssh-keyscan -t ed25519 -p "$1" 127.0.0.1 2>/dev/null | ssh-keygen -lf - | awk '{print $2}'; }
 espera_coletas() { timeout 150 bash -c "until [ \"\$(docker exec $1 sh -c 'grep -c \"poll OK\" /home/ana/$2/data/dashboard.log 2>/dev/null || echo 0')\" -ge $3 ]; do sleep 3; done"; }
 
@@ -167,6 +175,41 @@ confere "C: reconfigurado para a chave restrita (chave nova, não a da V1)" dock
 confere "C: coleta pela chave restrita" espera_coletas e2e-cli-v1 linux-server-dashboard-v2 $((ANTES + 1))
 em e2e-cli-v1 "cd linux-server-dashboard-v2 && ./dashboard diagnosticar" | tee "$OUT/C-diagnosticar.txt" || true
 confere "C: diagnóstico sem erros depois do upgrade" grep -q "nenhum erro" "$OUT/C-diagnosticar.txt"
+
+# ------------------------------------------------------------------ D · botão Atualizar
+log "D · botão Atualizar: systemd-run --user e queda para o segundo plano"
+servidor e2e-srv-bot dash-e2e-servidor-debian 2204
+cliente e2e-cli-bot dash-e2e-cliente-debian
+cliente_systemd e2e-cli-sd dash-e2e-cliente-systemd
+confere "D: systemd do usuário de pé" timeout 60 bash -c "until docker exec -u ana e2e-cli-sd bash -lc 'systemctl --user is-system-running' 2>/dev/null | grep -q running; do sleep 1; done"
+FP=$(identidade 2204)
+# botao <contêiner> <porta> <versão> <modo esperado> <resultado esperado>
+botao() {
+  local token
+  token=$(docker exec "$1" sh -c "grep '^DASH_TOKEN=' /home/ana/linux-server-dashboard-v2/.env | cut -d= -f2-")
+  node "$HERE/botao.mjs" "http://127.0.0.1:$2" "$token" "$3" "$4" "$5"
+}
+versao_instalada() { em "$1" "cd linux-server-dashboard-v2 && ./dashboard versao" | grep -q "$2"; }
+# 2 instalações na mesma rede, cada uma com a sua porta e a sua chave.
+instala_bot() { em "$1" "git clone -q git://127.0.0.1:9418/release linux-server-dashboard-v2 && cd linux-server-dashboard-v2 && printf 'PORT=$2\n' > .env && echo senha-de-teste | ./dashboard instalar --sem-interface --servidor 127.0.0.1 --porta 2204 --usuario maria --identidade '$FP' --senha-stdin --smart nenhum" > "$OUT/D-$1-instalar.txt"; }
+instala_bot e2e-cli-sd 3104
+instala_bot e2e-cli-bot 3105
+sd_ativo() { docker exec -u ana e2e-cli-sd bash -lc "systemctl --user is-active $1"; }
+confere "D: serviço do usuário no computador com systemd" sd_ativo server-dashboard
+cd "$GIT/release" && versao 2.0.2 && git commit -qam "e2e: 2.0.2" && assina v2.0.2 && cd "$REPO"
+confere "D: systemd-run --user: atualizou pelo botão" botao e2e-cli-sd 3104 v2.0.2 systemd atualizado
+confere "D: systemd-run --user: versão nova no disco" versao_instalada e2e-cli-sd 2.0.2
+confere "D: systemd-run --user: serviço de volta" sd_ativo server-dashboard
+confere "D: systemd-run --user: a unidade da troca sumiu sozinha" bash -c "! docker exec -u ana e2e-cli-sd bash -lc 'systemctl --user is-active server-dashboard-atualizar'"
+confere "D: segundo plano: atualizou pelo botão" botao e2e-cli-bot 3105 v2.0.2 segundo-plano atualizado
+confere "D: segundo plano: versão nova no disco" versao_instalada e2e-cli-bot 2.0.2
+# Versão que não liga: a volta atrás precisa funcionar nos 2 caminhos.
+cd "$GIT/release" && printf 'process.exit(1);\n' > server/index.js && versao 2.0.3 && git commit -qam "e2e: 2.0.3 quebrada" && assina v2.0.3 && cd "$REPO"
+confere "D: systemd-run --user: voltou atrás" botao e2e-cli-sd 3104 v2.0.3 systemd voltou
+confere "D: systemd-run --user: de volta à versão anterior" versao_instalada e2e-cli-sd 2.0.2
+confere "D: systemd-run --user: serviço de volta depois da falha" sd_ativo server-dashboard
+confere "D: segundo plano: voltou atrás" botao e2e-cli-bot 3105 v2.0.3 segundo-plano voltou
+confere "D: segundo plano: de volta à versão anterior" versao_instalada e2e-cli-bot 2.0.2
 
 log "Resultado"
 printf '%s passaram, %s falharam (saída em %s)\n' "${#PASSOU[@]}" "${#FALHOU[@]}" "$OUT"

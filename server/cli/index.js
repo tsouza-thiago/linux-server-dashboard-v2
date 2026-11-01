@@ -6,9 +6,8 @@ import os from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { ROOT, isPlaceholderHost, loadEnvFile } from '../config.js';
-import { createLoginCode } from '../http/entrar.js';
 import { makeOutput } from './saida.js';
-import { openBrowser, panelStatus, startPanel, stopPanel } from './servico.js';
+import { openBrowser, panelStatus, panelUrl, startPanel, stopPanel } from './servico.js';
 import { instalar } from './instalar.js';
 import { diagnosticar } from './diagnosticar.js';
 import { atualizar } from './atualizar.js';
@@ -29,7 +28,9 @@ const HELP = `Uso: ./dashboard <comando>
   status          mostra se o painel está rodando
   diagnosticar    testa tudo e explica cada problema em português simples
   reconfigurar    reabre o assistente (trocar servidor, discos, serviços)
-  atualizar       baixa a versão assinada mais nova, com backup e volta atrás se falhar
+  atualizar       abre o painel já logado, no diálogo da versão nova (sem tela ou com o painel
+                  parado, segue no terminal); backup e volta atrás se falhar
+                    --terminal       faz tudo no terminal, sem abrir o navegador
                     --pre            aceita pré-versão (rc) mesmo estando na estável
   desinstalar     remove serviço, atalho, comando e arquivos locais (e ajuda a limpar o servidor)
   versao          mostra a versão
@@ -48,15 +49,6 @@ function version(root) {
 export function isConfigured(root) {
   const env = loadEnvFile(path.join(root, '.env'));
   return Boolean(env.SSH_HOST) && !isPlaceholderHost(env.SSH_HOST);
-}
-
-/** Endereço para abrir o painel: com DASH_TOKEN, um link de entrada de uso único. */
-export function panelUrl(root, port) {
-  const env = loadEnvFile(path.join(root, '.env'));
-  const base = `http://127.0.0.1:${port}`;
-  if (!env.DASH_TOKEN) return { url: `${base}/`, oneTime: false };
-  const code = createLoginCode(path.join(root, 'data'));
-  return { url: `${base}/entrar?codigo=${code}`, oneTime: true };
 }
 
 // Os subcomandos: cada um recebe { out, root, home, args } e devolve o código de saída

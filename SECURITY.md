@@ -309,11 +309,14 @@ Inclua: o passo a passo para reproduzir, o impacto estimado e a versão afetada
   check, pelo CSRF e pelo limite de mutações. Sem login, a troca pela tela não existe. Antes de
   disparar, o painel confere de novo a pasta (só a da instalação, #118) e os arquivos alterados. A
   trava com PID barra a 2ª troca, no terminal e na tela. `.atualizacao/` é 0700, os arquivos são 0600,
-  fica fora do git, e o log traz só as linhas do `atualizar`, que não imprime segredos.
+  fica fora do git, e o log traz só as linhas do `atualizar`, que não imprime segredos. O
+  `dashboard atualizar` só abre a tela (ADR 0032): o fragmento `#...?atualizar=1` abre o diálogo, e
+  quem troca é o clique. Pré-versão pela tela exige `--pre` no terminal, que grava uma liberação com
+  prazo em `.atualizacao/`; a tela não tem como pedir.
 - **Verificado por:** `test/integration/atualizacao.test.js`, `test/unit/atualizacao-registro.test.js`,
-  `test/integration/cli-manutencao.test.js`, a regra I11 de `test/seguranca/invariantes-estaticas.test.js`
+  `test/integration/cli-manutencao.test.js`, `test/integration/atualizacao-ponta-a-ponta.test.js`, a regra I11 de `test/seguranca/invariantes-estaticas.test.js`
   e `scripts/mutacao-seguranca.mjs` (versão da tela, sem sessão, rotas fora da sessão, 2 trocas juntas,
-  pasta aberta, executor filho do painel).
+  pasta aberta, executor filho do painel, pré-versão liberada sem prazo).
 
 ---
 
