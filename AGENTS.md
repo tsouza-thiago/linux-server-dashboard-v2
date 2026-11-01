@@ -50,7 +50,7 @@ O teste `test/unit/docs.test.js` confere esta documentação contra o código.
 | I8 | Nada da configuração vira comando | `sanitizeToken`/`sanitizeHost` + fuzz e payloads |
 | I9 | Proteções HTTP (Host, CSRF, CSP, escape, CSV, permissões, token, limites, erros) | `test/integration/http-seguranca.test.js` (caracterização) e `test/seguranca/` |
 | I10 | Interatividade toda no navegador | nenhuma ação da tela abre SSH, exceto "coletar agora" |
-| I11 | A tela só dispara a atualização para a versão assinada mais nova já detectada; nenhum dado da tela entra no comando | a rota só compara a versão (409 se diferente), comando fixo em lista e regra estática, além das mutações |
+| I11 | A tela só dispara a atualização para a versão assinada mais nova já detectada e a reconfiguração; nenhum dado da tela entra no comando | a rota só compara a versão (409 se diferente), a do reconfigurar não lê o pedido, comando fixo em lista e regra estática, além das mutações |
 
 ### Regras de segurança (security by design)
 
@@ -161,6 +161,11 @@ O teste `test/unit/docs.test.js` confere esta documentação contra o código.
   não conferir. Nunca troca a versão da pasta. Cancelar (`POST /api/configurar/cancelar`, só neste
   modo e com a sessão do assistente), `SIGTERM`, 15 min parado ou falha ao subir o assistente restauram
   o `.env` e o `data/ssh/` da memória e religam o painel.
+- **Disparo do reconfigurar** (ADR 0036, I11): `POST /api/reconfigurar/iniciar` não lê nada do pedido.
+  Exige sessão e usa o executor da F7, com a unidade `server-dashboard-reconfigurar`. Barra antes de
+  criar o código: sem login, atualização em andamento, fora da pasta da instalação ou sem tag assinada.
+  Depois de disparar, nada mais dispara por 1 min, e a atualização também espera. Executor que não sobe
+  tira o código do disco.
 - **Volta do painel novo** (ADR 0035, F8): no `--pela-tela`, o painel novo só vale depois de responder
   em `/api/session`. Se `ligarPainel` falhar ou ele não responder, o comando para o painel novo, restaura
   a configuração, religa o painel, devolve o "iniciar com o computador" e sai com código 1, com o motivo
@@ -546,6 +551,7 @@ segurança, rate limit das mutações e error handler sem stack trace. Com `DASH
 | `/api/atualizacao/verificar` | POST | Procura versão nova agora e devolve o mesmo estado. No máximo 1 por minuto (429 acima) |
 | `/api/atualizacao/iniciar` | POST | `{versao}` igual à versão nova detectada → 202 `{alvo}`; senão, com `bloqueio` ou sem executor (testes e painel de teste), 409. Se o executor não subir, 503 (I11) |
 | `/api/atualizacao/registro` | GET | `?desde=<byte>` → `{texto, proximo, fase, alvo, de, inicio, fim, resultado, rodando}`: o pedaço novo do log, em linhas inteiras, até 64 KB. `fase`: `iniciando`, `procurando`, `trocando`, `ligando`, `voltando` ou `fim`; `resultado`: `atualizado`, `ja-na-mais-nova`, `voltou`, `falhou` ou `interrompida` |
+| `/api/reconfigurar/iniciar` | POST | Nada do pedido é lido → 202 `{codigo}`, o código do assistente, só nesta resposta (ADR 0036). Sem executor (testes e painel de teste), 409. `bloqueio` no 409: `sem-login`, `rodando`, `outra-pasta` ou `sem-assinatura`. Se o executor não subir, 503, sem código no disco (I11) |
 | `/api/outages` | GET | `?days=1..90` (padrão 30) → `{days, outages, monitored, uptime}`. `monitored` são os intervalos `{from, to}` em que o painel estava medindo; `uptime` conta só esse tempo (ADR 0018) |
 | `/api/alerts` | GET | `?status=&level=&limit=` → `{active, all}` |
 | `/api/alerts/:id/ack` | POST | Reconhece o alerta |

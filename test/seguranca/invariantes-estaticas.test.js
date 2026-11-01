@@ -113,8 +113,20 @@ test('I11: nada da tela entra no comando da troca de versão', () => {
   assert.match(dono, /this\.executar\(\)/, 'o executor não recebe argumento');
   assert.match(dono, /versao !== nova/, 'a versão do pedido só é comparada');
   const exec = semComentarios(ler('server/atualizacao/executor.js'));
-  assert.match(exec, /const COMANDO = \['atualizar', '--registro'\];/, 'comando fixo');
+  assert.match(exec, /const ATUALIZAR = \{ unidade: 'server-dashboard-atualizar', comando: \['atualizar', '--registro'\] \};/, 'comando fixo');
   assert.doesNotMatch(exec, /\breq\b|versao|process\.env/);
+});
+
+test('I11: nada da tela entra no comando da reconfiguração (ADR 0036)', () => {
+  const rotas = semComentarios(ler('server/index.js'));
+  assert.match(rotas, /atualizacao\.reconfigurar\(\)/, 'a rota não entrega nada do pedido');
+  assert.equal((rotas.match(/reconfigurarForaDoServico\(/g) || []).length, 1);
+  assert.match(rotas, /reconfigurarForaDoServico\(\{ root: ROOT, modo \}\)/, 'só a pasta e o modo, nada do pedido');
+  const dono = semComentarios(ler('server/atualizacao/index.js'));
+  assert.match(dono, /async reconfigurar\(\) \{/, 'o método não recebe argumento');
+  assert.match(dono, /this\.executarReconfiguracao\(\)/, 'o executor não recebe argumento');
+  const exec = semComentarios(ler('server/atualizacao/executor.js'));
+  assert.match(exec, /const RECONFIGURAR = \{ unidade: 'server-dashboard-reconfigurar', comando: \['reconfigurar', '--pela-tela'\] \};/, 'comando fixo');
 });
 
 test('CWE-1333: new RegExp só com texto escapado ou fixo (sem ReDoS nem injeção de regex)', () => {

@@ -127,5 +127,5 @@ export async function instalacaoReal(t, { versao = '2.90.0' } = {}) {
     dash(['parar']);
     fs.rmSync(base, { recursive: true, force: true });
   });
-  return { pasta, bin, porta, git, dash, dashAoFundo, publicar, apertarAtualizar, fimDaTroca, estadoNoAr };
+  return { pasta, bin, porta, git, api, dash, dashAoFundo, publicar, apertarAtualizar, fimDaTroca, estadoNoAr };
 }

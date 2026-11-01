@@ -8,7 +8,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { newestSignedTag } from '../setup/assinatura.js';
+import { currentVersionStatus, newestSignedTag } from '../setup/assinatura.js';
 import { otherServiceRoot } from '../cli/servico.js';
 import { recortarNovidades } from './novidades.js';
 import { preLiberada } from './registro.js';
@@ -28,11 +28,23 @@ export const versaoDaPasta = (root) => {
   try { return `v${JSON.parse(fs.readFileSync(path.join(root, 'package.json'), 'utf8')).version}`; } catch { return 'v0.0.0'; }
 };
 
+// Só a pasta da instalação troca de versão ou reconfigura pela tela (#118).
+const foraDaInstalacao = (root, home) => !fs.existsSync(path.join(root, '.env')) || otherServiceRoot(root, home);
+
 // O que impediria o `dashboard atualizar` nesta pasta; null se nada impede. `--no-optional-locks`:
 // esta conferência não pode disputar o índice do git com um `dashboard atualizar` em andamento.
 export function bloqueioDaPasta(root, home = os.homedir(), run = spawnSync) {
-  if (!fs.existsSync(path.join(root, '.env')) || otherServiceRoot(root, home)) return 'outra-pasta';
+  if (foraDaInstalacao(root, home)) return 'outra-pasta';
   return git(root, ['--no-optional-locks', 'status', '--porcelain', '--untracked-files=no'], run).stdout.trim() ? 'arquivos-alterados' : null;
+}
+
+/**
+ * O que faria o `reconfigurar --pela-tela` recusar com o painel já esperando; null se nada impede.
+ * Arquivo alterado não entra: o comando não troca de versão e aceita a pasta assim (ADR 0036).
+ */
+export function bloqueioDaReconfiguracao(root, home = os.homedir(), run = spawnSync) {
+  if (foraDaInstalacao(root, home)) return 'outra-pasta';
+  return currentVersionStatus(root, { run }).ok ? null : 'sem-assinatura';
 }
 
 /**

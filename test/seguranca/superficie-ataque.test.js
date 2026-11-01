@@ -87,6 +87,8 @@ test('matriz: as rotas foram lidas do código (painel e assistente)', () => {
   assert.ok(p.length >= 18, `painel: ${p.length} rotas`);
   assert.ok(a.length >= 10, `assistente: ${a.length} rotas`);
   assert.ok(p.some((r) => r.metodo === 'DELETE'), 'painel tem DELETE');
+  // O código do assistente sai desta rota: ela não pode sair da matriz sem ninguém ver (F8).
+  assert.ok(p.some((r) => r.metodo === 'POST' && r.caminho === '/api/reconfigurar/iniciar'), 'botão Reconfigurar na matriz');
 });
 
 test('matriz (painel): Host de outro nome recebe 403 em toda rota, com os cabeçalhos', async (t) => {

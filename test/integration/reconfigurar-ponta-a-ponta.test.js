@@ -1,7 +1,7 @@
 // `dashboard reconfigurar --pela-tela` de ponta a ponta (F8, ADR 0034): o ./dashboard de verdade numa
 // pasta temporária, com o painel de pé. O assistente sobe na porta do painel, e desistir traz o
 // painel de volta. Terminar o assistente fica com o painel novo, ou volta ao anterior se ele não
-// subir (ADR 0035). O disparo pela tela e o executor entram nas próximas etapas da F8.
+// subir (ADR 0035). O último caso entra pelo botão: o painel de verdade dispara o comando (ADR 0036).
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { spawnSync } from 'node:child_process';
@@ -161,6 +161,44 @@ test('ponta a ponta: painel novo que não sobe volta ao anterior, e o log diz o 
   assert.match(log, new RegExp(`o painel não subiu com a configuração nova \\(a porta ${tomada} já está em uso`));
   assert.match(log, /painel de volta com a configuração anterior/);
   assert.ok(!log.includes(TOKEN), 'o log não traz segredo');
+});
+
+test('ponta a ponta: a rota dispara o comando de verdade, e o código devolvido abre o assistente', semFerramentas, async (t) => {
+  const { pasta, git, api, dash, porta, estadoNoAr } = await instalacaoReal(t);
+  const dados = path.join(pasta, 'data');
+  const log = () => fs.readFileSync(path.join(dados, 'reconfigurar.log'), 'utf8');
+  const apertar = () => api('/api/reconfigurar/iniciar', { metodo: 'POST', corpo: {} });
+  // O executor é solto: se o teste cair antes do fim, ninguém mais o encerra.
+  t.after(() => spawnSync('pkill', ['-f', path.join(pasta, 'server/cli/index.js')]));
+  assert.equal(dash(['iniciar']).codigo, 0);
+
+  // Commit sem tag: o comando recusaria com o painel já esperando. A rota barra antes.
+  const assinado = git(pasta, 'rev-parse', 'HEAD');
+  git(pasta, '-c', 'user.email=teste@example.com', '-c', 'user.name=Teste', 'commit', '-q', '--allow-empty', '-m', 'sem tag');
+  const barrado = await apertar();
+  assert.equal(barrado.status, 409);
+  assert.equal((await barrado.json()).bloqueio, 'sem-assinatura');
+  assert.equal(fs.existsSync(path.join(dados, 'reconfigurar.json')), false);
+  git(pasta, 'checkout', '-q', '--detach', assinado);
+
+  // Arquivo alterado não barra: o comando não troca de versão.
+  fs.appendFileSync(path.join(pasta, 'CHANGELOG.md'), '\nalterado\n');
+  const pedido = await apertar();
+  assert.equal(pedido.status, 202);
+  const { codigo } = await pedido.json();
+  const csrf = await assistenteNoAr(porta);
+  let cookie = csrf;
+  const post = (p, body = {}) => request(porta, { method: 'POST', path: `/api/configurar/${p}`, body, headers: { 'Content-Type': 'application/json', Origin: 'http://localhost', Cookie: cookie } });
+  const entrou = await post('entrar', { codigo });
+  assert.equal(entrou.status, 200, log());
+  cookie = `${csrf}; ${[].concat(entrou.headers['set-cookie']).find((c) => c.startsWith('dash_setup=')).split(';')[0]}`;
+  assert.equal((await post('cancelar')).status, 200);
+
+  await esperarAte(() => log().includes('painel de volta com a configuração anterior'), { timeoutMs: 30000, passoMs: 100 });
+  assert.ok((await estadoNoAr()).instalada, 'o painel voltou sozinho');
+  assert.equal(fs.existsSync(path.join(dados, 'reconfigurar.json')), false);
+  assert.ok(!log().includes(codigo), 'o log não traz o código');
+  assert.ok(!fs.readFileSync(path.join(dados, 'dashboard.log'), 'utf8').includes(codigo), 'nem o log do painel');
 });
 
 test('ponta a ponta: --pela-tela nunca troca a versão da pasta', semFerramentas, async (t) => {

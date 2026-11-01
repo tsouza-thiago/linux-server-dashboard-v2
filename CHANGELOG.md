@@ -18,6 +18,10 @@ diante: `PATCH` corrige, `MINOR` acrescenta sem quebrar e `MAJOR` quebra.
 - Volta do painel novo (#91, etapa 2 da F8, ADR 0035): no `--pela-tela`, se o painel não subir ou não
   responder com a configuração nova, ele volta para a anterior e deixa o motivo em
   `data/reconfigurar.log`. A cópia fica na memória até o painel novo responder.
+- Disparo do "Reconfigurar pela tela" (#91, etapa 3 da F8, ADR 0036): a rota
+  `POST /api/reconfigurar/iniciar` exige sessão, gera o código de uso único, devolve o código só na
+  resposta e roda o `dashboard reconfigurar --pela-tela` fora do serviço. Pasta sem tag assinada,
+  atualização em andamento e painel sem login barram antes de disparar. Nenhuma tela mudou ainda.
 - Aviso de versão nova (#90, 1ª entrega da F7). O painel procura 1 vez por dia, só por tag assinada,
   e mostra uma faixa no topo com as novidades da versão. A engrenagem no topo abre o menu de
   manutenção, com a versão instalada, a última procura e "Procurar agora". A troca de versão
