@@ -1,6 +1,8 @@
 // `dashboard instalar` e `dashboard reconfigurar` (ADR 0011): confere a versão
 // assinada, o Node 24, os arquivos de terceiros (SHA-256), o SSH e a porta, e abre o
 // assistente no navegador — ou a TUI (--terminal) ou o modo sem perguntas (--sem-interface).
+// Com --pela-tela (interna, ADR 0034), quem chama é o painel: sem terminal, sem código novo, e
+// desistir religa o painel com a configuração anterior.
 import { spawnSync } from 'node:child_process';
 import crypto from 'node:crypto';
 import fs from 'node:fs';
@@ -8,12 +10,18 @@ import path from 'node:path';
 import { Instalacao } from '../setup/instalacao.js';
 import { createWizardApp, makeSetupCode } from '../setup/web.js';
 import { currentVersionStatus, describeVersion, signedReleaseTags, installTag } from '../setup/assinatura.js';
-import { ensureDataDirs } from '../setup/local.js';
-import { openBrowser, panelPort, panelStatus, portFree, stopPanel } from './servico.js';
-import { mostrarComando } from './saida.js';
+import { ensureDataDirs, guardarConfiguracao } from '../setup/local.js';
+import { retirarCodigoPelaTela } from '../setup/pela-tela.js';
+import { emAndamento } from '../atualizacao/registro.js';
+import { openBrowser, panelPort, panelStatus, portFree, startPanel, stopPanel } from './servico.js';
+import { makeOutput, mostrarComando } from './saida.js';
 
 // O assistente se desliga sozinho depois de 1 h sem nenhum pedido.
 const IDLE_MS = 60 * 60 * 1000;
+// Pela tela, a coleta está parada e não há terminal aberto: quem abandonou não volta para religar.
+const IDLE_TELA_MS = 15 * 60 * 1000;
+// Saída do `--pela-tela`, que não tem terminal. Guarda só a última vez.
+const LOG_TELA = 'reconfigurar.log';
 
 /** Confere uPlot e fontes contra as somas de public/vendor/vendor.json. */
 export function verifyVendor(root) {
@@ -136,16 +144,20 @@ export function preflight({ out, root, flags, env = process.env, run = spawnSync
 /**
  * Abre o assistente no navegador (servidor temporário na porta do painel, com código de uso
  * único) e espera ele terminar, ser cancelado (Ctrl+C) ou ficar 1 h parado. No fim, a senha
- * é esquecida, o assistente se desliga e o painel é ligado com as escolhas feitas.
+ * é esquecida, o assistente se desliga e o painel é ligado com as escolhas feitas. `pelaTela`
+ * ({ codigo, desistir }) troca o código novo pelo do arquivo e, ao cancelar ou abandonar, chama
+ * `desistir`.
  */
-export async function runWizard({ out, root, inst, port, open = openBrowser, idleMs = IDLE_MS, log = () => {} }) {
-  const code = makeSetupCode();
+export async function runWizard({ out, root, inst, port, open = openBrowser, idleMs = IDLE_MS, log = () => {}, pelaTela = null }) {
+  const code = pelaTela ? null : makeSetupCode();
   let idleTimer = null;
   let resolveDone;
   const done = new Promise((r) => { resolveDone = r; });
   const app = createWizardApp({
     inst,
-    code: code.raw,
+    ...(pelaTela
+      ? { codeHash: pelaTela.codigo.hash, codeTtlMs: pelaTela.codigo.exp - Date.now(), onCancel: () => resolveDone({ cancel: true }) }
+      : { code: code.raw }),
     log,
     onActivity: () => {
       clearTimeout(idleTimer);
@@ -162,15 +174,20 @@ export async function runWizard({ out, root, inst, port, open = openBrowser, idl
   idleTimer.unref?.();
   const url = `http://127.0.0.1:${port}/configurar`;
   out.line();
-  out.step('abrindo o assistente no navegador…');
-  out.line();
-  out.line(`  ${out.c.bold(url)}`);
-  out.line(`  ${out.c.dim(`código de uso único: ${code.shown} · vale por 30 min`)}`);
-  out.line();
-  const opened = open(`${url}#codigo=${code.raw}`);
-  out.line(out.c.dim(opened ? 'O navegador não abriu? Copie o endereço acima.' : 'Abra o endereço acima no navegador desta máquina e digite o código.'));
-  out.line(`${out.c.dim('Máquina sem tela? Rode:')} ${out.cmd} instalar --terminal`);
-  out.line(out.c.dim('Deixe esta janela aberta até o fim do assistente.'));
+  if (pelaTela) {
+    // O navegador que pediu já tem o código: nada para abrir nem mostrar.
+    out.step('assistente no ar, esperando o navegador');
+  } else {
+    out.step('abrindo o assistente no navegador…');
+    out.line();
+    out.line(`  ${out.c.bold(url)}`);
+    out.line(`  ${out.c.dim(`código de uso único: ${code.shown} · vale por 30 min`)}`);
+    out.line();
+    const opened = open(`${url}#codigo=${code.raw}`);
+    out.line(out.c.dim(opened ? 'O navegador não abriu? Copie o endereço acima.' : 'Abra o endereço acima no navegador desta máquina e digite o código.'));
+    out.line(`${out.c.dim('Máquina sem tela? Rode:')} ${out.cmd} instalar --terminal`);
+    out.line(out.c.dim('Deixe esta janela aberta até o fim do assistente.'));
+  }
 
   // Ctrl+C ou SIGTERM durante o assistente: cancela de forma limpa.
   const onSignal = () => resolveDone({ cancel: true });
@@ -184,6 +201,10 @@ export async function runWizard({ out, root, inst, port, open = openBrowser, idl
   await new Promise((r) => { server.close(() => r()); server.closeAllConnections(); });
   out.line();
   if (result.cancel || result.idle) {
+    if (pelaTela) {
+      out.warn(result.idle ? 'assistente fechado depois de 15 minutos parado' : 'assistente cancelado');
+      return pelaTela.desistir();
+    }
     out.warn(result.idle ? 'assistente fechado depois de 1 hora parado' : 'assistente cancelado', 'nada foi gravado depois do último passo concluído');
     return 1;
   }
@@ -208,11 +229,77 @@ export async function runWizard({ out, root, inst, port, open = openBrowser, idl
 }
 
 /**
+ * Passos do `--pela-tela`, com a saída já no log. Tudo o que pode recusar vem antes de parar o
+ * painel: quem recusa aqui deixa o painel no ar. Nenhuma opção entra: o comando é fixo (I11).
+ */
+async function assistentePelaTela({ out, root, home, deps }) {
+  const parar = deps.stopPanel ?? stopPanel;
+  const ligar = deps.startPanel ?? startPanel;
+  // Sem `reexec`: um clique na tela nunca troca a versão da pasta.
+  if ((deps.preflight ?? preflight)({ out, root, flags: {} }) !== true) return 1;
+  if (emAndamento(root)) {
+    out.fail('há uma atualização em andamento', 'o painel continua no ar');
+    return 1;
+  }
+  const codigo = retirarCodigoPelaTela(path.join(root, 'data'));
+  if (!codigo) {
+    out.fail('sem código válido da tela', 'o painel continua no ar');
+    return 1;
+  }
+  const parado = await parar({ root, home });
+  if (!parado.ok) {
+    out.fail('não consegui parar o painel');
+    return 1;
+  }
+  const restaurar = guardarConfiguracao(root);
+  const desistir = async () => {
+    restaurar();
+    const r = await ligar({ root, home });
+    if (!r.ok) {
+      out.fail('o painel não voltou', r.error);
+      return 1;
+    }
+    out.ok('painel de volta com a configuração anterior');
+    return 0;
+  };
+  const port = panelPort(root);
+  try {
+    const inst = deps.inst ?? new Instalacao({ root, home });
+    return await runWizard({ out, root, inst, port, idleMs: deps.idleMs ?? IDLE_TELA_MS, pelaTela: { codigo, desistir } });
+  } catch (err) {
+    // Na troca painel ↔ assistente, outro programa pode ter tomado a porta.
+    out.fail('o assistente não subiu', err.message);
+    return desistir();
+  }
+}
+
+/** `./dashboard reconfigurar --pela-tela` (interna): sem terminal, a saída vai para data/. */
+async function reconfigurarPelaTela({ root, home, deps }) {
+  const dataDir = path.join(root, 'data');
+  fs.mkdirSync(dataDir, { recursive: true, mode: 0o700 });
+  const fd = fs.openSync(path.join(dataDir, LOG_TELA), 'w', 0o600);
+  fs.fchmodSync(fd, 0o600);
+  const out = makeOutput({ stream: { isTTY: false, write: (texto) => fs.writeSync(fd, texto) }, root });
+  try {
+    return await assistentePelaTela({ out, root, home, deps });
+  } finally {
+    fs.closeSync(fd);
+  }
+}
+
+/**
  * `./dashboard instalar` e `./dashboard reconfigurar`: preflight, depois o caminho escolhido
  * (--importar-v1, --terminal, --sem-interface ou o assistente no navegador).
  */
 export async function instalar({ out, root, args, home, reconfigurar = false, deps = {} }) {
   const flags = parseFlags(args);
+  if (flags['pela-tela']) {
+    if (!reconfigurar || flags.terminal || flags['sem-interface'] || flags['importar-v1']) {
+      out.fail('--pela-tela é interna do reconfigurar', 'quem a usa é o painel');
+      return 2;
+    }
+    return reconfigurarPelaTela({ root, home, deps });
+  }
   out.title(reconfigurar ? 'Server Dashboard · reconfigurar' : 'Server Dashboard · instalação');
   // Roda o ./dashboard de novo com os mesmos argumentos (depois de trocar de versão).
   const reexec = deps.reexec ?? (() => {

@@ -37,17 +37,19 @@ export const normalizeCode = (v) => String(v ?? '').toUpperCase().replace(/[^A-Z
 /**
  * @param {object} p
  * @param {import('./instalacao.js').Instalacao} p.inst os 6 passos
- * @param {string} p.code código de uso único (sem o hífen)
+ * @param {string} [p.code] código de uso único (sem o hífen)
+ * @param {string} [p.codeHash] SHA-256 do código, no lugar de `code` (`--pela-tela`, ADR 0034)
  * @param {Function} [p.onFinish] chamado depois que a resposta do "Abrir o painel" saiu
+ * @param {Function} [p.onCancel] liga a rota de cancelar; no terminal, quem cancela é o Ctrl+C
  * @param {Function} [p.onActivity] a cada requisição (para o tempo de inatividade)
  */
-export function createWizardApp({ inst, code, onFinish = () => {}, onActivity = () => {}, log = () => {}, now = () => Date.now(), codeTtlMs = CODE_TTL_MS }) {
+export function createWizardApp({ inst, code, codeHash = null, onFinish = () => {}, onCancel = null, onActivity = () => {}, log = () => {}, now = () => Date.now(), codeTtlMs = CODE_TTL_MS }) {
   const createdAt = now();
-  // O código ainda não usado, as tentativas erradas e o hash da sessão aberta (uma só).
-  let pendingCode = normalizeCode(code);
+  const hash = (v) => crypto.createHash('sha256').update(String(v)).digest('hex');
+  // O hash do código ainda não usado, as tentativas erradas e o hash da sessão aberta (uma só).
+  let pendingHash = codeHash ?? hash(normalizeCode(code));
   let failures = 0;
   let sessionHash = null;
-  const hash = (v) => crypto.createHash('sha256').update(String(v)).digest('hex');
 
   // As mesmas proteções do painel, na mesma ordem (conferida pela matriz de ataque).
   const app = createRouter();
@@ -71,15 +73,15 @@ export function createWizardApp({ inst, code, onFinish = () => {}, onActivity = 
   const loginLimit = makeRateLimit({ windowMs: 60000, max: 10 });
   app.post('/api/configurar/entrar', loginLimit, (req, res) => {
     const given = normalizeCode(req.body && req.body.codigo);
-    if (!pendingCode || failures >= MAX_FAILURES || now() - createdAt > codeTtlMs) {
+    if (!pendingHash || failures >= MAX_FAILURES || now() - createdAt > codeTtlMs) {
       return res.status(410).json({ error: 'Este código não vale mais. Rode ./dashboard instalar de novo no terminal.' });
     }
-    if (given.length !== pendingCode.length || !safeEqual(given, pendingCode)) {
+    if (!safeEqual(hash(given), pendingHash)) {
       failures += 1;
       log('assistente: código de uso único incorreto');
       return res.status(401).json({ error: 'Código incorreto. Confira o que aparece no terminal.' });
     }
-    pendingCode = null; // uso único: o mesmo código não entra de novo
+    pendingHash = null; // uso único: o mesmo código não entra de novo
     const sid = crypto.randomBytes(32).toString('base64url');
     sessionHash = hash(sid);
     res.appendHeader('Set-Cookie', `${SETUP_COOKIE}=${sid}; Path=/; HttpOnly; SameSite=Strict`);
@@ -91,6 +93,14 @@ export function createWizardApp({ inst, code, onFinish = () => {}, onActivity = 
     if (sessionHash && sid && safeEqual(hash(sid), sessionHash)) return next();
     return res.status(401).json({ error: 'Digite o código que aparece no terminal.', codigo: true });
   });
+
+  // Depois da exigência de sessão: só quem entrou no assistente pode desistir dele.
+  if (onCancel) {
+    app.post('/api/configurar/cancelar', (req, res) => {
+      res.on('finish', () => onCancel());
+      res.json({ ok: true });
+    });
+  }
 
   // Cada passo responde o que a Instalacao devolve; erro esperado (InstallError) vira a
   // mensagem para a tela; o inesperado vai para o terminal e a tela recebe um texto genérico.

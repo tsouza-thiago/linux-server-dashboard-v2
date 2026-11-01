@@ -9,6 +9,8 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { verifyVendor, parseFlags, preflight, runWizard, instalar } from '../../server/cli/instalar.js';
 import { makeOutput } from '../../server/cli/saida.js';
+import { prepararRegistro } from '../../server/atualizacao/registro.js';
+import { criarCodigoPelaTela } from '../../server/setup/pela-tela.js';
 import { request } from '../../test-support/request.js';
 import { makeInstalacao } from '../../test-support/instalacao-fake.js';
 import { esperarAte } from '../../test-support/esperar.js';
@@ -147,4 +149,149 @@ test('instalar: painel já rodando → sugere reconfigurar; porta ocupada → ex
   const code = await instalar({ out: o.out, root, home: root, args: ['--sem-assinatura'], deps: { inst: fake.inst } });
   assert.equal(code, 1);
   assert.match(o.text(), new RegExp(`a porta ${port} está em uso por outro programa`));
+});
+
+// `--pela-tela` com o painel falso: o teste vê quando ele para e liga. O caminho de verdade, com o
+// ./dashboard e o painel de pé, fica em test/integration/reconfigurar-ponta-a-ponta.test.js.
+async function pelaTela(t, { codigo = true, deps = {}, args = ['--pela-tela'], reconfigurar = true, antes = () => {} } = {}) {
+  const fake = makeInstalacao({ systemd: false });
+  t.after(fake.cleanup);
+  const port = await freePort();
+  const dataDir = path.join(fake.root, 'data');
+  fs.mkdirSync(path.join(dataDir, 'ssh'), { recursive: true });
+  fs.writeFileSync(path.join(fake.root, '.env'), `PORT=${port}\nSSH_HOST=antigo\n`, { mode: 0o600 });
+  fs.writeFileSync(path.join(dataDir, 'ssh', 'known_hosts'), 'antigo\n', { mode: 0o600 });
+  const raw = codigo ? criarCodigoPelaTela(dataDir) : null;
+  await antes(port, fake.root);
+  const painel = [];
+  const o = memOut();
+  // Tempo parado curto: com um guarda quebrado, o assistente sobe e o teste não espera os 15 min reais.
+  const ctx = { idleMs: 5000, root: fake.root, home: fake.home, inst: fake.inst, stopPanel: async () => { painel.push('parou'); return { ok: true }; }, startPanel: async () => { painel.push('ligou'); return { ok: true }; }, preflight: () => true, ...deps };
+  const rodando = instalar({ out: o.out, root: fake.root, home: fake.home, args, reconfigurar, deps: ctx });
+  const log = () => fs.readFileSync(path.join(dataDir, 'reconfigurar.log'), 'utf8');
+  return { ...fake, port, raw, painel, o, rodando, log, dataDir };
+}
+
+// Cliente do assistente: entra com o código e chama os passos.
+async function entrarNoAssistente(port, codigo) {
+  let page = null;
+  await esperarAte(async () => {
+    page = await request(port, { path: '/configurar' }).catch(() => null);
+    return page;
+  });
+  const csrf = [].concat(page.headers['set-cookie']).find((c) => c.startsWith('dash_csrf=')).split(';')[0];
+  let cookie = csrf;
+  const post = async (p, body = {}) => {
+    const r = await request(port, { method: 'POST', path: `/api/configurar/${p}`, body, headers: { 'Content-Type': 'application/json', Origin: 'http://localhost', Cookie: cookie } });
+    const set = [].concat(r.headers['set-cookie'] || []).find((c) => c.startsWith('dash_setup='));
+    if (set) cookie = `${csrf}; ${set.split(';')[0]}`;
+    return r;
+  };
+  assert.equal((await post('entrar', { codigo })).status, 200);
+  return post;
+}
+
+// Vai até o teste de coleta do passo 5, que regrava o .env e o data/ssh antes do fim.
+async function ateOPasso5(post) {
+  await post('servidor', { host: '192.0.2.10', user: 'maria' });
+  await post('identidade');
+  await post('conectar', { senha: 'certa', confirmo: true });
+  await post('escolhas', { mounts: ['/'], smart: [], netIf: '', services: [] });
+  await post('plano', { from: false });
+  assert.equal((await post('preparar')).json.ok, true);
+}
+
+function confereConfiguracaoAnterior(p) {
+  assert.match(fs.readFileSync(path.join(p.root, '.env'), 'utf8'), /^SSH_HOST=antigo$/m);
+  assert.equal(fs.readFileSync(path.join(p.dataDir, 'ssh', 'known_hosts'), 'utf8'), 'antigo\n');
+  assert.equal(fs.existsSync(path.join(p.dataDir, 'ssh', 'config')), false);
+}
+
+test('--pela-tela: cancelar no passo 5 devolve a configuração anterior e religa o painel', async (t) => {
+  const p = await pelaTela(t);
+  const post = await entrarNoAssistente(p.port, p.raw);
+  assert.deepEqual(p.painel, ['parou']);
+  await ateOPasso5(post);
+  assert.match(fs.readFileSync(path.join(p.root, '.env'), 'utf8'), /^SSH_HOST=servidor$/m, 'o passo 5 regravou o .env');
+  assert.equal((await post('cancelar')).status, 200);
+  assert.equal(await p.rodando, 0);
+  assert.deepEqual(p.painel, ['parou', 'ligou']);
+  confereConfiguracaoAnterior(p);
+  assert.match(p.log(), /assistente cancelado/);
+  assert.match(p.log(), /painel de volta com a configuração anterior/);
+  assert.ok(!p.log().includes(p.raw), 'o log não traz o código');
+  assert.equal(fs.statSync(path.join(p.dataDir, 'reconfigurar.log')).mode & 0o777, 0o600);
+  assert.equal(p.o.text(), '', 'sem terminal: tudo vai para o log');
+  await assert.rejects(() => request(p.port, { path: '/configurar' }), 'o assistente não existe mais');
+});
+
+test('--pela-tela: abandonar fecha o assistente e religa o painel', async (t) => {
+  const p = await pelaTela(t, { deps: { idleMs: 150 } });
+  assert.equal(await p.rodando, 0);
+  assert.deepEqual(p.painel, ['parou', 'ligou']);
+  assert.match(p.log(), /assistente fechado depois de 15 minutos parado/);
+  confereConfiguracaoAnterior(p);
+});
+
+test('--pela-tela: terminar fica com a configuração nova e não religa a anterior', async (t) => {
+  const p = await pelaTela(t);
+  const post = await entrarNoAssistente(p.port, p.raw);
+  await ateOPasso5(post);
+  assert.equal((await post('concluir', { iniciarComComputador: false, atalho: false, link: false })).status, 200);
+  assert.equal(await p.rodando, 0);
+  assert.deepEqual(p.painel, ['parou'], 'quem liga agora é a instalação');
+  assert.match(fs.readFileSync(path.join(p.root, '.env'), 'utf8'), /^SSH_HOST=servidor$/m);
+});
+
+test('--pela-tela: porta tomada na troca religa o painel e o log diz o motivo', async (t) => {
+  const p = await pelaTela(t, {
+    antes: async (port) => {
+      const blocker = net.createServer().listen(port, '127.0.0.1');
+      await new Promise((r) => blocker.once('listening', r));
+      t.after(() => blocker.close());
+    },
+  });
+  assert.equal(await p.rodando, 0);
+  assert.deepEqual(p.painel, ['parou', 'ligou']);
+  assert.match(p.log(), /o assistente não subiu/);
+});
+
+test('--pela-tela: sem código válido, o painel nem para', async (t) => {
+  const p = await pelaTela(t, { codigo: false });
+  assert.equal(await p.rodando, 1);
+  assert.deepEqual(p.painel, []);
+  assert.match(p.log(), /sem código válido da tela/);
+});
+
+test('--pela-tela: com uma atualização em andamento, o painel nem para e o código fica', async (t) => {
+  const p = await pelaTela(t, { antes: (port, root) => prepararRegistro(root, { alvo: 'v2.90.0', de: 'v2.89.0' }) });
+  assert.equal(await p.rodando, 1);
+  assert.deepEqual(p.painel, []);
+  assert.match(p.log(), /há uma atualização em andamento/);
+  assert.equal(fs.existsSync(path.join(p.dataDir, 'reconfigurar.json')), true);
+});
+
+test('--pela-tela: conferência reprovada ou painel que não para não sobem o assistente', async (t) => {
+  const reprovada = await pelaTela(t, { deps: { preflight: () => false } });
+  assert.equal(await reprovada.rodando, 1);
+  assert.deepEqual(reprovada.painel, []);
+  const preso = await pelaTela(t, { deps: { stopPanel: async () => ({ ok: false }) } });
+  assert.equal(await preso.rodando, 1);
+  assert.match(preso.log(), /não consegui parar o painel/);
+  await assert.rejects(() => request(preso.port, { path: '/configurar' }), 'o assistente não subiu');
+});
+
+test('--pela-tela: painel que não volta aparece no log e sai com erro', async (t) => {
+  const p = await pelaTela(t, { deps: { idleMs: 100, startPanel: async () => ({ ok: false, error: 'o painel não respondeu' }) } });
+  assert.equal(await p.rodando, 1);
+  assert.match(p.log(), /o painel não voltou \(o painel não respondeu\)/);
+});
+
+test('--pela-tela: só vale no reconfigurar e sem outro modo', async (t) => {
+  for (const caso of [{ reconfigurar: false }, { args: ['--pela-tela', '--terminal'] }, { args: ['--pela-tela', '--sem-interface'] }, { args: ['--pela-tela', '--importar-v1', '/tmp/x'] }]) {
+    const p = await pelaTela(t, caso);
+    assert.equal(await p.rodando, 2, JSON.stringify(caso));
+    assert.deepEqual(p.painel, []);
+    assert.match(p.o.text(), /--pela-tela é interna do reconfigurar/);
+  }
 });

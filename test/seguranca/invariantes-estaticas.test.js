@@ -275,6 +275,17 @@ test('frontend: nenhuma URL de outra origem no código (só o link do tutorial n
   assert.deepEqual(urls, []);
 });
 
+test('CWE-88: o --pela-tela não lê nada da linha de comando (I11, ADR 0034)', () => {
+  const fonte = semComentarios(ler('server/cli/instalar.js'));
+  const corpo = (nome) => fonte.slice(fonte.indexOf(`async function ${nome}(`)).split('\n}\n')[0];
+  for (const nome of ['assistentePelaTela', 'reconfigurarPelaTela']) {
+    assert.match(corpo(nome), /\{ out|\{ root/, `${nome} existe`);
+    assert.doesNotMatch(corpo(nome), /\bargs\b|\bargv\b|\bflags\[|\bflags\./, `${nome} recebe o comando fixo`);
+  }
+  // O preflight sem `reexec`: pela tela, ele nunca troca a versão da pasta.
+  assert.match(corpo('assistentePelaTela'), /preflight\)\(\{ out, root, flags: \{\} \}\)/);
+});
+
 test('sem debugger esquecido', () => {
   assert.deepEqual(proibido(CODIGO, /\bdebugger\s*;/g), []);
 });

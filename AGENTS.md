@@ -154,6 +154,13 @@ O teste `test/unit/docs.test.js` confere esta documentação contra o código.
   Quem troca é o clique. Sem tela, sem login, sem navegador ou com o painel parado, segue no terminal;
   `--terminal` força isso. O comando do executor é fixo (I11), então o `--pre` pela tela é um arquivo
   `.atualizacao/pre.json` com prazo de 30 min, que só o dono da pasta cria.
+- **Reconfigurar pela tela** (ADR 0034, F8): o assistente segue em processo à parte, porque as rotas
+  dele recebem a senha do administrador. `dashboard reconfigurar --pela-tela` (opção interna, comando
+  fixo) lê o hash do código em `data/reconfigurar.json` (0600, 5 min, sai do disco ao ser lido) e
+  recusa antes de parar o painel se faltar código, se houver atualização em andamento ou se a versão
+  não conferir. Nunca troca a versão da pasta. Cancelar (`POST /api/configurar/cancelar`, só neste
+  modo e com a sessão do assistente), `SIGTERM`, 15 min parado ou falha ao subir o assistente restauram
+  o `.env` e o `data/ssh/` da memória e religam o painel.
 - **Code scanning** (CodeQL padrão do GitHub, a cada push): todo alerta é corrigido ou
   descartado como falso positivo com a análise em `docs/seguranca/` e, se possível, um
   teste que falhe na forma errada. Não aplique a sugestão do CodeQL sem conferir o formato
@@ -488,6 +495,7 @@ Tudo fica no disco local. Nada é gravado no servidor.
 | `data/sessions.json` | SHA-256 das sessões do navegador |
 | `data/atualizacao.json` | Última procura de versão nova: quando, versão achada, novidades, erro e bloqueio (ADR 0030) |
 | `data/entrar.json` | Hash do link de entrada de uso único (2 min no `./dashboard abrir`, 10 min no fim da instalação) |
+| `data/reconfigurar.json`, `data/reconfigurar.log` | Hash do código do "Reconfigurar pela tela" (5 min, sai do disco ao ser lido) e a saída da última vez, sem segredos (ADR 0034) |
 | `data/ssh/` | `config` e `known_hosts` próprios do painel (0700) |
 | `data/dashboard.log` | Log (gira em 5 MB para `dashboard.log.1`) |
 | `data/dashboard.pid`, `data/dashboard-erros.log` | Modo segundo plano (sem systemd): PID e erros de inicialização |
@@ -645,7 +653,7 @@ linux-server-dashboard-v2/
 │   ├── cli/                subcomandos do ./dashboard (index, servico, instalar, diagnosticar,
 │   │                       atualizar, desinstalar, importar-v1, saida)
 │   ├── setup/              instalação: acesso, deteccao, preparo, remoto, local, assinatura,
-│   │                       instalacao, web (assistente), tui, sem-interface
+│   │                       instalacao, web (assistente), tui, sem-interface, pela-tela
 │   ├── http/               router, static, session, sse, entrar (link de uso único)
 │   ├── collector/          builder (script), parser (amostra v2), rates (taxas), index (1 SSH)
 │   ├── storage/            ndjson (72 h), rollup (5 min/90 d), buckets, migrate-v1, outages,

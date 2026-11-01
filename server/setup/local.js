@@ -106,6 +106,23 @@ export function writeSshConfig(root, { host, port = 22, keyFile, hostKeyType }) 
 }
 
 /**
+ * Guarda na memória o que o assistente regrava antes do fim: o known_hosts no passo 3, o .env e o
+ * data/ssh/config a cada teste de coleta. Devolve a função que traz tudo de volta (ADR 0034).
+ */
+export function guardarConfiguracao(root) {
+  const copias = ['.env', path.join('data', 'ssh', 'config'), path.join('data', 'ssh', 'known_hosts')].map((nome) => {
+    const file = path.join(root, nome);
+    try { return { file, texto: fs.readFileSync(file, 'utf8') }; } catch { return { file, texto: null }; }
+  });
+  return () => {
+    for (const { file, texto } of copias) {
+      if (texto === null) fs.rmSync(file, { force: true });
+      else writeAtomic(file, texto);
+    }
+  };
+}
+
+/**
  * Atualiza o .env (0600) sem perder o resto: troca a 1ª linha `CHAVE=` de cada item e
  * acrescenta as que faltam. Sem .env, parte do .env.example.
  */

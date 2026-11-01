@@ -71,7 +71,7 @@ async function painel(t) {
 
 async function assistente(t) {
   const fake = makeInstalacao();
-  const app = createWizardApp({ inst: fake.inst, code: 'MTZ234' });
+  const app = createWizardApp({ inst: fake.inst, code: 'MTZ234', onCancel: () => {} });
   const { server, port } = await listen(app);
   t.after(async () => { await close(server); fake.cleanup(); });
   const home = await request(port, { path: '/configurar' });

@@ -48,10 +48,11 @@ e sem deixar uma janela de terminal aberta até o fim.
    assistente, fechar a aba ou ficar parado religa o painel com a configuração anterior.
    O tempo parado cai de 1 h para 15 min nesse modo, porque a coleta está pausada.
    Motivo: sem terminal aberto, ninguém religaria o painel.
-4. **Nada é gravado pela metade:** o `.env` e o `data/ssh/` só mudam no último passo do
-   assistente (como hoje); a cópia do `.env` anterior fica até o painel novo responder.
-   Se o painel não subir com a configuração nova, ele volta para a anterior e a tela diz
-   o motivo.
+4. **Nada fica pela metade:** o assistente regrava o `known_hosts` no passo 3 e o `.env` e o
+   `data/ssh/config` a cada teste de coleta do passo 5. Por isso, o modo `--pela-tela` guarda
+   esses 3 arquivos antes do assistente e os restaura ao desistir (ADR 0034). A cópia do
+   `.env` anterior fica até o painel novo responder. Se o painel não subir com a configuração
+   nova, ele volta para a anterior e a tela diz o motivo.
 5. **Terminal:** `dashboard reconfigurar` continua abrindo o assistente no navegador
    (padrão) e `--terminal` abre o TUI. Com o painel rodando, o padrão passa a abrir o
    painel no menu de manutenção, no mesmo fluxo da tela.
@@ -71,12 +72,19 @@ e sem deixar uma janela de terminal aberta até o fim.
 
 ## Etapas
 
-1. Modo `--pela-tela` em `instalar.js`: aceitar o hash do código vindo do arquivo,
-   religar o painel ao cancelar ou abandonar, tempo parado de 15 min.
+1. **Feita (ADR 0034).** Modo `--pela-tela` em `instalar.js`: aceitar o hash do código vindo
+   do arquivo, religar o painel ao cancelar ou abandonar, tempo parado de 15 min. Inclui a rota
+   `POST /api/configurar/cancelar`, a volta dos 3 arquivos ao desistir e o
+   `data/reconfigurar.log`. O arquivo do código já tem as funções de criar e retirar
+   (`server/setup/pela-tela.js`).
 2. Cópia do `.env` anterior e volta para ela se o painel novo não subir.
-3. `POST /api/reconfigurar/iniciar` e o arquivo do código (0600, uso único, expira).
+3. `POST /api/reconfigurar/iniciar`, com o código de `criarCodigoPelaTela`, e o executor da F7
+   para o comando fixo `reconfigurar --pela-tela`. A pasta sem tag assinada vira bloqueio aqui:
+   o comando fixo não leva `--sem-assinatura`, então ele recusaria com o painel já esperando.
 4. Item "Reconfigurar" no menu de manutenção e o diálogo de explicação.
-5. Espera do assistente e entrada automática com o código; volta ao painel no fim.
+5. Espera do assistente e entrada automática com o código; volta ao painel no fim. O botão
+   Cancelar do assistente entra aqui, só no modo `--pela-tela`, e espera o painel voltar. Os
+   textos que mandam olhar o terminal também mudam nesse modo.
 6. Botão "Reconfigurar agora" no resultado da atualização (F7).
 7. `dashboard reconfigurar` com o painel rodando abre o menu de manutenção; ajuda da CLI,
    README, TUTORIAL e AGENTS.
