@@ -23,6 +23,18 @@ export const ALIAS = {
   identityFile: '/home/maria/.ssh/chave_admin', identityAgent: '/run/user/1000/agente.sock',
 };
 
+/** Saída mínima de uma coleta, com o hash dos alvos. */
+export function saidaColeta(targets, { smartPerm = true } = {}) {
+  const smart = targets.smartDevs.map((d) => `${d} ${smartPerm ? 'PASSED' : 'SEM_PERMISSAO'}`).join('\n');
+  return [
+    '===VER===', `2 ${targetsHash(targets)}`, targets.smartDevs.length ? 'smart' : 'basico', '===HOST===', 'servidor-casa',
+    '===MEM===', 'MemTotal: 8000000 kB', 'MemFree: 1000000 kB', 'MemAvailable: 2320000 kB',
+    '===DF===', 'Filesystem 1B-blocks Used Avail Use% IUse% Mounted', '/dev/sdb1 /mnt/dados 100 64 36 64% 1%',
+    ...(targets.smartDevs.length ? ['===SMART===', smart] : []),
+    '===SERVICES===', ...targets.services.map((s) => `${s} active`), '===FIM===',
+  ].join('\n');
+}
+
 /**
  * Servidor falso: responde à detecção, ao preparo e às coletas. `sshd` é a saída da
  * conferência do sshd no preparo (linhas @@sshd); `sudoPassword` é a senha que o sudo aceita.
@@ -63,15 +75,7 @@ function fakeServer({ sudoOk = true, smartPerm = true, detection = FIXTURE, sshd
     async collect({ targets, access, runner }) {
       calls.push({ kind: 'collect', targets, access, runner });
       if (!srv.dashmon) return { ok: false, error: 'SSH falhou (exit 255) — host não encontrado ou chave inválida' };
-      const smart = targets.smartDevs.map((d) => `${d} ${smartPerm ? 'PASSED' : 'SEM_PERMISSAO'}`).join('\n');
-      const out = [
-        '===VER===', `2 ${targetsHash(targets)}`, targets.smartDevs.length ? 'smart' : 'basico', '===HOST===', 'servidor-casa',
-        '===MEM===', 'MemTotal: 8000000 kB', 'MemFree: 1000000 kB', 'MemAvailable: 2320000 kB',
-        '===DF===', 'Filesystem 1B-blocks Used Avail Use% IUse% Mounted', '/dev/sdb1 /mnt/dados 100 64 36 64% 1%',
-        ...(targets.smartDevs.length ? ['===SMART===', smart] : []),
-        '===SERVICES===', ...targets.services.map((s) => `${s} active`), '===FIM===',
-      ].join('\n');
-      const sample = parseOutput(out, new Date().toISOString(), { targets });
+      const sample = parseOutput(saidaColeta(targets, { smartPerm }), new Date().toISOString(), { targets });
       sample.collector.hashMismatch = sample.collector.hash !== targetsHash(targets);
       sample.collector.durationMs = 910;
       sample.collector.outputBytes = 6200;

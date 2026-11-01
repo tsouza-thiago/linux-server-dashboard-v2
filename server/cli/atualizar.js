@@ -14,7 +14,7 @@ import { recortarNovidades } from '../atualizacao/novidades.js';
 import { abrirRegistro, cancelarPre, liberarPre, pegarTrava, preLiberada, soltarTrava } from '../atualizacao/registro.js';
 import { loadEnvFile } from '../config.js';
 import { installService, situacaoDoLink } from '../setup/local.js';
-import { openBrowser, otherServiceRoot, panelPort, panelStatus, panelUrl, startPanel, stopPanel, unitPath, waitForPort, systemctlUser, UNIT_NAME } from './servico.js';
+import { openBrowser, otherServiceRoot, panelHealthy, panelPort, panelStatus, panelUrl, startPanel, stopPanel, unitPath, systemctlUser, UNIT_NAME } from './servico.js';
 import { parseFlags } from './instalar.js';
 import { makeOutput } from './saida.js';
 
@@ -48,18 +48,6 @@ export function restoreData(root, backupDir) {
   const data = path.join(root, 'data');
   fs.rmSync(data, { recursive: true, force: true });
   if (fs.existsSync(path.join(backupDir, 'data'))) fs.cpSync(path.join(backupDir, 'data'), data, { recursive: true, preserveTimestamps: true });
-}
-
-/** Painel respondendo de verdade (porta aberta e /api/session em JSON). */
-async function panelHealthy(port, { timeoutMs = 30000 } = {}) {
-  if (!(await waitForPort(port, { timeoutMs }))) return false;
-  try {
-    const res = await fetch(`http://127.0.0.1:${port}/api/session`, { headers: { Host: '127.0.0.1' } });
-    const body = await res.json();
-    return 'authRequired' in body;
-  } catch {
-    return false;
-  }
 }
 
 // Pasta da instalação desta máquina, se for outra: a do serviço ou a do comando `dashboard`.

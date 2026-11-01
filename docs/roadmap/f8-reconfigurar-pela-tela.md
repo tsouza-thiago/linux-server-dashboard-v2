@@ -51,8 +51,8 @@ e sem deixar uma janela de terminal aberta até o fim.
 4. **Nada fica pela metade:** o assistente regrava o `known_hosts` no passo 3 e o `.env` e o
    `data/ssh/config` a cada teste de coleta do passo 5. Por isso, o modo `--pela-tela` guarda
    esses 3 arquivos antes do assistente e os restaura ao desistir (ADR 0034). A cópia do
-   `.env` anterior fica até o painel novo responder. Se o painel não subir com a configuração
-   nova, ele volta para a anterior e a tela diz o motivo.
+   `.env` anterior fica na memória até o painel novo responder. Se o painel não subir com a
+   configuração nova, ele volta para a anterior e a tela diz o motivo (ADR 0035).
 5. **Terminal:** `dashboard reconfigurar` continua abrindo o assistente no navegador
    (padrão) e `--terminal` abre o TUI. Com o painel rodando, o padrão passa a abrir o
    painel no menu de manutenção, no mesmo fluxo da tela.
@@ -77,14 +77,17 @@ e sem deixar uma janela de terminal aberta até o fim.
    `POST /api/configurar/cancelar`, a volta dos 3 arquivos ao desistir e o
    `data/reconfigurar.log`. O arquivo do código já tem as funções de criar e retirar
    (`server/setup/pela-tela.js`).
-2. Cópia do `.env` anterior e volta para ela se o painel novo não subir.
+2. **Feita (ADR 0035).** A cópia fica na memória até o painel novo responder em `/api/session`.
+   Se ele não subir, o comando volta à configuração anterior, religa o painel, sai com código 1
+   e deixa o motivo em `data/reconfigurar.log`. A etapa 5 mostra esse motivo na tela.
 3. `POST /api/reconfigurar/iniciar`, com o código de `criarCodigoPelaTela`, e o executor da F7
    para o comando fixo `reconfigurar --pela-tela`. A pasta sem tag assinada vira bloqueio aqui:
    o comando fixo não leva `--sem-assinatura`, então ele recusaria com o painel já esperando.
 4. Item "Reconfigurar" no menu de manutenção e o diálogo de explicação.
 5. Espera do assistente e entrada automática com o código; volta ao painel no fim. O botão
    Cancelar do assistente entra aqui, só no modo `--pela-tela`, e espera o painel voltar. Os
-   textos que mandam olhar o terminal também mudam nesse modo.
+   textos que mandam olhar o terminal também mudam nesse modo. Se o painel novo não subir, a tela
+   mostra o motivo que está no `data/reconfigurar.log`.
 6. Botão "Reconfigurar agora" no resultado da atualização (F7).
 7. `dashboard reconfigurar` com o painel rodando abre o menu de manutenção; ajuda da CLI,
    README, TUTORIAL e AGENTS.
@@ -96,6 +99,7 @@ e sem deixar uma janela de terminal aberta até o fim.
 - Integração: rota com e sem sessão; código de uso único (2ª vez recusada); expiração.
 - Integração: cancelar, abandonar e terminar o assistente no modo `--pela-tela` religam o
   painel (com a configuração anterior nos 2 primeiros casos).
+- Integração: painel novo que não sobe volta ao anterior, com o `./dashboard` de verdade.
 - e2e no navegador: menu → diálogo → assistente → volta logado à Visão geral.
 
 ## Riscos

@@ -99,6 +99,18 @@ export async function waitForPort(port, { timeoutMs = 15000, host = '127.0.0.1' 
   return false;
 }
 
+/** Painel respondendo de verdade (porta aberta e /api/session em JSON). */
+export async function panelHealthy(port, { timeoutMs = 30000 } = {}) {
+  if (!(await waitForPort(port, { timeoutMs }))) return false;
+  try {
+    const res = await fetch(`http://127.0.0.1:${port}/api/session`, { headers: { Host: '127.0.0.1' } });
+    const body = await res.json();
+    return 'authRequired' in body;
+  } catch {
+    return false;
+  }
+}
+
 // Pausa assíncrona.
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 

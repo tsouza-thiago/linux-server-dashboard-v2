@@ -15,6 +15,9 @@ diante: `PATCH` corrige, `MINOR` acrescenta sem quebrar e `MAJOR` quebra.
   `dashboard reconfigurar --pela-tela` sobe o assistente com um código de uso único vindo de
   `data/reconfigurar.json`. Cancelar, abandonar por 15 min ou não conseguir subir o assistente
   devolve a configuração anterior e religa o painel. O botão na tela vem nas próximas etapas.
+- Volta do painel novo (#91, etapa 2 da F8, ADR 0035): no `--pela-tela`, se o painel não subir ou não
+  responder com a configuração nova, ele volta para a anterior e deixa o motivo em
+  `data/reconfigurar.log`. A cópia fica na memória até o painel novo responder.
 - Aviso de versão nova (#90, 1ª entrega da F7). O painel procura 1 vez por dia, só por tag assinada,
   e mostra uma faixa no topo com as novidades da versão. A engrenagem no topo abre o menu de
   manutenção, com a versão instalada, a última procura e "Procurar agora". A troca de versão
