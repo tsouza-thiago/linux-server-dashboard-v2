@@ -19,12 +19,15 @@ test('código da tela: em disco só o hash, com 0600', (t) => {
   const dir = pasta(t);
   const codigo = criarCodigoPelaTela(dir, { now: 1000 });
   assert.match(codigo, /^[0-9A-F]{32}$/);
-  const file = path.join(dir, 'reconfigurar.json');
-  assert.equal(fs.statSync(file).mode & 0o777, 0o600);
-  const salvo = JSON.parse(fs.readFileSync(file, 'utf8'));
+  // Permissão e conteúdo pelo mesmo descritor: os 2 vêm do mesmo arquivo (CodeQL js/file-system-race).
+  const fd = fs.openSync(path.join(dir, 'reconfigurar.json'), 'r');
+  t.after(() => fs.closeSync(fd));
+  assert.equal(fs.fstatSync(fd).mode & 0o777, 0o600);
+  const texto = fs.readFileSync(fd, 'utf8');
+  const salvo = JSON.parse(texto);
   assert.deepEqual(Object.keys(salvo).sort(), ['exp', 'hash']);
   assert.equal(salvo.hash, crypto.createHash('sha256').update(codigo).digest('hex'));
-  assert.ok(!fs.readFileSync(file, 'utf8').includes(codigo));
+  assert.ok(!texto.includes(codigo));
 });
 
 test('código da tela: sai do disco ao ser lido e não vale de novo', (t) => {
@@ -40,11 +43,11 @@ test('código da tela: vencido ou malformado é recusado e sai do disco', (t) =>
   const file = path.join(dir, 'reconfigurar.json');
   criarCodigoPelaTela(dir, { now: 1000, ttlMs: 500 });
   assert.equal(retirarCodigoPelaTela(dir, { now: 1500 }), null);
-  assert.equal(fs.existsSync(file), false);
+  assert.deepEqual(fs.readdirSync(dir), []);
   for (const lixo of ['{', 'null', '{"hash":"abc","exp":9e15}', `{"hash":"${'a'.repeat(64)}"}`]) {
     fs.writeFileSync(file, lixo);
     assert.equal(retirarCodigoPelaTela(dir, { now: 1000 }), null, lixo);
-    assert.equal(fs.existsSync(file), false, lixo);
+    assert.deepEqual(fs.readdirSync(dir), [], lixo);
   }
 });
 
