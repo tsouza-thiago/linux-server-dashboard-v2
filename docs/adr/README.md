@@ -38,3 +38,4 @@ Uma ADR aceita não é editada; se a decisão mudar, uma nova ADR a substitui.
 | [0031](0031-botao-atualizar-executor-fora-do-servico.md) | Botão Atualizar: executor fora do serviço e registro fora de `data/` | Aceita |
 | [0032](0032-dashboard-atualizar-abre-o-painel.md) | `dashboard atualizar` abre o painel, e o `--pre` passa pelo dono da pasta | Aceita |
 | [0033](0033-esqueleto-lembra-o-formato-no-navegador.md) | Esqueleto lembra o formato do servidor no navegador | Aceita |
+| [0034](0034-reconfigurar-pela-tela-processo-a-parte.md) | Reconfigurar pela tela: assistente em processo à parte e volta garantida | Aceita |

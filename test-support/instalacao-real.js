@@ -4,7 +4,7 @@
 // o serviço real desta máquina nunca é tocado (#118). Nada sai da máquina: o `origin` é uma pasta,
 // e o servidor monitorado é um nome .invalid, que nunca resolve.
 import assert from 'node:assert/strict';
-import { spawnSync } from 'node:child_process';
+import { spawn, spawnSync } from 'node:child_process';
 import fs from 'node:fs';
 import net from 'node:net';
 import os from 'node:os';
@@ -81,6 +81,12 @@ export async function instalacaoReal(t, { versao = '2.90.0' } = {}) {
     const r = spawnSync(path.join(pasta, 'dashboard'), args, { cwd: pasta, encoding: 'utf8', env: { ...ambiente, ...env }, timeout: 120000 });
     return { codigo: r.status, texto: `${r.stdout}${r.stderr}` };
   };
+  /** Roda o ./dashboard sem esperar, como o executor faz; `fim` é o código de saída. */
+  const dashAoFundo = (args) => {
+    const filho = spawn(path.join(pasta, 'dashboard'), args, { cwd: pasta, env: ambiente, stdio: 'ignore' });
+    t.after(() => filho.kill('SIGKILL'));
+    return { filho, fim: new Promise((resolve) => { filho.on('close', resolve); }) };
+  };
   const api = (rota, { metodo = 'GET', corpo } = {}) => fetch(`http://127.0.0.1:${porta}${rota}`, {
     method: metodo,
     headers: { Authorization: `Bearer ${TOKEN}`, 'Content-Type': 'application/json' },
@@ -121,5 +127,5 @@ export async function instalacaoReal(t, { versao = '2.90.0' } = {}) {
     dash(['parar']);
     fs.rmSync(base, { recursive: true, force: true });
   });
-  return { pasta, bin, porta, git, dash, publicar, apertarAtualizar, fimDaTroca, estadoNoAr };
+  return { pasta, bin, porta, git, dash, dashAoFundo, publicar, apertarAtualizar, fimDaTroca, estadoNoAr };
 }

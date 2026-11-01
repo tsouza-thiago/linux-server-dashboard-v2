@@ -75,6 +75,16 @@ const MUTACOES = [
   { nome: 'executor filho do painel (morre no stopPanel)', arquivo: 'server/atualizacao/executor.js', de: "{ cwd: root, detached: true, stdio: 'ignore' }", para: "{ cwd: root, stdio: 'ignore' }", testes: ['test/unit/atualizacao-registro.test.js'] },
   { nome: 'pré-versão liberada sem prazo', arquivo: 'server/atualizacao/registro.js', de: "return agora < JSON.parse(fs.readFileSync(arquivo(root, PRE), 'utf8')).ate;", para: "return Boolean(JSON.parse(fs.readFileSync(arquivo(root, PRE), 'utf8')).ate);", testes: ['test/unit/atualizacao-registro.test.js'] },
   { nome: '"procurar agora" sem limite de 1 por minuto', arquivo: 'server/atualizacao/index.js', de: 'if (this.agora() - this.manualEm < MANUAL_MS) return null;\n', para: '', testes: ['test/integration/atualizacao.test.js'] },
+  { nome: 'código do assistente aceito 2 vezes', arquivo: 'server/setup/web.js', de: "    pendingHash = null; // uso único: o mesmo código não entra de novo\n", para: '', testes: ['test/integration/assistente-http.test.js'] },
+  { nome: 'cancelar o assistente sem sessão', arquivo: 'server/setup/web.js', de: "    if (sessionHash && sid && safeEqual(hash(sid), sessionHash)) return next();\n", para: "    if (req.path.endsWith('/cancelar') || (sessionHash && sid && safeEqual(hash(sid), sessionHash))) return next();\n", testes: ['test/integration/assistente-http.test.js'] },
+  { nome: 'código da tela vencido aceito', arquivo: 'server/setup/pela-tela.js', de: '.test(hash) && exp > now ?', para: '.test(hash) ?', testes: ['test/unit/setup-pela-tela.test.js'] },
+  { nome: 'código da tela fica no disco depois de lido', arquivo: 'server/setup/pela-tela.js', de: "  fs.rmSync(file, { force: true });\n", para: '', testes: ['test/unit/setup-pela-tela.test.js'] },
+  { nome: 'código da tela em texto puro no disco', arquivo: 'server/setup/pela-tela.js', de: 'JSON.stringify({ hash, exp: now + ttlMs })', para: 'JSON.stringify({ hash, codigo, exp: now + ttlMs })', testes: ['test/unit/setup-pela-tela.test.js'] },
+  { nome: '--pela-tela para o painel sem código válido', arquivo: 'server/cli/instalar.js', de: "  if (!codigo) {\n    out.fail('sem código válido da tela', 'o painel continua no ar');\n    return 1;\n  }\n", para: '', testes: ['test/integration/cli-instalar.test.js'] },
+  { nome: '--pela-tela durante uma atualização', arquivo: 'server/cli/instalar.js', de: "  if (emAndamento(root)) {\n", para: '  if (false) {\n', testes: ['test/integration/cli-instalar.test.js'] },
+  { nome: 'clique na tela trocando a versão da pasta', arquivo: 'server/cli/instalar.js', de: "({ out, root, flags: {} }) !== true", para: "({ out, root, flags: {}, reexec: () => 0 }) !== true" },
+  { nome: 'desistir sem restaurar a configuração anterior', arquivo: 'server/cli/instalar.js', de: "    restaurar();\n", para: '', testes: ['test/integration/cli-instalar.test.js'] },
+  { nome: 'desistir sem religar o painel', arquivo: 'server/cli/instalar.js', de: "      return pelaTela.desistir();\n", para: '      return 1;\n', testes: ['test/integration/cli-instalar.test.js'] },
   { nome: 'exec com shell importado', arquivo: 'server/cli/servico.js', de: "import { spawn, spawnSync } from 'node:child_process';", para: "import { exec, spawn, spawnSync } from 'node:child_process';" },
 ];
 

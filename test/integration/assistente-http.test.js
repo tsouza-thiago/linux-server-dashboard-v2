@@ -2,9 +2,11 @@
 // mesmas proteções do painel (Host, CSRF, CSP) e os 6 passos até o link de entrada.
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import crypto from 'node:crypto';
 import { createWizardApp, makeSetupCode, normalizeCode } from '../../server/setup/web.js';
 import { listen, close, request } from '../../test-support/request.js';
 import { makeInstalacao } from '../../test-support/instalacao-fake.js';
+import { esperarAte } from '../../test-support/esperar.js';
 
 async function start(t, opts = {}) {
   const fake = makeInstalacao();
@@ -160,4 +162,29 @@ test('assistente modo chave (#61): apelido conferido, ssh-add quando falta, sem 
   const ok = await s.post('conectar', { confirmo: true });
   assert.equal(ok.status, 200, ok.text);
   assert.equal(ok.json.acesso, 'chave');
+});
+
+test('--pela-tela: entra pelo hash do código, 1 vez só, e o prazo vem de quem chama', async (t) => {
+  const hash = crypto.createHash('sha256').update('ABCDEF0123456789').digest('hex');
+  const w = await start(t, { code: undefined, codeHash: hash });
+  assert.equal((await w.login('errado')).status, 401);
+  assert.equal((await w.login('ABCDEF0123456789')).status, 200);
+  assert.equal((await w.login('ABCDEF0123456789')).status, 410, 'o código não entra de novo');
+  let agora = 1000;
+  const vencido = await start(t, { code: undefined, codeHash: hash, now: () => agora, codeTtlMs: 500 });
+  agora = 1501;
+  assert.equal((await vencido.login('ABCDEF0123456789')).status, 410);
+});
+
+test('cancelar: só com a sessão do assistente, e a rota só existe pela tela', async (t) => {
+  const cancelou = [];
+  const w = await start(t, { onCancel: () => cancelou.push(true) });
+  assert.equal((await w.post('cancelar')).status, 401, 'sem sessão não cancela');
+  assert.equal(cancelou.length, 0);
+  await w.login();
+  assert.equal((await w.post('cancelar')).status, 200);
+  await esperarAte(() => cancelou.length === 1);
+  const terminal = await start(t);
+  await terminal.login();
+  assert.equal((await terminal.post('cancelar')).status, 404);
 });

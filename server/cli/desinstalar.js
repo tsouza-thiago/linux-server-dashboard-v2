@@ -152,7 +152,7 @@ export async function desinstalar({ out, root, args = [], home = os.homedir(), d
     fs.rmSync(`${key}.pub`, { force: true });
     out.ok('chave do painel apagada', key.replace(home, '~'));
   }
-  for (const f of ['.env', path.join('data', 'ssh'), path.join('data', 'sessions.json'), path.join('data', 'entrar.json'), '.runtime']) {
+  for (const f of ['.env', path.join('data', 'ssh'), path.join('data', 'sessions.json'), path.join('data', 'entrar.json'), path.join('data', 'reconfigurar.json'), path.join('data', 'reconfigurar.log'), '.runtime']) {
     fs.rmSync(path.join(root, f), { recursive: true, force: true });
   }
   out.ok('configuração local apagada', '.env, data/ssh, sessões e o Node baixado');
