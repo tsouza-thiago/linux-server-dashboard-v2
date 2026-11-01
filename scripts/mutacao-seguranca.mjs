@@ -85,6 +85,12 @@ const MUTACOES = [
   { nome: 'clique na tela trocando a versão da pasta', arquivo: 'server/cli/instalar.js', de: "({ out, root, flags: {} }) !== true", para: "({ out, root, flags: {}, reexec: () => 0 }) !== true" },
   { nome: 'desistir sem restaurar a configuração anterior', arquivo: 'server/cli/instalar.js', de: "    restaurar();\n", para: '', testes: ['test/integration/cli-instalar.test.js'] },
   { nome: 'desistir sem religar o painel', arquivo: 'server/cli/instalar.js', de: "      return pelaTela.desistir();\n", para: '      return 1;\n', testes: ['test/integration/cli-instalar.test.js'] },
+  { nome: 'painel novo vale sem responder', arquivo: 'server/cli/instalar.js', de: "if (!lig.ok || await responde(panelPort(root))) return lig;", para: 'if (!lig.ok || true) return lig;', testes: ['test/integration/cli-instalar.test.js'] },
+  { nome: 'painel novo que falha fica sem volta', arquivo: 'server/cli/instalar.js', de: "    if (pelaTela) return pelaTela.voltar(lig.erro);\n", para: '', testes: ['test/integration/cli-instalar.test.js'] },
+  { nome: 'erro ao ligar o painel novo sem volta', arquivo: 'server/cli/instalar.js', de: "      } catch (err) {\n        return { ok: false, erro: err.message };\n      }\n", para: "      } catch (err) {\n        throw err;\n      }\n", testes: ['test/integration/cli-instalar.test.js'] },
+  { nome: 'volta sem parar o painel novo', arquivo: 'server/cli/instalar.js', de: "    const novo = await parar({ root, home });\n", para: "    const novo = { ok: true };\n", testes: ['test/integration/cli-instalar.test.js'] },
+  { nome: 'volta perde o "iniciar com o computador"', arquivo: 'server/cli/instalar.js', de: "if (antes.mode === 'servico') (deps.systemctl", para: "if (false) (deps.systemctl", testes: ['test/integration/cli-instalar.test.js'] },
+  { nome: 'SIGTERM no fim perde a cópia da configuração', arquivo: 'server/cli/instalar.js', de: "  process.on('SIGTERM', esperaOFim);\n", para: '', testes: ['test/integration/cli-instalar.test.js'] },
   { nome: 'exec com shell importado', arquivo: 'server/cli/servico.js', de: "import { spawn, spawnSync } from 'node:child_process';", para: "import { exec, spawn, spawnSync } from 'node:child_process';" },
 ];
 

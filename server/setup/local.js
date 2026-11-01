@@ -107,7 +107,8 @@ export function writeSshConfig(root, { host, port = 22, keyFile, hostKeyType }) 
 
 /**
  * Guarda na memória o que o assistente regrava antes do fim: o known_hosts no passo 3, o .env e o
- * data/ssh/config a cada teste de coleta. Devolve a função que traz tudo de volta (ADR 0034).
+ * data/ssh/config a cada teste de coleta. Devolve a função que traz tudo de volta (ADR 0034). Fica
+ * na memória de propósito: uma cópia velha no disco poderia desfazer uma configuração boa (ADR 0035).
  */
 export function guardarConfiguracao(root) {
   const copias = ['.env', path.join('data', 'ssh', 'config'), path.join('data', 'ssh', 'known_hosts')].map((nome) => {

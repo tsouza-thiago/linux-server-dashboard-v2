@@ -1,8 +1,8 @@
 // `dashboard instalar` e `dashboard reconfigurar` (ADR 0011): confere a versão
 // assinada, o Node 24, os arquivos de terceiros (SHA-256), o SSH e a porta, e abre o
 // assistente no navegador — ou a TUI (--terminal) ou o modo sem perguntas (--sem-interface).
-// Com --pela-tela (interna, ADR 0034), quem chama é o painel: sem terminal, sem código novo, e
-// desistir religa o painel com a configuração anterior.
+// Com --pela-tela (interna, ADR 0034 e 0035), quem chama é o painel: sem terminal, sem código novo.
+// Desistir, ou um painel novo que não responde, religa o painel com a configuração anterior.
 import { spawnSync } from 'node:child_process';
 import crypto from 'node:crypto';
 import fs from 'node:fs';
@@ -13,7 +13,7 @@ import { currentVersionStatus, describeVersion, signedReleaseTags, installTag } 
 import { ensureDataDirs, guardarConfiguracao } from '../setup/local.js';
 import { retirarCodigoPelaTela } from '../setup/pela-tela.js';
 import { emAndamento } from '../atualizacao/registro.js';
-import { openBrowser, panelPort, panelStatus, portFree, startPanel, stopPanel } from './servico.js';
+import { UNIT_NAME, openBrowser, panelHealthy, panelPort, panelStatus, portFree, startPanel, stopPanel, systemctlUser } from './servico.js';
 import { makeOutput, mostrarComando } from './saida.js';
 
 // O assistente se desliga sozinho depois de 1 h sem nenhum pedido.
@@ -145,8 +145,8 @@ export function preflight({ out, root, flags, env = process.env, run = spawnSync
  * Abre o assistente no navegador (servidor temporário na porta do painel, com código de uso
  * único) e espera ele terminar, ser cancelado (Ctrl+C) ou ficar 1 h parado. No fim, a senha
  * é esquecida, o assistente se desliga e o painel é ligado com as escolhas feitas. `pelaTela`
- * ({ codigo, desistir }) troca o código novo pelo do arquivo e, ao cancelar ou abandonar, chama
- * `desistir`.
+ * ({ codigo, desistir, ligarNovo, voltar }) troca o código novo pelo do arquivo; ao cancelar ou
+ * abandonar, chama `desistir`; no fim, liga por `ligarNovo` e, se falhar, chama `voltar`.
  */
 export async function runWizard({ out, root, inst, port, open = openBrowser, idleMs = IDLE_MS, log = () => {}, pelaTela = null }) {
   const code = pelaTela ? null : makeSetupCode();
@@ -210,8 +210,9 @@ export async function runWizard({ out, root, inst, port, open = openBrowser, idl
   }
   out.ok('assistente concluído e desligado');
   mostrarComando(out, inst.comando);
-  const lig = await inst.ligarPainel(result.prefs);
+  const lig = await (pelaTela ? pelaTela.ligarNovo(result.prefs) : inst.ligarPainel(result.prefs));
   if (!lig.ok) {
+    if (pelaTela) return pelaTela.voltar(lig.erro);
     out.fail('o painel não subiu', lig.erro);
     out.explain('a configuração foi salva, mas o painel não iniciou.', `rode ${out.cmd} diagnosticar para ver o motivo.`);
     return 1;
@@ -235,6 +236,7 @@ export async function runWizard({ out, root, inst, port, open = openBrowser, idl
 async function assistentePelaTela({ out, root, home, deps }) {
   const parar = deps.stopPanel ?? stopPanel;
   const ligar = deps.startPanel ?? startPanel;
+  const responde = deps.healthy ?? panelHealthy;
   // Sem `reexec`: um clique na tela nunca troca a versão da pasta.
   if ((deps.preflight ?? preflight)({ out, root, flags: {} }) !== true) return 1;
   if (emAndamento(root)) {
@@ -246,6 +248,8 @@ async function assistentePelaTela({ out, root, home, deps }) {
     out.fail('sem código válido da tela', 'o painel continua no ar');
     return 1;
   }
+  // O assistente pode trocar o "iniciar com o computador": a volta precisa saber como estava.
+  const antes = (deps.panelStatus ?? panelStatus)({ root, home });
   const parado = await parar({ root, home });
   if (!parado.ok) {
     out.fail('não consegui parar o painel');
@@ -262,14 +266,40 @@ async function assistentePelaTela({ out, root, home, deps }) {
     out.ok('painel de volta com a configuração anterior');
     return 0;
   };
+  // A configuração nova foi escolhida, mas o painel não subiu com ela (ADR 0035).
+  const voltar = async (erro) => {
+    out.fail('o painel não subiu com a configuração nova', erro);
+    // Ele pode ter ficado de pé sem responder: ligar de novo só diria "já está rodando".
+    const novo = await parar({ root, home });
+    if (!novo.ok) out.warn('não consegui parar o painel novo');
+    await desistir();
+    if (antes.mode === 'servico') (deps.systemctl ?? systemctlUser)([antes.enabled ? 'enable' : 'disable', UNIT_NAME]);
+    return 1;
+  };
   const port = panelPort(root);
+  // Depois do assistente, só este processo traz o painel de volta, e a cópia morreria com ele: o
+  // SIGTERM espera. Durante o assistente, quem atende o sinal é o `runWizard`.
+  const esperaOFim = () => {};
+  process.on('SIGTERM', esperaOFim);
   try {
     const inst = deps.inst ?? new Instalacao({ root, home });
-    return await runWizard({ out, root, inst, port, idleMs: deps.idleMs ?? IDLE_TELA_MS, pelaTela: { codigo, desistir } });
+    // O painel novo só vale depois de responder. A porta vem do .env novo.
+    const ligarNovo = async (prefs) => {
+      try {
+        const lig = await inst.ligarPainel(prefs);
+        if (!lig.ok || await responde(panelPort(root))) return lig;
+        return { ok: false, erro: 'o painel não respondeu' };
+      } catch (err) {
+        return { ok: false, erro: err.message };
+      }
+    };
+    return await runWizard({ out, root, inst, port, idleMs: deps.idleMs ?? IDLE_TELA_MS, pelaTela: { codigo, desistir, ligarNovo, voltar } });
   } catch (err) {
     // Na troca painel ↔ assistente, outro programa pode ter tomado a porta.
     out.fail('o assistente não subiu', err.message);
     return desistir();
+  } finally {
+    process.off('SIGTERM', esperaOFim);
   }
 }
 

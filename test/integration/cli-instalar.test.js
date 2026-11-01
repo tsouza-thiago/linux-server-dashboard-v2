@@ -153,9 +153,10 @@ test('instalar: painel já rodando → sugere reconfigurar; porta ocupada → ex
 
 // `--pela-tela` com o painel falso: o teste vê quando ele para e liga. O caminho de verdade, com o
 // ./dashboard e o painel de pé, fica em test/integration/reconfigurar-ponta-a-ponta.test.js.
-async function pelaTela(t, { codigo = true, deps = {}, args = ['--pela-tela'], reconfigurar = true, antes = () => {} } = {}) {
+async function pelaTela(t, { codigo = true, deps = {}, args = ['--pela-tela'], reconfigurar = true, antes = () => {}, ligarPainel = null } = {}) {
   const fake = makeInstalacao({ systemd: false });
   t.after(fake.cleanup);
+  if (ligarPainel) fake.inst.ligarPainel = ligarPainel;
   const port = await freePort();
   const dataDir = path.join(fake.root, 'data');
   fs.mkdirSync(path.join(dataDir, 'ssh'), { recursive: true });
@@ -166,7 +167,7 @@ async function pelaTela(t, { codigo = true, deps = {}, args = ['--pela-tela'], r
   const painel = [];
   const o = memOut();
   // Tempo parado curto: com um guarda quebrado, o assistente sobe e o teste não espera os 15 min reais.
-  const ctx = { idleMs: 5000, root: fake.root, home: fake.home, inst: fake.inst, stopPanel: async () => { painel.push('parou'); return { ok: true }; }, startPanel: async () => { painel.push('ligou'); return { ok: true }; }, preflight: () => true, ...deps };
+  const ctx = { idleMs: 5000, root: fake.root, home: fake.home, inst: fake.inst, stopPanel: async () => { painel.push('parou'); return { ok: true }; }, startPanel: async () => { painel.push('ligou'); return { ok: true }; }, preflight: () => true, healthy: async () => true, ...deps };
   const rodando = instalar({ out: o.out, root: fake.root, home: fake.home, args, reconfigurar, deps: ctx });
   const log = () => fs.readFileSync(path.join(dataDir, 'reconfigurar.log'), 'utf8');
   return { ...fake, port, raw, painel, o, rodando, log, dataDir };
@@ -241,6 +242,96 @@ test('--pela-tela: terminar fica com a configuração nova e não religa a anter
   assert.equal(await p.rodando, 0);
   assert.deepEqual(p.painel, ['parou'], 'quem liga agora é a instalação');
   assert.match(fs.readFileSync(path.join(p.root, '.env'), 'utf8'), /^SSH_HOST=servidor$/m);
+});
+
+// Até o fim do assistente, com o painel novo já escolhido.
+async function terminarAssistente(p) {
+  const post = await entrarNoAssistente(p.port, p.raw);
+  await ateOPasso5(post);
+  assert.equal((await post('concluir', { iniciarComComputador: false, atalho: false, link: false })).status, 200);
+  return p.rodando;
+}
+
+test('--pela-tela: painel novo que não responde para, volta à configuração anterior e religa', async (t) => {
+  const perguntas = [];
+  const p = await pelaTela(t, { deps: { healthy: async (port) => { perguntas.push(port); return false; } } });
+  assert.equal(await terminarAssistente(p), 1, 'a configuração nova não valeu');
+  assert.deepEqual(perguntas, [p.port]);
+  // A 2ª parada é a do painel novo: de pé e mudo, ligar de novo só diria "já está rodando".
+  assert.deepEqual(p.painel, ['parou', 'parou', 'ligou']);
+  confereConfiguracaoAnterior(p);
+  assert.match(p.log(), /o painel não subiu com a configuração nova \(o painel não respondeu\)/);
+  assert.match(p.log(), /painel de volta com a configuração anterior/);
+  assert.ok(!p.log().includes('SSH_HOST'), 'o log não copia o .env');
+});
+
+test('--pela-tela: ligarPainel que falha ou lança volta à configuração anterior e guarda o motivo', async (t) => {
+  for (const [ligarPainel, motivo] of [
+    [async () => ({ ok: false, erro: 'a porta está em uso' }), /a porta está em uso/],
+    [async () => { throw new Error('disco cheio'); }, /disco cheio/],
+  ]) {
+    const perguntas = [];
+    const p = await pelaTela(t, { ligarPainel, deps: { healthy: async () => { perguntas.push(1); return true; } } });
+    assert.equal(await terminarAssistente(p), 1);
+    assert.deepEqual(p.painel, ['parou', 'parou', 'ligou']);
+    assert.deepEqual(perguntas, [], 'sem painel, não há o que perguntar');
+    confereConfiguracaoAnterior(p);
+    assert.match(p.log(), motivo);
+    assert.match(p.log(), /painel de volta com a configuração anterior/);
+  }
+});
+
+test('--pela-tela: o painel novo que não para nem o anterior que não volta escondem a falha', async (t) => {
+  let vezes = 0;
+  const p = await pelaTela(t, {
+    deps: {
+      healthy: async () => false,
+      stopPanel: async () => { vezes += 1; return { ok: vezes === 1 }; },
+      startPanel: async () => ({ ok: false, error: 'o painel não respondeu' }),
+    },
+  });
+  assert.equal(await terminarAssistente(p), 1);
+  assert.match(p.log(), /não consegui parar o painel novo/);
+  assert.match(p.log(), /o painel não voltou/);
+  confereConfiguracaoAnterior(p);
+});
+
+test('--pela-tela: a volta devolve o "iniciar com o computador" de antes', async (t) => {
+  for (const [enabled, esperado] of [[true, 'enable'], [false, 'disable']]) {
+    const chamadas = [];
+    const p = await pelaTela(t, { deps: { healthy: async () => false, panelStatus: () => ({ mode: 'servico', enabled }), systemctl: (args) => { chamadas.push(args); } } });
+    assert.equal(await terminarAssistente(p), 1);
+    assert.deepEqual(chamadas, [[esperado, 'server-dashboard.service']]);
+  }
+  const semServico = [];
+  const p = await pelaTela(t, { deps: { healthy: async () => false, panelStatus: () => ({ mode: 'parado', enabled: false }), systemctl: (args) => { semServico.push(args); } } });
+  assert.equal(await terminarAssistente(p), 1);
+  assert.deepEqual(semServico, []);
+});
+
+test('--pela-tela: SIGTERM depois do assistente não mata a volta', async (t) => {
+  const ouvintes = process.listenerCount('SIGTERM');
+  let durante = null;
+  const p = await pelaTela(t, { ligarPainel: async () => { durante = process.listenerCount('SIGTERM'); return { ok: false, erro: 'sem porta' }; } });
+  assert.equal(await terminarAssistente(p), 1);
+  assert.equal(durante, ouvintes + 1, 'alguém atende o sinal enquanto o painel novo sobe');
+  assert.equal(process.listenerCount('SIGTERM'), ouvintes, 'o ouvinte sai no fim');
+});
+
+test('terminal: painel que não sobe fica com a configuração nova, sem volta', async (t) => {
+  const fake = makeInstalacao({ systemd: false });
+  t.after(fake.cleanup);
+  fake.inst.ligarPainel = async () => ({ ok: false, erro: 'sem porta' });
+  const port = await freePort();
+  const o = memOut();
+  const rodando = runWizard({ out: o.out, root: fake.root, inst: fake.inst, port, open: () => true });
+  await esperarAte(() => /código de uso único: [A-Z0-9-]+/.test(o.text()));
+  const post = await entrarNoAssistente(port, /código de uso único: ([A-Z0-9-]+)/.exec(o.text())[1]);
+  await ateOPasso5(post);
+  assert.equal((await post('concluir', { atalho: false, link: false })).status, 200);
+  assert.equal(await rodando, 1);
+  assert.match(o.text(), /a configuração foi salva, mas o painel não iniciou/);
+  assert.match(fs.readFileSync(path.join(fake.root, '.env'), 'utf8'), /^SSH_HOST=servidor$/m);
 });
 
 test('--pela-tela: porta tomada na troca religa o painel e o log diz o motivo', async (t) => {

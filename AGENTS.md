@@ -161,6 +161,11 @@ O teste `test/unit/docs.test.js` confere esta documentação contra o código.
   não conferir. Nunca troca a versão da pasta. Cancelar (`POST /api/configurar/cancelar`, só neste
   modo e com a sessão do assistente), `SIGTERM`, 15 min parado ou falha ao subir o assistente restauram
   o `.env` e o `data/ssh/` da memória e religam o painel.
+- **Volta do painel novo** (ADR 0035, F8): no `--pela-tela`, o painel novo só vale depois de responder
+  em `/api/session`. Se `ligarPainel` falhar ou ele não responder, o comando para o painel novo, restaura
+  a configuração, religa o painel, devolve o "iniciar com o computador" e sai com código 1, com o motivo
+  em `data/reconfigurar.log`. A cópia nunca vai para o disco: uma sobra velha desfaria uma configuração
+  boa. Depois do assistente, o `SIGTERM` espera o fim. O `dashboard reconfigurar` do terminal não volta.
 - **Code scanning** (CodeQL padrão do GitHub, a cada push): todo alerta é corrigido ou
   descartado como falso positivo com a análise em `docs/seguranca/` e, se possível, um
   teste que falhe na forma errada. Não aplique a sugestão do CodeQL sem conferir o formato
@@ -495,7 +500,7 @@ Tudo fica no disco local. Nada é gravado no servidor.
 | `data/sessions.json` | SHA-256 das sessões do navegador |
 | `data/atualizacao.json` | Última procura de versão nova: quando, versão achada, novidades, erro e bloqueio (ADR 0030) |
 | `data/entrar.json` | Hash do link de entrada de uso único (2 min no `./dashboard abrir`, 10 min no fim da instalação) |
-| `data/reconfigurar.json`, `data/reconfigurar.log` | Hash do código do "Reconfigurar pela tela" (5 min, sai do disco ao ser lido) e a saída da última vez, sem segredos (ADR 0034) |
+| `data/reconfigurar.json`, `data/reconfigurar.log` | Hash do código do "Reconfigurar pela tela" (5 min, sai do disco ao ser lido) e a saída da última vez, sem segredos, com o motivo se o painel novo não subiu (ADR 0034 e 0035) |
 | `data/ssh/` | `config` e `known_hosts` próprios do painel (0700) |
 | `data/dashboard.log` | Log (gira em 5 MB para `dashboard.log.1`) |
 | `data/dashboard.pid`, `data/dashboard-erros.log` | Modo segundo plano (sem systemd): PID e erros de inicialização |
