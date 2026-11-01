@@ -149,6 +149,11 @@ O teste `test/unit/docs.test.js` confere esta documentação contra o código.
   dado da tela. Exige sessão e confere a pasta de novo (só a da instalação, #118). Log, estado e
   trava com PID ficam em `.atualizacao/`, fora de `data/`, porque a volta atrás apaga `data/`. O
   terminal e o painel respeitam a mesma trava. A tela lê o log a cada 1 s e aguenta a queda do painel.
+- **`dashboard atualizar` abre a tela** (ADR 0032): o comando só abre o link de uso único com o
+  fragmento `#/visao-geral?atualizar=1`, que o navegador mantém no redirecionamento do `/entrar`.
+  Quem troca é o clique. Sem tela, sem login, sem navegador ou com o painel parado, segue no terminal;
+  `--terminal` força isso. O comando do executor é fixo (I11), então o `--pre` pela tela é um arquivo
+  `.atualizacao/pre.json` com prazo de 30 min, que só o dono da pasta cria.
 - **Code scanning** (CodeQL padrão do GitHub, a cada push): todo alerta é corrigido ou
   descartado como falso positivo com a análise em `docs/seguranca/` e, se possível, um
   teste que falhe na forma errada. Não aplique a sugestão do CodeQL sem conferir o formato
@@ -243,7 +248,9 @@ O teste `test/unit/docs.test.js` confere esta documentação contra o código.
 
 ### Publicar uma versão (ADR 0012)
 
-1. PR no `main` com o CI verde, a seção `[X.Y.Z] — data` no CHANGELOG e a versão no
+1. Mudou o script de coleta (`COLLECTOR_VERSION`)? A seção da versão traz a linha
+   `**Exige reconfigurar o acesso ao servidor.**`: a tela avisa antes de atualizar (ADR 0032).
+   PR no `main` com o CI verde, a seção `[X.Y.Z] — data` no CHANGELOG e a versão no
    `package.json` e no `package-lock.json`. As issues da versão estão no milestone dela.
 2. Depois do merge, na máquina do mantenedor, com a chave listada em `docs/allowed_signers`:
 
@@ -295,7 +302,8 @@ navegador. O backend só coleta, persiste e serve. O limite de 1 SSH por minuto 
 ./dashboard status              # rodando ou parado
 ./dashboard diagnosticar        # explica cada problema; reaproveita a última amostra e só coleta se ela estiver velha
 ./dashboard reconfigurar        # reabre o assistente
-./dashboard atualizar           # tag assinada mais nova, backup de data/, volta atrás se falhar; só na pasta da instalação (com .env e dona do serviço)
+./dashboard atualizar           # abre o painel logado, no diálogo da versão nova; sem tela, sem login ou com o painel parado, segue no terminal; só na pasta da instalação (com .env e dona do serviço)
+./dashboard atualizar --terminal  # tudo no terminal: tag assinada mais nova, backup de data/, volta atrás se falhar
 ./dashboard desinstalar         # remove daqui e oferece limpar a parte deste computador no servidor
 ./dashboard versao              # versão instalada
 npm start                       # o painel em primeiro plano (node --max-semi-space-size=2 --optimize-for-size server/index.js)
@@ -312,8 +320,8 @@ npm run capturar-telas          # refaz docs/img/ a partir do painel de teste (-
 npm run migrar-v1 -- --verificar  # resume o data/history.json da V1 sem gravar nada
 npm run migrar-v1               # migra a V1 agora (o painel também migra sozinho ao iniciar)
 npm run soak                    # soak acelerado: 83 h de coletas simuladas e pedidos de 90 dias; confere RAM e vazamento
-npm run painel-teste            # painel de teste com dados semeados (--cenario=normal|lacunas|offline|vazio, --porta=3943, --versao-nova)
-scripts/e2e-instalacao/rodar.sh # instalação de ponta a ponta em contêineres Debian/Ubuntu
+npm run painel-teste            # painel de teste com dados semeados (--cenario=normal|lacunas|offline|vazio, --porta=3943, --versao-nova, --exige-reconfigurar)
+scripts/e2e-instalacao/rodar.sh # instalação e botão Atualizar de ponta a ponta em contêineres Debian/Ubuntu, com e sem systemd
 ```
 
 Opções do modo sem perguntas: `./dashboard instalar --sem-interface --ajuda`. Servidor que só
@@ -485,7 +493,7 @@ Tudo fica no disco local. Nada é gravado no servidor.
 | `data/dashboard.pid`, `data/dashboard-erros.log` | Modo segundo plano (sem systemd): PID e erros de inicialização |
 | `.runtime/node/` | Node 24 baixado pelo `./dashboard`, se o do sistema faltar |
 | `.backups/` | Cópias de `data/` feitas pelo `atualizar` (as 3 mais novas, 0700) |
-| `.atualizacao/` | `ultima.log`, `estado.json` e `trava.pid` da atualização pelo painel (0700, fora do git). Fica fora de `data/` porque a volta atrás apaga `data/` (ADR 0031) |
+| `.atualizacao/` | `ultima.log`, `estado.json`, `trava.pid` e `pre.json` (liberação do `--pre`, ADR 0032) da atualização pelo painel (0700, fora do git). Fica fora de `data/` porque a volta atrás apaga `data/` (ADR 0031) |
 
 Fora da pasta do projeto: a chave `~/.ssh/dashboard-<servidor>-<id>` (as instalações até a
 2.1.0 continuam com a `dashboard_ed25519` ou a `dashboard_v2_ed25519`), o serviço
@@ -518,7 +526,7 @@ segurança, rate limit das mutações e error handler sem stack trace. Com `DASH
 | `/api/status` | GET | Última amostra + meta (online, lastPollAt, nextPollAt, offlineSince) + saúde + alertas ativos |
 | `/api/history` | GET | `?limit=N&from=&to=` → amostras (reduzidas a `limit`: padrão 720, máximo 2000, com o pior caso de cada grupo; `topProcs` só na mais recente). `&formato=baldes` → `{from, to, step, buckets}` com mín/máx/média, até 90 dias |
 | `/api/config` | GET | Configuração ativa para a Ajuda: versões, alvos, modo de acesso, limiares (sem segredos) |
-| `/api/atualizacao` | GET | `{instalada, nova, novidades, verificadoEm, erro, modo, bloqueio}`. `novidades` é `{secoes: [{versao, data, texto}], cortado}`; `erro` é `sem-acesso` ou `falhou`; `modo` é `systemd`, `segundo-plano` ou `null`; `bloqueio` é `sem-login`, `rodando`, `sem-git`, `arquivos-alterados` ou `outra-pasta` |
+| `/api/atualizacao` | GET | `{instalada, nova, novidades, exigeReconfigurar, verificadoEm, erro, modo, bloqueio}`. `novidades` é `{secoes: [{versao, data, texto}], cortado, exigeReconfigurar}`; o `exigeReconfigurar` de fora só vale no acesso restrito; `erro` é `sem-acesso` ou `falhou`; `modo` é `systemd`, `segundo-plano` ou `null`; `bloqueio` é `sem-login`, `rodando`, `sem-git`, `arquivos-alterados` ou `outra-pasta` |
 | `/api/atualizacao/verificar` | POST | Procura versão nova agora e devolve o mesmo estado. No máximo 1 por minuto (429 acima) |
 | `/api/atualizacao/iniciar` | POST | `{versao}` igual à versão nova detectada → 202 `{alvo}`; senão, com `bloqueio` ou sem executor (testes e painel de teste), 409. Se o executor não subir, 503 (I11) |
 | `/api/atualizacao/registro` | GET | `?desde=<byte>` → `{texto, proximo, fase, alvo, de, inicio, fim, resultado, rodando}`: o pedaço novo do log, em linhas inteiras, até 64 KB. `fase`: `iniciando`, `procurando`, `trocando`, `ligando`, `voltando` ou `fim`; `resultado`: `atualizado`, `ja-na-mais-nova`, `voltou`, `falhou` ou `interrompida` |
@@ -653,7 +661,8 @@ linux-server-dashboard-v2/
 ├── test/                   unit/, integration/, seguranca/, e2e/ e fixtures/ (node --test)
 └── test-support/           request.js (HTTP/SSE), sshd.js (sshd real), instalacao-fake.js,
                             rotas.js (rotas lidas do código), fonte.js (código sem comentários),
-                            hover.js (resposta ao mouse no navegador)
+                            hover.js (resposta ao mouse no navegador), instalacao-real.js
+                            (o comando real em pasta temporária, com tags assinadas)
 ```
 
 ## Solução de problemas (para quem desenvolve)

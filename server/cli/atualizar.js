@@ -3,20 +3,25 @@
 // data/ → troca de versão → a versão nova liga o painel e confere a saúde → se algo
 // falhar, volta sozinha para a versão anterior com o data/ do backup. Com --registro (quem
 // roda é o painel, ADR 0031), as linhas e as fases vão para .atualizacao/ em vez do terminal.
+// Sem --terminal e com tela, o comando só abre o painel no diálogo da versão nova (ADR 0032).
 import { spawnSync } from 'node:child_process';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { SIGNERS, newestSignedTag } from '../setup/assinatura.js';
 import { GIT_ENV, versaoDaPasta } from '../atualizacao/procurar.js';
-import { abrirRegistro, pegarTrava, soltarTrava } from '../atualizacao/registro.js';
+import { recortarNovidades } from '../atualizacao/novidades.js';
+import { abrirRegistro, cancelarPre, liberarPre, pegarTrava, preLiberada, soltarTrava } from '../atualizacao/registro.js';
+import { loadEnvFile } from '../config.js';
 import { installService, situacaoDoLink } from '../setup/local.js';
-import { otherServiceRoot, panelPort, panelStatus, startPanel, stopPanel, unitPath, waitForPort, systemctlUser, UNIT_NAME } from './servico.js';
+import { openBrowser, otherServiceRoot, panelPort, panelStatus, panelUrl, startPanel, stopPanel, unitPath, waitForPort, systemctlUser, UNIT_NAME } from './servico.js';
 import { parseFlags } from './instalar.js';
 import { makeOutput } from './saida.js';
 
 // Cópias de data/ guardadas em .backups/ (as mais antigas saem).
 const KEEP_BACKUPS = 3;
+// A tela do painel que o `dashboard atualizar` abre: o menu de manutenção, com o diálogo aberto.
+const TELA_DE_ATUALIZAR = '#/visao-geral?atualizar=1';
 
 /** Roda o git na pasta do painel (argumentos em lista, teto de 2 min) e devolve o resultado. */
 function git(root, args, run = spawnSync, env = process.env) {
@@ -111,6 +116,13 @@ export async function afterUpdate({ out, root, home = os.homedir(), deps = {} })
   return 0;
 }
 
+/** A versão nova muda o script de coleta? Só o acesso restrito guarda o script no servidor. */
+function exigeReconfigurar({ root, run, de, ate }) {
+  if (loadEnvFile(path.join(root, '.env')).SSH_ACESSO !== 'restrito') return false;
+  const changelog = git(root, ['show', `${ate}:CHANGELOG.md`], run);
+  return changelog.status === 0 && recortarNovidades(changelog.stdout, { de, ate }).exigeReconfigurar;
+}
+
 /**
  * A troca de versão em si, com a trava já pega. `registro` só existe quando quem roda é o painel:
  * as fases vão para a tela, a fase 2 escreve no mesmo log e o git não pode perguntar nada.
@@ -166,6 +178,9 @@ async function trocarDeVersao({ out, root, home, deps, flags, run, registro }) {
   if (second === 0) {
     out.ok(`atualizado de ${current} para ${target}`);
     if (!wasRunning) out.line(out.c.dim('O painel estava parado antes; ele foi ligado para conferir a versão nova.'));
+    if (exigeReconfigurar({ root, run, de: current, ate: target })) {
+      out.warn('esta versão exige reconfigurar o acesso ao servidor', `rode ${out.cmd} reconfigurar e confirme o passo "Preparar o servidor"`);
+    }
     return 0;
   }
   // A versão nova não subiu: volta o código e os dados, e a versão anterior se liga de novo.
@@ -181,6 +196,35 @@ async function trocarDeVersao({ out, root, home, deps, flags, run, registro }) {
   return 1;
 }
 
+// Por que a atualização fica no terminal; null se o painel pode cuidar dela.
+async function motivoDoTerminal({ root, home, deps }) {
+  const env = deps.env ?? process.env;
+  if (!env.DISPLAY && !env.WAYLAND_DISPLAY) return 'não há tela gráfica nesta sessão';
+  // Sem login, o botão fica desligado e a tela mandaria a pessoa de volta para cá.
+  if (!loadEnvFile(path.join(root, '.env')).DASH_TOKEN) return 'este painel não tem login, e sem login o botão fica desligado';
+  const { running } = (deps.panelStatus ?? panelStatus)({ root, home });
+  if (!running || !(await (deps.healthy ?? panelHealthy)(panelPort(root), { timeoutMs: 5000 }))) return 'o painel está parado';
+  return null;
+}
+
+/** Abre o painel já logado, no diálogo da versão nova. false: a atualização segue no terminal. */
+async function abrirNoPainel({ out, root, home, deps, flags }) {
+  const motivo = await motivoDoTerminal({ root, home, deps });
+  if (motivo) {
+    out.warn(motivo, 'sigo aqui no terminal');
+    return false;
+  }
+  if (flags.pre) liberarPre(root);
+  if (!(deps.openBrowser ?? openBrowser)(panelUrl(root, panelPort(root), TELA_DE_ATUALIZAR).url)) {
+    cancelarPre(root);
+    out.warn('não consegui abrir o navegador', 'sigo aqui no terminal');
+    return false;
+  }
+  out.ok('painel aberto no navegador', 'a atualização continua no diálogo da versão nova');
+  out.line(out.c.dim(`Prefere o terminal? Rode ${out.cmd} atualizar --terminal.`));
+  return true;
+}
+
 /** As conferências da pasta e a trava: 2 atualizações ao mesmo tempo trocariam o código uma da outra. */
 async function atualizarAqui({ out, root, home, deps, flags, registro }) {
   out.title('Server Dashboard · atualizar');
@@ -191,6 +235,7 @@ async function atualizarAqui({ out, root, home, deps, flags, registro }) {
     out.explain('o atualizar troca de versão com o git.', `baixe de novo com o comando do README e importe os dados: ${out.cmd} instalar --importar-v1 não serve aqui; copie a pasta data/.`);
     return 1;
   }
+  if (!registro && !flags.terminal && await abrirNoPainel({ out, root, home, deps, flags })) return 0;
   if (!pegarTrava(root, deps.trava)) {
     out.fail('já há uma atualização rodando nesta pasta');
     out.explain('2 atualizações ao mesmo tempo trocariam o código uma da outra.', 'espere ela terminar. O painel mostra o andamento.');
@@ -209,18 +254,21 @@ async function comRegistro({ root, home, deps, flags }) {
   const out = makeOutput({ stream: registro.stream, root });
   let codigo = 1;
   try {
-    codigo = await atualizarAqui({ out, root, home, deps, flags, registro });
+    // O comando do executor é fixo (I11): o --pre chega pelo que o dono liberou no terminal.
+    codigo = await atualizarAqui({ out, root, home, deps, flags: { ...flags, pre: preLiberada(root) }, registro });
   } catch (err) {
     out.fail('a atualização parou', err.message);
   }
+  cancelarPre(root);
   registro.fim(codigo);
   return codigo;
 }
 
 /**
- * `./dashboard atualizar`. Opções: --pre (aceita pré-versão), --registro (interna: escreve em
- * .atualizacao/, usada pelo painel) e --pos-atualizacao (interna: a 2ª fase, rodada pela versão
- * nova). Devolve 0 atualizado ou já na mais nova, 1 falha.
+ * `./dashboard atualizar`. Opções: --terminal (não abre o painel), --pre (aceita pré-versão),
+ * --registro (interna: escreve em .atualizacao/, usada pelo painel) e --pos-atualizacao (interna:
+ * a 2ª fase, rodada pela versão nova). Devolve 0 aberto no painel, atualizado ou já na mais nova;
+ * 1 falha.
  */
 export async function atualizar({ out, root, args = [], home = os.homedir(), deps = {} }) {
   const flags = parseFlags(args);

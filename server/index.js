@@ -100,6 +100,7 @@ export function createApp(deps = {}) {
     instalada: `v${VERSION.app}`,
     loginExigido: Boolean(DASH_TOKEN),
     procurar: deps.procurarVersao ?? (async () => ({})),
+    acessoRestrito: (deps.sshAccess ?? config.SSH_ACESSO) === 'restrito',
     root: deps.pastaAtualizacao ?? ROOT,
     modo: deps.modoAtualizacao ?? null,
     executar: deps.executarAtualizacao ?? null,

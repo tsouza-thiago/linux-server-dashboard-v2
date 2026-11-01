@@ -10,6 +10,7 @@ import { createApp } from '../../server/index.js';
 import { listen, close } from '../../test-support/request.js';
 import { APERTADO, pressiona, semHover, sobe } from '../../test-support/hover.js';
 import { atualizacaoFalsa, procurarFalso } from '../../scripts/painel-teste.mjs';
+import { createLoginCode } from '../../server/http/entrar.js';
 
 let chromium = null;
 try { ({ chromium } = await import('playwright-core')); } catch { /* sem playwright-core */ }
@@ -138,6 +139,49 @@ test('e2e: versão nova — aviso, novidades com texto escapado, menu e fechar o
   await page.keyboard.press('Escape');
   assert.ok(await page.isHidden('#manutMenu'));
   assert.deepEqual(problems, []);
+});
+
+// `dashboard atualizar` (ADR 0032): o link de uso único leva o fragmento até a tela, e a versão que
+// muda a coleta avisa antes de atualizar.
+test('e2e: dashboard atualizar — link de uso único abre o diálogo, com o aviso de reconfigurar', { skip: !chromium && 'sem playwright-core' }, async (t) => {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'dash-e2e-link-'));
+  t.after(() => fs.rmSync(dir, { recursive: true, force: true }));
+  const procurar = async () => { const r = await procurarFalso(); return { ...r, novidades: { ...r.novidades, exigeReconfigurar: true } }; };
+  const ctx = await setup(t, { procurarVersao: procurar, sshAccess: 'restrito', dashToken: 'teste', dataDir: dir });
+  if (ctx.skip) return t.skip(ctx.skip);
+  const { page, base, problems } = ctx;
+  await page.goto(`${base}/entrar?codigo=${createLoginCode(dir)}#/visao-geral?atualizar=1`);
+  await page.waitForSelector('#novidadesDialog[open]');
+  assert.match(await page.textContent('#novidadesDialog'), /Novidades da v9\.9\.9/);
+  assert.match(await page.textContent('#avisoReconfigurar'), /\.\/dashboard reconfigurar/);
+  assert.match(await page.textContent('#avisoVersao'), /exige reconfigurar o acesso ao servidor/);
+  assert.equal(new URL(page.url()).hash, '#/visao-geral', 'o pedido vale 1 vez');
+  await page.reload();
+  await page.waitForSelector('#manutBtn.tem-novidade');
+  assert.equal(await page.locator('#novidadesDialog[open]').count(), 0, 'recarregar não abre de novo');
+  assert.deepEqual(problems, []);
+});
+
+test('e2e: dashboard atualizar — sem versão nova, o menu fica aberto com a versão instalada', { skip: !chromium && 'sem playwright-core' }, async (t) => {
+  const ctx = await setup(t);
+  if (ctx.skip) return t.skip(ctx.skip);
+  const { page, base, problems } = ctx;
+  await page.goto(`${base}/#/visao-geral?atualizar=1`);
+  await page.waitForSelector('#manutMenu:not([hidden])');
+  assert.match(await page.textContent('#manutMenu'), /Versão instalada/);
+  assert.equal(await page.locator('#novidadesDialog[open]').count(), 0);
+  assert.deepEqual(problems, []);
+});
+
+test('e2e: script desatualizado no servidor — a Visão geral mostra o passo a passo', { skip: !chromium && 'sem playwright-core' }, async (t) => {
+  const ctx = await setup(t, { sshAccess: 'restrito' });
+  if (ctx.skip) return t.skip(ctx.skip);
+  const { app, page, base } = ctx;
+  app.store.getLatest().collector = { hash: 'antigo', expectedHash: 'novo', hashMismatch: true };
+  await page.goto(base);
+  await page.waitForSelector('.notice-passos');
+  assert.match(await page.textContent('.notice-passos'), /\.\/dashboard reconfigurar/);
+  assert.equal(await page.locator('.notice-passos li').count(), 4);
 });
 
 // O botão Atualizar (ADR 0031): o painel "cai" no meio (a leitura falha) e a tela continua sozinha.

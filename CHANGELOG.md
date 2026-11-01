@@ -29,6 +29,22 @@ diante: `PATCH` corrige, `MINOR` acrescenta sem quebrar e `MAJOR` quebra.
 - Pasta `.atualizacao/`, com o log e o estado da atualização, e a invariante I11: nada da tela entra
   no comando da troca de versão.
 - O `dashboard atualizar` recusa rodar junto com outra atualização na mesma pasta.
+- `dashboard atualizar --terminal` faz tudo no terminal, como antes (#90, 3ª entrega da F7).
+- Aviso de versão que muda a coleta: o marcador "**Exige reconfigurar o acesso ao servidor.**" no
+  CHANGELOG da versão aparece no aviso e nas novidades antes de atualizar, e o campo
+  `exigeReconfigurar` entra em `/api/atualizacao`. Vale só no acesso restrito (ADR 0032).
+- `npm run painel-teste -- --versao-nova --exige-reconfigurar`: mostra esse aviso no painel de teste.
+- Atualização de ponta a ponta com o `./dashboard` de verdade e tags assinadas por uma chave de
+  teste, e o cenário D de `scripts/e2e-instalacao/rodar.sh`, com `systemd-run --user` e segundo plano.
+
+### Mudado
+
+- `dashboard atualizar` abre o painel já logado, no menu de manutenção, com o diálogo da versão nova.
+  Sem tela gráfica, com o painel parado, sem login ou sem navegador, avisa e segue no terminal. O
+  `--pre` vale nos 2 modos (ADR 0032). Quem roda o comando num script, numa sessão com tela, precisa
+  acrescentar `--terminal`.
+- O aviso de script desatualizado da Visão geral mostra o passo a passo, e o bloqueio do diálogo cita
+  `./dashboard atualizar --terminal`.
 
 ## [2.4.1] — 2026-10-31
 

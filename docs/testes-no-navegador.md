@@ -127,6 +127,10 @@ Com `npm run painel-teste -- --versao-nova` (token `teste`), nos 2 temas:
 - O Esc não fecha o progresso. Recarregar a página no meio volta para o progresso.
 - Com `--resultado=voltou`, a tela diz que voltou para a versão anterior e não recarrega.
 - Com outro bloqueio, o botão fica desligado e o comando do terminal aparece.
+- Com `--exige-reconfigurar`, o aviso do topo e as novidades dizem que a versão exige reconfigurar, e
+  a Visão geral mostra o passo a passo de 4 itens.
+- Com `#/visao-geral?atualizar=1` no endereço, a página abre o diálogo da versão nova, tira o pedido
+  do endereço e não abre de novo ao recarregar.
 
 ## Como registrar
 

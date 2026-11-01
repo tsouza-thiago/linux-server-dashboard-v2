@@ -200,7 +200,7 @@ export async function diagnosticar({ out, root, home = os.homedir(), deps = {} }
   const c = sample.collector || {};
   if (restricted && c.hashMismatch) {
     warn('a linha da chave no servidor está desatualizada');
-    out.explain('o .env mudou (outro disco, outra pasta ou serviço) depois que o servidor foi preparado; o painel continua coletando o que a linha antiga permite.', 'rode dashboard reconfigurar e confirme o passo "Preparar o servidor".');
+    out.explain('a versão instalada mudou o script de coleta ou o .env mudou (outro disco, outra pasta ou serviço) depois que o servidor foi preparado; o painel continua coletando o que a linha antiga permite.', 'rode dashboard reconfigurar e confirme o passo "Preparar o servidor".');
   } else if (restricted) out.ok('chave restrita ao comando de coleta · em dia');
 
   // SMART: sem permissão e sem smartctl são avisos com conserto; FAILED é erro.

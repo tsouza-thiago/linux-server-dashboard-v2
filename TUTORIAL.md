@@ -188,7 +188,8 @@ coleta) e explica cada problema com "O que aconteceu" e "Como resolver".
 ## 5. Atualizar, reconfigurar e desinstalar
 
 ```bash
-./dashboard atualizar      # versão assinada mais nova; faz backup e volta atrás se falhar
+./dashboard atualizar      # abre o painel no diálogo da versão nova; faz backup e volta atrás se falhar
+./dashboard atualizar --terminal  # o mesmo, todo no terminal
 ./dashboard reconfigurar   # trocar servidor, discos, pastas ou serviços (reabre o assistente)
 ./dashboard desinstalar    # remove daqui e oferece limpar a parte deste computador no servidor
 ```
@@ -202,7 +203,20 @@ botão **Procurar agora**.
 o que está acontecendo. O painel fica fora do ar por alguns segundos e volta sozinho. No fim, a
 página recarrega. Se a versão nova falhar, o painel volta para a versão anterior, com os dados de
 antes, e a tela avisa. O botão fica desligado quando o painel não tem login ou quando há arquivos
-alterados na pasta; nesse caso, a tela diz o motivo e mostra o comando `./dashboard atualizar`.
+alterados na pasta; nesse caso, a tela diz o motivo e mostra o comando
+`./dashboard atualizar --terminal`.
+
+**E pelo terminal?** O `./dashboard atualizar` abre o painel já logado, com o diálogo da versão nova.
+Sem tela gráfica (numa sessão SSH, por exemplo), com o painel parado ou sem login, ele avisa e faz
+tudo ali mesmo. Para ficar sempre no terminal, use `./dashboard atualizar --terminal`. Para aceitar
+uma pré-versão, acrescente `--pre`, nos 2 casos.
+
+**"Exige reconfigurar o acesso ao servidor".** Algumas versões mudam o script de coleta guardado no
+servidor. O aviso e as novidades dizem isso antes de atualizar. Depois de atualizar:
+
+1. Rode `./dashboard reconfigurar`.
+2. Confirme o passo "Preparar o servidor". Ele pede a senha do administrador do servidor.
+3. Espere a próxima coleta. O aviso da Visão geral some sozinho.
 
 **Rode na pasta da instalação.** O `atualizar` só vale na pasta onde o painel foi instalado.
 Numa cópia sem `.env`, ou com o serviço em outra pasta, ele para sem alterar nada e mostra a pasta
@@ -376,8 +390,8 @@ Comece sempre por `./dashboard diagnosticar`: ele aponta o problema e diz como r
 ### "SMART sem permissão" ou "comando de coleta desatualizado"
 
 - A regra do `sudo` ou a linha da chave no servidor não batem com a configuração (por
-  exemplo, depois de mudar o `.env` à mão). Rode `./dashboard reconfigurar`: o passo
-  "Preparar o servidor" atualiza as duas.
+  exemplo, depois de mudar o `.env` à mão ou de uma versão que muda a coleta). Rode
+  `./dashboard reconfigurar`: o passo "Preparar o servidor" atualiza as duas.
 
 ### "O servidor recusou a chave do painel"
 

@@ -59,10 +59,11 @@ class ArquivoDeEstado extends JsonStore {
 
 /** Estado da verificação de versão, com a agenda diária. */
 export class Atualizacao {
-  constructor({ file, instalada, loginExigido, procurar, root = path.dirname(file), modo = null, executar = null, conferirPasta = () => null, procDir = '/proc', onChange = () => {}, log = () => {}, agora = Date.now, aleatorio = Math.random }) {
+  constructor({ file, instalada, loginExigido, procurar, acessoRestrito = false, root = path.dirname(file), modo = null, executar = null, conferirPasta = () => null, procDir = '/proc', onChange = () => {}, log = () => {}, agora = Date.now, aleatorio = Math.random }) {
     this.instalada = instalada;
     this.loginExigido = loginExigido;
     this.procurar = procurar;
+    this.acessoRestrito = acessoRestrito;
     this.root = root;
     this.modo = modo;
     this.executar = executar;
@@ -86,6 +87,8 @@ export class Atualizacao {
       instalada: this.instalada,
       nova: temNova ? d.nova : null,
       novidades: temNova ? d.novidades ?? null : null,
+      // Só o acesso restrito guarda o script no servidor; no direto, o painel manda o script novo.
+      exigeReconfigurar: temNova && this.acessoRestrito && Boolean(d.novidades?.exigeReconfigurar),
       verificadoEm: d.verificadoEm ?? null,
       erro: d.erro ?? null,
       modo: this.modo,

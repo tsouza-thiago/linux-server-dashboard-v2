@@ -73,6 +73,7 @@
 .notice-row > div { display: flex; flex-direction: column; gap: 4px; }
 .notice-row h2 { font-size: 18px; }
 .notice-row p { font-size: 13px; line-height: 1.5; color: var(--text-2); }
+.notice-passos { margin: 4px 0 0; padding-left: 20px; font-size: 13px; line-height: 1.6; color: var(--text-2); }
 
 /* Esqueletos no formato final */
 .ring-skel { width: 136px; height: 136px; flex: 0 0 136px; border-radius: 50%; background: transparent; border: 10px solid var(--surface-3); }

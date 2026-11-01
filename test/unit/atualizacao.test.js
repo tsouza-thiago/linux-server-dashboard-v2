@@ -5,7 +5,7 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import { recortarNovidades } from '../../server/atualizacao/novidades.js';
+import { MARCADOR_RECONFIGURAR, recortarNovidades } from '../../server/atualizacao/novidades.js';
 import { Atualizacao, esperaAteProcurar, procurarEmProcesso, MANUAL_MS } from '../../server/atualizacao/index.js';
 import { blocosDeNovidade } from '../../public/js/core/novidades.js';
 
@@ -55,6 +55,15 @@ test('novidades: só as seções entre a instalada e a nova, da mais nova para a
   assert.match(secoes[0].texto, /^Versão nova\.\n\n### Adicionado\n\n- Item A\.$/);
   assert.equal(cortado, false);
   assert.ok(!secoes.some((s) => /Item velho|nada ainda/.test(s.texto)), 'nem a instalada nem o [Não publicado]');
+});
+
+test('novidades: o marcador de reconfigurar vale em qualquer seção da faixa, mesmo cortada', () => {
+  const com = (marcador) => `## [2.5.0] — 2026-11-02\n\n${'x'.repeat(40 * 1024)}\n\n## [2.4.2] — 2026-11-01\n\n${marcador}\n\n## [2.4.1] — 2026-10-31\n\n- velho\n`;
+  const r = recortarNovidades(com(MARCADOR_RECONFIGURAR), { de: 'v2.4.1', ate: 'v2.5.0' });
+  assert.equal(r.cortado, true, 'o texto da seção passou do teto');
+  assert.equal(r.exigeReconfigurar, true);
+  assert.equal(recortarNovidades(com('- nada'), { de: 'v2.4.1', ate: 'v2.5.0' }).exigeReconfigurar, false);
+  assert.equal(recortarNovidades(com(MARCADOR_RECONFIGURAR), { de: 'v2.4.2', ate: 'v2.5.0' }).exigeReconfigurar, false, 'a versão instalada já foi reconfigurada');
 });
 
 test('novidades: a instalada fica de fora e a seção posterior à nova também', () => {

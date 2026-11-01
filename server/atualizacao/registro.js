@@ -9,10 +9,13 @@ const PASTA = '.atualizacao';
 const LOG = 'ultima.log';
 const ESTADO = 'estado.json';
 const TRAVA = 'trava.pid';
+const PRE = 'pre.json';
 // Maior pedaço do log numa resposta: a tela pede de novo até alcançar o fim.
 const MAX_PEDACO = 64 * 1024;
 // Tempo para o executor pegar a trava depois do pedido da tela. Passou disso sem trava, ele não subiu.
 const GRACA_MS = 60000;
+// Quanto vale o `dashboard atualizar --pre` pelo painel: o tempo de olhar o diálogo e clicar.
+const PRE_MS = 30 * 60000;
 
 const arquivo = (root, nome) => path.join(root, PASTA, nome);
 
@@ -106,6 +109,29 @@ export function emAndamento(root, { agora = Date.now(), procDir = '/proc' } = {}
   if (donoDaTrava(root, procDir)) return true;
   const e = lerEstado(root);
   return e.fase === 'iniciando' && agora - Date.parse(e.inicio) < GRACA_MS;
+}
+
+/**
+ * `dashboard atualizar --pre` com a tela (ADR 0032): a procura e o executor passam a aceitar
+ * pré-versão por um tempo. Quem libera é o dono da pasta, no terminal; a tela não tem como pedir.
+ */
+export function liberarPre(root, agora = Date.now()) {
+  garantirPasta(root);
+  fs.writeFileSync(arquivo(root, PRE), JSON.stringify({ ate: agora + PRE_MS }), { mode: 0o600 });
+}
+
+/** A pré-versão está liberada agora? */
+export function preLiberada(root, agora = Date.now()) {
+  try {
+    return agora < JSON.parse(fs.readFileSync(arquivo(root, PRE), 'utf8')).ate;
+  } catch {
+    return false;
+  }
+}
+
+/** Tira a liberação. */
+export function cancelarPre(root) {
+  fs.rmSync(arquivo(root, PRE), { force: true });
 }
 
 // Bytes do log a partir de `inicio`, só com linhas inteiras: o corte nunca parte um caractere.

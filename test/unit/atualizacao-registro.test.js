@@ -7,7 +7,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import {
-  abrirRegistro, donoDaTrava, emAndamento, garantirPasta, lerEstado, lerRegistro, pegarTrava, prepararRegistro, registrarFalha, soltarTrava,
+  abrirRegistro, cancelarPre, donoDaTrava, emAndamento, garantirPasta, lerEstado, lerRegistro, liberarPre, pegarTrava, preLiberada, prepararRegistro, registrarFalha, soltarTrava,
 } from '../../server/atualizacao/registro.js';
 import { executarForaDoServico, modoDoExecutor } from '../../server/atualizacao/executor.js';
 
@@ -195,6 +195,20 @@ test('executor: segundo plano → sessão própria e sem prender o painel', asyn
   assert.equal(chamadas[0].unref, true);
   const erro = espiao((f) => f.emit('error', new Error('sem arquivo')));
   assert.deepEqual(await executarForaDoServico({ root: '/opt/painel', modo: 'segundo-plano', spawnFn: erro.spawnFn }), { ok: false });
+});
+
+test('--pre pela tela: arquivo 0600, vale por um tempo e sai quando pedem', (t) => {
+  const root = pasta(t);
+  const agora = Date.parse('2026-11-01T12:00:00Z');
+  assert.equal(preLiberada(root, agora), false);
+  liberarPre(root, agora);
+  assert.equal(fs.statSync(path.join(root, '.atualizacao', 'pre.json')).mode & 0o777, 0o600);
+  assert.equal(preLiberada(root, agora + 29 * 60000), true);
+  assert.equal(preLiberada(root, agora + 30 * 60000), false, 'a tela não estica o prazo');
+  cancelarPre(root);
+  assert.equal(preLiberada(root, agora), false);
+  fs.writeFileSync(path.join(root, '.atualizacao', 'pre.json'), 'quebrado');
+  assert.equal(preLiberada(root, agora), false);
 });
 
 test('modo: serviço só com a unidade instalada e o systemd do usuário de pé', (t) => {

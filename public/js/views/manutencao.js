@@ -10,7 +10,8 @@ import { icon, withBusy } from './common.js';
 
 // Versão cujo aviso foi fechado neste navegador: ela só volta a aparecer no menu.
 const DISPENSADA_KEY = 'dash_versao_dispensada';
-const COMANDO = './dashboard atualizar';
+// Sem o --terminal, o comando abriria esta mesma tela.
+const COMANDO = './dashboard atualizar --terminal';
 // Leitura do progresso: a cada 1 s, e até ~3 min de painel fora do ar antes de sugerir o terminal.
 const LEITURA_MS = 1000;
 const MAX_FALHAS = 180;
@@ -31,6 +32,7 @@ const FASES = {
   voltando: 'A versão nova falhou. Voltando para a anterior…',
 };
 const REINICIANDO = 'Reiniciando o painel…';
+const RECONFIGURAR = 'Esta versão muda o script de coleta. Depois de atualizar, rode ./dashboard reconfigurar no terminal, com a senha do administrador do servidor. Até lá, alguns dados podem faltar. A Visão geral mostra o passo a passo.';
 const ERROS = {
   'sem-acesso': 'Sem acesso ao GitHub na última procura. Tento de novo amanhã.',
   falhou: 'A última procura falhou. Tento de novo amanhã.',
@@ -53,8 +55,11 @@ function secao(s) {
   </section>`;
 }
 
-/** Liga o menu, o aviso e o diálogo ao estado `atualizacao` do `store`. */
-export function iniciarManutencao({ store, toast }) {
+/**
+ * Liga o menu, o aviso e o diálogo ao estado `atualizacao` do `store`. `pedidoDoTerminal`: a página
+ * veio do `dashboard atualizar` (ADR 0032), que abre o menu, procura e mostra o diálogo.
+ */
+export function iniciarManutencao({ store, toast, pedidoDoTerminal = false }) {
   const botao = $('manutBtn');
   const menu = $('manutMenu');
   const aviso = $('avisoVersao');
@@ -70,7 +75,7 @@ export function iniciarManutencao({ store, toast }) {
 
   /** O diálogo com as novidades da versão nova e o botão, ou o motivo e o comando do terminal. */
   function abrirNovidades() {
-    const { nova, novidades, bloqueio } = store.get().atualizacao || {};
+    const { nova, novidades, bloqueio, exigeReconfigurar } = store.get().atualizacao || {};
     if (!nova) return;
     fecharMenu();
     mount(dialogo, html`<form method="dialog" class="dialogo-corpo">
@@ -79,6 +84,7 @@ export function iniciarManutencao({ store, toast }) {
         ${novidades?.secoes?.length ? novidades.secoes.map(secao) : html`<p>As novidades desta versão não estão disponíveis aqui.</p>`}
         ${novidades?.cortado ? html`<p class="novidades-corte">O texto é longo. O restante está no CHANGELOG da versão.</p>` : ''}
       </div>
+      ${exigeReconfigurar ? html`<p class="dialogo-aviso" id="avisoReconfigurar">${icon('warn', 16)}<span>${RECONFIGURAR}</span></p>` : ''}
       ${BLOQUEIOS[bloqueio] ? html`<p class="dialogo-aviso">${icon('warn', 16)}<span>${BLOQUEIOS[bloqueio]}</span></p>` : ''}
       ${bloqueio && bloqueio !== 'rodando' ? html`<p class="dialogo-comando">Para atualizar, rode no terminal, na pasta do painel: <span class="mono">${COMANDO}</span></p>`
     : bloqueio ? '' : html`<p class="dialogo-comando">O painel fica fora do ar por alguns segundos. Os dados ganham uma cópia antes da troca, e o painel volta sozinho para a versão atual se a nova falhar.</p>`}
@@ -211,7 +217,7 @@ export function iniciarManutencao({ store, toast }) {
     const mostrar = Boolean(a?.nova) && lerDispensada() !== a.nova;
     aviso.hidden = !mostrar;
     if (mostrar) {
-      mount(aviso, html`${icon('download', 16)}<span>Versão <b class="mono">${a.nova}</b> disponível</span>
+      mount(aviso, html`${icon('download', 16)}<span>Versão <b class="mono">${a.nova}</b> disponível${a.exigeReconfigurar ? ' · exige reconfigurar o acesso ao servidor' : ''}</span>
         <button class="btn-link" type="button" data-manut="novidades">Ver novidades</button>
         <button class="icon-btn aviso-fechar" type="button" data-manut="dispensar" aria-label="Fechar o aviso da versão ${a.nova}">${icon('fechar', 14)}</button>`);
     }
@@ -241,14 +247,23 @@ export function iniciarManutencao({ store, toast }) {
     else if (acao === 'dispensar') { gravarDispensada(store.get().atualizacao?.nova); render(); }
   }
 
-  botao.addEventListener('click', async () => {
-    if (!menu.hidden) { fecharMenu(); return; }
+  async function abrirMenu() {
     renderMenu();
     menu.hidden = false;
     botao.setAttribute('aria-expanded', 'true');
     menu.querySelector('button')?.focus();
-    try { store.set({ atualizacao: await api.atualizacao() }); } catch { /* fica o que veio do SSE */ }
-  });
+    await recarregarEstado();
+  }
+
+  // Quem pediu pelo terminal quer a versão de agora, não a da última procura. A trava de 1 por
+  // minuto só deixa o estado como está; a retomada de uma troca em andamento tem a preferência.
+  async function atenderTerminal() {
+    await abrirMenu();
+    await procurarAgora(menu.querySelector('[data-manut="procurar"]'));
+    if (!acompanhando) abrirNovidades();
+  }
+
+  botao.addEventListener('click', () => { if (menu.hidden) abrirMenu(); else fecharMenu(); });
   menu.addEventListener('click', onAcao);
   aviso.addEventListener('click', onAcao);
   dialogo.addEventListener('click', onAcao);
@@ -260,4 +275,5 @@ export function iniciarManutencao({ store, toast }) {
   });
   store.subscribe((_, mudou) => { if ('atualizacao' in mudou) render(); });
   render();
+  if (pedidoDoTerminal) atenderTerminal();
 }

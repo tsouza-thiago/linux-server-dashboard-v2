@@ -45,7 +45,7 @@ test('completar: 1ª palavra são os comandos, com o prefixo digitado', () => {
 });
 
 test('completar: depois do comando, só as opções dele', () => {
-  assert.deepEqual(completar(['dashboard', 'atualizar', '--']), ['--pre']);
+  assert.deepEqual(completar(['dashboard', 'atualizar', '--']), ['--pre', '--terminal']);
   assert.deepEqual(completar(['dashboard', 'desinstalar', '--a']), ['--apagar-historico']);
   assert.ok(completar(['dashboard', 'instalar', '--sem-interface', '--sem-']).includes('--sem-link'));
   assert.deepEqual(completar(['dashboard', 'reconfigurar', '--ter']), ['--terminal']);
