@@ -9,7 +9,7 @@ import path from 'node:path';
 import { createApp } from '../../server/index.js';
 import { listen, close } from '../../test-support/request.js';
 import { APERTADO, pressiona, semHover, sobe } from '../../test-support/hover.js';
-import { atualizacaoFalsa, procurarFalso } from '../../scripts/painel-teste.mjs';
+import { atualizacaoFalsa, procurarFalso, reconfiguracaoFalsa } from '../../scripts/painel-teste.mjs';
 import { createLoginCode } from '../../server/http/entrar.js';
 
 let chromium = null;
@@ -250,6 +250,91 @@ test('e2e: atualizar — voltou atrás mostra o resultado e não recarrega', { s
   assert.match(await page.textContent('#registroFase'), /não funcionou aqui/);
   await page.click('[data-manut="fechar"]');
   assert.ok(await page.isHidden('#novidadesDialog'));
+  assert.deepEqual(problems, []);
+});
+
+// O item Reconfigurar (ADR 0036): o diálogo explica antes, e os bloqueios aparecem nele.
+test('e2e: reconfigurar — menu, explicação, disparo e link do assistente', { skip: !chromium && 'sem playwright-core' }, async (t) => {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'dash-e2e-reconf-'));
+  t.after(() => fs.rmSync(dir, { recursive: true, force: true }));
+  const ctx = await setup(t, { ...reconfiguracaoFalsa(dir), dashToken: 'e2e-teste' });
+  if (ctx.skip) return t.skip(ctx.skip);
+  const { page, base, problems } = ctx;
+  await page.request.post(`${base}/api/login`, { data: { token: 'e2e-teste' } });
+  await page.goto(base);
+  await page.click('#manutBtn');
+  await page.click('#manutMenu [data-manut="reconfigurar"]');
+  await page.waitForSelector('#novidadesDialog[open]');
+  const texto = await page.textContent('#novidadesDialog');
+  assert.match(texto, /coleta pausa/);
+  assert.match(texto, /volta sozinho/);
+  assert.doesNotMatch(texto, /\.\/dashboard reconfigurar/, 'com login, o botão no lugar do comando');
+  // Fechar não dispara nada: o código só nasce no clique.
+  await page.click('#novidadesDialog button[type="submit"]');
+  assert.equal(fs.existsSync(path.join(dir, 'data', 'reconfigurar.json')), false);
+  await page.click('#manutBtn');
+  await page.click('#manutMenu [data-manut="reconfigurar"]');
+  await page.click('[data-manut="reconfigurar-agora"]');
+  await page.waitForSelector('#abrirAssistente');
+  assert.match(await page.getAttribute('#abrirAssistente', 'href'), /^\/configurar#codigo=[0-9A-F]{32}$/);
+  assert.equal(fs.existsSync(path.join(dir, 'data', 'reconfigurar.json')), true);
+  await page.keyboard.press('Escape');
+  assert.ok(await page.isVisible('#novidadesDialog[open]'), 'o Esc não joga fora o único link do assistente');
+  await page.click('[data-manut="fechar"]');
+  assert.ok(await page.isHidden('#novidadesDialog'));
+  assert.deepEqual(problems, []);
+});
+
+test('e2e: reconfigurar — bloqueio depois do clique mostra o motivo e o comando', { skip: !chromium && 'sem playwright-core' }, async (t) => {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'dash-e2e-reconf-bloq-'));
+  t.after(() => fs.rmSync(dir, { recursive: true, force: true }));
+  const ctx = await setup(t, { ...reconfiguracaoFalsa(dir, { bloqueio: 'sem-assinatura' }), dashToken: 'e2e-teste' });
+  if (ctx.skip) return t.skip(ctx.skip);
+  const { page, base, problems } = ctx;
+  await page.request.post(`${base}/api/login`, { data: { token: 'e2e-teste' } });
+  await page.goto(base);
+  await page.click('#manutBtn');
+  await page.click('#manutMenu [data-manut="reconfigurar"]');
+  await page.click('[data-manut="reconfigurar-agora"]');
+  await page.waitForSelector('#novidadesDialog .dialogo-aviso');
+  const texto = await page.textContent('#novidadesDialog');
+  assert.match(texto, /assinatura/);
+  assert.match(texto, /\.\/dashboard reconfigurar/);
+  assert.ok(await page.isDisabled('#novidadesDialog .btn-primary'), 'tentar de novo daria a mesma recusa');
+  assert.equal(fs.existsSync(path.join(dir, 'data', 'reconfigurar.json')), false, 'o bloqueio vem antes do código');
+  assert.deepEqual(problems.filter((p) => !/Failed to load resource/.test(p)), []);
+});
+
+test('e2e: reconfigurar — executor que não sobe deixa tentar de novo', { skip: !chromium && 'sem playwright-core' }, async (t) => {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'dash-e2e-reconf-503-'));
+  t.after(() => fs.rmSync(dir, { recursive: true, force: true }));
+  const ctx = await setup(t, { ...reconfiguracaoFalsa(dir), executarReconfiguracao: async () => ({ ok: false }), dashToken: 'e2e-teste' });
+  if (ctx.skip) return t.skip(ctx.skip);
+  const { page, base } = ctx;
+  await page.request.post(`${base}/api/login`, { data: { token: 'e2e-teste' } });
+  await page.goto(base);
+  await page.click('#manutBtn');
+  await page.click('#manutMenu [data-manut="reconfigurar"]');
+  await page.click('[data-manut="reconfigurar-agora"]');
+  await page.waitForSelector('#novidadesDialog .dialogo-aviso');
+  assert.match(await page.textContent('#novidadesDialog .dialogo-aviso'), /não consegui iniciar/);
+  assert.ok(await page.isEnabled('[data-manut="reconfigurar-agora"]'));
+});
+
+test('e2e: reconfigurar — sem login, o botão nasce desligado e o comando aparece', { skip: !chromium && 'sem playwright-core' }, async (t) => {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'dash-e2e-reconf-livre-'));
+  t.after(() => fs.rmSync(dir, { recursive: true, force: true }));
+  const ctx = await setup(t, { ...reconfiguracaoFalsa(dir), dashToken: '' });
+  if (ctx.skip) return t.skip(ctx.skip);
+  const { page, base, problems } = ctx;
+  await page.goto(base);
+  await page.click('#manutBtn');
+  // Abriu antes da 1ª resposta? O estado chega e o diálogo lê o bloqueio na hora de abrir.
+  await page.waitForFunction(() => document.querySelector('#manutMenu dd')?.textContent !== '—');
+  await page.click('#manutMenu [data-manut="reconfigurar"]');
+  await page.waitForSelector('#novidadesDialog[open]');
+  assert.match(await page.textContent('#novidadesDialog'), /não tem login[\s\S]*\.\/dashboard reconfigurar/);
+  assert.ok(await page.isDisabled('#novidadesDialog .btn-primary'));
   assert.deepEqual(problems, []);
 });
 

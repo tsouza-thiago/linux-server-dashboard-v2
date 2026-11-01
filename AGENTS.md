@@ -337,7 +337,7 @@ npm run capturar-telas          # refaz docs/img/ a partir do painel de teste (-
 npm run migrar-v1 -- --verificar  # resume o data/history.json da V1 sem gravar nada
 npm run migrar-v1               # migra a V1 agora (o painel também migra sozinho ao iniciar)
 npm run soak                    # soak acelerado: 83 h de coletas simuladas e pedidos de 90 dias; confere RAM e vazamento
-npm run painel-teste            # painel de teste com dados semeados (--cenario=normal|lacunas|offline|vazio, --porta=3943, --versao-nova, --exige-reconfigurar)
+npm run painel-teste            # painel de teste com dados semeados (--cenario=normal|lacunas|offline|vazio, --porta=3943, --versao-nova, --exige-reconfigurar, --reconfigurar[=bloqueio])
 scripts/e2e-instalacao/rodar.sh # instalação e botão Atualizar de ponta a ponta em contêineres Debian/Ubuntu, com e sem systemd
 ```
 
@@ -551,7 +551,7 @@ segurança, rate limit das mutações e error handler sem stack trace. Com `DASH
 | `/api/atualizacao/verificar` | POST | Procura versão nova agora e devolve o mesmo estado. No máximo 1 por minuto (429 acima) |
 | `/api/atualizacao/iniciar` | POST | `{versao}` igual à versão nova detectada → 202 `{alvo}`; senão, com `bloqueio` ou sem executor (testes e painel de teste), 409. Se o executor não subir, 503 (I11) |
 | `/api/atualizacao/registro` | GET | `?desde=<byte>` → `{texto, proximo, fase, alvo, de, inicio, fim, resultado, rodando}`: o pedaço novo do log, em linhas inteiras, até 64 KB. `fase`: `iniciando`, `procurando`, `trocando`, `ligando`, `voltando` ou `fim`; `resultado`: `atualizado`, `ja-na-mais-nova`, `voltou`, `falhou` ou `interrompida` |
-| `/api/reconfigurar/iniciar` | POST | Nada do pedido é lido → 202 `{codigo}`, o código do assistente, só nesta resposta (ADR 0036). Sem executor (testes e painel de teste), 409. `bloqueio` no 409: `sem-login`, `rodando`, `outra-pasta` ou `sem-assinatura`. Se o executor não subir, 503, sem código no disco (I11) |
+| `/api/reconfigurar/iniciar` | POST | Nada do pedido é lido → 202 `{codigo}`, o código do assistente, só nesta resposta (ADR 0036). Sem executor (testes e painel de teste sem `--reconfigurar`), 409. `bloqueio` no 409: `sem-login`, `rodando`, `outra-pasta` ou `sem-assinatura`. Se o executor não subir, 503, sem código no disco (I11) |
 | `/api/outages` | GET | `?days=1..90` (padrão 30) → `{days, outages, monitored, uptime}`. `monitored` são os intervalos `{from, to}` em que o painel estava medindo; `uptime` conta só esse tempo (ADR 0018) |
 | `/api/alerts` | GET | `?status=&level=&limit=` → `{active, all}` |
 | `/api/alerts/:id/ack` | POST | Reconhece o alerta |
