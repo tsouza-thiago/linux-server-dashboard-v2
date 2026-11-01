@@ -22,6 +22,9 @@ diante: `PATCH` corrige, `MINOR` acrescenta sem quebrar e `MAJOR` quebra.
   `POST /api/reconfigurar/iniciar` exige sessão, gera o código de uso único, devolve o código só na
   resposta e roda o `dashboard reconfigurar --pela-tela` fora do serviço. Pasta sem tag assinada,
   atualização em andamento e painel sem login barram antes de disparar. Nenhuma tela mudou ainda.
+- Item "Reconfigurar" na engrenagem (#91, etapa 4 da F8, ADR 0036): o diálogo explica a pausa da coleta
+  e a volta do painel antes de disparar. Sem login, ou com pasta que barra o disparo, ele mostra o
+  motivo e o comando do terminal. Por enquanto, o assistente abre por um link no diálogo.
 - Aviso de versão nova (#90, 1ª entrega da F7). O painel procura 1 vez por dia, só por tag assinada,
   e mostra uma faixa no topo com as novidades da versão. A engrenagem no topo abre o menu de
   manutenção, com a versão instalada, a última procura e "Procurar agora". A troca de versão

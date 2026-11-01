@@ -84,8 +84,10 @@ e sem deixar uma janela de terminal aberta até o fim.
    o executor da F7 para o comando fixo `reconfigurar --pela-tela`. Antes de disparar, a rota barra
    a pasta sem tag assinada, a pasta fora da instalação, a atualização em andamento e o painel sem
    login. Depois de disparar, nada mais dispara por 1 min, e a atualização também espera.
-4. Item "Reconfigurar" no menu de manutenção e o diálogo de explicação.
-5. Espera do assistente e entrada automática com o código; volta ao painel no fim. O botão
+4. **Feita.** Item "Reconfigurar" no menu de manutenção e o diálogo de explicação, com os bloqueios
+   da rota. Depois do 202, o diálogo mostra um link com o código, e a pessoa clica. Esse link é
+   provisório: a etapa 5 troca o clique pela espera.
+5. Espera do assistente e entrada automática com o código, no lugar do link da etapa 4; volta ao painel no fim. O botão
    Cancelar do assistente entra aqui, só no modo `--pela-tela`, e espera o painel voltar. Os
    textos que mandam olhar o terminal também mudam nesse modo. Se o painel novo não subir, a tela
    mostra o motivo que está no `data/reconfigurar.log`.

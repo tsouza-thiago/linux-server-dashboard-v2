@@ -1,7 +1,8 @@
 // Manutenção do painel (ADR 0030): a engrenagem no topo com a versão instalada e "Procurar
 // agora", o aviso de versão nova, o diálogo com as novidades e o botão Atualizar, com o progresso
-// (ADR 0031). Não é uma tela: fica por cima de todas. A tela só pede a troca da versão detectada:
-// quem troca é o `dashboard atualizar --registro`, fora do serviço (I11).
+// (ADR 0031), e o item Reconfigurar com o diálogo dele (ADR 0036). Não é uma tela: fica por cima de
+// todas. A tela só pede a troca da versão detectada: quem troca é o `dashboard atualizar --registro`,
+// fora do serviço (I11).
 import { api } from '../core/api.js';
 import { html, mount } from '../core/html.js';
 import { blocosDeNovidade } from '../core/novidades.js';
@@ -23,6 +24,16 @@ const BLOQUEIOS = {
   'arquivos-alterados': 'Há arquivos do painel alterados nesta pasta. Guarde ou desfaça as alterações antes de atualizar.',
   'sem-git': 'Esta pasta não veio de um git clone. Instale de novo pelo comando do README.',
   'outra-pasta': 'Este painel não roda da pasta da instalação. Rode o comando na pasta da instalação.',
+};
+// Por que não dá para reconfigurar. Só `sem-login` e `rodando` vêm do estado: os outros aparecem depois
+// do clique (ADR 0036). `arquivos-alterados` e `sem-git` valem só para a troca de versão.
+const COMANDO_RECONFIGURAR = './dashboard reconfigurar';
+const IMPEDEM_RECONFIGURAR = ['sem-login', 'rodando'];
+const BLOQUEIOS_RECONFIGURAR = {
+  'sem-login': BLOQUEIOS['sem-login'],
+  rodando: 'Já há uma atualização ou uma reconfiguração em andamento nesta pasta. Espere terminar e tente de novo.',
+  'outra-pasta': BLOQUEIOS['outra-pasta'],
+  'sem-assinatura': 'A versão desta pasta não passou na conferência da assinatura. Se você desenvolve o painel, use a opção --sem-assinatura no terminal; se não, baixe de novo com o comando do README.',
 };
 const FASES = {
   iniciando: 'Iniciando a atualização…',
@@ -95,6 +106,56 @@ export function iniciarManutencao({ store, toast, pedidoDoTerminal = false }) {
       </div>
     </form>`);
     if (!dialogo.open) dialogo.showModal();
+  }
+
+  /**
+   * O diálogo que explica a reconfiguração antes de parar a coleta. `motivo` é o bloqueio que veio
+   * depois do clique; `erro`, a recusa sem bloqueio, em que tentar de novo pode dar certo.
+   */
+  function abrirReconfigurar({ motivo = null, erro = null } = {}) {
+    const doEstado = store.get().atualizacao?.bloqueio;
+    const bloqueio = motivo ?? (IMPEDEM_RECONFIGURAR.includes(doEstado) ? doEstado : null);
+    const aviso = BLOQUEIOS_RECONFIGURAR[bloqueio] ?? erro;
+    fecharMenu();
+    delete dialogo.dataset.resultado;
+    mount(dialogo, html`<form method="dialog" class="dialogo-corpo">
+      <h2 id="novidadesTitulo">Reconfigurar o painel</h2>
+      <p>O assistente troca o servidor, as pastas, os discos, os serviços e os limites dos alertas. Tenha em mãos a senha do administrador do servidor.</p>
+      <p>A coleta pausa durante a reconfiguração, e o painel volta sozinho no fim. Se o assistente ficar parado por 15 min, o painel volta com a configuração de agora.</p>
+      ${aviso ? html`<p class="dialogo-aviso">${icon('warn', 16)}<span>${aviso}</span></p>` : ''}
+      ${bloqueio && bloqueio !== 'rodando' ? html`<p class="dialogo-comando">Para reconfigurar, rode no terminal, na pasta do painel: <span class="mono">${COMANDO_RECONFIGURAR}</span></p>` : ''}
+      <div class="dialogo-acoes">
+        <button class="btn btn-soft" type="submit" autofocus>Fechar</button>
+        ${bloqueio ? html`<button class="btn btn-primary" type="button" disabled>Reconfigurar agora</button>`
+    : html`<button class="btn btn-primary" type="button" data-manut="reconfigurar-agora">Reconfigurar agora</button>`}
+      </div>
+    </form>`);
+    if (!dialogo.open) dialogo.showModal();
+  }
+
+  /** Pede o assistente. O código só existe nesta resposta: o link dele não pode sumir com um Esc. */
+  async function reconfigurarAgora(el) {
+    // Antes do pedido: o SSE "rodando" pode chegar antes da resposta.
+    acompanhando = true;
+    let codigo;
+    try {
+      ({ codigo } = await withBusy(el, api.iniciarReconfiguracao()));
+    } catch (err) {
+      acompanhando = false;
+      // Sessão perdida: o login aparece, e ele não fura o diálogo.
+      if (err.status === 401) dialogo.close();
+      else abrirReconfigurar({ motivo: err.bloqueio, erro: err.message });
+      return;
+    }
+    mount(dialogo, html`<div class="dialogo-corpo">
+      <h2 id="novidadesTitulo">Abrindo o assistente</h2>
+      <p role="status">O painel está parando para dar lugar ao assistente. Espere alguns segundos e abra o assistente por este link. Ele só aparece aqui.</p>
+      <div class="dialogo-acoes">
+        <button class="btn btn-soft" type="button" data-manut="fechar">Fechar</button>
+        <a class="btn btn-primary" id="abrirAssistente" href="/configurar#codigo=${codigo}">Abrir o assistente</a>
+      </div>
+    </div>`);
+    $('abrirAssistente').focus();
   }
 
   /** Busca o estado de novo; se falhar, fica o que veio do SSE. */
@@ -206,7 +267,8 @@ export function iniciarManutencao({ store, toast, pedidoDoTerminal = false }) {
       </dl>
       ${ERROS[a?.erro] ? html`<p class="manut-erro">${ERROS[a.erro]}</p>` : ''}
       ${a?.nova ? html`<button class="btn btn-soft btn-block" type="button" data-manut="novidades">Ver novidades da ${a.nova}</button>` : ''}
-      <button class="btn btn-soft btn-block" type="button" data-manut="procurar">Procurar agora</button>`);
+      <button class="btn btn-soft btn-block" type="button" data-manut="procurar">Procurar agora</button>
+      <button class="btn btn-soft btn-block" type="button" data-manut="reconfigurar">Reconfigurar</button>`);
   }
 
   /** Aviso no topo e ponto na engrenagem, conforme o estado. */
@@ -242,8 +304,10 @@ export function iniciarManutencao({ store, toast, pedidoDoTerminal = false }) {
     if (acao === 'novidades') abrirNovidades();
     else if (acao === 'procurar') procurarAgora(el);
     else if (acao === 'atualizar') atualizarAgora(el);
+    else if (acao === 'reconfigurar') abrirReconfigurar();
+    else if (acao === 'reconfigurar-agora') reconfigurarAgora(el);
     else if (acao === 'recarregar') location.reload();
-    else if (acao === 'fechar') dialogo.close();
+    else if (acao === 'fechar') { acompanhando = false; dialogo.close(); }
     else if (acao === 'dispensar') { gravarDispensada(store.get().atualizacao?.nova); render(); }
   }
 
@@ -267,7 +331,8 @@ export function iniciarManutencao({ store, toast, pedidoDoTerminal = false }) {
   menu.addEventListener('click', onAcao);
   aviso.addEventListener('click', onAcao);
   dialogo.addEventListener('click', onAcao);
-  // Durante a troca, o Esc não fecha: o resultado e a recarga precisam aparecer.
+  // Durante a troca, o Esc não fecha: o resultado e a recarga precisam aparecer. O link do assistente
+  // também fica, e só o botão Fechar o tira.
   dialogo.addEventListener('cancel', (e) => { if (acompanhando) e.preventDefault(); });
   document.addEventListener('click', (e) => { if (!menu.hidden && !e.target.closest('.manut')) fecharMenu(); });
   document.addEventListener('keydown', (e) => {

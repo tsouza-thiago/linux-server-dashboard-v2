@@ -134,6 +134,17 @@ Com `npm run painel-teste -- --versao-nova` (token `teste`), nos 2 temas:
 - Com `#/visao-geral?atualizar=1` no endereço, a página abre o diálogo da versão nova, tira o pedido
   do endereço e não abre de novo ao recarregar.
 
+## Reconfigurar pela tela
+
+Com `npm run painel-teste -- --reconfigurar` (token `teste`), nos 2 temas. O painel de teste não
+sobe comando nenhum: a rota é a de verdade, e o assistente não abre.
+
+- A engrenagem tem o item **Reconfigurar**. O diálogo explica a pausa da coleta e a volta do painel.
+- **Fechar** não dispara nada. **Reconfigurar agora** mostra o link do assistente, e o Esc não fecha.
+- Com `--reconfigurar=sem-assinatura` ou `--reconfigurar=outra-pasta`, o motivo e o comando do terminal
+  aparecem depois do clique, e o botão fica desligado.
+- Sem a opção, `npm run painel-teste` não tem login: o botão nasce desligado, com o comando.
+
 ## Como registrar
 
 - No PR: os cenários rodados, as telas conferidas e o que falhou.
