@@ -177,8 +177,8 @@ export function atualizacaoFalsa(dir, { resultado = 'atualizado', passoMs = 700,
         escrever('✓ versão nova no ar');
         escrever(`✓ atualizado de ${de} para v9.9.9`);
       }
-      soltarTrava(dir);
       registro.fim(resultado === 'voltou' ? 1 : 0);
+      soltarTrava(dir);
     })();
     return { ok: true };
   };

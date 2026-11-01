@@ -245,6 +245,12 @@ test('atualizar --registro: log e estado em .atualizacao/, sem nada no terminal,
     stopPanel: async () => { fases.push(ler().fase); return {}; },
     reexec: (a) => { fases.push(ler().fase); assert.deepEqual(a, ['atualizar', '--pos-atualizacao']); return 0; },
   };
+  const rmSync = fs.rmSync;
+  const faseAoSoltar = [];
+  t.mock.method(fs, 'rmSync', (arq, ...resto) => {
+    if (String(arq).endsWith('trava.pid')) faseAoSoltar.push(ler().fase);
+    return rmSync(arq, ...resto);
+  });
   assert.equal(await atualizar({ out: silencioso.out, root: clone, home, args: ['--registro'], deps }), 0);
   assert.equal(silencioso.text(), '', 'o registro não escreve no terminal');
   assert.deepEqual(fases, ['trocando', 'ligando']);
@@ -260,6 +266,7 @@ test('atualizar --registro: log e estado em .atualizacao/, sem nada no terminal,
   assert.equal(e.de, 'v2.0.0-alpha.8');
   assert.ok(e.fim);
   assert.equal(fs.existsSync(path.join(clone, '.atualizacao', 'trava.pid')), false, 'a trava sai no fim');
+  assert.deepEqual(faseAoSoltar, ['fim'], 'a trava só sai com o estado final gravado (#130)');
   assert.equal(g(clone, 'status', '--porcelain', '--untracked-files=no'), '', 'a pasta nova não suja o git');
 });
 

@@ -59,6 +59,8 @@ diante: `PATCH` corrige, `MINOR` acrescenta sem quebrar e `MAJOR` quebra.
 
 ### Corrigido
 
+- A tela de progresso não diz mais "interrompida" numa atualização que deu certo (#130). O executor
+  grava o estado final antes de soltar a trava, e o painel olha a trava antes de ler o estado.
 - Esqueleto da Visão geral e do Armazenamento com a altura do conteúdo final (#121). A linha dos
   indicadores e os painéis de baixo seguem a estrutura real, e o navegador lembra só as contagens de
   pastas, discos, SMART e serviços para desenhar os blocos certos ao recarregar (ADR 0033). Com 3

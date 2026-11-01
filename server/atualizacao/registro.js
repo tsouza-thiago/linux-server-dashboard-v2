@@ -154,8 +154,10 @@ function pedacoDoLog(root, inicio) {
 
 /** O que a tela de progresso lê: o pedaço novo do log e o estado. */
 export function lerRegistro(root, desde = 0, opcoes = {}) {
-  const e = lerEstado(root);
+  // A trava vem antes do estado (#130): o executor grava `fim` e só então solta. Trava solta aqui
+  // garante que o estado lido depois já é o final.
   const rodando = emAndamento(root, opcoes);
+  const e = lerEstado(root);
   // Sem trava e sem `fim`: o executor morreu no meio (ex.: desligaram o computador).
   const interrompida = Boolean(e.fase) && e.fase !== 'fim' && !rodando;
   return {
@@ -177,15 +179,25 @@ export function lerRegistro(root, desde = 0, opcoes = {}) {
 export function abrirRegistro(root, { agora = Date.now } = {}) {
   garantirPasta(root);
   const fd = fs.openSync(arquivo(root, LOG), 'a', 0o600);
+  let comTrava = false;
   return {
     fd,
     stream: { isTTY: false, write: (texto) => fs.writeSync(fd, texto) },
     marcar: (mudanca) => marcarEstado(root, mudanca),
-    /** Fecha o registro. `resultado` já marcado (voltou, já na mais nova) continua valendo. */
+    /** Pega a trava em nome do registro: quem solta é o `fim`. */
+    pegarTrava(opcoes) {
+      comTrava = pegarTrava(root, opcoes);
+      return comTrava;
+    },
+    /**
+     * Fecha o registro. `resultado` já marcado (voltou, já na mais nova) continua valendo. A trava
+     * sai depois do estado final (#130): sem ela e sem `fim`, a tela concluiria que o executor morreu.
+     */
     fim(codigo) {
       const resultado = lerEstado(root).resultado ?? (codigo === 0 ? 'atualizado' : 'falhou');
       marcarEstado(root, { fase: 'fim', fim: new Date(agora()).toISOString(), resultado });
       fs.closeSync(fd);
+      if (comTrava) soltarTrava(root);
     },
   };
 }
