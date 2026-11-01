@@ -224,7 +224,7 @@ async function atualizarAqui({ out, root, home, deps, flags, registro }) {
     return 1;
   }
   if (!registro && !flags.terminal && await abrirNoPainel({ out, root, home, deps, flags })) return 0;
-  if (!pegarTrava(root, deps.trava)) {
+  if (!(registro ? registro.pegarTrava(deps.trava) : pegarTrava(root, deps.trava))) {
     out.fail('já há uma atualização rodando nesta pasta');
     out.explain('2 atualizações ao mesmo tempo trocariam o código uma da outra.', 'espere ela terminar. O painel mostra o andamento.');
     return 1;
@@ -232,7 +232,8 @@ async function atualizarAqui({ out, root, home, deps, flags, registro }) {
   try {
     return await trocarDeVersao({ out, root, home, deps, flags, run, registro });
   } finally {
-    soltarTrava(root);
+    // Com registro, quem solta é o `fim`, depois de gravar o estado final (#130).
+    if (!registro) soltarTrava(root);
   }
 }
 

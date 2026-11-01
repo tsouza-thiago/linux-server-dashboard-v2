@@ -146,6 +146,63 @@ test('registro: executor que morreu no meio aparece como interrompida', (t) => {
   fs.closeSync(r.fd);
 });
 
+test('registro: executor que termina entre as 2 leituras não vira interrompida (#130)', (t) => {
+  const root = pasta(t);
+  const procDir = proc(root, 700, ATUALIZAR);
+  prepararRegistro(root, { alvo: 'v2.5.0', de: 'v2.4.1', agora: 1000 });
+  const r = abrirRegistro(root);
+  assert.equal(r.pegarTrava({ pid: 700, procDir }), true);
+  r.marcar({ fase: 'ligando' });
+  // A corrida fica fixa: o executor termina logo depois da 1ª leitura do estado.
+  const original = fs.readFileSync;
+  let terminou = false;
+  t.mock.method(fs, 'readFileSync', (arq, ...resto) => {
+    const lido = original(arq, ...resto);
+    if (!terminou && String(arq).endsWith('estado.json')) {
+      terminou = true;
+      r.fim(0);
+    }
+    return lido;
+  });
+  const lido = lerRegistro(root, 0, { agora: 1000, procDir });
+  assert.equal(terminou, true);
+  assert.notEqual(lido.resultado, 'interrompida');
+  assert.equal(lido.rodando, true);
+  // A leitura seguinte, com a trava solta, já acha o estado final.
+  const depois = lerRegistro(root, 0, { agora: 1000, procDir });
+  assert.equal(depois.resultado, 'atualizado');
+  assert.equal(depois.fase, 'fim');
+  assert.equal(depois.rodando, false);
+});
+
+test('trava pelo registro: o fim grava o estado e só então solta (#130)', (t) => {
+  const root = pasta(t);
+  const procDir = proc(root, 700, ATUALIZAR);
+  prepararRegistro(root, { alvo: 'v2.5.0', de: 'v2.4.1' });
+  const r = abrirRegistro(root);
+  assert.equal(r.pegarTrava({ pid: 700, procDir }), true);
+  const original = fs.rmSync;
+  const faseAoSoltar = [];
+  t.mock.method(fs, 'rmSync', (arq, ...resto) => {
+    if (String(arq).endsWith('trava.pid')) faseAoSoltar.push(lerEstado(root).fase);
+    return original(arq, ...resto);
+  });
+  r.fim(0);
+  assert.deepEqual(faseAoSoltar, ['fim']);
+  assert.equal(donoDaTrava(root, procDir), null);
+});
+
+test('trava pelo registro: quem não pegou a trava não solta a dos outros', (t) => {
+  const root = pasta(t);
+  const procDir = proc(root, 700, ATUALIZAR);
+  assert.equal(pegarTrava(root, { pid: 700, procDir }), true);
+  prepararRegistro(root, { alvo: 'v2.5.0', de: 'v2.4.1' });
+  const r = abrirRegistro(root);
+  assert.equal(r.pegarTrava({ pid: 701, procDir }), false);
+  r.fim(1);
+  assert.equal(donoDaTrava(root, procDir), 700);
+});
+
 test('falha ao iniciar: fica no log e encerra o estado', (t) => {
   const root = pasta(t);
   prepararRegistro(root, { alvo: 'v2.5.0', de: 'v2.4.1' });
