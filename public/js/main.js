@@ -15,6 +15,7 @@ import { VIEWS, PERIODS, parseHash, buildHash, veioDoAtualizar, viewByKey } from
 import { html, mount } from './core/html.js';
 import { isOffline, mergeAlerts } from './core/analysis.js';
 import { esperaVisivel } from './core/espera.js';
+import { lembrarFormato } from './core/formato.js';
 import * as f from './core/format.js';
 import { icon, withBusy } from './views/common.js';
 import * as visaoGeral from './views/visao-geral.js';
@@ -388,6 +389,7 @@ async function loadOutages() {
 
 // Cada mudança de estado redesenha só o que depende dela.
 store.subscribe((state, patch) => {
+  if ('sample' in patch) lembrarFormato(patch.sample);
   if ('alerts' in patch || 'view' in patch || 'period' in patch) renderNav();
   if ('meta' in patch || 'live' in patch || 'sample' in patch || 'config' in patch) { renderStrip(); renderPollBox(); }
   if (loginShown) return;

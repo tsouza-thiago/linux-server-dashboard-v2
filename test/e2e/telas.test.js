@@ -46,15 +46,28 @@ function sample(ts, i) {
   };
 }
 
+// 4 pastas em 3 discos e 3 serviços: pastas e discos são contagens diferentes, como no painel de teste.
+function amostraVariosDiscos(ts, i) {
+  const s = sample(ts, i);
+  const pasta = (mount, dev) => ({ ...s.disks[0], mount, source: `/dev/${dev}1`, dev });
+  const discos = ['sda', 'sdb', 'sdc'];
+  return {
+    ...s, disks: [s.disks[0], pasta('/mnt/sdb1', 'sdb'), pasta('/mnt/sdc1', 'sdc'), pasta('/mnt/sdc2', 'sdc')],
+    io: discos.map((dev) => ({ ...s.io[0], dev })), smart: discos.map((dev) => ({ dev, status: 'PASSED' })),
+    services: { smbd: 'active', nmbd: 'active', ssh: 'active' },
+  };
+}
+
 async function setup(t, extra = {}) {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'dash-e2e-'));
   const app = createApp({
     historyFile: path.join(dir, 'history.json'), alertsFile: path.join(dir, 'alerts.json'),
     annotationsFile: path.join(dir, 'annotations.json'), collect: async () => ({ ok: false, error: 'sem coleta no e2e' }),
-    log: () => {}, ...extra, viewport: undefined,
+    log: () => {}, ...extra, viewport: undefined, amostra: undefined,
   });
   const now = Date.now();
-  for (let i = 0; i < 120; i++) app.store.append(sample(now - (120 - i) * 60e3, i));
+  const amostra = extra.amostra || sample;
+  for (let i = 0; i < 120; i++) app.store.append(amostra(now - (120 - i) * 60e3, i));
   app.engine.onSample(app.store.getLatest());
   const { server, port } = await listen(app.app);
   let browser;
@@ -577,7 +590,7 @@ const blocos = (page) => page.evaluate(() => {
   const base = document.querySelector('.view').getBoundingClientRect();
   return [...document.querySelectorAll('.view > *:not(.visually-hidden)')]
     .filter((el) => el.getBoundingClientRect().height > 0)
-    .map((el) => { const r = el.getBoundingClientRect(); return { nome: el.className || el.tagName, top: Math.round(r.top - base.top) }; });
+    .map((el) => { const r = el.getBoundingClientRect(); return { nome: el.className || el.tagName, top: Math.round(r.top - base.top), altura: Math.round(r.height) }; });
 });
 // Segura um pedido da API até `solta()`. Função sobre o caminho: o glob não pega URL com query.
 async function segura(page, caminho) {
@@ -605,6 +618,39 @@ test('e2e: esqueleto — nas 8 telas fica no formato final: o conteúdo entra se
     const depois = await blocos(s.page);
     assert.equal(depois.length, antes.length, `${id}: mesmos blocos`);
     depois.forEach((b, i) => assert.ok(Math.abs(b.top - antes[i].top) <= 2, `${id}: ${b.nome} pulou de ${antes[i].top} para ${b.top}`));
+  }
+  assert.deepEqual(s.problems, []);
+});
+
+test('e2e: esqueleto (#121) — com vários discos, Visão geral e Armazenamento já sobem na altura final ao recarregar', { skip: !chromium && 'sem playwright-core' }, async (t) => {
+  const s = await setup(t, { viewport: LARGA, amostra: amostraVariosDiscos });
+  if (s.skip) return t.skip(s.skip);
+  // 1ª carga completa: o navegador lembra quantas pastas e discos há. A partir daí, recarregar
+  // desenha o esqueleto certo antes de qualquer resposta da API.
+  await s.page.goto(`${s.base}/#/visao-geral`, { waitUntil: 'load' });
+  await s.page.waitForFunction(() => !document.querySelector('#view[aria-busy], .view .skel'));
+  // CWE-922: o que o navegador guardou são só contagens, sem nome de host, pasta, disco ou serviço.
+  const guardado = await s.page.evaluate(() => JSON.stringify({ ...localStorage }));
+  assert.match(guardado, /dash_formato/);
+  assert.doesNotMatch(guardado, /servidor-exemplo|sda|\/mnt|smbd/);
+  // Na 1920 os cartões da Visão geral têm 1 linha de nota; na 1600, a nota da memória quebra. Os
+  // cartões de pasta só a 1920: a 1600 eles ficam no limite, e a etiqueta da previsão decide a quebra.
+  for (const [id, width] of [['visao-geral', 1920], ['armazenamento', 1920], ['visao-geral', 1600]]) {
+    await s.page.setViewportSize({ width, height: 900 });
+    const status = await segura(s.page, '/api/status');
+    await s.page.goto(`${s.base}/#/${id}`, { waitUntil: 'load' });
+    await s.page.reload({ waitUntil: 'load' });
+    await s.page.waitForSelector('.view .skel');
+    const antes = await blocos(s.page);
+    status.solta();
+    await s.page.waitForFunction(() => !document.querySelector('#view[aria-busy], .view .skel'));
+    await status.tira();
+    const depois = await blocos(s.page);
+    assert.equal(depois.length, antes.length, `${id} a ${width}: mesmos blocos`);
+    depois.forEach((b, i) => {
+      assert.ok(Math.abs(b.top - antes[i].top) <= 4, `${id} a ${width}: ${b.nome} pulou de ${antes[i].top} para ${b.top}`);
+      assert.ok(Math.abs(b.altura - antes[i].altura) <= 4, `${id} a ${width}: ${b.nome} tinha ${antes[i].altura} px no esqueleto e ${b.altura} px no fim`);
+    });
   }
   assert.deepEqual(s.problems, []);
 });

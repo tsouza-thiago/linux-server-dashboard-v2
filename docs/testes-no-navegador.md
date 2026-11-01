@@ -65,6 +65,8 @@ Em todas as telas, nos cenários `normal` e `lacunas`:
   pisca. Ao trocar o período com a rede lenta, o gráfico fica com os dados velhos, esmaecido, com
   uma faixa fina no topo, e o botão do período responde na hora. Em Relatórios, o resumo velho fica
   até os blocos aparecerem. Rede e Armazenamento guardam o espaço do que carrega depois.
+  Na Visão geral e no Armazenamento, ao recarregar a página, os blocos já têm a altura final, com
+  vários discos também (ADR 0033).
 - **Aguardando (ADR 0025):** em "Coletar agora", "Reconhecer", "Resolver", "Salvar", "Remover" e
   "Entrar", o botão mostra o spinner e fica desligado até a resposta, sem mudar a largura, e o
   duplo clique faz só 1 pedido. Com "reduzir movimento", o spinner vira um ponto fixo.

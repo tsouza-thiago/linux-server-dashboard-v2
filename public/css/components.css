@@ -377,6 +377,7 @@ pre.code {
   animation: shimmer 1.5s ease-in-out infinite;
 }
 .skel-grafico { width: 100%; }
+.skel-selo > svg { visibility: hidden; }
 .skel-texto { display: flex; flex-direction: column; gap: 6px; font-size: 13px; }
 /* Peças de uma região: seguem o layout de quem as recebe; ocultas, só guardam o espaço. */
 .esqueleto { display: contents; }

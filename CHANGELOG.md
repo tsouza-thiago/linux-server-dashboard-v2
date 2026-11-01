@@ -46,6 +46,13 @@ diante: `PATCH` corrige, `MINOR` acrescenta sem quebrar e `MAJOR` quebra.
 - O aviso de script desatualizado da Visão geral mostra o passo a passo, e o bloqueio do diálogo cita
   `./dashboard atualizar --terminal`.
 
+### Corrigido
+
+- Esqueleto da Visão geral e do Armazenamento com a altura do conteúdo final (#121). A linha dos
+  indicadores e os painéis de baixo seguem a estrutura real, e o navegador lembra só as contagens de
+  pastas, discos, SMART e serviços para desenhar os blocos certos ao recarregar (ADR 0033). Com 3
+  discos, a Saúde SMART não desce mais 155 px quando os dados entram.
+
 ## [2.4.1] — 2026-10-31
 
 Versão de correção. A previsão de lotação não mostra mais texto errado durante a carga, e o

@@ -253,8 +253,14 @@ export const panelHead = (title, note = '', right = '') => html`
 export const skelLinha = (w = 100, exemplo = '\u00a0') => html`<span class="skel skel-txt" aria-hidden="true"${w === null ? '' : html` data-w="${w}"`}>${exemplo}</span>`;
 
 /** Cabeçalho de painel, com a nota opcional. A coluna encolhe no texto: a largura vem do exemplo. */
-export const skelCabeca = (nota = false) => html`
-  <div class="panel-head"><div><h2>${skelLinha(null, 'Título do painel · 24h')}</h2>${nota ? html`<span class="hint">${skelLinha(null, 'nota de exemplo deste painel, com um tamanho médio de texto')}</span>` : ''}</div></div>`;
+export const skelCabeca = (nota = false, direita = '') => html`
+  <div class="panel-head"><div><h2>${skelLinha(null, 'Título do painel · 24h')}</h2>${nota ? html`<span class="hint">${skelLinha(null, 'nota de exemplo deste painel, com um tamanho médio de texto')}</span>` : ''}</div>${direita}</div>`;
+
+/**
+ * Etiqueta com o texto de exemplo invisível: as etiquetas quebram de linha onde as finais
+ * quebrariam. `selo` guarda o lugar do ícone da etiqueta final, sem mostrá-lo.
+ */
+export const skelChip = (exemplo, { mono = false, selo = false } = {}) => html`<span class="chip${mono ? ' mono' : ''}${selo ? ' skel-selo' : ''}">${selo ? icon('check', 12, 3) : ''}${skelLinha(null, exemplo)}</span>`;
 
 /** Cartão de número: rótulo, número e nota. `numero` é o tamanho do `big()` ("md", "sm"…). */
 export const skelCartao = ({ medidor = false, numero = '', nota = '' } = {}) => html`<article class="card">
@@ -273,10 +279,10 @@ export const skelFaixas = (linhas, cls = '', altura = 60) => html`<div class="st
   <div class="ticks strip-ticks"><span>&nbsp;</span></div>
 </div>`;
 
-/** Tabela com `linhas` linhas e `colunas` colunas; `cabeca` é o `<tr>` do cabeçalho real. */
-export const skelTabela = (linhas, colunas = 4, { cabeca = '', cls = '' } = {}) => html`<div class="table-wrap"><table class="table${cls ? ` ${cls}` : ''}">
+/** Tabela com `linhas` linhas e `colunas` colunas; `cabeca` é o `<tr>` do cabeçalho real e `celula(i)`, a peça da coluna `i`. */
+export const skelTabela = (linhas, colunas = 4, { cabeca = '', cls = '', celula = () => skelLinha(70) } = {}) => html`<div class="table-wrap"><table class="table${cls ? ` ${cls}` : ''}">
   ${cabeca ? html`<thead>${cabeca}</thead>` : ''}
-  <tbody>${Array.from({ length: linhas }, () => html`<tr>${Array.from({ length: colunas }, () => html`<td>${skelLinha(70)}</td>`)}</tr>`)}</tbody>
+  <tbody>${Array.from({ length: linhas }, () => html`<tr>${Array.from({ length: colunas }, (_, i) => html`<td>${celula(i)}</td>`)}</tr>`)}</tbody>
 </table></div>`;
 
 /** Parágrafo de `linhas` linhas, com larguras variadas como num texto. */
