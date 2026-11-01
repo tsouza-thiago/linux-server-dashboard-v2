@@ -165,7 +165,8 @@ async function pelaTela(t, { codigo = true, deps = {}, args = ['--pela-tela'], r
   await antes(port, fake.root);
   const painel = [];
   const o = memOut();
-  const ctx = { root: fake.root, home: fake.home, inst: fake.inst, stopPanel: async () => { painel.push('parou'); return { ok: true }; }, startPanel: async () => { painel.push('ligou'); return { ok: true }; }, preflight: () => true, ...deps };
+  // Tempo parado curto: com um guarda quebrado, o assistente sobe e o teste não espera os 15 min reais.
+  const ctx = { idleMs: 5000, root: fake.root, home: fake.home, inst: fake.inst, stopPanel: async () => { painel.push('parou'); return { ok: true }; }, startPanel: async () => { painel.push('ligou'); return { ok: true }; }, preflight: () => true, ...deps };
   const rodando = instalar({ out: o.out, root: fake.root, home: fake.home, args, reconfigurar, deps: ctx });
   const log = () => fs.readFileSync(path.join(dataDir, 'reconfigurar.log'), 'utf8');
   return { ...fake, port, raw, painel, o, rodando, log, dataDir };
