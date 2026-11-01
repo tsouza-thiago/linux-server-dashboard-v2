@@ -4,9 +4,10 @@
 import { html, mount } from '../core/html.js';
 import * as f from '../core/format.js';
 import { diskEta, diskForecast, etaPendente, fullestDisk, keysWith } from '../core/analysis.js';
+import { formatoDe } from '../core/formato.js';
 import {
   $, chip, big, meter, chartBox, drawCharts, drawStrips, panelHead, icon, smartOf, onClick, carregarRegiao, skelCabeca, skelFaixas, skelGrafico, skelLinha,
-  skelRegiao, skelTabela,
+  skelChip, skelRegiao, skelTabela,
 } from './common.js';
 
 const DAY = 86400e3;
@@ -131,6 +132,8 @@ function ioStats(io) {
   return html`${cell('ocupado', f.pct(io?.utilPct))}${cell('ler/gravar MB/s', io ? `${f.num(io.readMBps, 1)} / ${f.num(io.writeMBps, 1)}` : '—')}${cell('latência', f.ms(io?.latencyMs))}`;
 }
 
+const CABECA_SMART = html`<tr><th scope="col">Disco</th><th scope="col">Resultado</th><th scope="col">Checado</th><th scope="col">Últimos 90 dias</th></tr>`;
+
 /** Tabela da saúde SMART de cada disco, com o histórico de falhas. */
 function smartTable(ctx) {
   const s = ctx.state.sample;
@@ -138,7 +141,7 @@ function smartTable(ctx) {
   if (!list.length) return html`<p class="empty">Nenhum disco com SMART configurado (DISK_DEVS no .env).</p>`;
   const all = ctx.state.alerts?.all || [];
   return html`<div class="table-wrap"><table class="table">
-    <thead><tr><th scope="col">Disco</th><th scope="col">Resultado</th><th scope="col">Checado</th><th scope="col">Últimos 90 dias</th></tr></thead>
+    <thead>${CABECA_SMART}</thead>
     <tbody>${list.map((x) => {
     const sm = smartOf(x.status);
     const fails = all.filter((a) => a.key === `smart:${x.dev}`);
@@ -157,20 +160,28 @@ function smartTable(ctx) {
 }
 
 // ---------------- Montagem ----------------
-/** Esqueleto no formato da tela, com 1 cartão e 1 faixa por disco já conhecido. */
+// O ícone da coluna do resultado deixa a linha mais alta: o esqueleto guarda o lugar dele.
+const skelCelulaSmart = (i) => (i === 1 ? html`<span class="status-ink skel-selo">${icon('check', 14, 2.5)}${skelLinha(null, 'Aprovado')}</span>` : skelLinha(70));
+
+/**
+ * Esqueleto no formato da tela. Pastas e discos são contagens separadas: 4 pastas em 3 discos têm
+ * 4 cartões, 3 faixas e 3 linhas de SMART (#121). Ao recarregar, elas vêm do `formatoDe`.
+ */
 export const ownSkeleton = (state) => {
-  const n = Math.max(1, state.sample?.disks?.length || 0);
+  const { pastas, discos, smart } = formatoDe(state.sample);
+  // Com mais de 1 pasta, o título da previsão tem o seletor, que é mais alto que o texto.
+  const seletor = pastas > 1 ? html`<div class="segmented on-bg" aria-hidden="true"><button type="button" disabled>${skelLinha(null, '/mnt/disco')}</button></div>` : '';
   return html`
-    <section class="grid-cards wide">${Array.from({ length: n }, () => html`<article class="card mount-card">
+    <section class="grid-cards wide">${Array.from({ length: pastas }, () => html`<article class="card mount-card">
       <div class="card-top"><span class="mount-name">${skelLinha(null, '/mnt/disco')}</span></div>
       <span class="big xl">${skelLinha(40)}</span>
       <div class="meter lg"></div>
       <div class="row-between ink-2">${skelLinha(90)}</div>
-      <div class="chips"><span class="chip">&nbsp;</span></div>
+      <div class="chips">${skelChip('inodes 2%')}${skelChip('estável')}${skelChip('SMART sda', { selo: true })}</div>
     </article>`)}</section>
-    <section class="panel">${skelCabeca(true)}${skelGrafico(ALTURA_PREVISAO)}<div class="chips"><span class="chip mono">&nbsp;</span></div></section>
-    <section class="panel flush">${skelCabeca(true)}<div class="panel-body">${skelFaixas(n, 'io')}</div></section>
-    <section class="panel">${skelCabeca()}${skelTabela(n, 4)}</section>`;
+    <section class="panel">${skelCabeca(true, seletor)}${skelGrafico(ALTURA_PREVISAO)}<div class="chips">${skelChip('hoje · 30%', { mono: true })}</div></section>
+    <section class="panel flush">${skelCabeca(true)}<div class="panel-body">${skelFaixas(discos, 'io')}</div></section>
+    <section class="panel">${skelCabeca()}${skelTabela(smart, 4, { cabeca: CABECA_SMART, celula: skelCelulaSmart })}</section>`;
 };
 
 export function render(ctx) {

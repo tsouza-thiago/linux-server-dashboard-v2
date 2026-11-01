@@ -10,8 +10,9 @@ import {
   dailyTraffic, series, outageOf, cpuState,
 } from '../core/analysis.js';
 import { PERIODS } from '../core/router.js';
+import { formatoDe } from '../core/formato.js';
 import {
-  $, icon, pill, chip, iconBox, big, n0, meter, chartBox, drawCharts, drawStrips, strips, panelHead, smartOf, onClick, withBusy, skelCabeca, skelFaixas, skelLinha, skelTexto,
+  $, icon, pill, chip, iconBox, big, n0, meter, chartBox, drawCharts, drawStrips, strips, panelHead, smartOf, onClick, withBusy, skelCabeca, skelChip, skelFaixas, skelLinha, skelTabela, skelTexto,
 } from './common.js';
 
 // Circunferência do anel de saúde (raio 58) e: esta tela desenha o próprio esqueleto.
@@ -294,16 +295,45 @@ function procsPanel(state) {
 }
 
 // ---------------- Estados especiais ----------------
+// Nota de cada cartão, do tamanho da final: o bloco quebra de linha onde o texto quebraria, e a
+// linha dos cartões fica com a altura certa em qualquer largura (#121).
+const NOTA_EXEMPLO = {
+  cpu: 'iowait 3,0% · load 0,30', ram: '400 MB de 840 MB · swap 24 MB · PSI 0,1%', disk: '/mnt/disco · 30 GB de 100 GB',
+  temp: 'acpitz · pico 43 °C', net: '↑ 1,0 Mbps · 9,9 GB hoje',
+};
+const skelIndicador = (id) => html`<article class="card">
+  <div class="card-top"><span class="card-label">${skelLinha(null, 'Processador')}</span><span class="pill skel-selo">${icon('check', 10, 4)}&nbsp;</span></div>
+  <span class="big">${skelLinha(60)}</span>
+  <span class="note">${skelLinha(null, NOTA_EXEMPLO[id])}</span>
+  <div class="card-viz"></div>
+</article>`;
+const repete = (n, peca) => Array.from({ length: n }, (_, i) => peca(i));
+
+// Os painéis de baixo crescem com as pastas, os discos e os serviços.
+const skelDiscos = ({ pastas, smart }) => html`<section class="panel">${skelCabeca()}
+  ${repete(pastas, () => html`<div class="disk-row">
+    <div class="disk-row-top"><span class="mono">${skelLinha(null, '/mnt/disco')}</span><span class="ink-2">${skelLinha(null, '30% · 30 GB / 100 GB')}</span></div>
+    <div class="meter"></div>
+  </div>`)}
+  <div class="chips">${repete(smart, () => skelChip('SMART sda', { selo: true }))}${skelChip('checado há 12 min')}</div>
+</section>`;
+const skelEventos = html`<section class="panel">${skelCabeca()}${skelTexto(3)}<button class="btn btn-quiet align-start" type="button" disabled>${skelLinha(null, 'Anotar agora')}</button></section>`;
+const skelProcessos = ({ servicos }) => html`<section class="panel">${skelCabeca()}
+  ${skelTabela(3, 3, { cls: 'compact', cabeca: html`<tr><th scope="col">${skelLinha(null, 'comando')}</th><th scope="col">${skelLinha(null, 'mem')}</th><th scope="col">${skelLinha(null, 'rss')}</th></tr>` })}
+  <div class="chips">${repete(servicos, () => skelChip('serviço ativo'))}</div>
+</section>`;
+
 export function ownSkeleton(state) {
+  const formato = formatoDe(state.sample);
   return html`
     <section class="hero">
       <div class="skel ring-skel"></div>
       <div class="hero-text"><div class="skel" data-w="40"></div><div class="skel tall" data-w="70"></div><div class="skel soft" data-w="85"></div></div>
       <div class="hero-minis">${[1, 2, 3].map(() => html`<div class="mini"><span class="k">${skelLinha(60)}</span><span class="v big sm">${skelLinha(80)}</span></div>`)}</div>
     </section>
-    <div class="grid-cards narrow">${CARDS.map(() => html`<div class="skel soft card-skel"></div>`)}</div>
+    <div class="grid-cards narrow">${CARDS.map(skelIndicador)}</div>
     <section class="panel flush">${skelCabeca(true)}<div class="panel-body">${skelFaixas(state.sample ? telemetryRows(state).length : 5)}</div></section>
-    <div class="grid-3">${[1, 2, 3].map(() => html`<section class="panel">${skelCabeca()}${skelTexto(4)}</section>`)}</div>`;
+    <div class="grid-3">${skelDiscos(formato)}${skelEventos}${skelProcessos(formato)}</div>`;
 }
 
 /** Aviso de primeiro uso (dados ainda chegando). */

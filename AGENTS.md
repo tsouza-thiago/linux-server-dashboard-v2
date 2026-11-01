@@ -495,6 +495,9 @@ Tudo fica no disco local. Nada é gravado no servidor.
 | `.backups/` | Cópias de `data/` feitas pelo `atualizar` (as 3 mais novas, 0700) |
 | `.atualizacao/` | `ultima.log`, `estado.json`, `trava.pid` e `pre.json` (liberação do `--pre`, ADR 0032) da atualização pelo painel (0700, fora do git). Fica fora de `data/` porque a volta atrás apaga `data/` (ADR 0031) |
 
+No navegador, o `localStorage` guarda só conveniências: o tema, a versão nova dispensada e as
+contagens de pastas, discos, SMART e serviços para o esqueleto (`dash_formato`, ADR 0033), sem nomes.
+
 Fora da pasta do projeto: a chave `~/.ssh/dashboard-<servidor>-<id>` (as instalações até a
 2.1.0 continuam com a `dashboard_ed25519` ou a `dashboard_v2_ed25519`), o serviço
 `~/.config/systemd/user/server-dashboard.service`, o atalho

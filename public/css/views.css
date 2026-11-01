@@ -80,7 +80,6 @@
 .hero .skel:not(.ring-skel) { height: 14px; }
 .hero .skel.tall { height: 30px; }
 .card-skel { min-height: 191px; border-radius: var(--r-3); }
-.card-skel:not(:last-child) { min-height: 209px; }
 .panel-skel { height: 420px; border-radius: var(--r-4); }
 
 /* ---------------- Recursos ---------------- */

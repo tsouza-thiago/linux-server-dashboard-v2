@@ -5,6 +5,7 @@ import { html, raw, escape, mount } from '../../public/js/core/html.js';
 import * as fmt from '../../public/js/core/format.js';
 import { parseHash, buildHash, veioDoAtualizar, VIEWS, PERIODS, viewByKey } from '../../public/js/core/router.js';
 import { createStore } from '../../public/js/core/store.js';
+import { formatoDe, lembrarFormato } from '../../public/js/core/formato.js';
 import { series, xs, keysWith, diskEta, dailySummary, headline, fullestDisk, timeline, isOffline, mergeAlerts, ALERTS_LIMIT } from '../../public/js/core/analysis.js';
 
 test('html: toda interpolação é escapada; raw() é a única porta para HTML', () => {
@@ -193,4 +194,50 @@ test('alertas ao vivo: o SSE (50 mais recentes) atualiza a lista sem encolher os
   assert.equal(new Set(out.map((a) => a.id)).size, 200, 'sem repetidos');
   assert.deepEqual(mergeAlerts(undefined, prev), prev);
   assert.deepEqual(mergeAlerts([{ id: 'x' }], undefined), [{ id: 'x' }]);
+});
+
+// #121 / ADR 0033: as contagens do esqueleto. Só o navegador as tem antes da 1ª amostra.
+function comArmazenamento(t, inicial = null) {
+  const guardado = new Map(inicial === null ? [] : [['dash_formato', inicial]]);
+  const escritas = [];
+  const armazenamento = { getItem: (k) => guardado.get(k) ?? null, setItem: (k, v) => { escritas.push(k); guardado.set(k, v); } };
+  Object.defineProperty(globalThis, 'localStorage', { value: armazenamento, configurable: true });
+  t.after(() => delete globalThis.localStorage);
+  return { guardado, escritas };
+}
+const quatroPastasEm3Discos = {
+  disks: [{}, {}, {}, {}], io: [{}, {}, {}], smart: [{}, {}, {}], services: { smbd: 'active', ssh: 'active' },
+};
+
+test('formato: pastas e discos são contagens separadas, e a amostra vence o que foi lembrado', (t) => {
+  comArmazenamento(t, JSON.stringify({ pastas: 9, discos: 9, smart: 9, servicos: 9 }));
+  assert.deepEqual(formatoDe(quatroPastasEm3Discos), { pastas: 4, discos: 3, smart: 3, servicos: 2 });
+});
+
+test('formato: lembra só as contagens, e grava 1 vez enquanto elas não mudam', (t) => {
+  const { guardado, escritas } = comArmazenamento(t);
+  assert.deepEqual(formatoDe(null), { pastas: 1, discos: 1, smart: 1, servicos: 1 }, 'sem nada guardado, supõe o menor servidor');
+  lembrarFormato({ ...quatroPastasEm3Discos, host: 'servidor-exemplo' });
+  lembrarFormato(quatroPastasEm3Discos);
+  lembrarFormato(null);
+  assert.deepEqual(escritas, ['dash_formato']);
+  assert.deepEqual(formatoDe(null), { pastas: 4, discos: 3, smart: 3, servicos: 2 });
+  assert.deepEqual(Object.keys(JSON.parse(guardado.get('dash_formato'))), ['pastas', 'discos', 'smart', 'servicos'], 'só números, nenhum nome');
+  assert.doesNotMatch(guardado.get('dash_formato'), /servidor-exemplo/);
+});
+
+test('formato: valor inválido no armazenamento volta ao padrão, sem criar blocos sem fim', (t) => {
+  const padrao = { pastas: 1, discos: 1, smart: 1, servicos: 1 };
+  for (const texto of ['{', 'null', '[]', '{"pastas":4}', '{"pastas":1e9,"discos":1,"smart":1,"servicos":1}', '{"pastas":-1,"discos":1,"smart":1,"servicos":1}', '{"pastas":"4","discos":1,"smart":1,"servicos":1}']) {
+    comArmazenamento(t, texto);
+    assert.deepEqual(formatoDe(null), padrao, texto);
+  }
+});
+
+test('formato: armazenamento bloqueado não derruba a tela', (t) => {
+  const bloqueado = { getItem() { throw new Error('bloqueado'); }, setItem() { throw new Error('bloqueado'); } };
+  Object.defineProperty(globalThis, 'localStorage', { value: bloqueado, configurable: true });
+  t.after(() => delete globalThis.localStorage);
+  assert.deepEqual(formatoDe(null), { pastas: 1, discos: 1, smart: 1, servicos: 1 });
+  assert.doesNotThrow(() => lembrarFormato(quatroPastasEm3Discos));
 });
