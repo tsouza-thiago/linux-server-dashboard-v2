@@ -9,6 +9,19 @@ diante: `PATCH` corrige, `MINOR` acrescenta sem quebrar e `MAJOR` quebra.
 
 ## [Não publicado]
 
+### Corrigido
+
+- Mutação dos guardas: a rodada que travava ao acaso (#148). A causa estava na limpeza dos testes do
+  botão Reconfigurar (`test/integration/reconfigurar.test.js`), não no painel. O `t.after` que apaga
+  a pasta temporária vinha antes do que fecha o painel, e o `node:test` roda os `t.after` nessa ordem.
+  Com a máquina carregada, a sessão do login ainda estava sendo gravada quando a pasta saía: o
+  `fs.rmSync` falhava com `ENOTEMPTY`, e o erro pulava o `close(server)`. O servidor ficava escutando,
+  e o processo do teste não saía. Por isso o `--test-timeout` nunca acusava nenhum teste. Agora a
+  limpeza passa por `aoFim` (`test-support/limpeza.js`). Ele fecha o que foi aberto por último
+  primeiro e roda todos os passos, mesmo quando um falha. O mesmo padrão saiu de `atualizacao.test.js`,
+  `painel-teste.test.js`, `http-router.test.js` e do e2e. `test/unit/limpeza.test.js` tem uma regra
+  que impede a volta do padrão.
+
 ### Mudado
 
 - Mutação dos guardas (#128, ADR 0041): cada teste da rodada tem limite (`--test-timeout`), e o

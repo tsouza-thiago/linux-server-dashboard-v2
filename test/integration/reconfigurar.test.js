@@ -13,6 +13,7 @@ import { bloqueioDaReconfiguracao } from '../../server/atualizacao/procurar.js';
 import { pegarTrava } from '../../server/atualizacao/registro.js';
 import { retirarCodigoPelaTela } from '../../server/setup/pela-tela.js';
 import { listen, close, request } from '../../test-support/request.js';
+import { aoFim } from '../../test-support/limpeza.js';
 
 const TOKEN = 't'.repeat(43);
 const NOVA = { nova: 'v9.9.9', novidades: null, bloqueio: null, erro: null };
@@ -20,7 +21,7 @@ const BEARER = { authorization: `Bearer ${TOKEN}` };
 
 async function painel(t, extra = {}) {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'dash-reconf-'));
-  t.after(() => fs.rmSync(dir, { recursive: true, force: true }));
+  aoFim(t, () => fs.rmSync(dir, { recursive: true, force: true }));
   const chamadas = [];
   const app = createApp({
     historyFile: path.join(dir, 'history.json'), alertsFile: path.join(dir, 'alerts.json'),
@@ -32,7 +33,10 @@ async function painel(t, extra = {}) {
     ...extra,
   });
   const { server, port } = await listen(app.app);
-  t.after(async () => { await app.shutdown(); await close(server); });
+  // `aoFim` roda do último para o 1º (#148): o painel termina de gravar (a sessão do login) e fecha
+  // antes de a pasta sair. Com `t.after`, a pasta saía antes, o rmSync falhava com ENOTEMPTY e o
+  // servidor ficava escutando, prendendo o processo do teste.
+  aoFim(t, async () => { await app.shutdown(); await close(server); });
   return { app, port, dir, chamadas, arquivo: path.join(dir, 'data', 'reconfigurar.json') };
 }
 const pedir = (port, headers = BEARER, body = {}) => request(port, { method: 'POST', path: '/api/reconfigurar/iniciar', headers: { 'Content-Type': 'application/json', ...headers }, body });
@@ -101,7 +105,7 @@ test('bloqueios: sem login, 409, e nada roda nem fica no disco', async (t) => {
 
 test('bloqueios: com uma atualização em andamento, 409', async (t) => {
   const pasta = fs.mkdtempSync(path.join(os.tmpdir(), 'dash-reconf-trava-'));
-  t.after(() => fs.rmSync(pasta, { recursive: true, force: true }));
+  aoFim(t, () => fs.rmSync(pasta, { recursive: true, force: true }));
   const procDir = path.join(pasta, 'proc');
   fs.mkdirSync(path.join(procDir, '700'), { recursive: true });
   fs.writeFileSync(path.join(procDir, '700', 'cmdline'), 'node\0/p/server/cli/index.js\0atualizar\0');
@@ -131,7 +135,7 @@ test('bloqueios: a pasta é conferida a cada pedido e barra antes de criar o có
 
 test('bloqueios: a conferência olha a instalação, a assinatura e não os arquivos alterados', (t) => {
   const pasta = fs.mkdtempSync(path.join(os.tmpdir(), 'dash-reconf-pasta-'));
-  t.after(() => fs.rmSync(pasta, { recursive: true, force: true }));
+  aoFim(t, () => fs.rmSync(pasta, { recursive: true, force: true }));
   const home = path.join(pasta, 'home');
   // `git` falso: repositório num commit sem tag, ou numa tag cuja assinatura confere.
   const git = (tags) => (cmd, args) => {
@@ -178,7 +182,7 @@ test('executor que não sobe ou lança: 503, sem código no disco, e dá para te
 
 test('o código já está no disco quando o executor sobe: o comando lê o arquivo logo de início', async (t) => {
   const pasta = fs.mkdtempSync(path.join(os.tmpdir(), 'dash-reconf-ordem-'));
-  t.after(() => fs.rmSync(pasta, { recursive: true, force: true }));
+  aoFim(t, () => fs.rmSync(pasta, { recursive: true, force: true }));
   let achou = false;
   const { port } = await painel(t, { pastaAtualizacao: pasta, executarReconfiguracao: async () => { achou = fs.existsSync(path.join(pasta, 'data', 'reconfigurar.json')); return { ok: true }; } });
   assert.equal((await pedir(port)).status, 202);
@@ -213,7 +217,7 @@ test('depois de disparar, a atualização espera: ela pararia o assistente', asy
 
 test('comando que recusou deixa o painel no ar: passado 1 min, o botão volta a valer', async (t) => {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'dash-reconf-prazo-'));
-  t.after(() => fs.rmSync(dir, { recursive: true, force: true }));
+  aoFim(t, () => fs.rmSync(dir, { recursive: true, force: true }));
   let agora = 1000;
   const chamadas = [];
   const a = new Atualizacao({

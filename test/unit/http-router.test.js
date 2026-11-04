@@ -8,12 +8,13 @@ import path from 'node:path';
 import { createRouter, jsonBody } from '../../server/http/router.js';
 import { serveStatic, sendFile } from '../../server/http/static.js';
 import { listen, close, request } from '../../test-support/request.js';
+import { aoFim } from '../../test-support/limpeza.js';
 
 async function serve(t, build) {
   const app = createRouter();
   build(app);
   const { server, port } = await listen(app);
-  t.after(() => close(server));
+  aoFim(t, () => close(server));
   return port;
 }
 
@@ -60,12 +61,12 @@ test('erros: exceção síncrona, promessa rejeitada e tratador de erro (4 argum
   const bare = createRouter({ onError: (err, req, res) => res.status(599).json({ e: 1 }) });
   bare.get('/x', () => { throw new Error('y'); });
   const { server, port: p2 } = await listen(bare);
-  t.after(() => close(server));
+  aoFim(t, () => close(server));
   assert.equal((await request(p2, { path: '/x' })).status, 599);
   const plain = createRouter();
   plain.get('/x', () => { throw new Error('y'); });
   const s3 = await listen(plain);
-  t.after(() => close(s3.server));
+  aoFim(t, () => close(s3.server));
   const r3 = await request(s3.port, { path: '/x' });
   assert.equal(r3.status, 500);
   assert.equal(r3.json.error, 'erro interno do servidor');
@@ -133,7 +134,7 @@ test('serveStatic: index, tipos, cache, oculto, traversal, pasta, tipo fora da l
 
 test('estáticos (#44): sem cache cego; ETag e 304 até o arquivo mudar', async (t) => {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), 'lsd-etag-'));
-  t.after(() => fs.rmSync(root, { recursive: true, force: true }));
+  aoFim(t, () => fs.rmSync(root, { recursive: true, force: true }));
   const file = path.join(root, 'app.js');
   fs.writeFileSync(file, 'x=1;'.repeat(400)); // acima de 1 KB: também sai em gzip
   const port = await serve(t, (app) => app.use(serveStatic(root)));

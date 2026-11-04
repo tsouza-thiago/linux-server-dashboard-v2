@@ -9,6 +9,7 @@ import os from 'node:os';
 import path from 'node:path';
 import { createApp } from '../../server/index.js';
 import { listen, close } from '../../test-support/request.js';
+import { aoFim } from '../../test-support/limpeza.js';
 import { APERTADO, pressiona, semHover, sobe } from '../../test-support/hover.js';
 import { atualizacaoFalsa, portaTrocavel, procurarFalso, reconfiguracaoFalsa } from '../../scripts/painel-teste.mjs';
 import { createLoginCode } from '../../server/http/entrar.js';
@@ -85,7 +86,7 @@ async function setup(t, extra = {}) {
   const problems = [];
   page.on('console', (m) => { if (m.type() === 'error' || /Content Security Policy/i.test(m.text())) problems.push(m.text()); });
   page.on('pageerror', (e) => problems.push(e.message));
-  t.after(async () => {
+  aoFim(t, async () => {
     await browser.close();
     extra.limparAssistentes?.();
     await app.shutdown();
@@ -162,7 +163,7 @@ test('e2e: versão nova — aviso, novidades com texto escapado, menu e fechar o
 // muda a coleta avisa antes de atualizar.
 test('e2e: dashboard atualizar — link de uso único abre o diálogo, com o aviso de reconfigurar', { skip: !chromium && 'sem playwright-core' }, async (t) => {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'dash-e2e-link-'));
-  t.after(() => fs.rmSync(dir, { recursive: true, force: true }));
+  aoFim(t, () => fs.rmSync(dir, { recursive: true, force: true }));
   const procurar = async () => { const r = await procurarFalso(); return { ...r, novidades: { ...r.novidades, exigeReconfigurar: true } }; };
   const ctx = await setup(t, { procurarVersao: procurar, sshAccess: 'restrito', dashToken: 'teste', dataDir: dir });
   if (ctx.skip) return t.skip(ctx.skip);
@@ -195,7 +196,7 @@ test('e2e: dashboard atualizar — sem versão nova, o menu fica aberto com a ve
 // Reconfigurar, sem disparar nada. Quem para a coleta é o clique em Reconfigurar agora.
 test('e2e: dashboard reconfigurar — link de uso único abre o diálogo do Reconfigurar, 1 vez', { skip: !chromium && 'sem playwright-core' }, async (t) => {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'dash-e2e-reconf-'));
-  t.after(() => fs.rmSync(dir, { recursive: true, force: true }));
+  aoFim(t, () => fs.rmSync(dir, { recursive: true, force: true }));
   const ctx = await setup(t, { dashToken: 'teste', dataDir: dir });
   if (ctx.skip) return t.skip(ctx.skip);
   const { page, base, problems } = ctx;
@@ -229,7 +230,7 @@ test('e2e: script desatualizado no servidor — a Visão geral mostra o passo a 
 // Etapa 6 da F8 (ADR 0038): com login, o passo do terminal vira o botão, no mesmo fluxo da engrenagem.
 test('e2e: script desatualizado no servidor — com login, a Visão geral traz o botão Reconfigurar agora', { skip: !chromium && 'sem playwright-core' }, async (t) => {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'dash-e2e-hash-'));
-  t.after(() => fs.rmSync(dir, { recursive: true, force: true }));
+  aoFim(t, () => fs.rmSync(dir, { recursive: true, force: true }));
   const ctx = await setup(t, { ...reconfiguracaoFalsa(dir), sshAccess: 'restrito', dashToken: 'e2e-teste' });
   if (ctx.skip) return t.skip(ctx.skip);
   const { app, page, base, problems } = ctx;
@@ -251,7 +252,7 @@ test('e2e: script desatualizado no servidor — com login, a Visão geral traz o
 // o botão segue o mesmo fluxo da engrenagem até o assistente.
 test('e2e: atualizar — versão que exige reconfigurar termina com Reconfigurar agora', { skip: !chromium && 'sem playwright-core' }, async (t) => {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'dash-e2e-troca-reconf-'));
-  t.after(() => fs.rmSync(dir, { recursive: true, force: true }));
+  aoFim(t, () => fs.rmSync(dir, { recursive: true, force: true }));
   const portaUnica = portaTrocavel();
   const procurar = async () => { const r = await procurarFalso(); return { ...r, novidades: { ...r.novidades, exigeReconfigurar: true } }; };
   const ctx = await setup(t, {
@@ -289,7 +290,7 @@ test('e2e: atualizar — versão que exige reconfigurar termina com Reconfigurar
 // O botão Atualizar (ADR 0031): o painel "cai" no meio (a leitura falha) e a tela continua sozinha.
 test('e2e: atualizar — botão, log ao vivo, painel fora do ar e recarga', { skip: !chromium && 'sem playwright-core' }, async (t) => {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'dash-e2e-troca-'));
-  t.after(() => fs.rmSync(dir, { recursive: true, force: true }));
+  aoFim(t, () => fs.rmSync(dir, { recursive: true, force: true }));
   let voltar;
   const pausa = new Promise((r) => { voltar = r; });
   const troca = atualizacaoFalsa(dir, { passoMs: 200, reiniciar: () => pausa });
@@ -325,7 +326,7 @@ test('e2e: atualizar — botão, log ao vivo, painel fora do ar e recarga', { sk
 
 test('e2e: atualizar — voltou atrás mostra o resultado e não recarrega', { skip: !chromium && 'sem playwright-core' }, async (t) => {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'dash-e2e-volta-'));
-  t.after(() => fs.rmSync(dir, { recursive: true, force: true }));
+  aoFim(t, () => fs.rmSync(dir, { recursive: true, force: true }));
   const ctx = await setup(t, { procurarVersao: procurarFalso, ...atualizacaoFalsa(dir, { passoMs: 100, resultado: 'voltou' }), dashToken: 'e2e-teste' });
   if (ctx.skip) return t.skip(ctx.skip);
   const { app, page, base, problems } = ctx;
@@ -346,7 +347,7 @@ test('e2e: atualizar — voltou atrás mostra o resultado e não recarrega', { s
 // clique, a tela espera o assistente e entra sozinha (etapa 5 da F8); cancelar volta ao painel.
 test('e2e: reconfigurar — menu, explicação, espera, entrada no assistente e cancelar', { skip: !chromium && 'sem playwright-core' }, async (t) => {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'dash-e2e-reconf-'));
-  t.after(() => fs.rmSync(dir, { recursive: true, force: true }));
+  aoFim(t, () => fs.rmSync(dir, { recursive: true, force: true }));
   const portaUnica = portaTrocavel();
   const ctx = await setup(t, { ...reconfiguracaoFalsa(dir, { trocar: portaUnica.trocar, passoMs: 1500 }), portaUnica, dashToken: 'e2e-teste' });
   if (ctx.skip) return t.skip(ctx.skip);
@@ -389,7 +390,7 @@ test('e2e: reconfigurar — menu, explicação, espera, entrada no assistente e 
 
 test('e2e: reconfigurar — o comando recusa depois do 202: a tela mostra o motivo e solta o diálogo', { skip: !chromium && 'sem playwright-core' }, async (t) => {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'dash-e2e-reconf-recusa-'));
-  t.after(() => fs.rmSync(dir, { recursive: true, force: true }));
+  aoFim(t, () => fs.rmSync(dir, { recursive: true, force: true }));
   const portaUnica = portaTrocavel();
   const ctx = await setup(t, { ...reconfiguracaoFalsa(dir, { trocar: portaUnica.trocar, resultado: 'recusa', passoMs: 500 }), portaUnica, dashToken: 'e2e-teste' });
   if (ctx.skip) return t.skip(ctx.skip);
@@ -410,7 +411,7 @@ test('e2e: reconfigurar — o comando recusa depois do 202: a tela mostra o moti
 
 test('e2e: reconfigurar — de volta do assistente, a Visão geral diz se a configuração valeu', { skip: !chromium && 'sem playwright-core' }, async (t) => {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'dash-e2e-reconf-volta-'));
-  t.after(() => fs.rmSync(dir, { recursive: true, force: true }));
+  aoFim(t, () => fs.rmSync(dir, { recursive: true, force: true }));
   const ctx = await setup(t, { ...reconfiguracaoFalsa(dir), dashToken: 'e2e-teste' });
   if (ctx.skip) return t.skip(ctx.skip);
   const { page, base, problems } = ctx;
@@ -433,7 +434,7 @@ test('e2e: reconfigurar — de volta do assistente, a Visão geral diz se a conf
 
 test('e2e: reconfigurar — bloqueio depois do clique mostra o motivo e o comando', { skip: !chromium && 'sem playwright-core' }, async (t) => {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'dash-e2e-reconf-bloq-'));
-  t.after(() => fs.rmSync(dir, { recursive: true, force: true }));
+  aoFim(t, () => fs.rmSync(dir, { recursive: true, force: true }));
   const ctx = await setup(t, { ...reconfiguracaoFalsa(dir, { bloqueio: 'sem-assinatura' }), dashToken: 'e2e-teste' });
   if (ctx.skip) return t.skip(ctx.skip);
   const { page, base, problems } = ctx;
@@ -453,7 +454,7 @@ test('e2e: reconfigurar — bloqueio depois do clique mostra o motivo e o comand
 
 test('e2e: reconfigurar — executor que não sobe deixa tentar de novo', { skip: !chromium && 'sem playwright-core' }, async (t) => {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'dash-e2e-reconf-503-'));
-  t.after(() => fs.rmSync(dir, { recursive: true, force: true }));
+  aoFim(t, () => fs.rmSync(dir, { recursive: true, force: true }));
   const ctx = await setup(t, { ...reconfiguracaoFalsa(dir), executarReconfiguracao: async () => ({ ok: false }), dashToken: 'e2e-teste' });
   if (ctx.skip) return t.skip(ctx.skip);
   const { page, base } = ctx;
@@ -469,7 +470,7 @@ test('e2e: reconfigurar — executor que não sobe deixa tentar de novo', { skip
 
 test('e2e: reconfigurar — sem login, o botão nasce desligado e o comando aparece', { skip: !chromium && 'sem playwright-core' }, async (t) => {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'dash-e2e-reconf-livre-'));
-  t.after(() => fs.rmSync(dir, { recursive: true, force: true }));
+  aoFim(t, () => fs.rmSync(dir, { recursive: true, force: true }));
   const ctx = await setup(t, { ...reconfiguracaoFalsa(dir), dashToken: '' });
   if (ctx.skip) return t.skip(ctx.skip);
   const { page, base, problems } = ctx;

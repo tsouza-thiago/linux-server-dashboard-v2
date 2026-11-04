@@ -18,6 +18,9 @@ o conteúdo dele aqui.
   `node --test --test-name-pattern="trecho do nome" test/unit/config.test.js`.
 - Os testes usam só `node:test`. A integração sobe o app com `createApp(deps)` de
   `server/index.js` (dependências injetáveis) e usa os auxiliares de `test-support/`.
+- Teste que sobe servidor limpa com `aoFim` (`test-support/limpeza.js`), não com `t.after` solto: o
+  `node:test` roda os `t.after` na ordem de registro, e um erro pula os seguintes. Apagar a pasta
+  antes de fechar o painel prendia o processo do teste (#148).
 - `test/unit/docs.test.js` também confere links e âncoras deste arquivo.
 - O frontend não tem build: ES modules nativos em `public/js/` servidos como estão
   (`core/` estado, API, SSE, roteador por hash e o template `html`; `views/` as 8 telas;

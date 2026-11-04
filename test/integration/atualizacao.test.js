@@ -11,6 +11,7 @@ import { procurar } from '../../server/atualizacao/procurar.js';
 import { abrirRegistro, cancelarPre, liberarPre, pegarTrava } from '../../server/atualizacao/registro.js';
 import { newestSignedTag } from '../../server/setup/assinatura.js';
 import { listen, close, request, readSSE } from '../../test-support/request.js';
+import { aoFim } from '../../test-support/limpeza.js';
 
 const TOKEN = 't'.repeat(43);
 const hasTools = !spawnSync('git', ['--version']).error && !spawnSync('ssh-keygen', ['-?']).error;
@@ -24,7 +25,7 @@ async function painel(t, extra = {}) {
     collect: async () => ({ ok: false, error: 'sem runner' }), log: () => {}, ...extra,
   });
   const { server, port } = await listen(app.app);
-  t.after(async () => { await app.shutdown(); await close(server); fs.rmSync(dir, { recursive: true, force: true }); });
+  aoFim(t, async () => { await app.shutdown(); await close(server); fs.rmSync(dir, { recursive: true, force: true }); });
   const bearer = { authorization: `Bearer ${TOKEN}` };
   return { app, port, bearer, dir };
 }
@@ -79,7 +80,7 @@ test('o painel de teste e os testes nunca procuram de verdade sem `procurarVersa
 // Origem com as tags, um clone instalado na v2.4.0, e tag nova empurrada pela origem.
 function clone(t) {
   const base = fs.mkdtempSync(path.join(os.tmpdir(), 'dash-atu-git-'));
-  t.after(() => fs.rmSync(base, { recursive: true, force: true }));
+  aoFim(t, () => fs.rmSync(base, { recursive: true, force: true }));
   const origem = path.join(base, 'origem');
   const pasta = path.join(base, 'instalada');
   fs.mkdirSync(origem);
@@ -183,7 +184,7 @@ test('procura: diz o que impediria a troca de versão', { skip: !hasTools }, (t)
   fs.rmSync(path.join(pasta, '.env'));
   assert.equal(procurar(pasta, { home }).bloqueio, 'outra-pasta');
   const semGit = fs.mkdtempSync(path.join(os.tmpdir(), 'dash-sem-git-'));
-  t.after(() => fs.rmSync(semGit, { recursive: true, force: true }));
+  aoFim(t, () => fs.rmSync(semGit, { recursive: true, force: true }));
   assert.equal(procurar(semGit, { home }).bloqueio, 'sem-git');
 });
 
@@ -201,7 +202,7 @@ async function comBotao(t, extra = {}) {
   const chamadas = [];
   const executarAtualizacao = extra.executarAtualizacao ?? (async () => { chamadas.push('executou'); return { ok: true }; });
   const pastaAtualizacao = extra.pastaAtualizacao ?? fs.mkdtempSync(path.join(os.tmpdir(), 'dash-atu-botao-'));
-  t.after(() => fs.rmSync(pastaAtualizacao, { recursive: true, force: true }));
+  aoFim(t, () => fs.rmSync(pastaAtualizacao, { recursive: true, force: true }));
   const p = await painel(t, { procurarVersao: async () => NOVA, modoAtualizacao: 'systemd', ...extra, pastaAtualizacao, executarAtualizacao });
   await p.app.atualizacao.verificar();
   return { ...p, chamadas, pastaAtualizacao };
@@ -246,7 +247,7 @@ test('iniciar: 2 pedidos ao mesmo tempo disparam 1 só', async (t) => {
 
 test('iniciar: com a trava de outra atualização, 409', async (t) => {
   const pastaAtualizacao = fs.mkdtempSync(path.join(os.tmpdir(), 'dash-atu-trava-'));
-  t.after(() => fs.rmSync(pastaAtualizacao, { recursive: true, force: true }));
+  aoFim(t, () => fs.rmSync(pastaAtualizacao, { recursive: true, force: true }));
   const procDir = path.join(pastaAtualizacao, 'proc');
   fs.mkdirSync(path.join(procDir, '700'), { recursive: true });
   fs.writeFileSync(path.join(procDir, '700', 'cmdline'), 'node\0/p/server/cli/index.js\0atualizar\0');

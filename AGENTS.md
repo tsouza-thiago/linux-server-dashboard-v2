@@ -706,7 +706,8 @@ linux-server-dashboard-v2/
 └── test-support/           request.js (HTTP/SSE), sshd.js (sshd real), instalacao-fake.js,
                             rotas.js (rotas lidas do código), fonte.js (código sem comentários),
                             hover.js (resposta ao mouse no navegador), instalacao-real.js
-                            (o comando real em pasta temporária, com tags assinadas)
+                            (o comando real em pasta temporária, com tags assinadas),
+                            limpeza.js (aoFim: limpeza do fim do teste, do último para o 1º, #148)
 ```
 
 ## Solução de problemas (para quem desenvolve)
