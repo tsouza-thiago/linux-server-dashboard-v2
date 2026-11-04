@@ -379,7 +379,8 @@ Os detalhes estão no AGENTS ("Verificação em camadas") e na ADR 0014.
 2. **`npm run seguranca`**: Semgrep (regras OWASP), Gitleaks, ShellCheck, OSV-Scanner,
    OWASP ZAP e a **mutação dos guardas**, que quebra cada proteção de propósito e exige que
    um teste acuse.
-3. **CI no GitHub** a cada push no `main` e a cada PR, com as duas etapas acima e o e2e.
+3. **CI no GitHub** a cada push no `main` e a cada PR, com as duas etapas acima e o e2e,
+   em jobs paralelos e com limite de tempo em cada etapa (ADR 0040).
 4. **CodeQL** do GitHub (suíte *extended*). Cada alerta é corrigido ou descartado como
    falso positivo, com a análise em `docs/seguranca/`.
 
@@ -393,6 +394,8 @@ Análises publicadas:
   travado por teste).
 - [Linha de base da 2.0.1](docs/seguranca/2026-10-16-linha-de-base.md): resultado de todas
   as ferramentas na `v2.0.0`, correções feitas e o que o repositório público revela.
+- [Auditoria do CI de 04/11/2026](docs/seguranca/2026-11-04-auditoria-ci.md): tempo de cada
+  verificação e o que cada uma pega que as outras não pegam; nenhuma camada saiu.
 - Achados aceitos depois de análise: `docs/seguranca/excecoes.json`.
 
 ---

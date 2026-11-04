@@ -19,6 +19,10 @@
 // CI). Sem Docker, as etapas que dependem dele avisam e pulam; no CI (CI=true) a falta de
 // Docker é erro. Achado aceito só com análise em docs/seguranca/excecoes.json.
 //
+// Tempo (#128): a mutação (só CPU, sem Docker) corre ao lado das etapas Docker, que seguem
+// uma por vez. Cada etapa tem um limite próprio (`limite`, em segundos, ~4× o medido no CI):
+// a que passa dele é derrubada e reprova com o nome, em vez de prender o job até o teto.
+//
 // Uso: npm run seguranca [-- --so=semgrep,zap] [-- --pular=zap]
 // Relatórios brutos: .seguranca/ (fora do git, só o dono lê).
 import { spawn, spawnSync } from 'node:child_process';
@@ -58,6 +62,42 @@ function rodar(cmd, args, opts = {}) {
   return spawnSync(cmd, args, { cwd: ROOT, encoding: 'utf8', maxBuffer: 256 * 1024 * 1024, ...opts });
 }
 
+/**
+ * Roda um comando sem shell e sem travar o laço de eventos (a mutação corre ao mesmo tempo).
+ * Passado `limiteS`, o comando é derrubado e o resultado vem com `estourou`. Um `docker run`
+ * ganha um nome próprio, para o limite parar o contêiner, e não só o cliente do Docker.
+ */
+let conteineres = 0;
+function executar(cmd, args, { limiteS, env } = {}) {
+  let nome = null;
+  if (cmd === 'docker' && args[0] === 'run') {
+    conteineres += 1;
+    nome = `dash-seguranca-${process.pid}-${conteineres}`;
+    args = ['run', '--name', nome, ...args.slice(1)];
+  }
+  return new Promise((resolve) => {
+    const p = spawn(cmd, args, { cwd: ROOT, env: env || process.env, stdio: ['ignore', 'pipe', 'pipe'] });
+    let stdout = '';
+    let stderr = '';
+    let estourou = false;
+    p.stdout.on('data', (c) => { stdout += c; });
+    p.stderr.on('data', (c) => { stderr += c; });
+    const teto = limiteS && setTimeout(() => {
+      estourou = true;
+      if (nome) spawnSync('docker', ['rm', '-f', nome], { stdio: 'ignore' });
+      // SIGTERM fora do Docker: a mutação o trata e derruba as rodadas dela antes de sair.
+      p.kill(nome ? 'SIGKILL' : 'SIGTERM');
+    }, limiteS * 1000);
+    p.on('close', (status) => {
+      clearTimeout(teto);
+      resolve({ status, stdout, stderr, estourou });
+    });
+  });
+}
+
+/** Resultado de uma etapa derrubada pelo limite. */
+const estourou = (limiteS) => ({ ok: false, detalhe: `passou do limite de ${limiteS} s e foi derrubada`, novos: [] });
+
 const temDocker = () => rodar('docker', ['version', '--format', '{{.Server.Version}}']).status === 0;
 
 /** Grava um relatório bruto em .seguranca/ (pasta 0700, arquivo 0600). */
@@ -92,11 +132,12 @@ const resumo = (a) => `${a.regra} em ${a.arquivo || '?'}${a.linha ? `:${a.linha}
 // ---------------------------------------------------------------- etapas
 
 /** Semgrep: análise estática com as regras OWASP. Reprova ERROR e WARNING novos. */
-function semgrep() {
+async function semgrep({ limite }) {
   const args = ['run', '--rm', '-v', `${ROOT}:/src:ro`, '-w', '/src', IMG.semgrep, 'semgrep', 'scan',
     '--metrics=off', '--json', '-q', '--exclude', 'node_modules', '--exclude', 'public/vendor',
     '--exclude', '.seguranca', ...SEMGREP_REGRAS.flatMap((r) => ['--config', r])];
-  const r = rodar('docker', args);
+  const r = await executar('docker', args, { limiteS: limite });
+  if (r.estourou) return estourou(limite);
   guardar('semgrep.json', r.stdout || r.stderr);
   let dados;
   try { dados = JSON.parse(r.stdout); } catch { return { ok: false, detalhe: `saída inválida: ${(r.stderr || '').trim().split('\n').pop()}` }; }
@@ -121,7 +162,7 @@ const foraDoRepositorio = (arquivo) => arquivo.startsWith('.runtime/');
  * Gitleaks: segredos nos arquivos e em todo o histórico. O worktree e o .git comum são
  * montados nos mesmos caminhos absolutos para o `git log` funcionar dentro do contêiner.
  */
-function segredos() {
+async function segredos({ limite }) {
   const gitDir = path.resolve(ROOT, rodar('git', ['rev-parse', '--git-common-dir']).stdout.trim());
   const montagens = ['-v', `${ROOT}:${ROOT}:ro`];
   if (!gitDir.startsWith(`${ROOT}/`)) montagens.push('-v', `${gitDir}:${gitDir}:ro`);
@@ -137,8 +178,12 @@ function segredos() {
   const achados = [];
   let commits = 0;
   for (const [modo, extra] of [['git', ['--log-opts=--all']], ['dir', []]]) {
-    const r = rodar('docker', ['run', '--rm', ...montagens, ...seguro, IMG.segredos, modo, ROOT, '--no-banner',
-      '--redact', '--exit-code', '0', '--report-format', 'json', '--report-path', `/relatorio/${modo}.json`, ...extra]);
+    const r = await executar('docker', ['run', '--rm', ...montagens, ...seguro, IMG.segredos, modo, ROOT, '--no-banner',
+      '--redact', '--exit-code', '0', '--report-format', 'json', '--report-path', `/relatorio/${modo}.json`, ...extra], { limiteS: limite });
+    if (r.estourou) {
+      fs.rmSync(base, { recursive: true, force: true });
+      return estourou(limite);
+    }
     let lista;
     try {
       const bruto = fs.readFileSync(path.join(rel, `${modo}.json`), 'utf8');
@@ -167,9 +212,10 @@ function segredos() {
 }
 
 /** ShellCheck nos scripts shell (avisos e erros reprovam). */
-function shell() {
-  const r = rodar('docker', ['run', '--rm', '-v', `${ROOT}:/mnt:ro`, '-w', '/mnt', IMG.shell,
-    'shellcheck', '-f', 'json1', '-S', 'warning', ...SHELL_SCRIPTS]);
+async function shell({ limite }) {
+  const r = await executar('docker', ['run', '--rm', '-v', `${ROOT}:/mnt:ro`, '-w', '/mnt', IMG.shell,
+    'shellcheck', '-f', 'json1', '-S', 'warning', ...SHELL_SCRIPTS], { limiteS: limite });
+  if (r.estourou) return estourou(limite);
   guardar('shellcheck.json', r.stdout || r.stderr);
   let dados;
   try { dados = JSON.parse(r.stdout); } catch { return { ok: false, detalhe: `saída inválida: ${(r.stderr || '').trim()}` }; }
@@ -179,9 +225,10 @@ function shell() {
 }
 
 /** OSV-Scanner: vulnerabilidades publicadas para as versões travadas no package-lock.json. */
-function osv() {
-  const r = rodar('docker', ['run', '--rm', '-v', `${ROOT}:/src:ro`, IMG.osv, 'scan', 'source',
-    '--lockfile', '/src/package-lock.json', '--format', 'json']);
+async function osv({ limite }) {
+  const r = await executar('docker', ['run', '--rm', '-v', `${ROOT}:/src:ro`, IMG.osv, 'scan', 'source',
+    '--lockfile', '/src/package-lock.json', '--format', 'json'], { limiteS: limite });
+  if (r.estourou) return estourou(limite);
   guardar('osv.json', r.stdout || r.stderr);
   let dados;
   try { dados = JSON.parse(r.stdout); } catch { return { ok: false, detalhe: `saída inválida: ${(r.stderr || '').trim().split('\n').pop()}` }; }
@@ -227,7 +274,7 @@ async function openapi(base) {
  * Bearer) e escuta só em 127.0.0.1 (`--network host`, porque o Host check recusa outro
  * nome). Varredura passiva + ativa, com teto de tempo. Reprova risco médio ou alto novo.
  */
-async function zap() {
+async function zap({ limite }) {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'dash-zap-'));
   const token = crypto.randomBytes(24).toString('hex');
   let reconfiguracoes = 0;
@@ -262,28 +309,24 @@ async function zap() {
   // O ZAP entra com `Authorization: Bearer <token>` em todo pedido (variáveis de ambiente dos
   // scans empacotados; o `-z` quebraria o valor no espaço). O token vai pelo ambiente do
   // `docker run`, não pela linha de comando do processo.
-  // Teto de 20 min: se o ZAP travar, o contêiner (com nome próprio) é parado e a etapa
-  // reprova "sem relatório", em vez de o `npm run seguranca` esperar para sempre.
-  const nome = `dash-zap-${process.pid}-${Date.now()}`;
-  const teto = setTimeout(() => spawnSync('docker', ['stop', nome], { stdio: 'ignore' }), 20 * 60 * 1000);
-  const r = await new Promise((resolve) => {
-    const p = spawn('docker', ['run', '--rm', '--name', nome, '--network', 'host', '-v', `${wrk}:/zap/wrk:rw`,
+  // Limite da etapa: se o ZAP travar, o contêiner (com nome próprio) é derrubado e a etapa
+  // reprova com o limite, em vez de o `npm run seguranca` esperar para sempre. A varredura
+  // ativa tem o próprio teto, abaixo do limite, para terminar com relatório se demorar.
+  const r = await executar('docker', ['run', '--rm', '--network', 'host', '-v', `${wrk}:/zap/wrk:rw`,
       '-e', 'ZAP_AUTH_HEADER=Authorization', '-e', 'ZAP_AUTH_HEADER_VALUE', '-e', 'ZAP_AUTH_HEADER_SITE=127.0.0.1',
       IMG.zap, 'zap-api-scan.py', '-t', '/zap/wrk/openapi.json', '-f', 'openapi', '-J', 'zap.json',
       // Com --network host, o ZAP escutaria em todas as interfaces e com a API sem chave (padrão
       // dos scans empacotados): `-host 127.0.0.1` prende proxy e API no loopback durante a
       // varredura. (A lista api.addrs fica como o scan a quer: o script fala com a API pelo
       // nome "zap".)
-      '-z', '-host 127.0.0.1 -config ascan.maxScanDurationInMins=10'],
-    { cwd: ROOT, env: { ...process.env, ZAP_AUTH_HEADER_VALUE: `Bearer ${token}` } });
-    let err = '';
-    p.stdout.on('data', () => {});
-    p.stderr.on('data', (c) => { err += c; });
-    p.on('close', (status) => resolve({ status, err }));
-  });
-  clearTimeout(teto);
+      '-z', '-host 127.0.0.1 -config ascan.maxScanDurationInMins=3'],
+  { limiteS: limite, env: { ...process.env, ZAP_AUTH_HEADER_VALUE: `Bearer ${token}` } });
   await app.shutdown();
   await new Promise((resolve) => server.close(resolve));
+  if (r.estourou) {
+    fs.rmSync(dir, { recursive: true, force: true });
+    return estourou(limite);
+  }
   let dados;
   try {
     const bruto = fs.readFileSync(path.join(wrk, 'zap.json'), 'utf8');
@@ -291,7 +334,7 @@ async function zap() {
     dados = JSON.parse(bruto);
   } catch {
     fs.rmSync(dir, { recursive: true, force: true });
-    return { ok: false, detalhe: `sem relatório (saída ${r.status}): ${r.err.trim().split('\n').pop() || '?'}` };
+    return { ok: false, detalhe: `sem relatório (saída ${r.status}): ${r.stderr.trim().split('\n').pop() || '?'}` };
   }
   fs.rmSync(dir, { recursive: true, force: true });
   const alertas = (dados.site || []).flatMap((s) => s.alerts || []);
@@ -313,9 +356,13 @@ async function zap() {
   };
 }
 
-/** Teste de mutação dos guardas de segurança (sem Docker). */
-function mutacao() {
-  const r = rodar(process.execPath, [path.join(ROOT, 'scripts', 'mutacao-seguranca.mjs')], { stdio: ['ignore', 'pipe', 'pipe'] });
+/**
+ * Teste de mutação dos guardas de segurança (sem Docker). Cada rodada dela tem o próprio
+ * limite (scripts/mutacao-seguranca.mjs); o limite daqui é o da etapa inteira.
+ */
+async function mutacao({ limite }) {
+  const r = await executar(process.execPath, [path.join(ROOT, 'scripts', 'mutacao-seguranca.mjs')], { limiteS: limite });
+  if (r.estourou) return estourou(limite);
   guardar('mutacao.txt', `${r.stdout}${r.stderr}`);
   const ultima = `${r.stdout}`.trim().split('\n').pop() || '';
   return { ok: r.status === 0, detalhe: ultima, novos: [] };
@@ -323,13 +370,16 @@ function mutacao() {
 
 // ---------------------------------------------------------------- execução
 
+// `limite`: segundos até a etapa ser derrubada. Medido no CI em 04/11/2026 (run #229): Semgrep
+// 20 s, Gitleaks 5 s, ShellCheck 1 s, OSV 7 s, ZAP 56 s e mutação 137 s (antes do paralelo).
+// O Semgrep e o OSV baixam regras e a base de vulnerabilidades a cada vez: folga maior.
 const ETAPAS = [
-  { nome: 'semgrep', titulo: 'análise estática OWASP (Semgrep)', docker: true, fn: semgrep },
-  { nome: 'segredos', titulo: 'segredos no código e no histórico (Gitleaks)', docker: true, fn: segredos },
-  { nome: 'shell', titulo: 'scripts shell (ShellCheck)', docker: true, fn: shell },
-  { nome: 'osv', titulo: 'vulnerabilidades conhecidas nas dependências (OSV-Scanner)', docker: true, fn: osv },
-  { nome: 'zap', titulo: 'ataque dinâmico à API (OWASP ZAP)', docker: true, fn: zap },
-  { nome: 'mutacao', titulo: 'mutação dos guardas de segurança', docker: false, fn: mutacao },
+  { nome: 'semgrep', titulo: 'análise estática OWASP (Semgrep)', docker: true, limite: 180, fn: semgrep },
+  { nome: 'segredos', titulo: 'segredos no código e no histórico (Gitleaks)', docker: true, limite: 120, fn: segredos },
+  { nome: 'shell', titulo: 'scripts shell (ShellCheck)', docker: true, limite: 60, fn: shell },
+  { nome: 'osv', titulo: 'vulnerabilidades conhecidas nas dependências (OSV-Scanner)', docker: true, limite: 120, fn: osv },
+  { nome: 'zap', titulo: 'ataque dinâmico à API (OWASP ZAP)', docker: true, limite: 300, fn: zap },
+  { nome: 'mutacao', titulo: 'mutação dos guardas de segurança', docker: false, limite: 480, fn: mutacao },
 ];
 
 async function main() {
@@ -342,20 +392,26 @@ async function main() {
   }
   const docker = temDocker();
   const noCI = process.env.CI === 'true';
-  let falhou = false;
-  for (const etapa of ETAPAS) {
-    if ((so.length && !so.includes(etapa.nome)) || pular.includes(etapa.nome)) continue;
+  const escolhidas = ETAPAS.filter((e) => !(so.length && !so.includes(e.nome)) && !pular.includes(e.nome));
+  const resultados = new Map();
+  /** Roda uma etapa, imprime a linha dela assim que termina e guarda o resultado. */
+  const rodarEtapa = async (etapa) => {
     if (etapa.docker && !docker) {
+      resultados.set(etapa.nome, { ok: !noCI });
       console.log(`${noCI ? '✗' : '▲'} ${etapa.titulo} — sem Docker${noCI ? ' (obrigatório no CI)' : ': pulada'}`);
-      if (noCI) falhou = true;
-      continue;
+      return;
     }
     const inicio = Date.now();
-    const { ok, detalhe, novos = [] } = await etapa.fn();
+    const { ok, detalhe, novos = [] } = await etapa.fn({ limite: etapa.limite });
+    resultados.set(etapa.nome, { ok });
     console.log(`${ok ? '✓' : '✗'} ${etapa.titulo} — ${detalhe} (${Math.round((Date.now() - inicio) / 1000)} s)`);
     for (const a of novos.slice(0, 20)) console.log(`    · ${resumo(a)}`);
-    if (!ok) falhou = true;
-  }
+  };
+  // 2 filas ao mesmo tempo: as etapas Docker, uma por vez (disputam o mesmo daemon e a rede),
+  // e a mutação, que só usa CPU. O tempo total fica perto da mais longa das 2, não da soma.
+  const fila = async (lista) => { for (const e of lista) await rodarEtapa(e); };
+  await Promise.all([fila(escolhidas.filter((e) => e.docker)), fila(escolhidas.filter((e) => !e.docker))]);
+  const falhou = [...resultados.values()].some((r) => !r.ok);
   console.log(falhou ? '\nSEGURANÇA REPROVADA — veja .seguranca/ e não faça commit.' : '\nSEGURANÇA OK');
   process.exit(falhou ? 1 : 0);
 }
