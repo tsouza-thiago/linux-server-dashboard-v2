@@ -17,18 +17,23 @@ sai sem análise, e toda mudança de decisão vira ADR (aqui, a [ADR 0040](../ad
 ## Tempos
 
 Medidos no CI do GitHub (`ubuntu-24.04`, 4 núcleos). "Antes" é o run #229 do `verificação`
-(04/11/2026, push do merge do PR #146, job 126684509124). "Depois" é o run do PR da #128.
+(04/11/2026, push do merge do PR #146, job 126684509124), com 1 job. "Depois" é o run 41890439275, do
+PR #147, com os 4 jobs ao mesmo tempo.
 
-| Etapa | Antes | Depois |
+| Etapa | Antes (1 job) | Depois (4 jobs ao mesmo tempo) |
 |---|---|---|
-| Preparo (código, Node 24, `npm ci`) | 8 s | DEPOIS_PREPARO por job |
-| `npm run check` | 32 s | DEPOIS_CHECK (job `check`: DEPOIS_JOB_CHECK) |
-| Chromium | 9 s | DEPOIS_CHROMIUM |
-| `npm run test:e2e` | 1 min 50 s | DEPOIS_E2E (job `e2e`: DEPOIS_JOB_E2E) |
-| `npm run seguranca` | 3 min 47 s | DEPOIS_SEGURANCA (job `seguranca`: DEPOIS_JOB_SEGURANCA) |
-| Dentro dela: Semgrep · Gitleaks · ShellCheck · OSV · ZAP | 20 · 5 · 1 · 7 · 56 s | DEPOIS_DOCKER |
-| Dentro dela: mutação, 77 mutações | 137 s, uma por vez | DEPOIS_MUTACAO |
-| **Workflow `verificação`** | **6 min 28 s** | **DEPOIS_TOTAL** |
+| Preparo (código, Node 24, `npm ci`) | 8 s, 1 vez | 7 a 8 s em cada job |
+| `npm run check` | 32 s | 35 s (job `check`: 45 s) |
+| Chromium | 9 s | 8 s |
+| `npm run test:e2e` | 1 min 50 s | 1 min 45 s (job `e2e`: 2 min 4 s) |
+| `npm run seguranca` sem a mutação | 1 min 30 s, dentro do comando | 1 min 26 s (job `seguranca`: 1 min 36 s) |
+| Dentro dela: Semgrep · Gitleaks · ShellCheck · OSV · ZAP | 20 · 5 · 1 · 7 · 56 s | 22 · 3 · 1 · 7 · 52 s |
+| Mutação, 77 mutações | 137 s, uma por vez | 85 s, 4 em paralelo (job `mutacao`: 1 min 38 s) |
+| Job `verificacao` (junta os 4) | — | 2 s |
+| **Workflow `verificação`** | **6 min 28 s** | **2 min 13 s** |
+
+O caminho crítico agora é o job `e2e`: os jobs `seguranca` e `mutacao` terminam cerca de 25 s antes
+dele.
 
 Os outros fluxos rodam ao mesmo tempo que o `verificação` e não aumentam a espera:
 
@@ -39,8 +44,10 @@ Os outros fluxos rodam ao mesmo tempo que o `verificação` e não aumentam a es
 | Scorecard (`scorecard.yml`) | push no `main` e toda segunda | 33 s |
 | Dependabot | toda segunda, abre PR | sem tempo de CI próprio; o PR dele roda o CI normal |
 
-**Soma por PR** (o que a pessoa espera): o mais lento dos fluxos, o `verificação`. Antes, 6 min 28 s;
-depois, DEPOIS_TOTAL. **Por push no `main`:** o mesmo, mais o Scorecard ao lado.
+**Por PR** (o que a pessoa espera): o mais lento dos fluxos, o `verificação`. Antes, 6 min 28 s;
+depois, 2 min 13 s (−66%). **Por push no `main`:** o mesmo, com o Scorecard e o CodeQL ao lado. Em
+minutos de máquina somados, o `verificação` foi de 6 min 28 s para cerca de 6 min 5 s (os 4 jobs mais
+o que junta): o preparo repetido custa menos que o tempo que a mutação ganhou.
 
 Medição local (8 núcleos presos a 4 com `taskset -c 0-3`, para imitar o CI): a mutação sequencial
 levou 177 s; com 2 rodadas, 115 s; com 4, 100 s. Mais de 4 não ajuda: cada `node --test` já roda os
