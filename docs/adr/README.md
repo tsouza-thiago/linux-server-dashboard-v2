@@ -45,3 +45,4 @@ Uma ADR aceita não é editada; se a decisão mudar, uma nova ADR a substitui.
 | [0038](0038-reconfigurar-agora-no-fim-da-atualizacao.md) | Reconfigurar pela tela: o botão no fim da atualização e na Visão geral | Aceita |
 | [0039](0039-dashboard-reconfigurar-abre-o-painel.md) | Reconfigurar pela tela: o `dashboard reconfigurar` abre o painel | Aceita |
 | [0040](0040-ci-em-jobs-paralelos-com-limite-de-tempo.md) | CI em jobs paralelos, com limite de tempo em cada etapa | Aceita |
+| [0041](0041-mutacao-repete-a-rodada-presa.md) | Mutação: a rodada presa repete 1 vez e diz qual teste prendeu | Aceita |

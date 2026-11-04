@@ -158,16 +158,19 @@ const LIMITE_S = Math.max(5, Number(process.env.MUTACAO_LIMITE_S) || 60);
 // Grupos de processo das rodadas em andamento: um Ctrl+C ou o limite derruba a rodada inteira
 // (o `node --test` e os filhos dele), sem deixar teste órfão rodando na cópia apagada.
 const ativos = new Set();
-for (const sinal of ['SIGINT', 'SIGTERM']) {
-  process.on(sinal, () => {
-    for (const pid of ativos) try { process.kill(-pid, 'SIGKILL'); } catch { /* já saiu */ }
-    process.exit(130);
-  });
+
+/**
+ * Testes que o `--test-timeout` derrubou, lidos do reporter spec: "✖ nome (Nms)" seguido de
+ * "test timed out after". É o que diz QUAL teste prendeu a rodada.
+ */
+export function testesPresos(saida) {
+  return [...new Set([...String(saida).matchAll(/✖ (.+?) \([\d.]+ms\)\n\s*'test timed out after/g)].map((m) => m[1]))];
 }
 
 /**
  * Roda a rede de segurança (mais `extras`) na cópia `dir`, com o limite `limiteS`. Devolve o
- * resultado do node --test; `estourou` diz que a rodada passou do limite e foi derrubada.
+ * resultado do node --test; `estourou` diz que a rodada passou do limite e foi derrubada, e
+ * `presos`, os testes que passaram do limite de cada teste.
  */
 function rodarTestes(dir, extras = [], pular = [], limiteS = LIMITE_S) {
   // Sem NODE_TEST_CONTEXT: se este script rodar dentro de um `node --test`, o filho não
@@ -177,7 +180,10 @@ function rodarTestes(dir, extras = [], pular = [], limiteS = LIMITE_S) {
   const inicio = Date.now();
   return new Promise((resolve) => {
     // detached: a rodada vira um grupo de processos próprio, para o limite derrubar todos.
-    const p = spawn(process.execPath, ['--test', '--test-reporter=spec', ...pular, ...SEG, ...extras],
+    // Cada teste tem limite um pouco menor que o da rodada: o que prende a rodada falha antes,
+    // com o nome no relatório, e o limite da rodada sobra para o que segura o processo depois.
+    const porTeste = `--test-timeout=${Math.max(1, limiteS - 10) * 1000}`;
+    const p = spawn(process.execPath, ['--test', '--test-reporter=spec', porTeste, ...pular, ...SEG, ...extras],
       { cwd: dir, env, detached: true, stdio: ['ignore', 'pipe', 'pipe'] });
     ativos.add(p.pid);
     let saida = '';
@@ -192,9 +198,15 @@ function rodarTestes(dir, extras = [], pular = [], limiteS = LIMITE_S) {
       clearTimeout(teto);
       ativos.delete(p.pid);
       const conta = (rotulo) => Number((saida.match(new RegExp(`ℹ ${rotulo} (\\d+)`)) || [])[1] || 0);
-      resolve({ status, estourou, testes: conta('tests'), falhas: conta('fail'), segundos: ((Date.now() - inicio) / 1000).toFixed(1), saida });
+      resolve({ status, estourou, presos: testesPresos(saida), testes: conta('tests'), falhas: conta('fail'), segundos: ((Date.now() - inicio) / 1000).toFixed(1), saida });
     });
   });
+}
+
+/** Nome do último teste que terminou na saída do reporter spec (pista de onde a rodada parou). */
+function ultimoTeste(saida) {
+  const linhas = String(saida).split('\n').filter((l) => /^\s*[✔✖] /.test(l));
+  return linhas.length ? linhas[linhas.length - 1].trim().slice(0, 160) : 'nenhum';
 }
 
 /** Quantas vezes o trecho `de` da mutação aparece no arquivo dela, na cópia `dir`. */
@@ -245,16 +257,30 @@ async function main() {
     const fila = MUTACOES.filter((m) => ocorrencias(dirs[0], m) === 1);
     const total = fila.length;
     let feitas = 0;
+    const instaveis = [];
     const trabalhador = async (dir) => {
       for (let m = fila.shift(); m; m = fila.shift()) {
-        const r = await medir(dir, m);
+        let r = await medir(dir, m);
+        // Rodada presa: repete 1 vez, já com as outras rodadas correndo menos. Um teste que
+        // espera um temporizador real (PR #127) prende de novo e reprova. Um travamento raro
+        // (#128: 1 rodada em cerca de 10 execuções da mutação, sem repetir isolada) passa na
+        // 2ª vez e fica registrado com o nome do teste, para virar issue.
+        const presa = (x) => x.estourou || x.presos.length > 0;
+        const quais = (x) => (x.presos.length ? `preso em: ${x.presos.join('; ')}` : `último teste terminado: ${ultimoTeste(x.saida)}`);
+        if (presa(r)) {
+          const antes = quais(r);
+          r = await medir(dir, m);
+          if (!presa(r)) instaveis.push(`${m.nome} (1ª vez ${antes})`);
+        }
         feitas += 1;
         const n = `[${String(feitas).padStart(String(total).length)}/${total}]`;
         // Só conta como acusada se um teste FALHOU de verdade (asserção), não se o processo
         // caiu por outro motivo. Rodada que passou do limite não conta: ela reprova à parte.
-        if (r.estourou) {
-          presas.push(m);
-          console.log(`  ✗ ${n} ${m.nome} — passou do limite de ${LIMITE_S} s: algum teste espera um temporizador real?`);
+        // Teste derrubado pelo --test-timeout também é rodada presa, e não "acusada": o teste
+        // falhou por tempo, não por uma asserção.
+        if (presa(r)) {
+          presas.push({ ...m, presos: r.presos });
+          console.log(`  ✗ ${n} ${m.nome} — passou do limite de ${LIMITE_S} s 2 vezes (${quais(r)})`);
         } else if (r.falhas > 0) {
           mortas += 1;
           console.log(`  ✓ ${n} ${m.nome} — acusada por ${r.falhas} teste(s) (${r.segundos} s)`);
@@ -266,17 +292,28 @@ async function main() {
     };
     await Promise.all(dirs.map(trabalhador));
     for (const d of desatualizadas) console.log(`    · desatualizada: ${d}`);
+    for (const i of instaveis) console.log(`  ▲ travou 1 vez e passou na repetição: ${i}`);
     for (const m of presas) {
-      console.log(`    · passou do limite: ${m.nome} (${m.arquivo}). Para ver qual teste espera, aplique a mutação e rode`
-        + ` node --test ${[...SEG, ...(m.testes || [])].join(' ')}`);
+      console.log(`    · passou do limite: ${m.nome} (${m.arquivo})${m.presos.length ? `, no teste "${m.presos.join('", "')}"` : ''}.`
+        + ` Para reproduzir, aplique a mutação e rode node --test ${[...SEG, ...(m.testes || [])].join(' ')}`);
     }
     const ok = sobreviventes.length === 0 && desatualizadas.length === 0 && presas.length === 0;
     const segundos = Math.round((Date.now() - inicio) / 1000);
-    console.log(`${mortas}/${MUTACOES.length} mutações acusadas pelos testes${ok ? '' : ` · ${sobreviventes.length} sobreviveram · ${desatualizadas.length} desatualizadas · ${presas.length} passaram do limite`} · ${PARALELO} em paralelo, ${segundos} s`);
+    console.log(`${mortas}/${MUTACOES.length} mutações acusadas pelos testes${ok ? '' : ` · ${sobreviventes.length} sobreviveram · ${desatualizadas.length} desatualizadas · ${presas.length} passaram do limite`}${instaveis.length ? ` · ${instaveis.length} repetida(s) depois de travar` : ''} · ${PARALELO} em paralelo, ${segundos} s`);
     process.exitCode = ok ? 0 : 1;
   } finally {
     for (const d of dirs) fs.rmSync(d, { recursive: true, force: true });
   }
 }
 
-main();
+// Só roda chamado pela linha de comando: test/unit/mutacao-seguranca.test.js importa
+// testesPresos sem disparar a mutação nem os tratadores de sinal.
+if (process.argv[1] && fileURLToPath(import.meta.url) === path.resolve(process.argv[1])) {
+  for (const sinal of ['SIGINT', 'SIGTERM']) {
+    process.on(sinal, () => {
+      for (const pid of ativos) try { process.kill(-pid, 'SIGKILL'); } catch { /* já saiu */ }
+      process.exit(130);
+    });
+  }
+  main();
+}

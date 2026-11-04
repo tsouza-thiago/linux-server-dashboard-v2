@@ -127,7 +127,7 @@ function triar(achados) {
   return { novos, aceitos: achados.length - novos.length };
 }
 
-const resumo = (a) => `${a.regra} em ${a.arquivo || '?'}${a.linha ? `:${a.linha}` : ''}`;
+const resumo = (a) => a.texto ?? `${a.regra} em ${a.arquivo || '?'}${a.linha ? `:${a.linha}` : ''}`;
 
 // ---------------------------------------------------------------- etapas
 
@@ -364,8 +364,11 @@ async function mutacao({ limite }) {
   const r = await executar(process.execPath, [path.join(ROOT, 'scripts', 'mutacao-seguranca.mjs')], { limiteS: limite });
   if (r.estourou) return estourou(limite);
   guardar('mutacao.txt', `${r.stdout}${r.stderr}`);
-  const ultima = `${r.stdout}`.trim().split('\n').pop() || '';
-  return { ok: r.status === 0, detalhe: ultima, novos: [] };
+  const linhas = `${r.stdout}`.trim().split('\n');
+  // As linhas de falha (sobreviveu, desatualizada, passou do limite, travou 1 vez) vão para
+  // o log, e não só para .seguranca/mutacao.txt: no CI, o arquivo some com a máquina (#128).
+  const falhas = linhas.filter((l) => /^\s+(✗|\?|·|▲) /.test(l)).map((l) => ({ texto: l.trim() }));
+  return { ok: r.status === 0, detalhe: linhas.pop() || '', novos: falhas };
 }
 
 // ---------------------------------------------------------------- execução

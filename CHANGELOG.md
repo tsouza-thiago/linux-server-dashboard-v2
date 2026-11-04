@@ -11,6 +11,10 @@ diante: `PATCH` corrige, `MINOR` acrescenta sem quebrar e `MAJOR` quebra.
 
 ### Mudado
 
+- Mutação dos guardas (#128, ADR 0041): cada teste da rodada tem limite (`--test-timeout`), e o
+  nome do teste que prendeu a rodada aparece no log do CI. A rodada presa repete 1 vez: se prender de
+  novo, reprova; se passar, a linha `▲ travou 1 vez` traz o nome do teste. No 1º push no `main` com os
+  jobs paralelos, 1 rodada travou ao acaso e deixou o CI vermelho sem dizer qual.
 - CI mais rápido (#128, ADR 0040): o workflow `verificação` roda `npm run check`, `npm run test:e2e` e
   `npm run seguranca` em 4 jobs ao mesmo tempo (a mutação num job só dela), e o job `verificacao`, o
   check obrigatório, só passa com os 4 verdes. Toda etapa tem limite de tempo, no workflow e no `npm run seguranca`. A mutação dos
