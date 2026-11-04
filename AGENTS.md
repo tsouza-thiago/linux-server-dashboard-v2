@@ -203,8 +203,10 @@ O teste `test/unit/docs.test.js` confere esta documentação contra o código.
      `npm run seguranca -- --so=semgrep,shell` ou `--pular=zap` (etapas: `semgrep`,
      `segredos`, `shell`, `osv`, `zap`, `mutacao`; nome errado sai com erro). A mutação
      corre ao lado das etapas Docker, com até 4 rodadas em paralelo, cada uma na sua cópia
-     (ADR 0040). Cada etapa tem um limite de tempo, e cada rodada da mutação também (60 s):
-     a que passa dele reprova com o nome. `MUTACAO_PARALELO` e `MUTACAO_LIMITE_S` ajustam os 2.
+     (ADR 0040). Cada etapa tem um limite de tempo, e cada rodada da mutação também (60 s,
+     com `--test-timeout` em cada teste): a rodada presa repete 1 vez e, se prender de novo,
+     reprova com o nome da mutação e do teste (ADR 0041). `MUTACAO_PARALELO` e
+     `MUTACAO_LIMITE_S` ajustam os 2.
   3. CI no GitHub (ADR 0014 e 0040, `.github/workflows/seguranca.yml`), a cada push no
      `main` e a cada PR: `npm run check`, `npm run test:e2e` com `E2E_OBRIGATORIO=1` (sem
      navegador, falha em vez de pular) e `npm run seguranca`, em 4 jobs ao mesmo tempo (a

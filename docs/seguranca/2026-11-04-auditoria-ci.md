@@ -143,6 +143,15 @@ Só o Dependency Review olha licença. Só o Dependabot avisa de uma falha nova 
 estava no `main`. O OSV e o `npm audit` são os únicos que rodam na máquina de quem desenvolve. Todos
 ficam; os 2 do CI somam 8 s.
 
+## Depois do merge: a rodada que travou ao acaso
+
+No 1º push no `main` com os jobs paralelos (merge do PR #147), 1 rodada da mutação passou do limite de
+60 s, e o job `mutacao` reprovou. Repetido, o job passou. Na máquina do mantenedor, o travamento
+apareceu em 1 de cerca de 10 execuções da mutação inteira, e nunca com a mesma rodada sozinha. O log
+do CI não dizia qual mutação nem qual teste. A [ADR 0041](../adr/0041-mutacao-repete-a-rodada-presa.md)
+resolve as 2 coisas: cada teste ganha `--test-timeout`, o nome do teste preso vai para o log, e a
+rodada presa repete 1 vez antes de reprovar.
+
 ## O que ficou de fora
 
 - **Dividir o e2e em partes paralelas:** descrito acima, fica para quando o tempo do e2e pesar.
