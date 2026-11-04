@@ -9,8 +9,10 @@
 //   npm run painel-teste -- --versao-nova             # com aviso de versão nova (falsa) e troca simulada
 //   npm run painel-teste -- --versao-nova --resultado=voltou  # a troca simulada volta atrás
 //   npm run painel-teste -- --versao-nova --exige-reconfigurar  # versão que muda a coleta, com o aviso
-//   npm run painel-teste -- --reconfigurar            # item Reconfigurar com login, sem subir comando
-//   npm run painel-teste -- --reconfigurar=sem-assinatura  # o mesmo, recusado depois do clique
+//   npm run painel-teste -- --reconfigurar            # Reconfigurar com login: o painel dá lugar ao assistente falso
+//   npm run painel-teste -- --reconfigurar=volta      # o mesmo, mas o painel novo "não sobe" no fim
+//   npm run painel-teste -- --reconfigurar=recusa     # o comando recusa depois do 202, e o painel fica
+//   npm run painel-teste -- --reconfigurar=sem-assinatura  # recusado pela rota, antes do código
 //   (com --versao-nova o painel tem login: o token é "teste")
 //
 // Cenários:
@@ -28,6 +30,7 @@
 //
 // Ctrl+C encerra o painel e apaga a pasta temporária.
 import fs from 'node:fs';
+import http from 'node:http';
 import os from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -37,6 +40,7 @@ import { normalizeTargets } from '../server/collector/builder.js';
 import { History } from '../server/storage/index.js';
 import { OutageLog } from '../server/storage/outages.js';
 import { createWizardApp } from '../server/setup/web.js';
+import { LOG_PELA_TELA, retirarCodigoPelaTela } from '../server/setup/pela-tela.js';
 import { VERSION } from '../server/version.js';
 import { abrirRegistro, lerEstado, pegarTrava, soltarTrava } from '../server/atualizacao/registro.js';
 import { makeInstalacao, detectionWithSudo } from '../test-support/instalacao-fake.js';
@@ -189,12 +193,67 @@ export function atualizacaoFalsa(dir, { resultado = 'atualizado', passoMs = 700,
 }
 
 /**
- * Reconfiguração falsa, para ver o diálogo: a rota de verdade gera o código, mas nenhum comando sobe.
- * `bloqueio` simula o que só aparece depois do clique (`sem-assinatura`, `outra-pasta`).
+ * Uma porta só para o painel e o assistente falso, como na troca de verdade: `trocar('painel')`,
+ * `trocar(app)` ou `trocar(null)`, que derruba cada conexão (nada escutando na porta).
  */
-export function reconfiguracaoFalsa(dir, { bloqueio = null } = {}) {
-  fs.mkdirSync(path.join(dir, 'data'), { recursive: true });
-  return { dashToken: 'teste', pastaAtualizacao: dir, executarReconfiguracao: async () => ({ ok: true }), conferirReconfiguracao: () => bloqueio };
+export function portaTrocavel() {
+  let atual = 'painel';
+  let painel = null;
+  const handler = (req, res) => {
+    if (atual === 'painel' && painel) return painel(req, res);
+    if (typeof atual === 'function') return atual(req, res);
+    return req.socket.destroy();
+  };
+  return { handler, usarPainel: (app) => { painel = app; }, trocar: (a) => { atual = a; } };
+}
+
+/**
+ * Reconfiguração falsa: a rota de verdade gera o código, e nenhum comando de verdade sobe. Sem
+ * `trocar`, só o 202. `bloqueio` simula o que a rota acusa depois do clique (`sem-assinatura`,
+ * `outra-pasta`). Com `trocar` (de `portaTrocavel`), faz o que o `--pela-tela` faria, com o
+ * assistente falso: `resultado` 'assistente' (cancelar ou terminar religa o painel), 'volta' (o
+ * painel novo "não sobe" e o log diz o motivo) ou 'recusa' (o comando recusa e o painel fica).
+ */
+export function reconfiguracaoFalsa(dir, { bloqueio = null, trocar = null, resultado = 'assistente', passoMs = 1200 } = {}) {
+  const dados = path.join(dir, 'data');
+  fs.mkdirSync(dados, { recursive: true });
+  const espera = () => new Promise((r) => { setTimeout(r, passoMs); });
+  // As linhas no formato da saída da CLI sem terminal (✓ ▲ ✗ →), como o comando grava.
+  const gravar = (linhas) => fs.writeFileSync(path.join(dados, LOG_PELA_TELA), linhas.map((l) => `${l}\n`).join(''), { mode: 0o600 });
+  const assistentes = [];
+  const voltar = async (falhou) => {
+    trocar(null);
+    gravar(falhou
+      ? ['→ assistente no ar, esperando o navegador', '✓ assistente concluído e desligado', '✗ o painel não subiu com a configuração nova (o painel não respondeu)', '✓ painel de volta com a configuração anterior']
+      : ['→ assistente no ar, esperando o navegador', '▲ assistente cancelado', '✓ painel de volta com a configuração anterior']);
+    await espera();
+    trocar('painel');
+  };
+  const simular = async () => {
+    await espera();
+    const codigo = retirarCodigoPelaTela(dados);
+    if (resultado === 'recusa' || !codigo) {
+      gravar(['✗ há uma atualização em andamento (o painel continua no ar)']);
+      return;
+    }
+    trocar(null);
+    await espera();
+    const { app, cleanup } = criarAssistente({
+      codeHash: codigo.hash, codeTtlMs: codigo.exp - Date.now(),
+      onCancel: () => voltar(false), onFinish: () => voltar(resultado === 'volta'),
+    });
+    assistentes.push(cleanup);
+    gravar(['→ assistente no ar, esperando o navegador']);
+    trocar(app);
+  };
+  const executarReconfiguracao = async () => {
+    if (trocar) simular().catch((err) => console.error(`reconfiguração falsa: ${err.message}`));
+    return { ok: true };
+  };
+  return {
+    dashToken: 'teste', pastaAtualizacao: dir, executarReconfiguracao, conferirReconfiguracao: () => bloqueio,
+    limparAssistentes: () => { for (const c of assistentes.splice(0)) c(); },
+  };
 }
 
 /** Versão nova falsa para ver o aviso, o menu e as novidades: nada sai desta máquina. */
@@ -214,8 +273,11 @@ export async function procurarFalso() {
   };
 }
 
-/** O assistente com a instalação falsa: nada sai desta máquina (ver o cabeçalho). */
-export function criarAssistente() {
+/**
+ * O assistente com a instalação falsa: nada sai desta máquina (ver o cabeçalho). `opcoes` vão para o
+ * `createWizardApp` (o modo `--pela-tela` passa o hash do código e o cancelar).
+ */
+export function criarAssistente(opcoes = {}) {
   const fake = makeInstalacao({ detection: detectionWithSudo('pede-senha') });
   // A chave "falta" no agente só na 1ª conferência: assim dá para ver o ssh-add e o Tentar de novo.
   fake.srv.agentHasKey = false;
@@ -228,7 +290,7 @@ export function criarAssistente() {
     fake.srv.agentHasKey = true;
     return r;
   };
-  const app = createWizardApp({ inst: fake.inst, code: 'ACD347', onFinish: () => {}, log: (m) => console.log(m) });
+  const app = createWizardApp({ inst: fake.inst, code: 'ACD347', onFinish: () => {}, log: (m) => console.log(m), ...opcoes });
   return { app, cleanup: fake.cleanup };
 }
 
@@ -262,14 +324,20 @@ async function main() {
   const troca = versaoNova ? atualizacaoFalsa(dir, { resultado: opcao('resultado', 'atualizado'), reiniciar }) : {};
   // Sem esta opção, o painel de teste não tem executor e o item Reconfigurar responde 409.
   const pedido = process.argv.find((x) => x === '--reconfigurar' || x.startsWith('--reconfigurar='));
-  const reconfiguracao = pedido ? reconfiguracaoFalsa(dir, { bloqueio: pedido.split('=')[1] ?? null }) : {};
-  const { app, runPoll, atualizacao, shutdown } = criarPainel(dir, cenario, coletar, { ...reconfiguracao, ...(versaoNova ? { procurarVersao: reconfigurar ? procurarQueExigeReconfigurar : procurarFalso, sshAccess: reconfigurar ? 'restrito' : undefined, ...troca } : {}) });
+  const valor = pedido?.split('=')[1] ?? null;
+  const portaUnica = portaTrocavel();
+  const reconfiguracao = pedido
+    ? reconfiguracaoFalsa(dir, ['recusa', 'volta'].includes(valor) || !valor ? { trocar: portaUnica.trocar, resultado: valor ?? 'assistente' } : { bloqueio: valor })
+    : {};
+  const { limparAssistentes = () => {}, ...depsReconfiguracao } = reconfiguracao;
+  const { app, runPoll, atualizacao, shutdown } = criarPainel(dir, cenario, coletar, { ...depsReconfiguracao, ...(versaoNova ? { procurarVersao: reconfigurar ? procurarQueExigeReconfigurar : procurarFalso, sshAccess: reconfigurar ? 'restrito' : undefined, ...troca } : {}) });
   if (versaoNova) await atualizacao.verificar();
   if (cenario === 'offline') { await runPoll(); await runPoll(); }
   // vazio fica sem coleta: é o estado do 1º uso, antes da 1ª amostra chegar.
   const timer = cenario === 'vazio' ? null : setInterval(runPoll, 60000);
   // Só 127.0.0.1 (I6), como o painel de verdade.
-  server = app.listen(porta, '127.0.0.1', () => {
+  portaUnica.usarPainel(app);
+  server = http.createServer(portaUnica.handler).listen(porta, '127.0.0.1', () => {
     console.log(`painel de teste (${cenario}) em http://127.0.0.1:${porta} — dados em ${dir}`);
     console.log('Ctrl+C encerra e apaga os dados de teste.');
   });
@@ -277,6 +345,7 @@ async function main() {
     if (timer) clearInterval(timer);
     server.close();
     await shutdown();
+    limparAssistentes();
     fs.rmSync(dir, { recursive: true, force: true });
     process.exit(0);
   };

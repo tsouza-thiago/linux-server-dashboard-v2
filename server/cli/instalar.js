@@ -11,7 +11,7 @@ import { Instalacao } from '../setup/instalacao.js';
 import { createWizardApp, makeSetupCode } from '../setup/web.js';
 import { currentVersionStatus, describeVersion, signedReleaseTags, installTag } from '../setup/assinatura.js';
 import { ensureDataDirs, guardarConfiguracao } from '../setup/local.js';
-import { retirarCodigoPelaTela } from '../setup/pela-tela.js';
+import { LOG_PELA_TELA, retirarCodigoPelaTela } from '../setup/pela-tela.js';
 import { emAndamento } from '../atualizacao/registro.js';
 import { UNIT_NAME, openBrowser, panelHealthy, panelPort, panelStatus, portFree, startPanel, stopPanel, systemctlUser } from './servico.js';
 import { makeOutput, mostrarComando } from './saida.js';
@@ -20,8 +20,6 @@ import { makeOutput, mostrarComando } from './saida.js';
 const IDLE_MS = 60 * 60 * 1000;
 // Pela tela, a coleta está parada e não há terminal aberto: quem abandonou não volta para religar.
 const IDLE_TELA_MS = 15 * 60 * 1000;
-// Saída do `--pela-tela`, que não tem terminal. Guarda só a última vez.
-const LOG_TELA = 'reconfigurar.log';
 
 /** Confere uPlot e fontes contra as somas de public/vendor/vendor.json. */
 export function verifyVendor(root) {
@@ -307,7 +305,7 @@ async function assistentePelaTela({ out, root, home, deps }) {
 async function reconfigurarPelaTela({ root, home, deps }) {
   const dataDir = path.join(root, 'data');
   fs.mkdirSync(dataDir, { recursive: true, mode: 0o700 });
-  const fd = fs.openSync(path.join(dataDir, LOG_TELA), 'w', 0o600);
+  const fd = fs.openSync(path.join(dataDir, LOG_PELA_TELA), 'w', 0o600);
   fs.fchmodSync(fd, 0o600);
   const out = makeOutput({ stream: { isTTY: false, write: (texto) => fs.writeSync(fd, texto) }, root });
   try {

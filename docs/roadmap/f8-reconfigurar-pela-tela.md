@@ -87,10 +87,11 @@ e sem deixar uma janela de terminal aberta até o fim.
 4. **Feita.** Item "Reconfigurar" no menu de manutenção e o diálogo de explicação, com os bloqueios
    da rota. Depois do 202, o diálogo mostra um link com o código, e a pessoa clica. Esse link é
    provisório: a etapa 5 troca o clique pela espera.
-5. Espera do assistente e entrada automática com o código, no lugar do link da etapa 4; volta ao painel no fim. O botão
-   Cancelar do assistente entra aqui, só no modo `--pela-tela`, e espera o painel voltar. Os
-   textos que mandam olhar o terminal também mudam nesse modo. Se o painel novo não subir, a tela
-   mostra o motivo que está no `data/reconfigurar.log`.
+5. **Feita (ADR 0037).** Espera do assistente e entrada automática com o código, no lugar do link da
+   etapa 4; volta ao painel no fim. O botão Cancelar do assistente entra aqui, só no modo
+   `--pela-tela`, e espera o painel voltar. Os textos que mandam olhar o terminal também mudam nesse
+   modo. Se o comando recusar ou o painel novo não subir, a tela mostra só as linhas de falha do
+   `data/reconfigurar.log`, pelo estado de `/api/atualizacao`.
 6. Botão "Reconfigurar agora" no resultado da atualização (F7).
 7. `dashboard reconfigurar` com o painel rodando abre o menu de manutenção; ajuda da CLI,
    README, TUTORIAL e AGENTS.

@@ -236,3 +236,23 @@ test('o código não vai para o log do painel nem para o estado da tela', async 
   assert.ok(!linhas.join('\n').includes(json.codigo));
   assert.ok(!JSON.stringify(app.atualizacao.estado()).includes(json.codigo));
 });
+
+// Etapa 5 da F8: o motivo de uma recusa ou de uma volta chega à tela pelo estado, só as falhas.
+test('estado: as falhas do log do --pela-tela, sem o resto do log', async (t) => {
+  const { port, dir } = await painel(t);
+  const ler = async () => (await request(port, { path: '/api/atualizacao', headers: BEARER })).json.reconfiguracao;
+  assert.equal(await ler(), null, 'sem log, nada');
+  fs.mkdirSync(path.join(dir, 'data'), { recursive: true });
+  fs.writeFileSync(path.join(dir, 'data', 'reconfigurar.log'), '→ assistente no ar, esperando o navegador\n✓ painel em http://127.0.0.1:3000\n✗ há uma atualização em andamento (o painel continua no ar)\n');
+  const r = await ler();
+  assert.deepEqual(r.motivos, ['há uma atualização em andamento (o painel continua no ar)']);
+  assert.ok(Number.isFinite(Date.parse(r.em)));
+  const sem = await request(port, { path: '/api/atualizacao' });
+  assert.equal(sem.status, 401, 'o motivo só sai com sessão');
+});
+
+// A tela espera o assistente pelo `/`: o assistente redireciona, e o painel nunca pode.
+test('o painel responde / sem redirecionar, com e sem sessão', async (t) => {
+  const { port } = await painel(t);
+  for (const headers of [BEARER, {}]) assert.equal((await request(port, { path: '/', headers })).status, 200);
+});

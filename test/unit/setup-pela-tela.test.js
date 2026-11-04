@@ -6,7 +6,7 @@ import crypto from 'node:crypto';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import { criarCodigoPelaTela, retirarCodigoPelaTela } from '../../server/setup/pela-tela.js';
+import { LOG_PELA_TELA, criarCodigoPelaTela, lerResultadoPelaTela, retirarCodigoPelaTela } from '../../server/setup/pela-tela.js';
 import { guardarConfiguracao } from '../../server/setup/local.js';
 
 function pasta(t) {
@@ -66,4 +66,31 @@ test('configuração guardada: volta o .env e o data/ssh, e some o que não exis
   assert.equal(fs.readFileSync(path.join(ssh, 'known_hosts'), 'utf8'), 'antigo\n');
   assert.equal(fs.existsSync(path.join(ssh, 'config')), false);
   assert.equal(fs.statSync(path.join(root, '.env')).mode & 0o777, 0o600);
+});
+
+// Etapa 5 da F8: a tela mostra o motivo de uma recusa ou de uma volta, e nada além das falhas.
+test('resultado para a tela: só as linhas de falha, curtas e poucas, com o instante do log', (t) => {
+  const dir = pasta(t);
+  assert.equal(lerResultadoPelaTela(dir), null, 'sem log, nada a dizer');
+  const file = path.join(dir, LOG_PELA_TELA);
+  fs.writeFileSync(file, [
+    '→ assistente no ar, esperando o navegador',
+    '✓ painel em http://127.0.0.1:3000 (só nesta máquina)',
+    '  O que aconteceu: detalhe da máquina que não vai para a tela',
+    '✗ o painel não subiu com a configuração nova (o painel não respondeu)',
+    '✓ painel de volta com a configuração anterior',
+    `✗ ${'x'.repeat(500)}`,
+    ...Array.from({ length: 6 }, (_, i) => `✗ falha ${i}`),
+    '',
+  ].join('\n'));
+  const quando = new Date('2026-11-04T12:00:00.000Z');
+  fs.utimesSync(file, quando, quando);
+  const r = lerResultadoPelaTela(dir);
+  assert.equal(r.em, quando.toISOString());
+  assert.deepEqual(r.motivos.slice(0, 1), ['o painel não subiu com a configuração nova (o painel não respondeu)']);
+  assert.equal(r.motivos[1].length, 300, 'linha longa é cortada');
+  assert.equal(r.motivos.length, 5, 'no máximo 5 linhas');
+  assert.ok(!r.motivos.join('\n').includes('127.0.0.1') && !r.motivos.join('\n').includes('O que aconteceu'));
+  fs.writeFileSync(file, '→ assistente no ar, esperando o navegador\n▲ assistente cancelado\n');
+  assert.deepEqual(lerResultadoPelaTela(dir).motivos, [], 'cancelar não é falha');
 });

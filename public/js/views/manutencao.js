@@ -1,7 +1,7 @@
 // Manutenção do painel (ADR 0030): a engrenagem no topo com a versão instalada e "Procurar
 // agora", o aviso de versão nova, o diálogo com as novidades e o botão Atualizar, com o progresso
-// (ADR 0031), e o item Reconfigurar com o diálogo dele (ADR 0036). Não é uma tela: fica por cima de
-// todas. A tela só pede a troca da versão detectada: quem troca é o `dashboard atualizar --registro`,
+// (ADR 0031), e o item Reconfigurar com o diálogo dele (ADR 0036), a espera do assistente e o motivo
+// quando a reconfiguração não vale (ADR 0035). Não é uma tela: fica por cima de todas. A tela só pede a troca da versão detectada: quem troca é o `dashboard atualizar --registro`,
 // fora do serviço (I11).
 import { api } from '../core/api.js';
 import { html, mount } from '../core/html.js';
@@ -17,6 +17,11 @@ const COMANDO = './dashboard atualizar --terminal';
 const LEITURA_MS = 1000;
 const MAX_FALHAS = 180;
 const RECARGA_MS = 3000;
+// Espera do assistente depois do clique: parar o painel e subir o assistente leva segundos. Acima
+// disso, a tela para de esperar e deixa o link, caso ele suba depois.
+const ESPERA_ASSISTENTE_MS = 90000;
+// Na volta do assistente, só uma falha deste tempo para cá é desta reconfiguração.
+const VOLTA_RECENTE_MS = 10 * 60000;
 // Por que não dá para atualizar, para dizer antes de a pessoa tentar.
 const BLOQUEIOS = {
   'sem-login': 'Este painel não tem login. Sem sessão, o botão ficaria aberto a qualquer programa desta máquina.',
@@ -35,6 +40,11 @@ const BLOQUEIOS_RECONFIGURAR = {
   'outra-pasta': BLOQUEIOS['outra-pasta'],
   'sem-assinatura': 'A versão desta pasta não passou na conferência da assinatura. Se você desenvolve o painel, use a opção --sem-assinatura no terminal; se não, baixe de novo com o comando do README.',
 };
+// O fim da reconfiguração quando ela não vale, com as linhas de falha de data/reconfigurar.log.
+const NAO_VALEU = {
+  recusou: 'O painel recusou a reconfiguração e continua no ar, com a configuração de agora.',
+  voltou: 'A configuração nova não funcionou, e o painel voltou com a configuração de antes.',
+};
 const FASES = {
   iniciando: 'Iniciando a atualização…',
   procurando: 'Conferindo a versão e a assinatura…',
@@ -49,6 +59,7 @@ const ERROS = {
   falhou: 'A última procura falhou. Tento de novo amanhã.',
 };
 const $ = (id) => document.getElementById(id);
+const pausa = (ms) => new Promise((r) => { setTimeout(r, ms); });
 
 const lerDispensada = () => { try { return localStorage.getItem(DISPENSADA_KEY); } catch { return null; } };
 const gravarDispensada = (v) => { try { localStorage.setItem(DISPENSADA_KEY, v); } catch { /* armazenamento bloqueado */ } };
@@ -69,8 +80,9 @@ function secao(s) {
 /**
  * Liga o menu, o aviso e o diálogo ao estado `atualizacao` do `store`. `pedidoDoTerminal`: a página
  * veio do `dashboard atualizar` (ADR 0032), que abre o menu, procura e mostra o diálogo.
+ * `voltaDoAssistente`: a página veio do fim do assistente aberto pelo botão Reconfigurar.
  */
-export function iniciarManutencao({ store, toast, pedidoDoTerminal = false }) {
+export function iniciarManutencao({ store, toast, pedidoDoTerminal = false, voltaDoAssistente = false }) {
   const botao = $('manutBtn');
   const menu = $('manutMenu');
   const aviso = $('avisoVersao');
@@ -133,10 +145,63 @@ export function iniciarManutencao({ store, toast, pedidoDoTerminal = false }) {
     if (!dialogo.open) dialogo.showModal();
   }
 
-  /** Pede o assistente. O código só existe nesta resposta: o link dele não pode sumir com um Esc. */
+  /**
+   * O fim que não valeu: o motivo vem das linhas de falha do log do comando, nunca do log inteiro.
+   * `link`: o código ainda pode servir, se o assistente subir depois da espera.
+   */
+  function naoValeu({ titulo, texto, motivos = [], link = null }) {
+    acompanhando = false;
+    mount(dialogo, html`<div class="dialogo-corpo">
+      <h2 id="novidadesTitulo">${titulo}</h2>
+      <p class="dialogo-aviso" role="status">${icon('warn', 16)}<span>${texto}</span></p>
+      ${motivos.length ? html`<pre class="registro mono" id="reconfigurarMotivos" tabindex="0">${motivos.join('\n')}</pre>
+        <p class="dialogo-comando">O registro completo fica em <span class="mono">data/reconfigurar.log</span>. Para reconfigurar pelo terminal, rode na pasta do painel: <span class="mono">${COMANDO_RECONFIGURAR}</span></p>` : ''}
+      <div class="dialogo-acoes">
+        <button class="btn btn-soft" type="button" data-manut="fechar">Fechar</button>
+        ${link ? html`<a class="btn btn-primary" id="abrirAssistente" href="${link}">Abrir o assistente</a>` : ''}
+      </div>
+    </div>`);
+    if (!dialogo.open) dialogo.showModal();
+    ($('abrirAssistente') ?? dialogo.querySelector('[data-manut="fechar"]')).focus();
+  }
+
+  /**
+   * Espera o assistente tomar o lugar do painel. O assistente responde `/` com um redirecionamento
+   * para /configurar, e o painel nunca: sem seguir o redirecionamento, a resposta diz quem está na
+   * porta, sem erro no console. Enquanto o painel responde, o comando pode ter recusado: as falhas
+   * do log mais novas que o clique dizem isso.
+   */
+  async function esperarAssistente(inicio) {
+    // Quem respondeu por último: no fim da espera, o texto muda se o painel nem chegou a parar.
+    let painelNoAr = true;
+    while (Date.now() - inicio < ESPERA_ASSISTENTE_MS) {
+      await pausa(LEITURA_MS);
+      let res;
+      try {
+        res = await fetch('/', { credentials: 'same-origin', cache: 'no-store', redirect: 'manual' });
+      } catch { painelNoAr = false; continue; } // nem o painel nem o assistente: a troca está no meio
+      if (res.type === 'opaqueredirect') return { assistente: true };
+      painelNoAr = true;
+      let estado;
+      try { estado = await api.atualizacao(); } catch (err) {
+        if (err.status === 401) return { sessaoPerdida: true };
+        continue;
+      }
+      store.set({ atualizacao: estado });
+      const r = estado.reconfiguracao;
+      if (r?.motivos?.length && Date.parse(r.em) >= inicio) return { motivos: r.motivos };
+    }
+    return { esgotou: true, painelNoAr };
+  }
+
+  /**
+   * Pede o assistente e entra nele sozinho, com o código no fragmento (não vai ao servidor nem ao
+   * histórico: o assistente o tira do endereço). O código só existe nesta resposta e nesta aba.
+   */
   async function reconfigurarAgora(el) {
     // Antes do pedido: o SSE "rodando" pode chegar antes da resposta.
     acompanhando = true;
+    const inicio = Date.now();
     let codigo;
     try {
       ({ codigo } = await withBusy(el, api.iniciarReconfiguracao()));
@@ -149,13 +214,31 @@ export function iniciarManutencao({ store, toast, pedidoDoTerminal = false }) {
     }
     mount(dialogo, html`<div class="dialogo-corpo">
       <h2 id="novidadesTitulo">Abrindo o assistente</h2>
-      <p role="status">O painel está parando para dar lugar ao assistente. Espere alguns segundos e abra o assistente por este link. Ele só aparece aqui.</p>
-      <div class="dialogo-acoes">
-        <button class="btn btn-soft" type="button" data-manut="fechar">Fechar</button>
-        <a class="btn btn-primary" id="abrirAssistente" href="/configurar#codigo=${codigo}">Abrir o assistente</a>
-      </div>
+      <p class="registro-fase" id="reconfigurarFase" role="status"><span class="spinner"></span><span>O painel está parando para dar lugar ao assistente. Esta página entra nele sozinha em alguns segundos.</span></p>
     </div>`);
-    $('abrirAssistente').focus();
+    const fim = await esperarAssistente(inicio);
+    const link = `/configurar#codigo=${codigo}`;
+    if (fim.assistente) { location.assign(link); return; }
+    if (fim.sessaoPerdida) { acompanhando = false; dialogo.close(); return; }
+    if (fim.motivos) { naoValeu({ titulo: 'A reconfiguração não começou', texto: NAO_VALEU.recusou, motivos: fim.motivos }); return; }
+    naoValeu({
+      titulo: 'O assistente não abriu',
+      texto: fim.painelNoAr
+        ? `O painel continua no ar, e o assistente não subiu. Se ele subir agora, este link entra nele. Se não, tente de novo daqui a 1 minuto ou rode no terminal, na pasta do painel: ${COMANDO_RECONFIGURAR}`
+        : 'O assistente não respondeu a tempo. Se ele subir agora, este link entra nele. Se nada subir, o painel volta sozinho, com a configuração de agora, em até 15 minutos.',
+      link,
+    });
+  }
+
+  /** De volta do assistente: diz se a configuração nova valeu ou o motivo da volta. */
+  async function atenderVolta() {
+    await recarregarEstado();
+    const r = store.get().atualizacao?.reconfiguracao;
+    if (r?.motivos?.length && Date.now() - Date.parse(r.em) < VOLTA_RECENTE_MS) {
+      naoValeu({ titulo: 'A reconfiguração não valeu', texto: NAO_VALEU.voltou, motivos: r.motivos });
+    } else {
+      toast('Painel reconfigurado. A coleta segue com a configuração nova.');
+    }
   }
 
   /** Busca o estado de novo; se falhar, fica o que veio do SSE. */
@@ -331,8 +414,8 @@ export function iniciarManutencao({ store, toast, pedidoDoTerminal = false }) {
   menu.addEventListener('click', onAcao);
   aviso.addEventListener('click', onAcao);
   dialogo.addEventListener('click', onAcao);
-  // Durante a troca, o Esc não fecha: o resultado e a recarga precisam aparecer. O link do assistente
-  // também fica, e só o botão Fechar o tira.
+  // Durante a troca, o Esc não fecha: o resultado e a recarga precisam aparecer. Na espera do
+  // assistente, também não: a espera tem fim, e ele traz o Fechar.
   dialogo.addEventListener('cancel', (e) => { if (acompanhando) e.preventDefault(); });
   document.addEventListener('click', (e) => { if (!menu.hidden && !e.target.closest('.manut')) fecharMenu(); });
   document.addEventListener('keydown', (e) => {
@@ -341,4 +424,5 @@ export function iniciarManutencao({ store, toast, pedidoDoTerminal = false }) {
   store.subscribe((_, mudou) => { if ('atualizacao' in mudou) render(); });
   render();
   if (pedidoDoTerminal) atenderTerminal();
+  else if (voltaDoAssistente) atenderVolta();
 }

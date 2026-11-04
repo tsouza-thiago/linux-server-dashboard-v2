@@ -25,6 +25,13 @@ diante: `PATCH` corrige, `MINOR` acrescenta sem quebrar e `MAJOR` quebra.
 - Item "Reconfigurar" na engrenagem (#91, etapa 4 da F8, ADR 0036): o diálogo explica a pausa da coleta
   e a volta do painel antes de disparar. Sem login, ou com pasta que barra o disparo, ele mostra o
   motivo e o comando do terminal. Por enquanto, o assistente abre por um link no diálogo.
+- Espera e volta do "Reconfigurar pela tela" (#91, etapa 5 da F8, ADR 0037): depois do clique, a tela
+  espera o assistente e entra nele sozinha, sem o link. No fim, o navegador volta logado à Visão geral,
+  que diz se a configuração nova valeu. Se o comando recusar ou o painel novo não subir, a tela mostra o
+  motivo, com só as linhas de falha de `data/reconfigurar.log`. O assistente aberto pela tela tem o
+  botão **Cancelar**, que espera o painel voltar, e os textos dele não mandam olhar o terminal.
+- `/api/atualizacao` traz `reconfiguracao` (`{em, motivos}`), e o painel de teste simula a troca
+  painel ↔ assistente: `--reconfigurar`, `--reconfigurar=volta` e `--reconfigurar=recusa`.
 - Aviso de versão nova (#90, 1ª entrega da F7). O painel procura 1 vez por dia, só por tag assinada,
   e mostra uma faixa no topo com as novidades da versão. A engrenagem no topo abre o menu de
   manutenção, com a versão instalada, a última procura e "Procurar agora". A troca de versão

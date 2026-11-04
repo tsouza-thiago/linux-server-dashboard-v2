@@ -35,7 +35,7 @@ test('rotas: sem sessão, 401; com sessão, o estado sem segredo', async (t) => 
   assert.equal((await request(port, { method: 'POST', path: '/api/atualizacao/verificar', body: {} })).status, 401);
   const r = await request(port, { path: '/api/atualizacao', headers: bearer });
   assert.equal(r.status, 200);
-  assert.deepEqual(Object.keys(r.json).sort(), ['bloqueio', 'erro', 'exigeReconfigurar', 'instalada', 'modo', 'nova', 'novidades', 'verificadoEm']);
+  assert.deepEqual(Object.keys(r.json).sort(), ['bloqueio', 'erro', 'exigeReconfigurar', 'instalada', 'modo', 'nova', 'novidades', 'reconfiguracao', 'verificadoEm']);
   assert.ok(!JSON.stringify(r.json).includes(TOKEN));
   assert.equal(fs.existsSync(path.join(dir, 'atualizacao.json')), false, 'ler não grava nada');
 });
