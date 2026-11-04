@@ -170,7 +170,8 @@ test('e2e: dashboard atualizar — link de uso único abre o diálogo, com o avi
   await page.goto(`${base}/entrar?codigo=${createLoginCode(dir)}#/visao-geral?atualizar=1`);
   await page.waitForSelector('#novidadesDialog[open]');
   assert.match(await page.textContent('#novidadesDialog'), /Novidades da v9\.9\.9/);
-  assert.match(await page.textContent('#avisoReconfigurar'), /\.\/dashboard reconfigurar/);
+  // Com login e sem bloqueio, o aviso aponta o botão do fim da troca (ADR 0038), não o terminal.
+  assert.match(await page.textContent('#avisoReconfigurar'), /botão Reconfigurar agora/);
   assert.match(await page.textContent('#avisoVersao'), /exige reconfigurar o acesso ao servidor/);
   assert.equal(new URL(page.url()).hash, '#/visao-geral', 'o pedido vale 1 vez');
   await page.reload();
@@ -199,6 +200,67 @@ test('e2e: script desatualizado no servidor — a Visão geral mostra o passo a 
   await page.waitForSelector('.notice-passos');
   assert.match(await page.textContent('.notice-passos'), /\.\/dashboard reconfigurar/);
   assert.equal(await page.locator('.notice-passos li').count(), 4);
+  assert.equal(await page.$('[data-reconfigurar]'), null, 'sem login, só o comando do terminal');
+});
+
+// Etapa 6 da F8 (ADR 0038): com login, o passo do terminal vira o botão, no mesmo fluxo da engrenagem.
+test('e2e: script desatualizado no servidor — com login, a Visão geral traz o botão Reconfigurar agora', { skip: !chromium && 'sem playwright-core' }, async (t) => {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'dash-e2e-hash-'));
+  t.after(() => fs.rmSync(dir, { recursive: true, force: true }));
+  const ctx = await setup(t, { ...reconfiguracaoFalsa(dir), sshAccess: 'restrito', dashToken: 'e2e-teste' });
+  if (ctx.skip) return t.skip(ctx.skip);
+  const { app, page, base, problems } = ctx;
+  app.store.getLatest().collector = { hash: 'antigo', expectedHash: 'novo', hashMismatch: true };
+  await page.request.post(`${base}/api/login`, { data: { token: 'e2e-teste' } });
+  await page.goto(base);
+  await page.waitForSelector('[data-reconfigurar]');
+  assert.doesNotMatch(await page.textContent('.notice-passos'), /\.\/dashboard reconfigurar/, 'com login, o botão no lugar do comando');
+  await page.click('[data-reconfigurar]');
+  await page.waitForSelector('#novidadesDialog[open]');
+  const texto = await page.textContent('#novidadesDialog');
+  assert.match(texto, /Reconfigurar o painel[\s\S]*coleta pausa/);
+  assert.equal(fs.existsSync(path.join(dir, 'data', 'reconfigurar.json')), false, 'o código só nasce no clique do diálogo');
+  assert.ok(await page.isEnabled('[data-manut="reconfigurar-agora"]'));
+  assert.deepEqual(problems, []);
+});
+
+// Etapa 6 da F8 (ADR 0038): a versão que muda a coleta termina com o botão, sem recarregar sozinha, e
+// o botão segue o mesmo fluxo da engrenagem até o assistente.
+test('e2e: atualizar — versão que exige reconfigurar termina com Reconfigurar agora', { skip: !chromium && 'sem playwright-core' }, async (t) => {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'dash-e2e-troca-reconf-'));
+  t.after(() => fs.rmSync(dir, { recursive: true, force: true }));
+  const portaUnica = portaTrocavel();
+  const procurar = async () => { const r = await procurarFalso(); return { ...r, novidades: { ...r.novidades, exigeReconfigurar: true } }; };
+  const ctx = await setup(t, {
+    procurarVersao: procurar, sshAccess: 'restrito', portaUnica,
+    ...atualizacaoFalsa(dir, { passoMs: 100 }),
+    ...reconfiguracaoFalsa(dir, { trocar: portaUnica.trocar, passoMs: 800 }),
+    dashToken: 'e2e-teste',
+  });
+  if (ctx.skip) return t.skip(ctx.skip);
+  const { app, page, base, problems } = ctx;
+  await page.request.post(`${base}/api/login`, { data: { token: 'e2e-teste' } });
+  await app.atualizacao.verificar();
+  await page.goto(base);
+  await page.click('#manutBtn');
+  await page.click('#manutMenu [data-manut="novidades"]');
+  const aviso = await page.textContent('#avisoReconfigurar');
+  assert.match(aviso, /Reconfigurar agora/);
+  assert.doesNotMatch(aviso, /\.\/dashboard reconfigurar/, 'com login, o botão no lugar do comando');
+  await page.evaluate(() => { window.semRecarregar = true; });
+  await page.click('[data-manut="atualizar"]');
+  await page.waitForSelector('#novidadesDialog[data-resultado="atualizado"]');
+  assert.match(await page.textContent('#registroFase'), /Atualizado para v9\.9\.9[\s\S]*muda o script de coleta/);
+  // Sem a recarga dos 3 s: o botão precisa ficar até a pessoa decidir.
+  await new Promise((r) => { setTimeout(r, 4000); });
+  assert.ok(await page.evaluate(() => window.semRecarregar), 'não recarrega sozinha');
+  assert.ok(await page.isVisible('[data-manut="recarregar"]'), 'deixar para depois recarrega');
+  await page.click('[data-manut="reconfigurar-agora"]');
+  await page.waitForSelector('#reconfigurarFase');
+  await page.waitForURL(/\/configurar$/, { timeout: 20000 });
+  await page.waitForSelector('#wz-main h1');
+  assert.doesNotMatch(await page.textContent('#wz-main'), /código do terminal/i, 'entrou sozinha, sem pedir código');
+  assert.deepEqual(problems.filter((p) => !/Failed to load resource|ERR_|net::/.test(p)), []);
 });
 
 // O botão Atualizar (ADR 0031): o painel "cai" no meio (a leitura falha) e a tela continua sozinha.

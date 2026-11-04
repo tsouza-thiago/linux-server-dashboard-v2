@@ -30,6 +30,10 @@ diante: `PATCH` corrige, `MINOR` acrescenta sem quebrar e `MAJOR` quebra.
   que diz se a configuração nova valeu. Se o comando recusar ou o painel novo não subir, a tela mostra o
   motivo, com só as linhas de falha de `data/reconfigurar.log`. O assistente aberto pela tela tem o
   botão **Cancelar**, que espera o painel voltar, e os textos dele não mandam olhar o terminal.
+- Botão **Reconfigurar agora** depois de atualizar (#91, etapa 6 da F8, ADR 0038): a versão que muda o
+  script de coleta termina com o botão, sem recarregar sozinha, e ele segue o mesmo fluxo do item
+  Reconfigurar da engrenagem. Com login, o aviso de script desatualizado da Visão geral também traz o
+  botão no lugar do comando do terminal. Sem login, os 2 continuam com `./dashboard reconfigurar`.
 - `/api/atualizacao` traz `reconfiguracao` (`{em, motivos}`), e o painel de teste simula a troca
   painel ↔ assistente: `--reconfigurar`, `--reconfigurar=volta` e `--reconfigurar=recusa`.
 - Aviso de versão nova (#90, 1ª entrega da F7). O painel procura 1 vez por dia, só por tag assinada,

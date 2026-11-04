@@ -1,7 +1,8 @@
 // Manutenção do painel (ADR 0030): a engrenagem no topo com a versão instalada e "Procurar
 // agora", o aviso de versão nova, o diálogo com as novidades e o botão Atualizar, com o progresso
 // (ADR 0031), e o item Reconfigurar com o diálogo dele (ADR 0036), a espera do assistente e o motivo
-// quando a reconfiguração não vale (ADR 0035). Não é uma tela: fica por cima de todas. A tela só pede a troca da versão detectada: quem troca é o `dashboard atualizar --registro`,
+// quando a reconfiguração não vale (ADR 0035), e o botão "Reconfigurar agora" no fim da versão que muda
+// a coleta (ADR 0038). Não é uma tela: fica por cima de todas. A tela só pede a troca da versão detectada: quem troca é o `dashboard atualizar --registro`,
 // fora do serviço (I11).
 import { api } from '../core/api.js';
 import { html, mount } from '../core/html.js';
@@ -53,7 +54,11 @@ const FASES = {
   voltando: 'A versão nova falhou. Voltando para a anterior…',
 };
 const REINICIANDO = 'Reiniciando o painel…';
+// A versão que muda o script de coleta. Com o botão Atualizar liberado, o fim da troca oferece o botão
+// Reconfigurar agora (ADR 0038); com a troca pelo terminal, a reconfiguração também vai por ele.
 const RECONFIGURAR = 'Esta versão muda o script de coleta. Depois de atualizar, rode ./dashboard reconfigurar no terminal, com a senha do administrador do servidor. Até lá, alguns dados podem faltar. A Visão geral mostra o passo a passo.';
+const RECONFIGURAR_PELA_TELA = 'Esta versão muda o script de coleta. No fim da troca, o painel oferece o botão Reconfigurar agora: tenha em mãos a senha do administrador do servidor. Até lá, alguns dados podem faltar.';
+const ATUALIZADO_RECONFIGURAR = 'Esta versão muda o script de coleta. Reconfigure o acesso ao servidor agora, com a senha do administrador do servidor, para a coleta voltar completa. A coleta pausa durante a reconfiguração, e o painel volta sozinho no fim.';
 const ERROS = {
   'sem-acesso': 'Sem acesso ao GitHub na última procura. Tento de novo amanhã.',
   falhou: 'A última procura falhou. Tento de novo amanhã.',
@@ -90,6 +95,8 @@ export function iniciarManutencao({ store, toast, pedidoDoTerminal = false, volt
   mount(botao, icon('gear', 18));
   // Há uma leitura de progresso ligada nesta aba.
   let acompanhando = false;
+  // A troca em andamento é de uma versão que muda a coleta: o fim oferece Reconfigurar agora.
+  let trocaExigeReconfigurar = false;
 
   const fecharMenu = () => {
     menu.hidden = true;
@@ -107,7 +114,7 @@ export function iniciarManutencao({ store, toast, pedidoDoTerminal = false, volt
         ${novidades?.secoes?.length ? novidades.secoes.map(secao) : html`<p>As novidades desta versão não estão disponíveis aqui.</p>`}
         ${novidades?.cortado ? html`<p class="novidades-corte">O texto é longo. O restante está no CHANGELOG da versão.</p>` : ''}
       </div>
-      ${exigeReconfigurar ? html`<p class="dialogo-aviso" id="avisoReconfigurar">${icon('warn', 16)}<span>${RECONFIGURAR}</span></p>` : ''}
+      ${exigeReconfigurar ? html`<p class="dialogo-aviso" id="avisoReconfigurar">${icon('warn', 16)}<span>${bloqueio ? RECONFIGURAR : RECONFIGURAR_PELA_TELA}</span></p>` : ''}
       ${BLOQUEIOS[bloqueio] ? html`<p class="dialogo-aviso">${icon('warn', 16)}<span>${BLOQUEIOS[bloqueio]}</span></p>` : ''}
       ${bloqueio && bloqueio !== 'rodando' ? html`<p class="dialogo-comando">Para atualizar, rode no terminal, na pasta do painel: <span class="mono">${COMANDO}</span></p>`
     : bloqueio ? '' : html`<p class="dialogo-comando">O painel fica fora do ar por alguns segundos. Os dados ganham uma cópia antes da troca, e o painel volta sozinho para a versão atual se a nova falhar.</p>`}
@@ -201,6 +208,7 @@ export function iniciarManutencao({ store, toast, pedidoDoTerminal = false, volt
   async function reconfigurarAgora(el) {
     // Antes do pedido: o SSE "rodando" pode chegar antes da resposta.
     acompanhando = true;
+    delete dialogo.dataset.resultado;
     const inicio = Date.now();
     let codigo;
     try {
@@ -246,9 +254,16 @@ export function iniciarManutencao({ store, toast, pedidoDoTerminal = false, volt
     try { store.set({ atualizacao: await api.atualizacao() }); } catch { /* painel fora do ar */ }
   }
 
-  /** Mostra o resultado. Com a versão nova no ar, recarrega para carregar a interface dela. */
+  /**
+   * Mostra o resultado. Com a versão nova no ar, recarrega para carregar a interface dela. A versão
+   * que muda a coleta não recarrega sozinha: o fim oferece Reconfigurar agora, no mesmo fluxo da
+   * engrenagem, e "Agora não" recarrega (a Visão geral repete o botão enquanto o script estiver velho).
+   */
   function terminar(r, fase, acoes) {
     acompanhando = false;
+    // Sem login a troca nem começa; o teste fica para o estado mudar por baixo.
+    const reconfigurar = r.resultado === 'atualizado' && trocaExigeReconfigurar
+      && store.get().atualizacao?.bloqueio !== 'sem-login';
     const textos = {
       atualizado: `Atualizado para ${r.alvo}. Recarregando a página…`,
       'ja-na-mais-nova': 'Você já está na versão mais nova.',
@@ -257,16 +272,20 @@ export function iniciarManutencao({ store, toast, pedidoDoTerminal = false, volt
       interrompida: 'A atualização foi interrompida antes de terminar. Rode `./dashboard diagnosticar` no terminal.',
     };
     $('novidadesTitulo').textContent = 'Fim da atualização';
+    if (reconfigurar) textos.atualizado = `Atualizado para ${r.alvo}. ${ATUALIZADO_RECONFIGURAR}`;
     mount(fase, html`<span>${textos[r.resultado] ?? textos.falhou}</span>`);
     dialogo.dataset.resultado = r.resultado ?? 'falhou';
-    if (r.resultado === 'atualizado') {
+    if (reconfigurar) {
+      mount(acoes, html`<button class="btn btn-soft" type="button" data-manut="recarregar">Agora não</button>
+        <button class="btn btn-primary" type="button" data-manut="reconfigurar-agora" autofocus>Reconfigurar agora</button>`);
+    } else if (r.resultado === 'atualizado') {
       mount(acoes, html`<button class="btn btn-primary" type="button" data-manut="recarregar" autofocus>Recarregar agora</button>`);
       setTimeout(() => location.reload(), RECARGA_MS);
     } else {
       mount(acoes, html`<button class="btn btn-primary" type="button" data-manut="fechar" autofocus>Fechar</button>`);
       recarregarEstado();
     }
-    acoes.querySelector('button').focus();
+    (acoes.querySelector('[autofocus]') ?? acoes.querySelector('button')).focus();
   }
 
   /**
@@ -275,6 +294,9 @@ export function iniciarManutencao({ store, toast, pedidoDoTerminal = false, volt
    */
   function acompanhar(alvo) {
     acompanhando = true;
+    // O estado de antes da troca diz se a versão muda a coleta; depois dela, a versão nova some dele.
+    const a = store.get().atualizacao;
+    trocaExigeReconfigurar = Boolean(a?.exigeReconfigurar && a.nova === alvo);
     delete dialogo.dataset.resultado;
     mount(dialogo, html`<div class="dialogo-corpo">
       <h2 id="novidadesTitulo">Atualizando para ${alvo}</h2>
@@ -425,4 +447,6 @@ export function iniciarManutencao({ store, toast, pedidoDoTerminal = false, volt
   render();
   if (pedidoDoTerminal) atenderTerminal();
   else if (voltaDoAssistente) atenderVolta();
+  // A Visão geral abre o mesmo diálogo pelo aviso de script desatualizado (ADR 0038).
+  return { abrirReconfigurar: () => abrirReconfigurar() };
 }

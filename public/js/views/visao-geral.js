@@ -354,20 +354,30 @@ function firstUse(state) {
   </section>`;
 }
 
-/** Aviso de script desatualizado no servidor, com o passo a passo (depois de atualizar ou de mudar o .env). */
+/**
+ * Aviso de script desatualizado no servidor, com o passo a passo (depois de atualizar ou de mudar o
+ * .env). Com login, o passo do terminal vira o botão do mesmo diálogo da engrenagem (ADR 0038); sem
+ * login, a reconfiguração pela tela fica desligada, e o passo continua sendo o comando.
+ */
 function configWarning(state) {
   const c = state.sample?.collector;
   if (!c?.hashMismatch) return '';
+  const pelaTela = Boolean(state.session?.authRequired) && state.atualizacao?.bloqueio !== 'sem-login';
   return html`<section class="panel notice notice-warn" aria-label="Aviso de configuração">
     <div class="notice-row">${iconBox('warn', 'key', 'lg')}<div>
       <h2>A configuração no servidor está desatualizada</h2>
       <p>O script de coleta guardado no servidor não é o que este painel espera. Isso acontece depois de uma versão que muda a coleta ou de mudar os alvos no <span class="mono">.env</span>. O painel continua coletando o que a linha antiga permite, e alguns dados podem faltar.</p>
-      <ol class="notice-passos">
+      ${pelaTela ? html`<ol class="notice-passos">
+        <li>Clique em Reconfigurar agora. A coleta pausa enquanto o assistente estiver aberto.</li>
+        <li>No assistente, confirme o passo "Preparar o servidor". Ele pede a senha do administrador do servidor.</li>
+        <li>No fim, o painel volta sozinho. Espere a próxima coleta: este aviso some sozinho.</li>
+      </ol>
+      <div class="notice-acao"><button class="btn btn-primary btn-sm" type="button" data-reconfigurar>Reconfigurar agora</button></div>` : html`<ol class="notice-passos">
         <li>Abra um terminal nesta máquina, na pasta do painel.</li>
         <li>Rode <span class="mono">./dashboard reconfigurar</span>.</li>
         <li>Confirme o passo "Preparar o servidor". Ele pede a senha do administrador do servidor.</li>
         <li>Espere a próxima coleta. Este aviso some sozinho.</li>
-      </ol>
+      </ol>`}
     </div></div>
     <span class="note mono">esperado ${c.expectedHash || '—'} · servidor ${c.hash || '—'}</span>
   </section>`;
@@ -398,6 +408,7 @@ export function render(ctx) {
     if (!t) return;
     if (t.dataset.ack) withBusy(t, ctx.act.ack(t.dataset.ack));
     else if ('annotate' in t.dataset) ctx.act.go('eventos');
+    else if ('reconfigurar' in t.dataset) ctx.act.reconfigurar();
   });
   loadDisk30(ctx);
   update(ctx);
