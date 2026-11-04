@@ -9,13 +9,14 @@ import { semear, criarPainel, CENARIOS } from '../../scripts/painel-teste.mjs';
 import { History } from '../../server/storage/index.js';
 import { OutageLog } from '../../server/storage/outages.js';
 import { listen, close, request } from '../../test-support/request.js';
+import { aoFim } from '../../test-support/limpeza.js';
 
 const MIN = 60000;
 const DAY = 1440 * MIN;
 const AGORA = Date.parse('2026-10-20T15:00:00-03:00');
 const pasta = (t) => {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'lsd-painel-teste-'));
-  t.after(() => fs.rmSync(dir, { recursive: true, force: true }));
+  aoFim(t, () => fs.rmSync(dir, { recursive: true, force: true }));
   return dir;
 };
 const abrir = (dir) => ({
@@ -66,7 +67,7 @@ test('painel de teste: /api/config tem os discos com SMART, como a instalação 
   const { coletar } = await semear(dir, 'vazio', { agora: AGORA });
   const { app, shutdown } = criarPainel(dir, 'vazio', coletar);
   const { server, port } = await listen(app);
-  t.after(async () => { await close(server); await shutdown(); });
+  aoFim(t, async () => { await close(server); await shutdown(); });
   const r = await request(port, { path: '/api/config' });
   assert.equal(r.status, 200);
   // Sem smartDevs, a Ajuda diria "nenhum disco em SMART_DEVS" ao lado do sudo liberado.
