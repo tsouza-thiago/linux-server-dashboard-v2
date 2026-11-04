@@ -9,6 +9,12 @@ diante: `PATCH` corrige, `MINOR` acrescenta sem quebrar e `MAJOR` quebra.
 
 ## [Não publicado]
 
+### Mudado
+
+- Roteiro dos testes no navegador (#144): o item de `--exige-reconfigurar` em
+  `docs/testes-no-navegador.md` diz as 2 formas do aviso da Visão geral. Com login, 3 itens e o botão
+  **Reconfigurar agora** (ADR 0038); sem login, 4 itens e o comando `./dashboard reconfigurar`.
+
 ## [2.5.0] — 2026-11-04
 
 Versão com a atualização e a reconfiguração pela tela. O painel procura versão nova 1 vez por dia,

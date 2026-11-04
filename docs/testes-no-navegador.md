@@ -130,7 +130,9 @@ Com `npm run painel-teste -- --versao-nova` (token `teste`), nos 2 temas:
 - Com `--resultado=voltou`, a tela diz que voltou para a versão anterior e não recarrega.
 - Com outro bloqueio, o botão fica desligado e o comando do terminal aparece.
 - Com `--exige-reconfigurar`, o aviso do topo e as novidades dizem que a versão exige reconfigurar, e
-  a Visão geral mostra o passo a passo de 4 itens.
+  a Visão geral mostra o aviso de configuração desatualizada. Com login, ele tem o passo a passo de 3
+  itens e o botão **Reconfigurar agora**. Sem login (`npm run painel-teste -- --exige-reconfigurar`,
+  sem `--versao-nova`), ele tem 4 itens e o comando `./dashboard reconfigurar`, sem o botão.
 - Com `#/visao-geral?atualizar=1` no endereço, a página abre o diálogo da versão nova, tira o pedido
   do endereço e não abre de novo ao recarregar.
 
