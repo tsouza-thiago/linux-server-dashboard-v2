@@ -99,8 +99,10 @@ e sem deixar uma janela de terminal aberta até o fim.
    diálogo do item Reconfigurar (`#/visao-geral?reconfigurar=1`), sem parar nada; qualquer opção, sem
    tela, sem login, painel parado ou pasta que a rota recusaria seguem pelo caminho de antes. Ajuda da
    CLI, README, TUTORIAL e AGENTS.
-8. Segurança: rota nova na matriz de ataque, mutações novas (tirar a sessão; aceitar o
-   código 2 vezes), ZAP autenticado, SECURITY.md e ADR.
+8. **Feita.** Segurança: a matriz de ataque com o executor falso (nenhum ataque dispara, deixa código
+   no disco ou cancela o assistente), 9 mutações novas além das das etapas anteriores, o ZAP
+   autenticado alcançando o executor falso e o modelo de ameaças no SECURITY.md (seção 23). Sem ADR
+   nova: as decisões estão nas ADRs 0034 a 0039.
 
 ## Testes
 

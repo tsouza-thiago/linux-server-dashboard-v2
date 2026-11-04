@@ -38,6 +38,11 @@ diante: `PATCH` corrige, `MINOR` acrescenta sem quebrar e `MAJOR` quebra.
   o comando abre o painel já logado, no diálogo do item Reconfigurar, no mesmo fluxo da engrenagem. Sem
   tela, sem login, com o painel parado ou com qualquer opção (`--terminal`, `--sem-interface`…), ele
   abre o assistente dali, como antes.
+- Segurança do "Reconfigurar pela tela" (#91, etapa 8 da F8): o modelo de ameaças no SECURITY.md
+  (seção 23). A matriz de ataque usa um executor falso e confere que nenhum ataque dispara a
+  reconfiguração, deixa código no disco ou cancela o assistente. O OWASP ZAP ataca a rota até o
+  executor falso e reprova se não chegar nele. Mais 9 mutações dos guardas: limite de mutações, código
+  curto, código na query ou no endereço, 1 h parado, Cancelar fora da tela e o log inteiro na tela.
 - `/api/atualizacao` traz `reconfiguracao` (`{em, motivos}`), e o painel de teste simula a troca
   painel ↔ assistente: `--reconfigurar`, `--reconfigurar=volta` e `--reconfigurar=recusa`.
 - Aviso de versão nova (#90, 1ª entrega da F7). O painel procura 1 vez por dia, só por tag assinada,
