@@ -9,6 +9,15 @@ import { fileURLToPath } from 'node:url';
 
 const ROOT = path.join(path.dirname(fileURLToPath(import.meta.url)), '..', '..');
 
+// Só o texto das mensagens: o horário de cada linha pode conter o valor recusado por acaso
+// (`.999Z`), e isso não é vazamento (#135).
+const semHorario = (saida) => saida.replace(/^\[[^\]]*\] /gm, '');
+
+test('semHorario: tira o horário de cada linha e mantém o número da mensagem', () => {
+  const saida = '[2026-11-01T17:14:56.999Z] primeira\n[2026-11-01T17:14:56.999Z] valor 999\n';
+  assert.equal(semHorario(saida), 'primeira\nvalor 999\n');
+});
+
 test('servidor avisa no log quando um limiar do .env é recusado (sem ecoar o valor)', async (t) => {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'lsd-avisos-'));
   const bin = path.join(dir, 'bin');
@@ -35,7 +44,8 @@ test('servidor avisa no log quando um limiar do .env é recusado (sem ecoar o va
   });
   child.kill('SIGTERM');
   await new Promise((r) => child.on('exit', r));
-  assert.match(out, /AVISO de configuração: ALERT_TEMP_C inválido \(aceita 30–110\); usando 60/);
-  assert.ok(!out.includes('999'), 'valor recusado não aparece no log');
-  assert.ok(!out.includes('ALERT_DISK_PCT'), 'valor válido não gera aviso');
+  const mensagens = semHorario(out);
+  assert.match(mensagens, /AVISO de configuração: ALERT_TEMP_C inválido \(aceita 30–110\); usando 60/);
+  assert.ok(!mensagens.includes('999'), 'valor recusado não aparece no log');
+  assert.ok(!mensagens.includes('ALERT_DISK_PCT'), 'valor válido não gera aviso');
 });
