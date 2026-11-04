@@ -85,9 +85,10 @@ function secao(s) {
 /**
  * Liga o menu, o aviso e o diálogo ao estado `atualizacao` do `store`. `pedidoDoTerminal`: a página
  * veio do `dashboard atualizar` (ADR 0032), que abre o menu, procura e mostra o diálogo.
- * `voltaDoAssistente`: a página veio do fim do assistente aberto pelo botão Reconfigurar.
+ * `reconfigurarDoTerminal`: a página veio do `dashboard reconfigurar` (ADR 0039), que abre o diálogo
+ * do Reconfigurar. `voltaDoAssistente`: a página veio do fim do assistente aberto pelo botão Reconfigurar.
  */
-export function iniciarManutencao({ store, toast, pedidoDoTerminal = false, voltaDoAssistente = false }) {
+export function iniciarManutencao({ store, toast, pedidoDoTerminal = false, reconfigurarDoTerminal = false, voltaDoAssistente = false }) {
   const botao = $('manutBtn');
   const menu = $('manutMenu');
   const aviso = $('avisoVersao');
@@ -432,6 +433,13 @@ export function iniciarManutencao({ store, toast, pedidoDoTerminal = false, volt
     if (!acompanhando) abrirNovidades();
   }
 
+  // O `dashboard reconfigurar` abre o mesmo diálogo do item do menu, com o estado de agora: uma troca
+  // ou reconfiguração em andamento vira o bloqueio, e a retomada de uma troca tem a preferência.
+  async function atenderReconfigurar() {
+    await recarregarEstado();
+    if (!acompanhando) abrirReconfigurar();
+  }
+
   botao.addEventListener('click', () => { if (menu.hidden) abrirMenu(); else fecharMenu(); });
   menu.addEventListener('click', onAcao);
   aviso.addEventListener('click', onAcao);
@@ -446,6 +454,7 @@ export function iniciarManutencao({ store, toast, pedidoDoTerminal = false, volt
   store.subscribe((_, mudou) => { if ('atualizacao' in mudou) render(); });
   render();
   if (pedidoDoTerminal) atenderTerminal();
+  else if (reconfigurarDoTerminal) atenderReconfigurar();
   else if (voltaDoAssistente) atenderVolta();
   // A Visão geral abre o mesmo diálogo pelo aviso de script desatualizado (ADR 0038).
   return { abrirReconfigurar: () => abrirReconfigurar() };

@@ -10,6 +10,7 @@ import path from 'node:path';
 import { makeOutput } from '../../server/cli/saida.js';
 import { diagnosticar, latestSample, permissionProblems, explainFailure, sshSettings } from '../../server/cli/diagnosticar.js';
 import { atualizar, afterUpdate, backupData, restoreData } from '../../server/cli/atualizar.js';
+import { instalar } from '../../server/cli/instalar.js';
 import { importarV1, detectV1, v1Settings, v1Pid, stopV1 } from '../../server/cli/importar-v1.js';
 import { desinstalar } from '../../server/cli/desinstalar.js';
 import { LINHA_PATH, editarArquivoDeLogin, unitText } from '../../server/setup/local.js';
@@ -392,6 +393,71 @@ test('atualizar: pasta errada para antes de abrir o painel (#118)', async (t) =>
   const deps = { env: { DISPLAY: ':0' }, openBrowser: (u) => { urls.push(u); return true; } };
   assert.equal(await atualizar({ out: m.out, root, home: tmp(t, 'dash-upd-home-'), deps }), 1);
   assert.deepEqual(urls, []);
+});
+
+// ---------------- reconfigurar (ADR 0039) ----------------
+
+// `dashboard reconfigurar` com o painel no ar: o mesmo cenário do atualizar com tela. O `open` é o
+// navegador; o `reexec` segura o preflight, que só roda quando o comando segue pelo caminho de hoje.
+function reconfigurarComTela(t, extra = {}) {
+  const ctx = comTela(t, extra);
+  const { openBrowser: open, ...deps } = ctx.deps;
+  return { ...ctx, deps: { ...deps, open, reexec: () => 7 } };
+}
+
+test('reconfigurar: com o painel no ar, abre o painel já logado no diálogo e não para nada aqui', { skip: !hasGit }, async (t) => {
+  const { clone, urls, deps, home } = reconfigurarComTela(t);
+  const m = memOut();
+  assert.equal(await instalar({ out: m.out, root: clone, home, args: [], reconfigurar: true, deps }), 0, m.text());
+  assert.match(m.text(), /painel aberto no navegador/);
+  assert.match(m.text(), /reconfigurar --terminal/);
+  const [, codigo] = /^http:\/\/127\.0\.0\.1:3311\/entrar\?codigo=([\w-]+)#\/visao-geral\?reconfigurar=1$/.exec(urls[0] ?? '') ?? [];
+  assert.ok(codigo, `link com o pedido: ${urls[0]}`);
+  assert.equal(consumeLoginCode(path.join(clone, 'data'), codigo), true, 'link de uso único, como o dashboard abrir');
+  assert.doesNotMatch(m.text(), /arquivos de terceiros|painel parado durante/, 'nem o preflight roda: quem para o painel é o --pela-tela, depois do clique');
+  assert.equal(fs.existsSync(path.join(clone, 'data', 'reconfigurar.json')), false, 'o código do assistente só sai da rota');
+});
+
+test('reconfigurar: sem tela, sem login, painel parado, pasta recusada ou sem navegador, segue pelo caminho de hoje', { skip: !hasGit }, async (t) => {
+  const casos = [
+    [{ env: {} }, /não há tela gráfica nesta sessão/],
+    [{ env: { WAYLAND_DISPLAY: 'wayland-0' }, panelStatus: () => ({ running: false }) }, /o painel está parado/],
+    [{ healthy: async () => false }, /o painel está parado/],
+    [{ abre: false }, /não consegui abrir o navegador/],
+  ];
+  for (const [extra, aviso] of casos) {
+    const { clone, deps, home } = reconfigurarComTela(t, extra);
+    const m = memOut();
+    await instalar({ out: m.out, root: clone, home, args: [], reconfigurar: true, deps });
+    assert.match(m.text(), aviso);
+    assert.match(m.text(), /sigo pelo assistente daqui/);
+  }
+  // Sem login, a pasta fora da instalação e a versão sem assinatura: a tela recusaria o clique e
+  // mandaria a pessoa de volta ao terminal, que abriria a mesma tela.
+  const semLogin = reconfigurarComTela(t);
+  fs.writeFileSync(path.join(semLogin.clone, '.env'), 'SSH_HOST=servidor\n');
+  const outraPasta = reconfigurarComTela(t);
+  fs.mkdirSync(path.dirname(unitPath(outraPasta.home)), { recursive: true });
+  fs.writeFileSync(unitPath(outraPasta.home), unitText({ root: '/opt/outro-painel', nodeBin: '/usr/bin/node' }));
+  const semAssinatura = reconfigurarComTela(t);
+  semAssinatura.g(semAssinatura.clone, 'tag', '-d', 'v2.0.0-alpha.8');
+  for (const [c, aviso] of [[semLogin, /este painel não tem login/], [outraPasta, /o serviço do painel roda de outra pasta/], [semAssinatura, /a versão desta pasta não passou na conferência da assinatura/]]) {
+    const m = memOut();
+    await instalar({ out: m.out, root: c.clone, home: c.home, args: [], reconfigurar: true, deps: c.deps });
+    assert.match(m.text(), aviso);
+    assert.match(m.text(), /sigo pelo assistente daqui/);
+    assert.deepEqual(c.urls, [], m.text());
+  }
+});
+
+test('reconfigurar: qualquer opção segue pelo caminho de hoje, e o instalar nunca abre o painel', { skip: !hasGit }, async (t) => {
+  for (const [args, reconfigurar] of [[['--terminal'], true], [['--sem-interface'], true], [['--sem-link'], true], [['--sem-assinatura'], true], [[], false]]) {
+    const { clone, urls, deps, home } = reconfigurarComTela(t);
+    const m = memOut();
+    await instalar({ out: m.out, root: clone, home, args, reconfigurar, deps });
+    assert.deepEqual(urls, [], `${args.join(' ')}: ${m.text()}`);
+    assert.doesNotMatch(m.text(), /painel aberto no navegador|sigo pelo assistente/);
+  }
 });
 
 test('atualizar --pre: pela tela, o executor aceita a rc só com a liberação do dono da pasta', { skip: !hasGit }, async (t) => {

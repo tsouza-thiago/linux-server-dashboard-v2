@@ -1,6 +1,7 @@
 // `dashboard instalar` e `dashboard reconfigurar` (ADR 0011): confere a versão
 // assinada, o Node 24, os arquivos de terceiros (SHA-256), o SSH e a porta, e abre o
 // assistente no navegador — ou a TUI (--terminal) ou o modo sem perguntas (--sem-interface).
+// `reconfigurar` sem opções, com o painel no ar, só abre o painel no diálogo do Reconfigurar (ADR 0039).
 // Com --pela-tela (interna, ADR 0034 e 0035), quem chama é o painel: sem terminal, sem código novo.
 // Desistir, ou um painel novo que não responde, religa o painel com a configuração anterior.
 import { spawnSync } from 'node:child_process';
@@ -13,7 +14,8 @@ import { currentVersionStatus, describeVersion, signedReleaseTags, installTag } 
 import { ensureDataDirs, guardarConfiguracao } from '../setup/local.js';
 import { LOG_PELA_TELA, retirarCodigoPelaTela } from '../setup/pela-tela.js';
 import { emAndamento } from '../atualizacao/registro.js';
-import { UNIT_NAME, openBrowser, panelHealthy, panelPort, panelStatus, portFree, startPanel, stopPanel, systemctlUser } from './servico.js';
+import { bloqueioDaReconfiguracao } from '../atualizacao/procurar.js';
+import { UNIT_NAME, motivoSemPainel, openBrowser, panelHealthy, panelPort, panelStatus, panelUrl, portFree, startPanel, stopPanel, systemctlUser } from './servico.js';
 import { makeOutput, mostrarComando } from './saida.js';
 
 // O assistente se desliga sozinho depois de 1 h sem nenhum pedido.
@@ -315,6 +317,36 @@ async function reconfigurarPelaTela({ root, home, deps }) {
   }
 }
 
+// A tela que o `dashboard reconfigurar` abre: a Visão geral, com o diálogo do Reconfigurar (ADR 0039).
+const TELA_DE_RECONFIGURAR = '#/visao-geral?reconfigurar=1';
+// O que a rota do painel recusaria depois do clique (ADR 0036). Recusar aqui evita a volta ao terminal,
+// que abriria a mesma tela de novo.
+const PASTA_RECUSADA = {
+  'outra-pasta': 'o serviço do painel roda de outra pasta',
+  'sem-assinatura': 'a versão desta pasta não passou na conferência da assinatura',
+};
+
+/**
+ * Com o painel no ar, o `reconfigurar` sem opções termina pela tela: abre o link de uso único no
+ * diálogo do Reconfigurar, e quem para o painel é o `--pela-tela`, depois do clique. false: segue
+ * pelo caminho de hoje (preflight e assistente daqui), depois de dizer o motivo.
+ */
+async function abrirNoPainel({ out, root, home, deps }) {
+  const motivo = await motivoSemPainel({ root, home, deps })
+    ?? PASTA_RECUSADA[bloqueioDaReconfiguracao(root, home, deps.gitRun)] ?? null;
+  if (motivo) {
+    out.line(out.c.dim(`${motivo}: sigo pelo assistente daqui.`));
+    return false;
+  }
+  if (!(deps.open ?? openBrowser)(panelUrl(root, panelPort(root), TELA_DE_RECONFIGURAR).url)) {
+    out.warn('não consegui abrir o navegador', 'sigo pelo assistente daqui');
+    return false;
+  }
+  out.ok('painel aberto no navegador', 'a reconfiguração continua no diálogo do Reconfigurar');
+  out.line(out.c.dim(`Prefere o terminal? Rode ${out.cmd} reconfigurar --terminal.`));
+  return true;
+}
+
 /**
  * `./dashboard instalar` e `./dashboard reconfigurar`: preflight, depois o caminho escolhido
  * (--importar-v1, --terminal, --sem-interface ou o assistente no navegador).
@@ -329,6 +361,8 @@ export async function instalar({ out, root, args, home, reconfigurar = false, de
     return reconfigurarPelaTela({ root, home, deps });
   }
   out.title(reconfigurar ? 'Server Dashboard · reconfigurar' : 'Server Dashboard · instalação');
+  // Qualquer opção segue pelo caminho de hoje: a tela não leva opção ao comando fixo do executor (I11).
+  if (reconfigurar && args.length === 0 && await abrirNoPainel({ out, root, home, deps })) return 0;
   // Roda o ./dashboard de novo com os mesmos argumentos (depois de trocar de versão).
   const reexec = deps.reexec ?? (() => {
     const env = { ...process.env, ...(process.env.DASHBOARD_NODE_ORIGEM === 'baixado' ? { DASHBOARD_NODE_BAIXADO: '1' } : {}) };

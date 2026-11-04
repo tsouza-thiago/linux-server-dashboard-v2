@@ -34,6 +34,10 @@ diante: `PATCH` corrige, `MINOR` acrescenta sem quebrar e `MAJOR` quebra.
   script de coleta termina com o botão, sem recarregar sozinha, e ele segue o mesmo fluxo do item
   Reconfigurar da engrenagem. Com login, o aviso de script desatualizado da Visão geral também traz o
   botão no lugar do comando do terminal. Sem login, os 2 continuam com `./dashboard reconfigurar`.
+- `dashboard reconfigurar` abre o painel (#91, etapa 7 da F8, ADR 0039): sem opções e com o painel no ar,
+  o comando abre o painel já logado, no diálogo do item Reconfigurar, no mesmo fluxo da engrenagem. Sem
+  tela, sem login, com o painel parado ou com qualquer opção (`--terminal`, `--sem-interface`…), ele
+  abre o assistente dali, como antes.
 - `/api/atualizacao` traz `reconfiguracao` (`{em, motivos}`), e o painel de teste simula a troca
   painel ↔ assistente: `--reconfigurar`, `--reconfigurar=volta` e `--reconfigurar=recusa`.
 - Aviso de versão nova (#90, 1ª entrega da F7). O painel procura 1 vez por dia, só por tag assinada,

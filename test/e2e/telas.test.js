@@ -191,6 +191,29 @@ test('e2e: dashboard atualizar — sem versão nova, o menu fica aberto com a ve
   assert.deepEqual(problems, []);
 });
 
+// `dashboard reconfigurar` com o painel no ar (ADR 0039): o link de uso único abre o diálogo do
+// Reconfigurar, sem disparar nada. Quem para a coleta é o clique em Reconfigurar agora.
+test('e2e: dashboard reconfigurar — link de uso único abre o diálogo do Reconfigurar, 1 vez', { skip: !chromium && 'sem playwright-core' }, async (t) => {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'dash-e2e-reconf-'));
+  t.after(() => fs.rmSync(dir, { recursive: true, force: true }));
+  const ctx = await setup(t, { dashToken: 'teste', dataDir: dir });
+  if (ctx.skip) return t.skip(ctx.skip);
+  const { page, base, problems } = ctx;
+  const pedidos = [];
+  page.on('request', (r) => { if (r.method() === 'POST') pedidos.push(new URL(r.url()).pathname); });
+  await page.goto(`${base}/entrar?codigo=${createLoginCode(dir)}#/visao-geral?reconfigurar=1`);
+  await page.waitForSelector('#novidadesDialog[open]');
+  assert.match(await page.textContent('#novidadesDialog h2'), /Reconfigurar o painel/);
+  assert.equal(await page.locator('#novidadesDialog [data-manut="reconfigurar-agora"]').count(), 1, 'sem bloqueio, o botão fica ligado');
+  assert.equal(new URL(page.url()).hash, '#/visao-geral', 'o pedido vale 1 vez');
+  assert.deepEqual(pedidos.filter((p) => p.startsWith('/api/reconfigurar')), [], 'abrir o diálogo não dispara nada');
+  await page.reload();
+  await page.waitForSelector('#manutBtn');
+  await page.waitForTimeout(300);
+  assert.equal(await page.locator('#novidadesDialog[open]').count(), 0, 'recarregar não abre de novo');
+  assert.deepEqual(problems, []);
+});
+
 test('e2e: script desatualizado no servidor — a Visão geral mostra o passo a passo', { skip: !chromium && 'sem playwright-core' }, async (t) => {
   const ctx = await setup(t, { sshAccess: 'restrito' });
   if (ctx.skip) return t.skip(ctx.skip);

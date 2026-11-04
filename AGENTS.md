@@ -179,6 +179,11 @@ O teste `test/unit/docs.test.js` confere esta documentação contra o código.
 - **Reconfigurar agora** (ADR 0038, F8): a troca para uma versão com `exigeReconfigurar` termina com o
   botão, sem a recarga de 3 s, e o aviso de `hashMismatch` da Visão geral também o traz. Os 2 usam o
   disparo da ADR 0036; sem login, os 2 mostram `./dashboard reconfigurar`.
+- **`dashboard reconfigurar` abre a tela** (ADR 0039, F8): sem nenhuma opção e com o painel no ar, o
+  comando só abre o link de uso único com o fragmento `#/visao-geral?reconfigurar=1`, que abre o diálogo
+  do item Reconfigurar 1 vez. Não para o painel nem cria código: isso é do clique. Sem tela, sem login,
+  com o painel parado, sem navegador, com a pasta que a rota recusaria (`outra-pasta`, `sem-assinatura`)
+  ou com qualquer opção (a tela não leva opção ao comando fixo, I11), segue pelo caminho de antes.
 - **Code scanning** (CodeQL padrão do GitHub, a cada push): todo alerta é corrigido ou
   descartado como falso positivo com a análise em `docs/seguranca/` e, se possível, um
   teste que falhe na forma errada. Não aplique a sugestão do CodeQL sem conferir o formato
@@ -326,7 +331,7 @@ navegador. O backend só coleta, persiste e serve. O limite de 1 SSH por minuto 
 ./dashboard parar               # para só o processo do painel desta pasta (PID conferido, B12)
 ./dashboard status              # rodando ou parado
 ./dashboard diagnosticar        # explica cada problema; reaproveita a última amostra e só coleta se ela estiver velha
-./dashboard reconfigurar        # reabre o assistente
+./dashboard reconfigurar        # com o painel no ar, abre o painel logado no diálogo do Reconfigurar; sem tela, sem login, painel parado ou qualquer opção, reabre o assistente daqui (--terminal: TUI)
 ./dashboard atualizar           # abre o painel logado, no diálogo da versão nova; sem tela, sem login ou com o painel parado, segue no terminal; só na pasta da instalação (com .env e dona do serviço)
 ./dashboard atualizar --terminal  # tudo no terminal: tag assinada mais nova, backup de data/, volta atrás se falhar
 ./dashboard desinstalar         # remove daqui e oferece limpar a parte deste computador no servidor

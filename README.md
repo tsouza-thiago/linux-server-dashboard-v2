@@ -122,7 +122,7 @@ Na pasta do projeto:
 | `./dashboard status` | Mostra se o painel está rodando |
 | `./dashboard iniciar` / `./dashboard parar` | Liga ou desliga o painel (o servidor não é afetado) |
 | `./dashboard diagnosticar` | Testa tudo e explica cada problema |
-| `./dashboard reconfigurar` | Reabre o assistente (outro servidor, disco novo, outro serviço) |
+| `./dashboard reconfigurar` | Outro servidor, disco novo, outro serviço. Com o painel no ar, abre o painel já logado, no diálogo do Reconfigurar. Com `--terminal`, sem tela ou com o painel parado, abre o assistente dali |
 | `./dashboard atualizar` | Abre o painel já logado, no diálogo da versão nova. Com `--terminal`, sem tela ou com o painel parado, faz tudo no terminal |
 | `./dashboard desinstalar` | Remove o painel e o comando deste computador e oferece limpar a parte dele no servidor |
 | `./dashboard versao` | Mostra a versão |
