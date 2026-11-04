@@ -4,12 +4,13 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
+import http from 'node:http';
 import os from 'node:os';
 import path from 'node:path';
 import { createApp } from '../../server/index.js';
 import { listen, close } from '../../test-support/request.js';
 import { APERTADO, pressiona, semHover, sobe } from '../../test-support/hover.js';
-import { atualizacaoFalsa, procurarFalso, reconfiguracaoFalsa } from '../../scripts/painel-teste.mjs';
+import { atualizacaoFalsa, portaTrocavel, procurarFalso, reconfiguracaoFalsa } from '../../scripts/painel-teste.mjs';
 import { createLoginCode } from '../../server/http/entrar.js';
 
 let chromium = null;
@@ -63,13 +64,15 @@ async function setup(t, extra = {}) {
   const app = createApp({
     historyFile: path.join(dir, 'history.json'), alertsFile: path.join(dir, 'alerts.json'),
     annotationsFile: path.join(dir, 'annotations.json'), collect: async () => ({ ok: false, error: 'sem coleta no e2e' }),
-    log: () => {}, ...extra, viewport: undefined, amostra: undefined,
+    log: () => {}, ...extra, viewport: undefined, amostra: undefined, portaUnica: undefined, limparAssistentes: undefined,
   });
   const now = Date.now();
   const amostra = extra.amostra || sample;
   for (let i = 0; i < 120; i++) app.store.append(amostra(now - (120 - i) * 60e3, i));
   app.engine.onSample(app.store.getLatest());
-  const { server, port } = await listen(app.app);
+  // Com `portaUnica`, o painel divide a porta com o assistente falso, como na reconfiguração de verdade.
+  if (extra.portaUnica) extra.portaUnica.usarPainel(app.app);
+  const { server, port } = await listen(extra.portaUnica ? { listen: (...a) => http.createServer(extra.portaUnica.handler).listen(...a) } : app.app);
   let browser;
   try {
     browser = await chromium.launch({ executablePath: process.env.CHROMIUM || undefined });
@@ -84,6 +87,7 @@ async function setup(t, extra = {}) {
   page.on('pageerror', (e) => problems.push(e.message));
   t.after(async () => {
     await browser.close();
+    extra.limparAssistentes?.();
     await app.shutdown();
     await close(server);
     fs.rmSync(dir, { recursive: true, force: true });
@@ -253,11 +257,13 @@ test('e2e: atualizar — voltou atrás mostra o resultado e não recarrega', { s
   assert.deepEqual(problems, []);
 });
 
-// O item Reconfigurar (ADR 0036): o diálogo explica antes, e os bloqueios aparecem nele.
-test('e2e: reconfigurar — menu, explicação, disparo e link do assistente', { skip: !chromium && 'sem playwright-core' }, async (t) => {
+// O item Reconfigurar (ADR 0036): o diálogo explica antes, e os bloqueios aparecem nele. Depois do
+// clique, a tela espera o assistente e entra sozinha (etapa 5 da F8); cancelar volta ao painel.
+test('e2e: reconfigurar — menu, explicação, espera, entrada no assistente e cancelar', { skip: !chromium && 'sem playwright-core' }, async (t) => {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'dash-e2e-reconf-'));
   t.after(() => fs.rmSync(dir, { recursive: true, force: true }));
-  const ctx = await setup(t, { ...reconfiguracaoFalsa(dir), dashToken: 'e2e-teste' });
+  const portaUnica = portaTrocavel();
+  const ctx = await setup(t, { ...reconfiguracaoFalsa(dir, { trocar: portaUnica.trocar, passoMs: 1500 }), portaUnica, dashToken: 'e2e-teste' });
   if (ctx.skip) return t.skip(ctx.skip);
   const { page, base, problems } = ctx;
   await page.request.post(`${base}/api/login`, { data: { token: 'e2e-teste' } });
@@ -275,12 +281,67 @@ test('e2e: reconfigurar — menu, explicação, disparo e link do assistente', {
   await page.click('#manutBtn');
   await page.click('#manutMenu [data-manut="reconfigurar"]');
   await page.click('[data-manut="reconfigurar-agora"]');
-  await page.waitForSelector('#abrirAssistente');
-  assert.match(await page.getAttribute('#abrirAssistente', 'href'), /^\/configurar#codigo=[0-9A-F]{32}$/);
-  assert.equal(fs.existsSync(path.join(dir, 'data', 'reconfigurar.json')), true);
+  await page.waitForSelector('#reconfigurarFase');
+  assert.equal(await page.$('#abrirAssistente'), null, 'nada de link: a página entra sozinha');
+  // Clique real antes: sem ativação do usuário, o navegador fecha o diálogo no Esc de qualquer jeito.
   await page.keyboard.press('Escape');
-  assert.ok(await page.isVisible('#novidadesDialog[open]'), 'o Esc não joga fora o único link do assistente');
+  assert.ok(await page.isVisible('#novidadesDialog[open]'), 'o Esc não interrompe a espera');
+  await page.waitForURL(/\/configurar$/, { timeout: 20000 });
+  await page.waitForSelector('#wz-main h1');
+  assert.doesNotMatch(await page.textContent('#wz-main'), /código do terminal/i, 'entrou sozinha, sem pedir código');
+  assert.equal(await page.evaluate(() => location.hash), '', 'o código sai do endereço');
+  await page.click('#wzCancelar');
+  assert.match(await page.textContent('#wz-main h1'), /Cancelar a reconfiguração/);
+  await page.click('[data-act="ficar"]');
+  assert.ok(await page.isVisible('#wzCancelar'), 'continuar no assistente traz o botão de volta');
+  await page.click('#wzCancelar');
+  await page.click('[data-act="cancelar"]');
+  await page.waitForURL(/#\/visao-geral$/, { timeout: 20000 });
+  await page.waitForSelector('#manutBtn');
+  assert.ok(await page.isHidden('#login'), 'continua logado');
+  assert.deepEqual(problems.filter((p) => !/Failed to load resource|ERR_|net::/.test(p)), []);
+});
+
+test('e2e: reconfigurar — o comando recusa depois do 202: a tela mostra o motivo e solta o diálogo', { skip: !chromium && 'sem playwright-core' }, async (t) => {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'dash-e2e-reconf-recusa-'));
+  t.after(() => fs.rmSync(dir, { recursive: true, force: true }));
+  const portaUnica = portaTrocavel();
+  const ctx = await setup(t, { ...reconfiguracaoFalsa(dir, { trocar: portaUnica.trocar, resultado: 'recusa', passoMs: 500 }), portaUnica, dashToken: 'e2e-teste' });
+  if (ctx.skip) return t.skip(ctx.skip);
+  const { page, base, problems } = ctx;
+  await page.request.post(`${base}/api/login`, { data: { token: 'e2e-teste' } });
+  await page.goto(base);
+  await page.click('#manutBtn');
+  await page.click('#manutMenu [data-manut="reconfigurar"]');
+  await page.click('[data-manut="reconfigurar-agora"]');
+  await page.waitForSelector('#reconfigurarMotivos', { timeout: 15000 });
+  assert.match(await page.textContent('#reconfigurarMotivos'), /atualização em andamento/);
+  assert.match(await page.textContent('#novidadesDialog'), /continua no ar/);
+  assert.equal(await page.$('#abrirAssistente'), null, 'o código não serve mais');
+  await page.keyboard.press('Escape');
+  assert.ok(await page.isHidden('#novidadesDialog'), 'depois do fim, o Esc volta a fechar');
+  assert.deepEqual(problems, []);
+});
+
+test('e2e: reconfigurar — de volta do assistente, a Visão geral diz se a configuração valeu', { skip: !chromium && 'sem playwright-core' }, async (t) => {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'dash-e2e-reconf-volta-'));
+  t.after(() => fs.rmSync(dir, { recursive: true, force: true }));
+  const ctx = await setup(t, { ...reconfiguracaoFalsa(dir), dashToken: 'e2e-teste' });
+  if (ctx.skip) return t.skip(ctx.skip);
+  const { page, base, problems } = ctx;
+  const log = path.join(dir, 'data', 'reconfigurar.log');
+  await page.request.post(`${base}/api/login`, { data: { token: 'e2e-teste' } });
+  fs.writeFileSync(log, '✓ assistente concluído e desligado\n✗ o painel não subiu com a configuração nova (o painel não respondeu)\n✓ painel de volta com a configuração anterior\n');
+  await page.goto(`${base}/#/visao-geral?reconfigurado=1`);
+  await page.waitForSelector('#reconfigurarMotivos');
+  assert.match(await page.textContent('#reconfigurarMotivos'), /não subiu com a configuração nova/);
+  assert.doesNotMatch(await page.textContent('#reconfigurarMotivos'), /painel de volta/, 'só as falhas');
+  assert.equal(await page.evaluate(() => location.hash), '#/visao-geral', 'o pedido vale 1 vez');
   await page.click('[data-manut="fechar"]');
+  fs.writeFileSync(log, '✓ assistente concluído e desligado\n✓ painel rodando como serviço de usuário\n');
+  await page.goto('about:blank');
+  await page.goto(`${base}/#/visao-geral?reconfigurado=1`);
+  await page.waitForSelector('#toasts :text("reconfigurado")', { timeout: 5000 });
   assert.ok(await page.isHidden('#novidadesDialog'));
   assert.deepEqual(problems, []);
 });

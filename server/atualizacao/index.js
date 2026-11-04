@@ -9,7 +9,7 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { JsonStore } from '../stores.js';
 import { compareVersions } from '../setup/assinatura.js';
-import { criarCodigoPelaTela, retirarCodigoPelaTela } from '../setup/pela-tela.js';
+import { criarCodigoPelaTela, lerResultadoPelaTela, retirarCodigoPelaTela } from '../setup/pela-tela.js';
 import { emAndamento, lerRegistro, prepararRegistro, registrarFalha } from './registro.js';
 
 const DIA_MS = 24 * 3600000;
@@ -101,6 +101,8 @@ export class Atualizacao {
       erro: d.erro ?? null,
       modo: this.modo,
       bloqueio: this.bloqueio(),
+      // As falhas da última reconfiguração pela tela: a tela compara o instante com o do clique.
+      reconfiguracao: lerResultadoPelaTela(path.join(this.root, 'data')),
     };
   }
 

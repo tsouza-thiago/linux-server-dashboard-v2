@@ -50,6 +50,24 @@ export function createWizardApp({ inst, code, codeHash = null, onFinish = () => 
   let pendingHash = codeHash ?? hash(normalizeCode(code));
   let failures = 0;
   let sessionHash = null;
+  // Aberto pelo painel (`--pela-tela`): não há terminal para olhar, e o código veio do botão
+  // Reconfigurar. Os textos mudam, e cancelar devolve o painel (ADR 0034).
+  const pelaTela = Boolean(onCancel);
+  const TEXTO = pelaTela
+    ? {
+      vencido: 'Este código não vale mais. O painel volta sozinho depois de 15 minutos sem uso; depois, peça de novo pela engrenagem.',
+      incorreto: 'Código incorreto. O painel volta sozinho depois de 15 minutos sem uso; depois, peça de novo pela engrenagem.',
+      semSessao: 'Este assistente só abre pelo botão Reconfigurar do painel.',
+      inesperado: 'Algo deu errado aqui. Tente de novo; se continuar, cancele: o painel volta com a configuração de antes.',
+      concluir: 'Não consegui concluir. Tente de novo; se continuar, cancele: o painel volta com a configuração de antes.',
+    }
+    : {
+      vencido: 'Este código não vale mais. Rode ./dashboard instalar de novo no terminal.',
+      incorreto: 'Código incorreto. Confira o que aparece no terminal.',
+      semSessao: 'Digite o código que aparece no terminal.',
+      inesperado: 'Algo deu errado aqui. Veja o terminal.',
+      concluir: 'Não consegui concluir. Veja o terminal.',
+    };
 
   // As mesmas proteções do painel, na mesma ordem (conferida pela matriz de ataque).
   const app = createRouter();
@@ -74,12 +92,12 @@ export function createWizardApp({ inst, code, codeHash = null, onFinish = () => 
   app.post('/api/configurar/entrar', loginLimit, (req, res) => {
     const given = normalizeCode(req.body && req.body.codigo);
     if (!pendingHash || failures >= MAX_FAILURES || now() - createdAt > codeTtlMs) {
-      return res.status(410).json({ error: 'Este código não vale mais. Rode ./dashboard instalar de novo no terminal.' });
+      return res.status(410).json({ error: TEXTO.vencido, pelaTela });
     }
     if (!safeEqual(hash(given), pendingHash)) {
       failures += 1;
       log('assistente: código de uso único incorreto');
-      return res.status(401).json({ error: 'Código incorreto. Confira o que aparece no terminal.' });
+      return res.status(401).json({ error: TEXTO.incorreto, pelaTela });
     }
     pendingHash = null; // uso único: o mesmo código não entra de novo
     const sid = crypto.randomBytes(32).toString('base64url');
@@ -91,7 +109,8 @@ export function createWizardApp({ inst, code, codeHash = null, onFinish = () => 
   app.use('/api/configurar', (req, res, next) => {
     const sid = parseCookies(req.headers.cookie)[SETUP_COOKIE];
     if (sessionHash && sid && safeEqual(hash(sid), sessionHash)) return next();
-    return res.status(401).json({ error: 'Digite o código que aparece no terminal.', codigo: true });
+    // `pelaTela` também aqui: sem sessão, a tela troca o pedido de código pela explicação.
+    return res.status(401).json({ error: TEXTO.semSessao, codigo: true, pelaTela });
   });
 
   // Depois da exigência de sessão: só quem entrou no assistente pode desistir dele.
@@ -110,12 +129,13 @@ export function createWizardApp({ inst, code, codeHash = null, onFinish = () => 
     } catch (err) {
       if (err instanceof InstallError) return res.status(err.status).json({ error: err.message, field: err.field, detalhes: err.detalhes });
       log(`assistente: erro inesperado: ${err.stack || err.message}`);
-      return res.status(500).json({ error: 'Algo deu errado aqui. Veja o terminal.' });
+      return res.status(500).json({ error: TEXTO.inesperado });
     }
   };
 
   app.get('/api/configurar/estado', handle(() => ({
     passos: STEPS,
+    pelaTela,
     computador: inst.verificarComputador(),
     servidor: inst.servidor,
     acesso: { modo: inst.acesso.modo, apelido: inst.acesso.apelido || '' },
@@ -151,7 +171,7 @@ export function createWizardApp({ inst, code, codeHash = null, onFinish = () => 
     } catch (err) {
       if (err instanceof InstallError) return res.status(err.status).json({ error: err.message });
       log(`assistente: erro ao concluir: ${err.stack || err.message}`);
-      return res.status(500).json({ error: 'Não consegui concluir. Veja o terminal.' });
+      return res.status(500).json({ error: TEXTO.concluir });
     }
   });
 

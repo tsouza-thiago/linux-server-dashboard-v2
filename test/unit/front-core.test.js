@@ -3,7 +3,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { html, raw, escape, mount } from '../../public/js/core/html.js';
 import * as fmt from '../../public/js/core/format.js';
-import { parseHash, buildHash, veioDoAtualizar, VIEWS, PERIODS, viewByKey } from '../../public/js/core/router.js';
+import { parseHash, buildHash, veioDoAtualizar, veioDoAssistente, VIEWS, PERIODS, viewByKey } from '../../public/js/core/router.js';
 import { createStore } from '../../public/js/core/store.js';
 import { formatoDe, lembrarFormato } from '../../public/js/core/formato.js';
 import { series, xs, keysWith, diskEta, dailySummary, headline, fullestDisk, timeline, isOffline, mergeAlerts, ALERTS_LIMIT } from '../../public/js/core/analysis.js';
@@ -97,6 +97,9 @@ test('router: tela e período na URL, com padrões para valores desconhecidos', 
   assert.equal(veioDoAtualizar('#/visao-geral?atualizar=1'), true);
   assert.equal(veioDoAtualizar('#/visao-geral?p=7d'), false);
   assert.equal(veioDoAtualizar(''), false);
+  assert.equal(veioDoAssistente('#/visao-geral?reconfigurado=1'), true);
+  assert.equal(veioDoAssistente('#/visao-geral?atualizar=1'), false);
+  assert.equal(veioDoAssistente(''), false);
   assert.equal(buildHash({ view: 'rede', period: '90d' }), '#/rede?p=90d');
   assert.equal(PERIODS['90d'], 90 * 86400e3);
   assert.equal(viewByKey('6').id, 'eventos');

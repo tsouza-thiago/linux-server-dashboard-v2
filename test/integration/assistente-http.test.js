@@ -188,3 +188,40 @@ test('cancelar: só com a sessão do assistente, e a rota só existe pela tela',
   await terminal.login();
   assert.equal((await terminal.post('cancelar')).status, 404);
 });
+
+// Etapa 5 da F8: pela tela não há terminal para olhar. A tela sabe do modo até sem sessão.
+test('--pela-tela: o estado diz o modo, e os textos não mandam olhar o terminal', async (t) => {
+  const hash = crypto.createHash('sha256').update('ABCDEF0123456789').digest('hex');
+  const w = await start(t, { code: undefined, codeHash: hash, onCancel: () => {} });
+  // A tela do painel reconhece o assistente por este redirecionamento (o painel nunca redireciona /).
+  const raiz = await request(w.port, { path: '/' });
+  assert.deepEqual([raiz.status, raiz.headers.location], [302, '/configurar']);
+  const sem = await w.get('estado');
+  assert.equal(sem.status, 401);
+  assert.equal(sem.json.codigo, true);
+  assert.equal(sem.json.pelaTela, true);
+  const errado = await w.login('errado');
+  assert.equal(errado.status, 401);
+  assert.equal(errado.json.pelaTela, true);
+  assert.equal((await w.login('ABCDEF0123456789')).status, 200);
+  const usado = await w.login('ABCDEF0123456789');
+  assert.equal(usado.status, 410);
+  for (const r of [sem, errado, usado]) assert.doesNotMatch(r.json.error, /terminal/);
+  assert.equal((await w.get('estado')).json.pelaTela, true);
+  const terminal = await start(t);
+  assert.match((await terminal.get('estado')).json.error, /terminal/);
+  assert.equal((await terminal.get('estado')).json.pelaTela, false);
+  await terminal.login();
+  assert.equal((await terminal.get('estado')).json.pelaTela, false);
+});
+
+test('--pela-tela: erro inesperado manda cancelar, não olhar o terminal', async (t) => {
+  const hash = crypto.createHash('sha256').update('ABCDEF0123456789').digest('hex');
+  const w = await start(t, { code: undefined, codeHash: hash, onCancel: () => {} });
+  await w.login('ABCDEF0123456789');
+  w.inst.definirServidor = async () => { throw new Error('detalhe interno'); };
+  const r = await w.post('servidor', { host: '192.0.2.10', user: 'maria' });
+  assert.equal(r.status, 500);
+  assert.match(r.json.error, /cancele/);
+  assert.doesNotMatch(r.json.error, /terminal|detalhe interno/);
+});

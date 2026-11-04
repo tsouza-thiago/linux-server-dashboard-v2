@@ -171,6 +171,11 @@ O teste `test/unit/docs.test.js` confere esta documentação contra o código.
   a configuração, religa o painel, devolve o "iniciar com o computador" e sai com código 1, com o motivo
   em `data/reconfigurar.log`. A cópia nunca vai para o disco: uma sobra velha desfaria uma configuração
   boa. Depois do assistente, o `SIGTERM` espera o fim. O `dashboard reconfigurar` do terminal não volta.
+- **Espera e motivo na tela** (ADR 0037, F8): depois do 202, a tela pede `/` sem seguir redirecionamento
+  até o assistente responder com o 302 dele, e entra em `/configurar` com o código no fragmento, que não
+  vai ao servidor. O motivo de uma recusa ou de uma volta chega pelo estado de `/api/atualizacao`
+  (`reconfiguracao`): só as linhas de falha do `data/reconfigurar.log`, no máximo 5, curtas. A espera
+  acaba em 90 s. Pela tela, o assistente tem o botão Cancelar e não manda olhar o terminal.
 - **Code scanning** (CodeQL padrão do GitHub, a cada push): todo alerta é corrigido ou
   descartado como falso positivo com a análise em `docs/seguranca/` e, se possível, um
   teste que falhe na forma errada. Não aplique a sugestão do CodeQL sem conferir o formato
@@ -337,7 +342,7 @@ npm run capturar-telas          # refaz docs/img/ a partir do painel de teste (-
 npm run migrar-v1 -- --verificar  # resume o data/history.json da V1 sem gravar nada
 npm run migrar-v1               # migra a V1 agora (o painel também migra sozinho ao iniciar)
 npm run soak                    # soak acelerado: 83 h de coletas simuladas e pedidos de 90 dias; confere RAM e vazamento
-npm run painel-teste            # painel de teste com dados semeados (--cenario=normal|lacunas|offline|vazio, --porta=3943, --versao-nova, --exige-reconfigurar, --reconfigurar[=bloqueio])
+npm run painel-teste            # painel de teste com dados semeados (--cenario=normal|lacunas|offline|vazio, --porta=3943, --versao-nova, --exige-reconfigurar, --reconfigurar[=volta|recusa|bloqueio])
 scripts/e2e-instalacao/rodar.sh # instalação e botão Atualizar de ponta a ponta em contêineres Debian/Ubuntu, com e sem systemd
 ```
 
@@ -505,7 +510,7 @@ Tudo fica no disco local. Nada é gravado no servidor.
 | `data/sessions.json` | SHA-256 das sessões do navegador |
 | `data/atualizacao.json` | Última procura de versão nova: quando, versão achada, novidades, erro e bloqueio (ADR 0030) |
 | `data/entrar.json` | Hash do link de entrada de uso único (2 min no `./dashboard abrir`, 10 min no fim da instalação) |
-| `data/reconfigurar.json`, `data/reconfigurar.log` | Hash do código do "Reconfigurar pela tela" (5 min, sai do disco ao ser lido) e a saída da última vez, sem segredos, com o motivo se o painel novo não subiu (ADR 0034 e 0035) |
+| `data/reconfigurar.json`, `data/reconfigurar.log` | Hash do código do "Reconfigurar pela tela" (5 min, sai do disco ao ser lido) e a saída da última vez, sem segredos, com o motivo se o painel novo não subiu (ADR 0034 e 0035). A tela lê só as linhas de falha (ADR 0037) |
 | `data/ssh/` | `config` e `known_hosts` próprios do painel (0700) |
 | `data/dashboard.log` | Log (gira em 5 MB para `dashboard.log.1`) |
 | `data/dashboard.pid`, `data/dashboard-erros.log` | Modo segundo plano (sem systemd): PID e erros de inicialização |
@@ -547,7 +552,7 @@ segurança, rate limit das mutações e error handler sem stack trace. Com `DASH
 | `/api/status` | GET | Última amostra + meta (online, lastPollAt, nextPollAt, offlineSince) + saúde + alertas ativos |
 | `/api/history` | GET | `?limit=N&from=&to=` → amostras (reduzidas a `limit`: padrão 720, máximo 2000, com o pior caso de cada grupo; `topProcs` só na mais recente). `&formato=baldes` → `{from, to, step, buckets}` com mín/máx/média, até 90 dias |
 | `/api/config` | GET | Configuração ativa para a Ajuda: versões, alvos, modo de acesso, limiares (sem segredos) |
-| `/api/atualizacao` | GET | `{instalada, nova, novidades, exigeReconfigurar, verificadoEm, erro, modo, bloqueio}`. `novidades` é `{secoes: [{versao, data, texto}], cortado, exigeReconfigurar}`; o `exigeReconfigurar` de fora só vale no acesso restrito; `erro` é `sem-acesso` ou `falhou`; `modo` é `systemd`, `segundo-plano` ou `null`; `bloqueio` é `sem-login`, `rodando`, `sem-git`, `arquivos-alterados` ou `outra-pasta` |
+| `/api/atualizacao` | GET | `{instalada, nova, novidades, exigeReconfigurar, verificadoEm, erro, modo, bloqueio, reconfiguracao}`. `reconfiguracao` é `null` ou `{em, motivos}`: o instante do `data/reconfigurar.log` e só as linhas de falha dele, até 5 (ADR 0037). `novidades` é `{secoes: [{versao, data, texto}], cortado, exigeReconfigurar}`; o `exigeReconfigurar` de fora só vale no acesso restrito; `erro` é `sem-acesso` ou `falhou`; `modo` é `systemd`, `segundo-plano` ou `null`; `bloqueio` é `sem-login`, `rodando`, `sem-git`, `arquivos-alterados` ou `outra-pasta` |
 | `/api/atualizacao/verificar` | POST | Procura versão nova agora e devolve o mesmo estado. No máximo 1 por minuto (429 acima) |
 | `/api/atualizacao/iniciar` | POST | `{versao}` igual à versão nova detectada → 202 `{alvo}`; senão, com `bloqueio` ou sem executor (testes e painel de teste), 409. Se o executor não subir, 503 (I11) |
 | `/api/atualizacao/registro` | GET | `?desde=<byte>` → `{texto, proximo, fase, alvo, de, inicio, fim, resultado, rodando}`: o pedaço novo do log, em linhas inteiras, até 64 KB. `fase`: `iniciando`, `procurando`, `trocando`, `ligando`, `voltando` ou `fim`; `resultado`: `atualizado`, `ja-na-mais-nova`, `voltou`, `falhou` ou `interrompida` |
@@ -565,7 +570,8 @@ segurança, rate limit das mutações e error handler sem stack trace. Com `DASH
 Durante a instalação, o assistente (`server/setup/web.js`) roda num servidor temporário,
 na mesma porta e com as mesmas proteções: `/configurar` (a página) e `/api/configurar/*`
 (os passos). Ele só abre com o código de uso único mostrado no terminal (30 min, 20
-tentativas).
+tentativas). Aberto pela tela (`--pela-tela`), ele aceita o código que o painel entregou ao navegador,
+`/api/configurar/estado` traz `pelaTela: true` e `POST /api/configurar/cancelar` devolve o painel.
 
 ## Alertas
 
