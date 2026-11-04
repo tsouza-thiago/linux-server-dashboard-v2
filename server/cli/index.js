@@ -27,7 +27,11 @@ const HELP = `Uso: ./dashboard <comando>
   parar           para o painel
   status          mostra se o painel está rodando
   diagnosticar    testa tudo e explica cada problema em português simples
-  reconfigurar    reabre o assistente (trocar servidor, discos, serviços)
+  reconfigurar    trocar servidor, discos, serviços: com o painel no ar, abre o painel já logado,
+                  no diálogo do Reconfigurar; sem tela, sem login, com o painel parado ou com
+                  qualquer opção, abre o assistente daqui
+                    --terminal       os mesmos passos no terminal (máquina sem tela)
+                    --sem-interface  sem perguntas, por opções
   atualizar       abre o painel já logado, no diálogo da versão nova (sem tela ou com o painel
                   parado, segue no terminal); backup e volta atrás se falhar
                     --terminal       faz tudo no terminal, sem abrir o navegador

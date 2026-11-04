@@ -190,7 +190,7 @@ coleta) e explica cada problema com "O que aconteceu" e "Como resolver".
 ```bash
 ./dashboard atualizar      # abre o painel no diálogo da versão nova; faz backup e volta atrás se falhar
 ./dashboard atualizar --terminal  # o mesmo, todo no terminal
-./dashboard reconfigurar   # trocar servidor, discos, pastas ou serviços (reabre o assistente)
+./dashboard reconfigurar   # trocar servidor, discos, pastas ou serviços (abre o painel no diálogo do Reconfigurar)
 ./dashboard desinstalar    # remove daqui e oferece limpar a parte deste computador no servidor
 ```
 
@@ -221,6 +221,13 @@ estiver desatualizado:
 3. No fim, o painel volta sozinho. Espere a próxima coleta: o aviso da Visão geral some sozinho.
 
 Sem login no painel, rode `./dashboard reconfigurar` no terminal no lugar do 1º passo.
+
+**Como reconfigurar?** Clique na engrenagem no topo e em **Reconfigurar**, ou rode
+`./dashboard reconfigurar`: com o painel no ar, ele abre o painel já logado, no mesmo diálogo. Clique
+em **Reconfigurar agora**. A coleta pausa, o assistente abre e, no fim ou ao cancelar, o painel volta
+sozinho. Se o assistente ficar parado por 15 min, o painel volta com a configuração de antes. Sem tela
+gráfica, sem login, com o painel parado ou com qualquer opção (`--terminal`, por exemplo), o comando
+abre o assistente dali, como antes.
 
 **Rode na pasta da instalação.** O `atualizar` só vale na pasta onde o painel foi instalado.
 Numa cópia sem `.env`, ou com o serviço em outra pasta, ele para sem alterar nada e mostra a pasta

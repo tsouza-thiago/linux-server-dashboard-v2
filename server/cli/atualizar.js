@@ -14,7 +14,7 @@ import { recortarNovidades } from '../atualizacao/novidades.js';
 import { abrirRegistro, cancelarPre, liberarPre, pegarTrava, preLiberada, soltarTrava } from '../atualizacao/registro.js';
 import { loadEnvFile } from '../config.js';
 import { installService, situacaoDoLink } from '../setup/local.js';
-import { openBrowser, otherServiceRoot, panelHealthy, panelPort, panelStatus, panelUrl, startPanel, stopPanel, unitPath, systemctlUser, UNIT_NAME } from './servico.js';
+import { motivoSemPainel, openBrowser, otherServiceRoot, panelHealthy, panelPort, panelStatus, panelUrl, startPanel, stopPanel, unitPath, systemctlUser, UNIT_NAME } from './servico.js';
 import { parseFlags } from './instalar.js';
 import { makeOutput } from './saida.js';
 
@@ -184,20 +184,9 @@ async function trocarDeVersao({ out, root, home, deps, flags, run, registro }) {
   return 1;
 }
 
-// Por que a atualização fica no terminal; null se o painel pode cuidar dela.
-async function motivoDoTerminal({ root, home, deps }) {
-  const env = deps.env ?? process.env;
-  if (!env.DISPLAY && !env.WAYLAND_DISPLAY) return 'não há tela gráfica nesta sessão';
-  // Sem login, o botão fica desligado e a tela mandaria a pessoa de volta para cá.
-  if (!loadEnvFile(path.join(root, '.env')).DASH_TOKEN) return 'este painel não tem login, e sem login o botão fica desligado';
-  const { running } = (deps.panelStatus ?? panelStatus)({ root, home });
-  if (!running || !(await (deps.healthy ?? panelHealthy)(panelPort(root), { timeoutMs: 5000 }))) return 'o painel está parado';
-  return null;
-}
-
 /** Abre o painel já logado, no diálogo da versão nova. false: a atualização segue no terminal. */
 async function abrirNoPainel({ out, root, home, deps, flags }) {
-  const motivo = await motivoDoTerminal({ root, home, deps });
+  const motivo = await motivoSemPainel({ root, home, deps });
   if (motivo) {
     out.warn(motivo, 'sigo aqui no terminal');
     return false;

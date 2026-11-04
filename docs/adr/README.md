@@ -43,3 +43,4 @@ Uma ADR aceita não é editada; se a decisão mudar, uma nova ADR a substitui.
 | [0036](0036-reconfigurar-pela-tela-disparo-pelo-painel.md) | Reconfigurar pela tela: o disparo pelo painel | Aceita |
 | [0037](0037-reconfigurar-pela-tela-espera-e-motivo.md) | Reconfigurar pela tela: a espera do assistente e o motivo na tela | Aceita |
 | [0038](0038-reconfigurar-agora-no-fim-da-atualizacao.md) | Reconfigurar pela tela: o botão no fim da atualização e na Visão geral | Aceita |
+| [0039](0039-dashboard-reconfigurar-abre-o-painel.md) | Reconfigurar pela tela: o `dashboard reconfigurar` abre o painel | Aceita |

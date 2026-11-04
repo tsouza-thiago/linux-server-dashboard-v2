@@ -95,8 +95,10 @@ e sem deixar uma janela de terminal aberta até o fim.
 6. **Feita (ADR 0038).** Botão "Reconfigurar agora" no resultado da atualização (F7). A versão que muda a
    coleta não recarrega sozinha no fim, e o aviso de script desatualizado da Visão geral também traz o
    botão quando o painel tem login.
-7. `dashboard reconfigurar` com o painel rodando abre o menu de manutenção; ajuda da CLI,
-   README, TUTORIAL e AGENTS.
+7. **Feita (ADR 0039).** `dashboard reconfigurar` sem opções e com o painel rodando abre o painel no
+   diálogo do item Reconfigurar (`#/visao-geral?reconfigurar=1`), sem parar nada; qualquer opção, sem
+   tela, sem login, painel parado ou pasta que a rota recusaria seguem pelo caminho de antes. Ajuda da
+   CLI, README, TUTORIAL e AGENTS.
 8. Segurança: rota nova na matriz de ataque, mutações novas (tirar a sessão; aceitar o
    código 2 vezes), ZAP autenticado, SECURITY.md e ADR.
 

@@ -32,6 +32,8 @@ export function parseHash(hash) {
 
 /** A página veio do `dashboard atualizar` (ADR 0032)? Só abre o diálogo: quem troca de versão é o clique. */
 export const veioDoAtualizar = (hash) => new URLSearchParams(String(hash || '').split('?')[1] ?? '').get('atualizar') === '1';
+/** A página veio do `dashboard reconfigurar` (ADR 0039)? Só abre o diálogo: quem para a coleta é o clique. */
+export const veioDoReconfigurar = (hash) => new URLSearchParams(String(hash || '').split('?')[1] ?? '').get('reconfigurar') === '1';
 /** A página veio do fim do assistente aberto pelo botão Reconfigurar (F8)? Mostra se a configuração valeu. */
 export const veioDoAssistente = (hash) => new URLSearchParams(String(hash || '').split('?')[1] ?? '').get('reconfigurado') === '1';
 

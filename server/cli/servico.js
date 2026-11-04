@@ -215,6 +215,20 @@ export function panelUrl(root, port, fragmento = '') {
   return { url: `${base}/entrar?codigo=${code}${fragmento}`, oneTime: true };
 }
 
+/**
+ * Por que o comando não abre o painel para a pessoa terminar pela tela (ADR 0032 e 0039); null se
+ * pode abrir. Sem login, o botão fica desligado e a tela mandaria a pessoa de volta ao terminal.
+ * `deps` troca o ambiente, o estado do painel e a conferência de saúde nos testes.
+ */
+export async function motivoSemPainel({ root, home = os.homedir(), deps = {} }) {
+  const env = deps.env ?? process.env;
+  if (!env.DISPLAY && !env.WAYLAND_DISPLAY) return 'não há tela gráfica nesta sessão';
+  if (!loadEnvFile(path.join(root, '.env')).DASH_TOKEN) return 'este painel não tem login, e sem login o botão fica desligado';
+  const { running } = (deps.panelStatus ?? panelStatus)({ root, home });
+  if (!running || !(await (deps.healthy ?? panelHealthy)(panelPort(root), { timeoutMs: 5000 }))) return 'o painel está parado';
+  return null;
+}
+
 /** Abre uma URL no navegador da sessão gráfica (false se não houver tela). */
 export function openBrowser(url, { env = process.env, spawnFn = spawn, run = spawnSync } = {}) {
   if (!env.DISPLAY && !env.WAYLAND_DISPLAY) return false;
