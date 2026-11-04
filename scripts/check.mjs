@@ -131,5 +131,8 @@ if (isCLI) {
     if (!ok) { failed = true; break; }
   }
   console.log(failed ? '\nCHECK FALHOU — não faça commit.' : '\nCHECK OK');
-  process.exit(failed ? 1 : 0);
+  // exitCode, nunca process.exit (#134): num pipe (o CI), a escrita do stdout é assíncrona e o
+  // process.exit descarta o que passa dos 64 KiB do pipe, inclusive o erro do teste e o resumo.
+  // Sem nada pendente além do stdout (só spawnSync), o processo sai sozinho depois de escrever.
+  process.exitCode = failed ? 1 : 0;
 }

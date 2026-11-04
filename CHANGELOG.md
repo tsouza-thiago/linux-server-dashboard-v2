@@ -62,6 +62,10 @@ diante: `PATCH` corrige, `MINOR` acrescenta sem quebrar e `MAJOR` quebra.
 
 ### Corrigido
 
+- O `npm run check` não perde mais o final da saída no CI quando um teste falha (#134). Num pipe, o
+  `process.exit` cortava o que passava de 64 KiB: o log não mostrava o erro do teste, a lista
+  `falharam:` nem o `CHECK FALHOU`. Agora o script só marca o código de saída e termina depois de
+  escrever tudo.
 - O teste do aviso de limiar recusado não falha mais ao acaso (#135). Ele procurava `999` na saída
   inteira e achava o valor no horário das linhas terminado em `.999Z`, em 0,4% das subidas. Agora
   confere só o texto das mensagens.
