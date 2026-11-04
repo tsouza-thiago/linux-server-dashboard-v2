@@ -11,6 +11,13 @@ diante: `PATCH` corrige, `MINOR` acrescenta sem quebrar e `MAJOR` quebra.
 
 ### Mudado
 
+- CI mais rápido (#128, ADR 0040): o workflow `verificação` roda `npm run check`, `npm run test:e2e` e
+  `npm run seguranca` em 4 jobs ao mesmo tempo (a mutação num job só dela), e o job `verificacao`, o
+  check obrigatório, só passa com os 4 verdes. Toda etapa tem limite de tempo, no workflow e no `npm run seguranca`. A mutação dos
+  guardas roda até 4 rodadas em paralelo, ao lado das etapas Docker, e a rodada que passa de 60 s
+  reprova com o nome da mutação (`MUTACAO_PARALELO` e `MUTACAO_LIMITE_S` ajustam). A auditoria, com os
+  tempos e a decisão de cada verificação, está em `docs/seguranca/2026-11-04-auditoria-ci.md`: nenhuma
+  camada de segurança saiu.
 - Roteiro dos testes no navegador (#144): o item de `--exige-reconfigurar` em
   `docs/testes-no-navegador.md` diz as 2 formas do aviso da Visão geral. Com login, 3 itens e o botão
   **Reconfigurar agora** (ADR 0038); sem login, 4 itens e o comando `./dashboard reconfigurar`.

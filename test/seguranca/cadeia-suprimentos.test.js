@@ -163,3 +163,38 @@ test('A03: Dependabot, Dependency Review e Scorecard seguem a ADR 0016', () => {
   assert.match(sc, /github\/codeql-action\/upload-sarif@[0-9a-f]{40}/);
   assert.match(sc, /runs-on:\s*ubuntu-/, 'runner Ubuntu hospedado');
 });
+
+test('CI (ADR 0040): os 3 comandos rodam no verificação, cada etapa com limite de tempo, e o check obrigatório junta os jobs', () => {
+  const y = ler('.github/workflows/seguranca.yml').replace(/(^|\s)#.*$/gm, '$1');
+  // As camadas da ADR 0014 continuam todas no CI, com o e2e obrigatório. O `npm run seguranca`
+  // roda em 2 jobs que, juntos, cobrem todas as etapas: um pula só a mutação, o outro só a roda.
+  for (const cmd of ['npm run check', 'npm run test:e2e', 'npm run seguranca -- --pular=mutacao', 'npm run seguranca -- --so=mutacao']) {
+    assert.ok(y.split('\n').some((l) => l.trim() === `run: ${cmd}`), `${cmd} saiu do CI`);
+  }
+  assert.match(y, /E2E_OBRIGATORIO:\s*'1'/, 'e2e sem navegador tem de falhar, não pular');
+  assert.match(y, /fetch-depth:\s*0/, 'o Gitleaks precisa de todo o histórico');
+  // Toda etapa `run:` tem timeout-minutes: a que trava reprova cedo, com o nome dela (#128).
+  const etapas = y.split(/\n\s+- name:/).slice(1);
+  for (const e of etapas.filter((t) => /\n\s+run:/.test(t))) {
+    assert.match(e, /\n\s+timeout-minutes:\s*\d+/, `etapa sem limite de tempo:${e.split('\n')[0]}`);
+  }
+  // O job `verificacao` é o check obrigatório do ruleset: precisa esperar os 4, rodar sempre e
+  // só passar com os 4 em success (job pulado ou cancelado não pode virar verde).
+  const jobs = ['check', 'e2e', 'seguranca', 'mutacao'];
+  const agregador = y.slice(y.indexOf('\n  verificacao:'));
+  assert.match(agregador, new RegExp(`needs:\\s*\\[${jobs.join(', ')}\\]`));
+  assert.match(agregador, /if:\s*always\(\)/);
+  for (const job of jobs) assert.match(agregador, new RegExp(`needs\\.${job}\\.result`));
+  assert.equal((agregador.match(/= success/g) || []).length, jobs.length, 'todos os resultados conferidos');
+});
+
+test('npm run seguranca (#128): cada etapa e cada rodada da mutação têm limite de tempo', () => {
+  const seg = ler('scripts/seguranca.mjs');
+  const etapas = [...seg.matchAll(/\{ nome: '([a-z]+)', titulo:[^\n]*\n?/g)].map((m) => m[0]);
+  assert.equal(etapas.length, 6, 'as 6 etapas');
+  for (const e of etapas) assert.match(e, /limite: \d+,/, `etapa sem limite: ${e.slice(0, 40)}`);
+  const mut = ler('scripts/mutacao-seguranca.mjs');
+  assert.match(mut, /const LIMITE_S = /, 'limite por rodada');
+  assert.match(mut, /process\.kill\(-p\.pid, 'SIGKILL'\)/, 'o limite derruba o grupo de processos da rodada');
+  assert.match(mut, /passou do limite/, 'a rodada presa reprova com mensagem própria');
+});

@@ -5,6 +5,12 @@
 #   npm run seguranca  Semgrep, Gitleaks (todo o histórico), ShellCheck, OSV-Scanner, OWASP ZAP
 #                      e a mutação dos guardas de segurança
 #
+# Tempo (ADR 0040, #128): os 3 comandos rodam em 4 jobs ao mesmo tempo, cada um na sua máquina
+# (o `npm run seguranca` em 2: as ferramentas Docker e a mutação, que disputariam os mesmos
+# núcleos), e o job `verificacao` só junta o resultado. É ele o check obrigatório do main (ruleset), então
+# o nome dele não muda. Cada etapa tem `timeout-minutes` (~3× o medido): a que trava reprova
+# cedo e com o nome dela, em vez de esperar o teto do job.
+#
 # Endurecimento do próprio workflow (OWASP A03:2025, cadeia de suprimentos):
 #   - cada action presa pelo SHA do commit (uma tag pode ser movida; um SHA, não)
 #   - permissões mínimas (só leitura do código), sem segredo nenhum
@@ -26,9 +32,65 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  verificacao:
+  check:
+    name: npm run check
     runs-on: ubuntu-24.04
-    timeout-minutes: 40
+    timeout-minutes: 10
+    steps:
+      - name: Código
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Node 24 (a mesma versão que o ./dashboard baixa)
+        uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: 24.21.0
+
+      - name: Dependências de desenvolvimento (lockfile, com integridade sha512)
+        run: npm ci
+        timeout-minutes: 3
+
+      - name: npm run check
+        run: npm run check
+        timeout-minutes: 3
+
+  e2e:
+    name: npm run test:e2e
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - name: Código
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Node 24 (a mesma versão que o ./dashboard baixa)
+        uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: 24.21.0
+
+      - name: Dependências de desenvolvimento (lockfile, com integridade sha512)
+        run: npm ci
+        timeout-minutes: 3
+
+      # Sem --with-deps (#81): a imagem ubuntu-24.04 já traz as bibliotecas do Chromium
+      # (vem com o Google Chrome), e o apt-get do --with-deps chegava a levar 8 min no
+      # espelho lento. Se faltar biblioteca, o e2e falha (E2E_OBRIGATORIO), nunca pula.
+      - name: Chromium para o e2e
+        run: npx playwright-core install chromium
+        timeout-minutes: 3
+
+      - name: npm run test:e2e
+        run: npm run test:e2e
+        timeout-minutes: 6
+        env:
+          E2E_OBRIGATORIO: '1'
+
+  seguranca:
+    name: npm run seguranca
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
     steps:
       - name: Código (com todo o histórico, para o Gitleaks)
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -43,20 +105,53 @@ jobs:
 
       - name: Dependências de desenvolvimento (lockfile, com integridade sha512)
         run: npm ci
+        timeout-minutes: 3
 
-      - name: npm run check
-        run: npm run check
+      # Cada etapa de dentro também tem o próprio limite (scripts/seguranca.mjs).
+      - name: npm run seguranca, sem a mutação (Semgrep, Gitleaks, ShellCheck, OSV e ZAP)
+        run: npm run seguranca -- --pular=mutacao
+        timeout-minutes: 8
 
-      # Sem --with-deps (#81): a imagem ubuntu-24.04 já traz as bibliotecas do Chromium
-      # (vem com o Google Chrome), e o apt-get do --with-deps chegava a levar 8 min no
-      # espelho lento. Se faltar biblioteca, o e2e falha (E2E_OBRIGATORIO), nunca pula.
-      - name: Chromium para o e2e
-        run: npx playwright-core install chromium
+  mutacao:
+    name: npm run seguranca (mutação)
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - name: Código
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
 
-      - name: npm run test:e2e
-        run: npm run test:e2e
+      - name: Node 24 (a mesma versão que o ./dashboard baixa)
+        uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: 24.21.0
+
+      - name: Dependências de desenvolvimento (lockfile, com integridade sha512)
+        run: npm ci
+        timeout-minutes: 3
+
+      # Até 4 rodadas em paralelo (os 4 núcleos da máquina), cada uma com limite de 60 s
+      # (scripts/mutacao-seguranca.mjs).
+      - name: npm run seguranca, só a mutação dos guardas
+        run: npm run seguranca -- --so=mutacao
+        timeout-minutes: 8
+
+  # O check obrigatório do main. Roda sempre (always), mesmo com um job vermelho ou cancelado,
+  # e só passa se os 4 passaram: um job pulado ou cancelado não vira verde por omissão.
+  verificacao:
+    needs: [check, e2e, seguranca, mutacao]
+    if: always()
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - name: check, e2e, segurança e mutação passaram
+        timeout-minutes: 1
+        run: |
+          echo "check: $CHECK · e2e: $E2E · segurança: $SEGURANCA · mutação: $MUTACAO"
+          test "$CHECK" = success && test "$E2E" = success && test "$SEGURANCA" = success && test "$MUTACAO" = success
         env:
-          E2E_OBRIGATORIO: '1'
-
-      - name: npm run seguranca
-        run: npm run seguranca
+          CHECK: ${{ needs.check.result }}
+          E2E: ${{ needs.e2e.result }}
+          SEGURANCA: ${{ needs.seguranca.result }}
+          MUTACAO: ${{ needs.mutacao.result }}

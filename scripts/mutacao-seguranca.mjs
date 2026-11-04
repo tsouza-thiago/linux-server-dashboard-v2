@@ -10,8 +10,13 @@
 // Se o trecho que a mutação procura não existe mais (o código mudou de forma), ela é
 // "desatualizada" e também reprova: a lista precisa acompanhar o código, nunca ficar cega.
 //
+// As rodadas correm em paralelo, cada uma na sua cópia (#128), e cada rodada tem um limite de
+// tempo: a que passa dele reprova com o nome da mutação, em vez de prender o CI (PR #127).
+//
 // Uso: node scripts/mutacao-seguranca.mjs   (também roda dentro de `npm run seguranca`)
-import { spawnSync } from 'node:child_process';
+//   MUTACAO_PARALELO=N   rodadas ao mesmo tempo (padrão: os núcleos da máquina, até 4)
+//   MUTACAO_LIMITE_S=S   limite de cada rodada, em segundos (padrão: 60)
+import { spawn, spawnSync } from 'node:child_process';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
@@ -142,63 +147,136 @@ function copiar() {
 
 let copiados = 0;
 
-/** Roda a rede de segurança (mais `extras`) na cópia; devolve o resultado do node --test. */
-function rodarTestes(dir, extras = [], pular = []) {
+// Rodadas ao mesmo tempo. Cada `node --test` já roda os arquivos dele em paralelo, então mais
+// de 4 rodadas só disputam os mesmos núcleos (medido em #128).
+const PARALELO = Math.max(1, Math.floor(Number(process.env.MUTACAO_PARALELO)) || Math.min(4, os.availableParallelism()));
+// Limite de cada rodada. Com 4 rodadas em 4 núcleos, a mais lenta levou 10,5 s (#128). Uma
+// rodada presa num temporizador real (PR #127: 15 min) reprova aqui com o nome da mutação. O
+// controle roda todos os testes extras de uma vez e ganha o triplo.
+const LIMITE_S = Math.max(5, Number(process.env.MUTACAO_LIMITE_S) || 60);
+
+// Grupos de processo das rodadas em andamento: um Ctrl+C ou o limite derruba a rodada inteira
+// (o `node --test` e os filhos dele), sem deixar teste órfão rodando na cópia apagada.
+const ativos = new Set();
+for (const sinal of ['SIGINT', 'SIGTERM']) {
+  process.on(sinal, () => {
+    for (const pid of ativos) try { process.kill(-pid, 'SIGKILL'); } catch { /* já saiu */ }
+    process.exit(130);
+  });
+}
+
+/**
+ * Roda a rede de segurança (mais `extras`) na cópia `dir`, com o limite `limiteS`. Devolve o
+ * resultado do node --test; `estourou` diz que a rodada passou do limite e foi derrubada.
+ */
+function rodarTestes(dir, extras = [], pular = [], limiteS = LIMITE_S) {
   // Sem NODE_TEST_CONTEXT: se este script rodar dentro de um `node --test`, o filho não
   // pode se achar um subteste (ele precisa devolver o próprio código de saída).
   const env = { ...process.env };
   delete env.NODE_TEST_CONTEXT;
   const inicio = Date.now();
-  const r = spawnSync(process.execPath, ['--test', '--test-reporter=spec', ...pular, ...SEG, ...extras], { cwd: dir, encoding: 'utf8', env });
-  const conta = (rotulo) => Number((r.stdout.match(new RegExp(`ℹ ${rotulo} (\\d+)`)) || [])[1] || 0);
-  return { status: r.status, testes: conta('tests'), falhas: conta('fail'), segundos: ((Date.now() - inicio) / 1000).toFixed(1), saida: `${r.stdout}${r.stderr}` };
+  return new Promise((resolve) => {
+    // detached: a rodada vira um grupo de processos próprio, para o limite derrubar todos.
+    const p = spawn(process.execPath, ['--test', '--test-reporter=spec', ...pular, ...SEG, ...extras],
+      { cwd: dir, env, detached: true, stdio: ['ignore', 'pipe', 'pipe'] });
+    ativos.add(p.pid);
+    let saida = '';
+    let estourou = false;
+    p.stdout.on('data', (c) => { saida += c; });
+    p.stderr.on('data', (c) => { saida += c; });
+    const teto = setTimeout(() => {
+      estourou = true;
+      try { process.kill(-p.pid, 'SIGKILL'); } catch { /* já saiu */ }
+    }, limiteS * 1000);
+    p.on('close', (status) => {
+      clearTimeout(teto);
+      ativos.delete(p.pid);
+      const conta = (rotulo) => Number((saida.match(new RegExp(`ℹ ${rotulo} (\\d+)`)) || [])[1] || 0);
+      resolve({ status, estourou, testes: conta('tests'), falhas: conta('fail'), segundos: ((Date.now() - inicio) / 1000).toFixed(1), saida });
+    });
+  });
 }
 
-function main() {
-  const dir = copiar();
+/** Quantas vezes o trecho `de` da mutação aparece no arquivo dela, na cópia `dir`. */
+const ocorrencias = (dir, m) => fs.readFileSync(path.join(dir, m.arquivo), 'utf8').split(m.de).length - 1;
+
+/** Aplica a mutação `m` na cópia `dir`, roda os testes e desfaz. */
+async function medir(dir, m) {
+  const arquivo = path.join(dir, m.arquivo);
+  const original = fs.readFileSync(arquivo, 'utf8');
+  fs.writeFileSync(arquivo, original.replace(m.de, m.para));
+  try {
+    return await rodarTestes(dir, m.testes, [`--test-skip-pattern=${SO_NO_CONTROLE}`]);
+  } finally {
+    fs.writeFileSync(arquivo, original);
+  }
+}
+
+async function main() {
+  const inicio = Date.now();
+  const dirs = [copiar()];
   const sobreviventes = [];
-  const desatualizadas = [];
+  const presas = [];
   let mortas = 0;
   try {
+    // Trecho que sumiu ou se repete: "desatualizada", sem rodar nada. Conferido antes de tudo,
+    // para o aviso sair no começo do log, e não depois de todas as rodadas.
+    const desatualizadas = MUTACOES.filter((m) => ocorrencias(dirs[0], m) !== 1)
+      .map((m) => `${m.nome}: o trecho aparece ${ocorrencias(dirs[0], m)} vez(es) em ${m.arquivo}`);
+    for (const d of desatualizadas) console.log(`  ? desatualizada — ${d}`);
     // Controle: sem mutação, a rede precisa passar. Senão toda mutação "morreria" por outro
     // motivo (cópia incompleta, teste quebrado) e o resultado não valeria nada.
     const extras = [...new Set(MUTACOES.flatMap((m) => m.testes || []))];
-    const controle = rodarTestes(dir, extras);
-    if (controle.status !== 0 || controle.testes < 50 || controle.falhas > 0) {
-      console.log(`  ✗ controle: ${controle.testes} testes, ${controle.falhas} falhas SEM mutação; nada a medir\n${controle.saida.slice(-2500)}`);
+    const controle = await rodarTestes(dirs[0], extras, [], LIMITE_S * 3);
+    if (controle.estourou || controle.status !== 0 || controle.testes < 50 || controle.falhas > 0) {
+      const motivo = controle.estourou ? `passou do limite de ${LIMITE_S * 3} s` : `${controle.testes} testes, ${controle.falhas} falhas`;
+      console.log(`  ✗ controle: ${motivo} SEM mutação; nada a medir\n${controle.saida.slice(-2500)}`);
       process.exitCode = 1;
       return;
     }
     console.log(`  ✓ controle: sem mutação, ${controle.testes} testes passam (${controle.segundos} s, ${copiados} arquivos copiados)`);
-    for (const m of MUTACOES) {
-      const arquivo = path.join(dir, m.arquivo);
-      const original = fs.readFileSync(arquivo, 'utf8');
-      const vezes = original.split(m.de).length - 1;
-      if (vezes !== 1) {
-        desatualizadas.push(`${m.nome}: o trecho aparece ${vezes} vez(es) em ${m.arquivo}`);
-        console.log(`  ? ${m.nome} — desatualizada (${vezes}×)`);
-        continue;
-      }
-      fs.writeFileSync(arquivo, original.replace(m.de, m.para));
-      const r = rodarTestes(dir, m.testes, [`--test-skip-pattern=${SO_NO_CONTROLE}`]);
-      fs.writeFileSync(arquivo, original);
-      // Só conta como acusada se um teste FALHOU de verdade (asserção), não se o processo
-      // caiu por outro motivo.
-      if (r.falhas > 0) {
-        mortas += 1;
-        console.log(`  ✓ ${m.nome} — acusada por ${r.falhas} teste(s) (${r.segundos} s)`);
-      } else {
-        sobreviventes.push(m.nome);
-        console.log(`  ✗ ${m.nome} — SOBREVIVEU (${r.testes} testes, nenhuma falha; saída ${r.status})`);
-      }
+    // Uma cópia por rodada simultânea: cada uma muta só a sua, então nenhuma vê a mutação
+    // da outra. As cópias saem da 1ª, que já é um repositório git com o commit base.
+    for (let i = 1; i < PARALELO; i++) {
+      const outra = fs.mkdtempSync(path.join(os.tmpdir(), 'dash-mutacao-'));
+      fs.cpSync(dirs[0], outra, { recursive: true });
+      dirs.push(outra);
     }
+    const fila = MUTACOES.filter((m) => ocorrencias(dirs[0], m) === 1);
+    const total = fila.length;
+    let feitas = 0;
+    const trabalhador = async (dir) => {
+      for (let m = fila.shift(); m; m = fila.shift()) {
+        const r = await medir(dir, m);
+        feitas += 1;
+        const n = `[${String(feitas).padStart(String(total).length)}/${total}]`;
+        // Só conta como acusada se um teste FALHOU de verdade (asserção), não se o processo
+        // caiu por outro motivo. Rodada que passou do limite não conta: ela reprova à parte.
+        if (r.estourou) {
+          presas.push(m);
+          console.log(`  ✗ ${n} ${m.nome} — passou do limite de ${LIMITE_S} s: algum teste espera um temporizador real?`);
+        } else if (r.falhas > 0) {
+          mortas += 1;
+          console.log(`  ✓ ${n} ${m.nome} — acusada por ${r.falhas} teste(s) (${r.segundos} s)`);
+        } else {
+          sobreviventes.push(m.nome);
+          console.log(`  ✗ ${n} ${m.nome} — SOBREVIVEU (${r.testes} testes, nenhuma falha; saída ${r.status})`);
+        }
+      }
+    };
+    await Promise.all(dirs.map(trabalhador));
+    for (const d of desatualizadas) console.log(`    · desatualizada: ${d}`);
+    for (const m of presas) {
+      console.log(`    · passou do limite: ${m.nome} (${m.arquivo}). Para ver qual teste espera, aplique a mutação e rode`
+        + ` node --test ${[...SEG, ...(m.testes || [])].join(' ')}`);
+    }
+    const ok = sobreviventes.length === 0 && desatualizadas.length === 0 && presas.length === 0;
+    const segundos = Math.round((Date.now() - inicio) / 1000);
+    console.log(`${mortas}/${MUTACOES.length} mutações acusadas pelos testes${ok ? '' : ` · ${sobreviventes.length} sobreviveram · ${desatualizadas.length} desatualizadas · ${presas.length} passaram do limite`} · ${PARALELO} em paralelo, ${segundos} s`);
+    process.exitCode = ok ? 0 : 1;
   } finally {
-    fs.rmSync(dir, { recursive: true, force: true });
+    for (const d of dirs) fs.rmSync(d, { recursive: true, force: true });
   }
-  const ok = sobreviventes.length === 0 && desatualizadas.length === 0;
-  for (const d of desatualizadas) console.log(`    · ${d}`);
-  console.log(`${mortas}/${MUTACOES.length} mutações acusadas pelos testes${ok ? '' : ` · ${sobreviventes.length} sobreviveram · ${desatualizadas.length} desatualizadas`}`);
-  process.exit(ok ? 0 : 1);
 }
 
 main();
