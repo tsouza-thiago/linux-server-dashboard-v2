@@ -212,11 +212,15 @@ tudo ali mesmo. Para ficar sempre no terminal, use `./dashboard atualizar --term
 uma pré-versão, acrescente `--pre`, nos 2 casos.
 
 **"Exige reconfigurar o acesso ao servidor".** Algumas versões mudam o script de coleta guardado no
-servidor. O aviso e as novidades dizem isso antes de atualizar. Depois de atualizar:
+servidor. O aviso e as novidades dizem isso antes de atualizar. Depois de atualizar pelo botão, o
+painel oferece **Reconfigurar agora**. O mesmo botão aparece no aviso da Visão geral enquanto o script
+estiver desatualizado:
 
-1. Rode `./dashboard reconfigurar`.
+1. Clique em **Reconfigurar agora**. A coleta pausa enquanto o assistente estiver aberto.
 2. Confirme o passo "Preparar o servidor". Ele pede a senha do administrador do servidor.
-3. Espere a próxima coleta. O aviso da Visão geral some sozinho.
+3. No fim, o painel volta sozinho. Espere a próxima coleta: o aviso da Visão geral some sozinho.
+
+Sem login no painel, rode `./dashboard reconfigurar` no terminal no lugar do 1º passo.
 
 **Rode na pasta da instalação.** O `atualizar` só vale na pasta onde o painel foi instalado.
 Numa cópia sem `.env`, ou com o serviço em outra pasta, ele para sem alterar nada e mostra a pasta

@@ -176,6 +176,9 @@ O teste `test/unit/docs.test.js` confere esta documentação contra o código.
   vai ao servidor. O motivo de uma recusa ou de uma volta chega pelo estado de `/api/atualizacao`
   (`reconfiguracao`): só as linhas de falha do `data/reconfigurar.log`, no máximo 5, curtas. A espera
   acaba em 90 s. Pela tela, o assistente tem o botão Cancelar e não manda olhar o terminal.
+- **Reconfigurar agora** (ADR 0038, F8): a troca para uma versão com `exigeReconfigurar` termina com o
+  botão, sem a recarga de 3 s, e o aviso de `hashMismatch` da Visão geral também o traz. Os 2 usam o
+  disparo da ADR 0036; sem login, os 2 mostram `./dashboard reconfigurar`.
 - **Code scanning** (CodeQL padrão do GitHub, a cada push): todo alerta é corrigido ou
   descartado como falso positivo com a análise em `docs/seguranca/` e, se possível, um
   teste que falhe na forma errada. Não aplique a sugestão do CodeQL sem conferir o formato

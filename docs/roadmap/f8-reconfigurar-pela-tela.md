@@ -92,7 +92,9 @@ e sem deixar uma janela de terminal aberta até o fim.
    `--pela-tela`, e espera o painel voltar. Os textos que mandam olhar o terminal também mudam nesse
    modo. Se o comando recusar ou o painel novo não subir, a tela mostra só as linhas de falha do
    `data/reconfigurar.log`, pelo estado de `/api/atualizacao`.
-6. Botão "Reconfigurar agora" no resultado da atualização (F7).
+6. **Feita (ADR 0038).** Botão "Reconfigurar agora" no resultado da atualização (F7). A versão que muda a
+   coleta não recarrega sozinha no fim, e o aviso de script desatualizado da Visão geral também traz o
+   botão quando o painel tem login.
 7. `dashboard reconfigurar` com o painel rodando abre o menu de manutenção; ajuda da CLI,
    README, TUTORIAL e AGENTS.
 8. Segurança: rota nova na matriz de ataque, mutações novas (tirar a sessão; aceitar o

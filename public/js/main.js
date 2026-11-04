@@ -171,8 +171,12 @@ const act = {
     if (current) refreshView();
   },
   go(view, period = store.get().period) { location.hash = buildHash({ view, period }); },
+  // O diálogo do item Reconfigurar da engrenagem, aberto por outra tela (ADR 0038).
+  reconfigurar() { manutencao?.abrirReconfigurar(); },
   toast,
 };
+// A manutenção (engrenagem), ligada depois do login.
+let manutencao = null;
 
 // ---------------- Navegação ----------------
 /** Menu lateral com as telas por grupo e o número de alertas abertos em Eventos. */
@@ -522,7 +526,7 @@ async function start() {
   const voltaDoAssistente = veioDoAssistente(location.hash);
   // O pedido vale 1 vez: recarregar a página não abre o diálogo de novo.
   if (pedidoDoTerminal || voltaDoAssistente) history.replaceState(null, '', buildHash(parseHash(location.hash)));
-  iniciarManutencao({ store, toast, pedidoDoTerminal, voltaDoAssistente });
+  manutencao = iniciarManutencao({ store, toast, pedidoDoTerminal, voltaDoAssistente });
   window.addEventListener('hashchange', navigate);
   await navigate(); // esqueleto no formato final enquanto os dados chegam
   try {
