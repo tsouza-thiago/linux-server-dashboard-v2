@@ -5,11 +5,12 @@ import { ALERTS_LIMIT } from './analysis.js';
 let authHandler = () => {};
 export const onAuthRequired = (fn) => { authHandler = fn; };
 
-// Erro de API com o status HTTP (a tela decide o que fazer com 401, 409, 429…).
+// Erro de API com o status HTTP (a tela decide o que fazer com 401, 409, 429…) e o `bloqueio` do 409.
 class ApiError extends Error {
-  constructor(status, message) {
+  constructor(status, message, bloqueio) {
     super(message);
     this.status = status;
+    this.bloqueio = bloqueio;
   }
 }
 
@@ -24,7 +25,7 @@ async function request(path, { method = 'GET', body } = {}) {
   let data = null;
   try { data = await res.json(); } catch { /* resposta sem JSON */ }
   if (res.status === 401 && path !== '/api/login') authHandler();
-  if (!res.ok) throw new ApiError(res.status, (data && data.error) || `erro ${res.status}`);
+  if (!res.ok) throw new ApiError(res.status, (data && data.error) || `erro ${res.status}`, data?.bloqueio);
   return data;
 }
 
@@ -55,6 +56,7 @@ export const api = {
   atualizacao: () => request('/api/atualizacao'),
   verificarAtualizacao: () => request('/api/atualizacao/verificar', { method: 'POST', body: {} }),
   iniciarAtualizacao: (versao) => request('/api/atualizacao/iniciar', { method: 'POST', body: { versao } }),
+  iniciarReconfiguracao: () => request('/api/reconfigurar/iniciar', { method: 'POST', body: {} }),
   registroAtualizacao: (desde) => request(`/api/atualizacao/registro${qs({ desde })}`),
   exportUrl: ({ format, from, to }) => `/api/export${qs({ format, from, to })}`,
 };

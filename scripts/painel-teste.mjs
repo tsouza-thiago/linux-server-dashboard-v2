@@ -9,6 +9,8 @@
 //   npm run painel-teste -- --versao-nova             # com aviso de versão nova (falsa) e troca simulada
 //   npm run painel-teste -- --versao-nova --resultado=voltou  # a troca simulada volta atrás
 //   npm run painel-teste -- --versao-nova --exige-reconfigurar  # versão que muda a coleta, com o aviso
+//   npm run painel-teste -- --reconfigurar            # item Reconfigurar com login, sem subir comando
+//   npm run painel-teste -- --reconfigurar=sem-assinatura  # o mesmo, recusado depois do clique
 //   (com --versao-nova o painel tem login: o token é "teste")
 //
 // Cenários:
@@ -186,6 +188,15 @@ export function atualizacaoFalsa(dir, { resultado = 'atualizado', passoMs = 700,
   return { dashToken: 'teste', pastaAtualizacao: dir, procDirAtualizacao: procDir, executarAtualizacao: executar, modoAtualizacao: 'segundo-plano' };
 }
 
+/**
+ * Reconfiguração falsa, para ver o diálogo: a rota de verdade gera o código, mas nenhum comando sobe.
+ * `bloqueio` simula o que só aparece depois do clique (`sem-assinatura`, `outra-pasta`).
+ */
+export function reconfiguracaoFalsa(dir, { bloqueio = null } = {}) {
+  fs.mkdirSync(path.join(dir, 'data'), { recursive: true });
+  return { dashToken: 'teste', pastaAtualizacao: dir, executarReconfiguracao: async () => ({ ok: true }), conferirReconfiguracao: () => bloqueio };
+}
+
 /** Versão nova falsa para ver o aviso, o menu e as novidades: nada sai desta máquina. */
 export async function procurarFalso() {
   return {
@@ -249,7 +260,10 @@ async function main() {
     setTimeout(() => { server.listen(porta, '127.0.0.1', pronto); }, 3000);
   });
   const troca = versaoNova ? atualizacaoFalsa(dir, { resultado: opcao('resultado', 'atualizado'), reiniciar }) : {};
-  const { app, runPoll, atualizacao, shutdown } = criarPainel(dir, cenario, coletar, versaoNova ? { procurarVersao: reconfigurar ? procurarQueExigeReconfigurar : procurarFalso, sshAccess: reconfigurar ? 'restrito' : undefined, ...troca } : {});
+  // Sem esta opção, o painel de teste não tem executor e o item Reconfigurar responde 409.
+  const pedido = process.argv.find((x) => x === '--reconfigurar' || x.startsWith('--reconfigurar='));
+  const reconfiguracao = pedido ? reconfiguracaoFalsa(dir, { bloqueio: pedido.split('=')[1] ?? null }) : {};
+  const { app, runPoll, atualizacao, shutdown } = criarPainel(dir, cenario, coletar, { ...reconfiguracao, ...(versaoNova ? { procurarVersao: reconfigurar ? procurarQueExigeReconfigurar : procurarFalso, sshAccess: reconfigurar ? 'restrito' : undefined, ...troca } : {}) });
   if (versaoNova) await atualizacao.verificar();
   if (cenario === 'offline') { await runPoll(); await runPoll(); }
   // vazio fica sem coleta: é o estado do 1º uso, antes da 1ª amostra chegar.
