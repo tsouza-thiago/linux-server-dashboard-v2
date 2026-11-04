@@ -62,6 +62,9 @@ diante: `PATCH` corrige, `MINOR` acrescenta sem quebrar e `MAJOR` quebra.
 
 ### Corrigido
 
+- O teste do aviso de limiar recusado não falha mais ao acaso (#135). Ele procurava `999` na saída
+  inteira e achava o valor no horário das linhas terminado em `.999Z`, em 0,4% das subidas. Agora
+  confere só o texto das mensagens.
 - A tela de progresso não diz mais "interrompida" numa atualização que deu certo (#130). O executor
   grava o estado final antes de soltar a trava, e o painel olha a trava antes de ler o estado.
 - Esqueleto da Visão geral e do Armazenamento com a altura do conteúdo final (#121). A linha dos
