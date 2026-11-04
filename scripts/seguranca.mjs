@@ -230,6 +230,7 @@ async function openapi(base) {
 async function zap() {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'dash-zap-'));
   const token = crypto.randomBytes(24).toString('hex');
+  let reconfiguracoes = 0;
   const { createApp } = await import('../server/index.js');
   const app = createApp({
     historyFile: path.join(dir, 'history.json'), alertsFile: path.join(dir, 'alerts.json'),
@@ -238,6 +239,10 @@ async function zap() {
     // Sem os limites de taxa, para o ZAP chegar a todas as rotas em vez de colher só 429.
     // Os limites são conferidos à parte (test/integration/api-ext.test.js).
     rateLimitMax: 1e6, loginRateMax: 1e6,
+    // Reconfigurar pela tela (F8) com o executor FALSO: o ZAP ataca a rota até o 202 e o código
+    // do assistente, mas nada para nem sobe de verdade. O código vai para a pasta temporária.
+    pastaAtualizacao: dir,
+    executarReconfiguracao: async () => { reconfiguracoes += 1; return { ok: true }; },
   });
   // Conta as respostas por código HTTP: se nenhuma for 2xx, o ZAP não conseguiu entrar (Bearer
   // errado, rota trocada) e a varredura seria rasa. Isso reprova em vez de passar.
@@ -299,9 +304,11 @@ async function zap() {
   guardar('zap-codigos.json', JSON.stringify(codigos));
   const total = Object.values(codigos).reduce((a, b) => a + b, 0);
   const ok2xx = Object.entries(codigos).filter(([c]) => c.startsWith('2')).reduce((a, [, n]) => a + n, 0);
+  // O ZAP precisa ter chegado ao executor falso do Reconfigurar pelo menos 1 vez: senão a rota
+  // que para o painel ficou só nos bloqueios (409) e o ataque a ela foi raso.
   return {
-    ok: novos.length === 0 && ok2xx > 0,
-    detalhe: `${novos.length} médios/altos novos · ${aceitos} analisados · ${baixos.length} baixos/informativos · ${total} pedidos (${ok2xx} com 2xx)`,
+    ok: novos.length === 0 && ok2xx > 0 && reconfiguracoes > 0,
+    detalhe: `${novos.length} médios/altos novos · ${aceitos} analisados · ${baixos.length} baixos/informativos · ${total} pedidos (${ok2xx} com 2xx) · ${reconfiguracoes} disparo(s) do Reconfigurar falso`,
     novos,
   };
 }

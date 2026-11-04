@@ -318,6 +318,35 @@ Inclua: o passo a passo para reproduzir, o impacto estimado e a versão afetada
   e `scripts/mutacao-seguranca.mjs` (versão da tela, sem sessão, rotas fora da sessão, 2 trocas juntas,
   pasta aberta, executor filho do painel, pré-versão liberada sem prazo).
 
+### 23. Reconfigurar pela tela (ADR 0034 a 0039)
+- **Ameaça:** o item Reconfigurar para o painel e abre o assistente, que recebe a senha do
+  administrador do servidor e regrava o `.env` e o `data/ssh/`. Um site de fora ou outro programa da
+  máquina poderia disparar a troca, usar o código do assistente, deixar o painel parado de propósito
+  ou mandar texto para o comando. O motivo de uma falha, mostrado na tela, poderia vazar detalhes.
+
+  | Ameaça | Proteção |
+  |---|---|
+  | Site de fora dispara a reconfiguração | Host check, CSRF de 2 camadas e sessão; sem login, a reconfiguração pela tela não existe |
+  | Outro programa local usa o código | o código (128 bits) vai só na resposta do `POST` e no fragmento da URL, que não vai ao servidor e sai do endereço ao entrar; vale 1 vez e por 5 min; em disco, só o hash, 0600, que sai ao ser lido |
+  | Senha do administrador exposta | continua só na memória do assistente, em processo à parte; nunca no painel, no log ou na URL |
+  | Painel parado de propósito | limite de mutações; depois de disparar, nada mais dispara por 1 min; o assistente abandonado religa o painel em 15 min, com a configuração anterior; o Cancelar exige a sessão do assistente |
+  | Injeção | a rota não lê o pedido (I11); o comando `reconfigurar --pela-tela` é fixo, em lista, sem shell, e não lê a linha de comando |
+  | Vazamento pelo motivo da falha | a tela recebe só as linhas de falha do `data/reconfigurar.log`, no máximo 5 e curtas; o log não traz o código nem a senha |
+
+- **Mitigação:** além da tabela, a rota barra antes de criar o código: atualização em andamento,
+  pasta fora da instalação e pasta sem tag assinada. Se o executor não sobe, o código sai do disco. O
+  `--pela-tela` recusa antes de parar o painel se faltar código válido. O painel novo só vale depois de
+  responder; se não responder, a configuração anterior volta da memória e o painel antigo religa.
+- **Verificado por:** `test/integration/reconfigurar.test.js`, `test/unit/setup-pela-tela.test.js`,
+  `test/integration/assistente-http.test.js`, `test/integration/cli-instalar.test.js`,
+  `test/integration/reconfigurar-ponta-a-ponta.test.js`, a matriz de `test/seguranca/superficie-ataque.test.js`
+  (com o executor falso: nenhum ataque dispara nem deixa código no disco, nenhum cancela o assistente),
+  as regras de `test/seguranca/invariantes-estaticas.test.js` (I11, código no fragmento, 15 min), o
+  OWASP ZAP autenticado (a rota com o executor falso, que precisa ser alcançado) e
+  `scripts/mutacao-seguranca.mjs` (sem sessão, rota fora da sessão e do limite, código aceito 2 vezes,
+  vencido, curto, em texto puro ou na query, dado da tela no comando, cancelar sem sessão ou fora da
+  tela, 1 h parado, log inteiro na tela).
+
 ---
 
 ## OWASP Top 10:2025

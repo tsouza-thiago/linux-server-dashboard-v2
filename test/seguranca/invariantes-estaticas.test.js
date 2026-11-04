@@ -298,6 +298,27 @@ test('CWE-88: o --pela-tela não lê nada da linha de comando (I11, ADR 0034)', 
   assert.match(corpo('assistentePelaTela'), /preflight\)\(\{ out, root, flags: \{\} \}\)/);
 });
 
+// F8 (ADR 0037): o fragmento não vai ao servidor nem ao Referer; a query iria para o log de acesso
+// e o histórico guardaria o código. O assistente ainda tira o código do endereço ao entrar.
+test('CWE-598: o código do assistente vai no fragmento (#codigo=) e sai do endereço ao entrar', () => {
+  assert.deepEqual(proibido(FRONTEND, /[?&]codigo=/g), [], 'código do assistente na query da URL');
+  assert.match(semComentarios(ler('public/js/views/manutencao.js')), /`\/configurar#codigo=\$\{codigo\}`/);
+  const inicio = semComentarios(ler('public/js/configurar/main.js'));
+  assert.match(inicio, /\.exec\(location\.hash\);\n\s+if \(m\) \{\n\s+history\.replaceState\(null, '', location\.pathname\);\n\s+await enterCode\(m\[1\]\);/,
+    'o assistente tira o código do endereço antes de usá-lo');
+});
+
+// F8: com a reconfiguração pela tela, a coleta fica parada enquanto o assistente espera. Quem
+// abandona (ou quem disparou de propósito) não pode deixar o painel parado por muito tempo.
+test('F8: o assistente aberto pela tela desiste em até 15 min sem uso e religa o painel', () => {
+  const fonte = semComentarios(ler('server/cli/instalar.js'));
+  const m = /const IDLE_TELA_MS = ([0-9* ]+);/.exec(fonte);
+  assert.ok(m, 'IDLE_TELA_MS existe');
+  const ms = m[1].split('*').reduce((a, n) => a * Number(n.trim()), 1);
+  assert.ok(ms > 0 && ms <= 15 * 60 * 1000, `tempo parado de ${ms} ms`);
+  assert.match(fonte, /runWizard\(\{[^}]*idleMs: deps\.idleMs \?\? IDLE_TELA_MS,/, 'o --pela-tela usa o tempo curto');
+});
+
 test('sem debugger esquecido', () => {
   assert.deepEqual(proibido(CODIGO, /\bdebugger\s*;/g), []);
 });

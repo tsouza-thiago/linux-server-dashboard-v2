@@ -104,6 +104,16 @@ const MUTACOES = [
   { nome: 'código da tela válido no disco sem executor', arquivo: 'server/atualizacao/index.js', de: '    retirarCodigoPelaTela(dados);\n', para: '', testes: ['test/integration/reconfigurar.test.js'] },
   { nome: 'botão Reconfigurar preso depois que o executor falha', arquivo: 'server/atualizacao/index.js', de: "(dados);\n    this.reconfigurandoAte = 0;\n", para: '(dados);\n', testes: ['test/integration/reconfigurar.test.js'] },
   { nome: 'código da tela no log do painel', arquivo: 'server/atualizacao/index.js', de: "this.log('[reconfiguração] assistente pedido pela tela');", para: 'this.log(`[reconfiguração] assistente pedido pela tela: ${codigo}`);', testes: ['test/integration/reconfigurar.test.js'] },
+  // Etapa 8 da F8: o modelo de ameaças do Reconfigurar pela tela (SECURITY.md).
+  { nome: 'rota de reconfigurar fora do limite de mutações', arquivo: 'server/index.js', de: "    if (['POST', 'PUT', 'PATCH', 'DELETE'].includes(req.method)) return apiRateLimit(req, res, next);\n", para: "    if (['POST', 'PUT', 'PATCH', 'DELETE'].includes(req.method) && !req.path.startsWith('/api/reconfigurar')) return apiRateLimit(req, res, next);\n", testes: ['test/integration/reconfigurar.test.js'] },
+  { nome: 'código da tela curto (adivinhável)', arquivo: 'server/setup/pela-tela.js', de: 'crypto.randomBytes(16).toString', para: 'crypto.randomBytes(2).toString', testes: ['test/integration/reconfigurar.test.js'] },
+  { nome: 'código da tela na query da URL', arquivo: 'public/js/views/manutencao.js', de: '`/configurar#codigo=${codigo}`', para: '`/configurar?codigo=${codigo}`' },
+  { nome: 'código do assistente fica no endereço', arquivo: 'public/js/configurar/main.js', de: "    history.replaceState(null, '', location.pathname);\n", para: '' },
+  { nome: 'assistente abandonado pela tela espera 1 h', arquivo: 'server/cli/instalar.js', de: 'const IDLE_TELA_MS = 15 * 60 * 1000;', para: 'const IDLE_TELA_MS = 60 * 60 * 1000;' },
+  { nome: '--pela-tela sem o tempo parado curto', arquivo: 'server/cli/instalar.js', de: 'idleMs: deps.idleMs ?? IDLE_TELA_MS,', para: 'idleMs: deps.idleMs ?? IDLE_MS,' },
+  { nome: 'cancelar o assistente fora da tela', arquivo: 'server/setup/web.js', de: '  if (onCancel) {\n', para: '  if (true) {\n', testes: ['test/integration/assistente-http.test.js'] },
+  { nome: 'log inteiro do --pela-tela na tela', arquivo: 'server/setup/pela-tela.js', de: "      .filter((l) => l.startsWith('✗ '))\n", para: '', testes: ['test/unit/setup-pela-tela.test.js'] },
+  { nome: 'motivos do --pela-tela sem limite', arquivo: 'server/setup/pela-tela.js', de: '      .slice(0, MAX_MOTIVOS);\n', para: ';\n', testes: ['test/unit/setup-pela-tela.test.js'] },
   { nome: 'exec com shell importado', arquivo: 'server/cli/servico.js', de: "import { spawn, spawnSync } from 'node:child_process';", para: "import { exec, spawn, spawnSync } from 'node:child_process';" },
 ];
 
