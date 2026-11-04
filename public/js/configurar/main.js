@@ -57,7 +57,16 @@ const st = {
   token: '',
   opening: false,
   pastHelp: false,
+  // Aberto pelo botão Reconfigurar do painel (`--pela-tela`): sem terminal, com o botão Cancelar.
+  pelaTela: false,
+  // Cancelar: 'confirmar', 'esperando' (o painel voltando) ou 'falhou'; null fora do cancelamento.
+  cancel: null,
+  cancelError: '',
 };
+// Espera do painel depois de fechar o assistente. Pela tela, a volta à configuração de antes (ADR
+// 0035) espera o painel novo não responder antes de religar o anterior: leva mais tempo.
+const ESPERA_PAINEL_MS = 45000;
+const ESPERA_VOLTA_MS = 150000;
 
 // ---------------- API ----------------
 async function api(path, body) {
@@ -69,6 +78,8 @@ async function api(path, body) {
   const res = await fetch(`/api/configurar/${path}`, opts);
   let data = null;
   try { data = await res.json(); } catch { /* sem JSON */ }
+  // O assistente diz se veio do painel até sem sessão: o pedido de código vira a explicação.
+  if (data && data.pelaTela) st.pelaTela = true;
   if (res.status === 401 && data && data.codigo) { st.gate = true; render(); }
   if (!res.ok) {
     const err = new Error((data && data.error) || `erro ${res.status}`);
@@ -157,6 +168,15 @@ const next = (label, act, { disabled = false, big = false } = {}) => html`<butto
 
 // ---------------- Passo 0: código de uso único ----------------
 function viewGate() {
+  // Pela tela, ninguém digita o código: ele veio do painel, e só servia uma vez.
+  if (st.pelaTela) {
+    return html`<main class="wz-card md wz-gate">
+      <div class="wz-title"><h1 class="wz-h1 sm" tabindex="-1">O assistente não abriu</h1>
+      <p class="wz-lead sm">Este assistente foi aberto pelo botão Reconfigurar do painel e só aceita, uma vez, o código que o painel entregou a este navegador.</p></div>
+      ${alertBox(st.gateError, true)}
+      <p class="wz-lead sm">Sem uso, o assistente fecha depois de 15 minutos e o painel volta com a configuração de antes. Depois, peça de novo pela engrenagem do painel.</p>
+    </main>`;
+  }
   return html`<main class="wz-card md wz-gate">
     <div class="wz-title"><h1 class="wz-h1 sm" tabindex="-1">Digite o código do terminal</h1>
     <p class="wz-lead sm">Por segurança, o assistente só abre com o código de uso único que o <span class="mono">./dashboard instalar</span> mostrou no terminal.</p></div>
@@ -561,9 +581,33 @@ function viewStep6() {
     <button type="button" class="wz-next big" data-act="abrir" ${st.opening ? raw('disabled') : ''}>${st.opening ? 'Abrindo…' : raw('Abrir o painel <span aria-hidden="true">→</span>')}</button></footer>`;
 }
 
+// ---------------- Cancelar (só pela tela) ----------------
+function viewCancel() {
+  if (st.cancel === 'esperando') {
+    return html`<main class="wz-card md wz-gate">
+      <div class="wz-title"><h1 class="wz-h1 sm" tabindex="-1">Voltando ao painel…</h1>
+      <p class="wz-lead sm" role="status"><span class="spinner" aria-hidden="true"></span> O assistente fechou. O painel volta com a configuração de antes, e esta página entra nele sozinha.</p></div>
+    </main>`;
+  }
+  return html`<main class="wz-card md wz-gate">
+    <div class="wz-title"><h1 class="wz-h1 sm" tabindex="-1">Cancelar a reconfiguração?</h1>
+    <p class="wz-lead sm">O painel volta com a configuração de antes, e a coleta continua de onde parou. O que o assistente já mudou no servidor fica como está: se as pastas, os discos ou os serviços mudaram, a Visão geral mostra como resolver.</p></div>
+    ${alertBox(st.cancelError, true)}
+    <div class="wz-foot"><button type="button" class="wz-back" data-act="ficar">Continuar</button><span class="grow"></span>
+      <button type="button" class="wz-next" data-act="cancelar">Cancelar e voltar ao painel</button></div>
+  </main>`;
+}
+
 // ---------------- Render ----------------
 function render() {
   meta();
+  // Cancelar só existe pela tela, depois de entrar e antes de o painel começar a subir.
+  $('wzCancelar').hidden = !st.pelaTela || st.gate || st.opening || st.cancel !== null;
+  if (st.cancel) {
+    mount($('wzSteps'), '');
+    mount(root, viewCancel());
+    return;
+  }
   mount($('wzSteps'), st.gate ? '' : stepsBar());
   const views = { 1: viewStep1, 2: viewStep2, 3: viewStep3, 4: viewStep4, 5: viewStep5, 6: viewStep6 };
   // Preserva o que a pessoa está digitando (o render refaz o HTML).
@@ -583,6 +627,7 @@ function render() {
 // ---------------- Ações ----------------
 async function loadState() {
   const s = await api('estado');
+  st.pelaTela = Boolean(s.pelaTela);
   st.computer = s.computador;
   st.passos = s.passos;
   if (s.computador.systemd === false) st.prefs.boot = false;
@@ -718,6 +763,41 @@ async function copyBlock(id) {
   }
 }
 
+/** Espera o painel responder na mesma porta (o assistente responde outra coisa em /api/session). */
+async function esperarPainel(ms) {
+  const until = Date.now() + ms;
+  while (Date.now() < until) {
+    await new Promise((r) => setTimeout(r, 600));
+    try {
+      const res = await fetch('/api/session', { credentials: 'same-origin', cache: 'no-store' });
+      const body = await res.json();
+      if (body && 'authRequired' in body) return true;
+    } catch { /* ainda subindo */ }
+  }
+  return false;
+}
+
+/**
+ * Cancela pela tela (ADR 0034): o comando restaura a configuração de antes e liga o painel. A sessão
+ * do painel continua valendo, então a página volta à Visão geral sem pedir o token.
+ */
+async function cancelWizard() {
+  st.cancelError = '';
+  try {
+    await api('cancelar', {});
+  } catch (err) {
+    st.cancelError = err.message;
+    render();
+    return;
+  }
+  st.cancel = 'esperando';
+  render();
+  if (await esperarPainel(ESPERA_PAINEL_MS)) { location.href = '/#/visao-geral'; return; }
+  st.cancel = 'confirmar';
+  st.cancelError = 'O painel não voltou. No terminal, na pasta do painel, rode ./dashboard iniciar.';
+  render();
+}
+
 /** Conclui: o assistente fecha, espera o painel subir na mesma porta e entra já logado. */
 async function openPanel() {
   st.opening = true;
@@ -732,18 +812,16 @@ async function openPanel() {
     render();
     return;
   }
-  // O assistente fecha e o painel sobe na mesma porta: espera ele responder.
-  const until = Date.now() + 45000;
-  while (Date.now() < until) {
-    await new Promise((r) => setTimeout(r, 600));
-    try {
-      const res = await fetch('/api/session', { credentials: 'same-origin', cache: 'no-store' });
-      const body = await res.json();
-      if (body && 'authRequired' in body) { location.href = url; return; }
-    } catch { /* ainda subindo */ }
+  // O assistente fecha e o painel sobe na mesma porta: espera ele responder. Pela tela, a Visão
+  // geral diz se a configuração nova valeu (o fragmento sobrevive ao redirecionamento do /entrar).
+  if (await esperarPainel(st.pelaTela ? ESPERA_VOLTA_MS : ESPERA_PAINEL_MS)) {
+    location.href = st.pelaTela ? `${url}#/visao-geral?reconfigurado=1` : url;
+    return;
   }
   st.opening = false;
-  st.error = 'O painel não respondeu. No terminal, rode ./dashboard abrir.';
+  st.error = st.pelaTela
+    ? 'O painel não respondeu. No terminal, na pasta do painel, rode ./dashboard diagnosticar.'
+    : 'O painel não respondeu. No terminal, rode ./dashboard abrir.';
   render();
 }
 
@@ -781,6 +859,8 @@ root.addEventListener('click', (e) => {
     case 'preparar': prepare(); break;
     case 'token': api('token', {}).then((r) => { st.token = r.token; render(); }, (err) => { st.error = err.message; render(); }); break;
     case 'abrir': openPanel(); break;
+    case 'ficar': st.cancel = null; st.cancelError = ''; render(); root.querySelector('h1')?.focus(); break;
+    case 'cancelar': cancelWizard(); break;
     default: break;
   }
 });
@@ -830,6 +910,12 @@ let theme = 'dark';
 try { theme = localStorage.getItem(THEME_KEY) === 'light' ? 'light' : 'dark'; } catch { /* bloqueado */ }
 applyTheme(theme);
 $('wzTheme').addEventListener('click', () => applyTheme(document.documentElement.dataset.theme === 'dark' ? 'light' : 'dark'));
+$('wzCancelar').addEventListener('click', () => {
+  st.cancel = 'confirmar';
+  st.cancelError = '';
+  render();
+  root.querySelector('h1')?.focus();
+});
 
 // Início: com #codigo= na URL (link do terminal), entra direto e tira o código do
 // endereço (não fica no histórico); sem ele, retoma o estado ou pede o código.
