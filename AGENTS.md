@@ -435,6 +435,15 @@ As unidades do executor (`pacote/systemd/`, ADR 0045; no pacote, `/usr/lib/syste
 rede. `test/unit/unidades-systemd.test.js` exige cada diretiva e a nota do
 `systemd-analyze security` (até 1,5 no verificar e 0,5 nos outros).
 
+A regra do polkit (`pacote/polkit/50-server-dashboard.rules`, ADR 0046; no pacote,
+`/usr/share/polkit-1/rules.d/`) libera sem senha só a ação `org.freedesktop.systemd1.manage-units`,
+com o verbo `start`, nas unidades `server-dashboard-atualizar.service` e
+`server-dashboard-voltar.service`, para quem está no grupo `server-dashboard`. O resto cai no padrão
+do polkit (senha do administrador). O `pacote/sysusers/server-dashboard.conf` (no pacote,
+`/usr/lib/sysusers.d/`) cria esse grupo, vazio, e o usuário `_server-dashboard`, sem login e fora do
+grupo. `test/unit/polkit-e-grupo.test.js` avalia a regra num `vm` contra cada combinação e aplica o
+`sysusers.d` numa raiz falsa.
+
 ## Comando SSH de coleta
 
 O script é montado por `server/collector/builder.js`. É um único script POSIX `sh`,
@@ -708,6 +717,8 @@ linux-server-dashboard-v2/
 ├── bin/dashboard           lançador do pacote .deb (modo sistema, ADR 0043): Node do pacote ou do sistema, código do link atual
 ├── libexec/atualizador     executor do pacote .deb (ADR 0044): verificar, atualizar e voltar, como _server-dashboard
 ├── pacote/systemd/         unidades do executor e o timer diário (ADR 0045), isoladas
+├── pacote/polkit/          regra do polkit: o grupo só inicia atualizar e voltar (ADR 0046)
+├── pacote/sysusers/        grupo server-dashboard e usuário _server-dashboard (ADR 0046)
 ├── package.json            sem dependências de runtime; devDependency: playwright-core (e2e)
 ├── .env.example            modelo do .env (sem valores reais)
 ├── .github/                workflows/: seguranca.yml (CI, ADR 0014), dependencias.yml e
