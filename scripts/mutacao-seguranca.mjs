@@ -103,7 +103,7 @@ const MUTACOES = [
   { nome: 'dado da tela indo para a reconfiguração', arquivo: 'server/index.js', de: 'atualizacao.reconfigurar()', para: 'atualizacao.reconfigurar(req.body)' },
   { nome: 'comando da reconfiguração sem o --pela-tela', arquivo: 'server/atualizacao/executor.js', de: "comando: ['reconfigurar', '--pela-tela']", para: "comando: ['reconfigurar']", testes: ['test/unit/atualizacao-registro.test.js'] },
   { nome: 'reconfigurar sem conferir a assinatura da pasta', arquivo: 'server/atualizacao/procurar.js', de: "return currentVersionStatus(root, { run }).ok ? null : 'sem-assinatura';", para: 'return null;', testes: ['test/integration/reconfigurar.test.js'] },
-  { nome: 'reconfigurar fora da pasta da instalação', arquivo: 'server/atualizacao/procurar.js', de: "  if (foraDaInstalacao(root, home)) return 'outra-pasta';\n  return currentVersionStatus", para: '  return currentVersionStatus', testes: ['test/integration/reconfigurar.test.js'] },
+  { nome: 'reconfigurar fora da pasta da instalação', arquivo: 'server/atualizacao/procurar.js', de: "  if (foraDaInstalacao(root, home)) return 'outra-pasta';\n  if (modo === 'sistema') return null;\n  return currentVersionStatus", para: "  if (modo === 'sistema') return null;\n  return currentVersionStatus", testes: ['test/integration/reconfigurar.test.js'] },
   { nome: 'reconfigurar sem as conferências da pasta', arquivo: 'server/atualizacao/index.js', de: 'this.impedimento() ?? this.conferirReconfiguracao()', para: 'this.impedimento()', testes: ['test/integration/reconfigurar.test.js'] },
   { nome: 'reconfigurar durante uma atualização', arquivo: 'server/atualizacao/index.js', de: "    if (emAndamento(this.root, { agora: this.agora(), procDir: this.procDir })) return 'rodando';\n", para: '', testes: ['test/integration/reconfigurar.test.js'] },
   { nome: '2 reconfigurações ao mesmo tempo', arquivo: 'server/atualizacao/index.js', de: '    this.reconfigurandoAte = this.agora() + RECONFIGURAR_MS;\n', para: '', testes: ['test/integration/reconfigurar.test.js'] },
@@ -137,6 +137,12 @@ const MUTACOES = [
   { nome: 'polkit sem conferir o grupo', arquivo: 'pacote/polkit/50-server-dashboard.rules', de: "!subject.isInGroup('server-dashboard')", para: 'false', testes: ['test/unit/polkit-e-grupo.test.js'] },
   { nome: 'polkit libera outra ação', arquivo: 'pacote/polkit/50-server-dashboard.rules', de: "action.id !== 'org.freedesktop.systemd1.manage-units'", para: "action.id.indexOf('org.freedesktop.systemd1.') !== 0", testes: ['test/unit/polkit-e-grupo.test.js'] },
   { nome: 'executor no grupo do polkit', arquivo: 'pacote/sysusers/server-dashboard.conf', de: 'g server-dashboard - -\n', para: 'g server-dashboard - -\nm _server-dashboard server-dashboard\n', testes: ['test/unit/polkit-e-grupo.test.js'] },
+  { nome: 'painel pede outra unidade do sistema', arquivo: 'server/atualizacao/pacote.js', de: "if (unidade !== UNIDADE_ATUALIZAR && unidade !== UNIDADE_VOLTAR) throw", para: 'if (false) throw', testes: ['test/integration/atualizacao-pacote.test.js'] },
+  { nome: 'painel deixa o polkit pedir senha', arquivo: 'server/atualizacao/pacote.js', de: "['--no-ask-password', 'start', unidade]", para: "['start', unidade]", testes: ['test/integration/atualizacao-pacote.test.js'] },
+  { nome: 'painel aceita versão do estado fora do padrão', arquivo: 'server/atualizacao/pacote.js', de: "RELEASE_TAG.test(d.versao ?? '') && ", para: '', testes: ['test/integration/atualizacao-pacote.test.js'] },
+  { nome: 'troca no pacote sem conferir o link atual', arquivo: 'server/cli/atualizar.js', de: 'if (!alvo || alvo === current) {', para: 'if (!alvo) {', testes: ['test/integration/atualizacao-pacote.test.js'] },
+  { nome: 'troca no pacote sem pedir o voltar', arquivo: 'server/cli/atualizar.js', de: 'const volta = executor(UNIDADE_VOLTAR);', para: 'const volta = { ok: true, erro: null };', testes: ['test/integration/atualizacao-pacote.test.js'] },
+  { nome: 'pacote aceita o --pre', arquivo: 'server/cli/atualizar.js', de: 'if (pacote && flags.pre && !registro) {', para: 'if (false) {', testes: ['test/integration/atualizacao-pacote.test.js'] },
   { nome: 'exec com shell importado', arquivo: 'server/cli/servico.js', de: "import { spawn, spawnSync } from 'node:child_process';", para: "import { exec, spawn, spawnSync } from 'node:child_process';" },
 ];
 

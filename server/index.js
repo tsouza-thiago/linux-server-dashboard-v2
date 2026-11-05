@@ -18,13 +18,13 @@ import { spansToIso } from './storage/coverage.js';
 import { AlertEngine } from './alerts/engine.js';
 import { collect, configTargets } from './poller.js';
 import { VERSION } from './version.js';
-import { config, configWarnings, ROOT, DATA_ROOT, isPlaceholderHost } from './config.js';
+import { config, configWarnings, ROOT, DATA_ROOT, PASTAS, isPlaceholderHost } from './config.js';
 import { hostCheck, csrfCheck, securityHeaders, makeRequireAuth, issueCsrfCookie, makeRateLimit, parseCookies } from './security.js';
 import { toCSV } from './csv.js';
 import { createLogFile } from './logfile.js';
-import { Atualizacao, procurarEmProcesso } from './atualizacao/index.js';
+import { Atualizacao, PERIODO_NO_PACOTE_MS, procurarEmProcesso } from './atualizacao/index.js';
 import { executarForaDoServico, modoDoExecutor, reconfigurarForaDoServico } from './atualizacao/executor.js';
-import { bloqueioDaPasta, bloqueioDaReconfiguracao } from './atualizacao/procurar.js';
+import { bloqueioDaPasta, bloqueioDaReconfiguracao, procurar } from './atualizacao/procurar.js';
 
 /**
  * Monta o painel: stores, motor de alertas, sessões, SSE e o roteador com todas as rotas.
@@ -109,6 +109,7 @@ export function createApp(deps = {}) {
     executarReconfiguracao: deps.executarReconfiguracao ?? null,
     conferirReconfiguracao: deps.conferirReconfiguracao,
     procDir: deps.procDirAtualizacao,
+    periodoMs: deps.periodoAtualizacao,
     onChange: (estado) => broadcast('atualizacao', estado),
     log,
   });
@@ -493,9 +494,13 @@ function startServer() {
   for (const w of configWarnings) log(`AVISO de configuração: ${w}`);
 
   const modo = modoDoExecutor();
+  // No pacote .deb, a procura só lê o estado/ do executor (ADR 0048): sem git, sem rede e sem
+  // processo à parte, de hora em hora.
+  const noPacote = PASTAS.modo === 'sistema';
   const { app, runPoll, atualizacao, shutdown: flushAll } = createApp({
     log,
-    procurarVersao: procurarEmProcesso,
+    procurarVersao: noPacote ? async () => procurar(ROOT) : procurarEmProcesso,
+    periodoAtualizacao: noPacote ? PERIODO_NO_PACOTE_MS : undefined,
     modoAtualizacao: modo,
     executarAtualizacao: () => executarForaDoServico({ root: ROOT, modo }),
     conferirPasta: () => bloqueioDaPasta(ROOT),

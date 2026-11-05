@@ -49,13 +49,13 @@ test('recusaNoPacote: no modo clone, nenhum comando é recusado', () => {
   }
 });
 
-test('recusaNoPacote: no pacote, recusa atualizar, desinstalar, reconfigurar pela tela e importar a V1', () => {
-  for (const [nome, args] of [['atualizar', []], ['atualizar', ['--terminal']], ['desinstalar', ['--apagar-historico']], ['reconfigurar', ['--pela-tela']], ['instalar', ['--importar-v1', '/x']]]) {
+test('recusaNoPacote: no pacote, recusa desinstalar e importar a V1', () => {
+  for (const [nome, args] of [['desinstalar', []], ['desinstalar', ['--apagar-historico']], ['instalar', ['--importar-v1', '/x']]]) {
     const r = recusaNoPacote(nome, args, 'sistema');
     assert.ok(r?.texto && r?.oQueFazer, `${nome} ${args.join(' ')}`);
   }
-  // O resto segue: instalação, reconfigurar no terminal, status, abrir, diagnosticar.
-  for (const [nome, args] of [['instalar', []], ['instalar', ['--terminal']], ['reconfigurar', []], ['status', []], ['abrir', []], ['diagnosticar', []], ['versao', []]]) {
+  // O resto segue: atualizar e reconfigurar pela tela (etapa 8, ADR 0048), instalação, status…
+  for (const [nome, args] of [['atualizar', []], ['atualizar', ['--terminal']], ['atualizar', ['--registro']], ['reconfigurar', ['--pela-tela']], ['instalar', []], ['instalar', ['--terminal']], ['reconfigurar', []], ['status', []], ['abrir', []], ['diagnosticar', []], ['versao', []]]) {
     assert.equal(recusaNoPacote(nome, args, 'sistema'), null, nome);
   }
 });

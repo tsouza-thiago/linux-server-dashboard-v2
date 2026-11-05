@@ -4,6 +4,8 @@
 // falhar, volta sozinha para a versão anterior com o data/ do backup. Com --registro (quem
 // roda é o painel, ADR 0031), as linhas e as fases vão para .atualizacao/ em vez do terminal.
 // Sem --terminal e com tela, o comando só abre o painel no diálogo da versão nova (ADR 0032).
+// No pacote .deb (modo sistema, ADR 0048), não há git: quem troca o código em /opt é o executor do
+// pacote, pedido pelas unidades do sistema; aqui ficam a cópia dos dados, a saúde e a volta.
 import { spawnSync } from 'node:child_process';
 import fs from 'node:fs';
 import os from 'node:os';
@@ -12,7 +14,8 @@ import { SIGNERS, newestSignedTag } from '../setup/assinatura.js';
 import { GIT_ENV, versaoDaPasta } from '../atualizacao/procurar.js';
 import { recortarNovidades } from '../atualizacao/novidades.js';
 import { abrirRegistro, cancelarPre, liberarPre, pegarTrava, preLiberada, soltarTrava } from '../atualizacao/registro.js';
-import { backupsDe, dataDe, envDe, loadEnvFile } from '../config.js';
+import { UNIDADE_ATUALIZAR, UNIDADE_VOLTAR, iniciarUnidade, procurarNoPacote, registroDesde, tamanhoDoRegistro, versaoDoPacote } from '../atualizacao/pacote.js';
+import { backupsDe, caminhosDoPacote, dataDe, envDe, loadEnvFile, pastasDe } from '../config.js';
 import { installService, situacaoDoLink } from '../setup/local.js';
 import { motivoSemPainel, openBrowser, otherServiceRoot, panelHealthy, panelPort, panelStatus, panelUrl, startPanel, stopPanel, unitPath, systemctlUser, UNIT_NAME } from './servico.js';
 import { parseFlags } from './instalar.js';
@@ -184,6 +187,81 @@ async function trocarDeVersao({ out, root, home, deps, flags, run, registro }) {
   return 1;
 }
 
+/**
+ * A troca pelo pacote .deb (ADR 0042 item 4 e ADR 0048), com a trava já pega: a cópia dos dados da
+ * pessoa, a unidade `atualizar` do executor (sem parâmetro: ela instala a versão que o `verificar`
+ * conferiu), a versão nova liga o painel e, se ele não responder, a unidade `voltar` e os dados da
+ * cópia. Este processo nunca grava em /opt: só o executor troca o código (`pacote` é a base dele).
+ */
+async function trocarNoPacote({ out, root, home, deps, pacote, registro }) {
+  const marcar = registro?.marcar ?? (() => {});
+  const stdio = registro ? ['ignore', registro.fd, registro.fd] : 'inherit';
+  // O lançador resolve o link `atual` de novo: a fase 2 roda a versão que o executor deixou lá.
+  const reexec = deps.reexec ?? ((a) => spawnSync(path.join(pacote, 'bin', 'dashboard'), a, { stdio }).status);
+  const pedir = deps.iniciarUnidade ?? iniciarUnidade;
+  // A tela de progresso junta o registro do executor ao desta troca (ADR 0042, item 4.6).
+  const executor = (unidade) => {
+    const desde = tamanhoDoRegistro(pacote);
+    const r = pedir(unidade);
+    for (const linha of registroDesde(pacote, desde).split('\n').filter(Boolean)) out.line(`  executor: ${linha}`);
+    return r;
+  };
+  marcar({ fase: 'procurando' });
+  const current = versaoDaPasta(root);
+  const { nova: target, novidades, erro } = procurarNoPacote({ base: pacote, instalada: current });
+  if (!target) {
+    if (erro) out.warn('a última procura do pacote não alcançou o GitHub', 'o pacote procura de novo 1 vez por dia');
+    out.ok(`você já está na versão mais nova (${current})`);
+    marcar({ resultado: 'ja-na-mais-nova' });
+    return 0;
+  }
+  out.ok(`versão nova encontrada: ${target}`, 'assinatura conferida pelo executor do pacote');
+  marcar({ alvo: target, de: current });
+  marcar({ fase: 'trocando' });
+  const wasRunning = (deps.panelStatus ?? panelStatus)({ root, home }).running;
+  await (deps.stopPanel ?? stopPanel)({ root, home });
+  const backup = backupData(root, current);
+  out.ok('cópia de segurança dos dados feita', path.relative(pastasDe(root).dados, backup));
+  const troca = executor(UNIDADE_ATUALIZAR);
+  // Vale o link `atual`, não só o código de saída: é ele que o lançador e o serviço seguem.
+  const alvo = versaoDoPacote(pacote);
+  if (!alvo || alvo === current) {
+    out.fail('o executor do pacote não trocou de versão', troca.erro ?? 'o link atual não mudou');
+    out.explain('nada mudou no código do painel.', `confira se você está no grupo server-dashboard (rode: id). Se entrou nele agora há pouco, saia e entre de novo na sessão. Depois, rode ${out.cmd} atualizar de novo.`);
+    if (wasRunning) await (deps.startPanel ?? startPanel)({ root, home });
+    return 1;
+  }
+  // O timer pode ter achado uma versão mais nova entre a leitura e o pedido.
+  if (alvo !== target) marcar({ alvo });
+  marcar({ fase: 'ligando' });
+  if (reexec(['atualizar', '--pos-atualizacao']) === 0) {
+    out.ok(`atualizado de ${current} para ${alvo}`);
+    if (!wasRunning) out.line(out.c.dim('O painel estava parado antes; ele foi ligado para conferir a versão nova.'));
+    if (alvo === target && novidades?.exigeReconfigurar && loadEnvFile(envDe(root)).SSH_ACESSO === 'restrito') {
+      out.warn('esta versão exige reconfigurar o acesso ao servidor', `rode ${out.cmd} reconfigurar e confirme o passo "Preparar o servidor"`);
+    }
+    return 0;
+  }
+  // A versão nova não subiu: o executor volta o código, e os dados voltam da cópia.
+  marcar({ fase: 'voltando', resultado: 'voltou' });
+  out.fail(`a versão ${alvo} não funcionou aqui: voltando para ${current}`);
+  await (deps.stopPanel ?? stopPanel)({ root, home });
+  const volta = executor(UNIDADE_VOLTAR);
+  if (versaoDoPacote(pacote) !== current) {
+    // O código continua na versão nova: os dados ficam como ela os deixou, e a cópia fica guardada.
+    marcar({ resultado: 'falhou' });
+    out.fail('o executor do pacote não voltou para a versão anterior', volta.erro ?? 'o link atual não mudou');
+    out.explain(`a versão ${alvo} continua instalada, e a cópia dos dados está em ${backup}.`, `rode ${out.cmd} diagnosticar e avise no GitHub do projeto.`);
+    return 1;
+  }
+  restoreData(root, backup);
+  const back = reexec(['atualizar', '--pos-atualizacao']);
+  if (back === 0) out.ok(`de volta à ${current}, com os dados de antes da atualização`);
+  else out.fail('a versão anterior também não subiu', `rode ${out.cmd} diagnosticar`);
+  out.explain(`a versão ${alvo} não ligou o painel nesta máquina.`, `nada foi perdido. Rode ${out.cmd} diagnosticar e, se quiser, avise no GitHub do projeto.`);
+  return 1;
+}
+
 /** Abre o painel já logado, no diálogo da versão nova. false: a atualização segue no terminal. */
 async function abrirNoPainel({ out, root, home, deps, flags }) {
   const motivo = await motivoSemPainel({ root, home, deps });
@@ -203,11 +281,18 @@ async function abrirNoPainel({ out, root, home, deps, flags }) {
 }
 
 /** As conferências da pasta e a trava: 2 atualizações ao mesmo tempo trocariam o código uma da outra. */
-async function atualizarAqui({ out, root, home, deps, flags, registro }) {
+async function atualizarAqui({ out, root, home, deps, flags, registro, pacote }) {
   out.title('Server Dashboard · atualizar');
   if (!checkFolder({ out, root, home })) return 1;
   const run = deps.run ?? spawnSync;
-  if (git(root, ['rev-parse', '--is-inside-work-tree'], run).status !== 0) {
+  // A unidade do executor não recebe parâmetro, e liberar o --pre pediria uma pasta que a pessoa
+  // grava e o executor lê (ADR 0048): no pacote, pré-versão só para quem já está numa.
+  if (pacote && flags.pre && !registro) {
+    out.fail('o pacote não instala pré-versão pelo --pre');
+    out.explain('o executor do pacote só aceita pré-versão para quem já está numa.', `rode ${out.cmd} atualizar sem o --pre.`);
+    return 1;
+  }
+  if (!pacote && git(root, ['rev-parse', '--is-inside-work-tree'], run).status !== 0) {
     out.fail('esta pasta não veio de um git clone');
     out.explain('o atualizar troca de versão com o git.', `baixe de novo com o comando do README e importe os dados: ${out.cmd} instalar --importar-v1 não serve aqui; copie a pasta data/.`);
     return 1;
@@ -219,6 +304,7 @@ async function atualizarAqui({ out, root, home, deps, flags, registro }) {
     return 1;
   }
   try {
+    if (pacote) return await trocarNoPacote({ out, root, home, deps, pacote, registro });
     return await trocarDeVersao({ out, root, home, deps, flags, run, registro });
   } finally {
     // Com registro, quem solta é o `fim`, depois de gravar o estado final (#130).
@@ -227,13 +313,13 @@ async function atualizarAqui({ out, root, home, deps, flags, registro }) {
 }
 
 // Rodado pelo painel (ADR 0031): sem terminal, tudo vai para .atualizacao/.
-async function comRegistro({ root, home, deps, flags }) {
+async function comRegistro({ root, home, deps, flags, pacote }) {
   const registro = abrirRegistro(root);
   const out = makeOutput({ stream: registro.stream, root });
   let codigo = 1;
   try {
     // O comando do executor é fixo (I11): o --pre chega pelo que o dono liberou no terminal.
-    codigo = await atualizarAqui({ out, root, home, deps, flags: { ...flags, pre: preLiberada(root) }, registro });
+    codigo = await atualizarAqui({ out, root, home, deps, flags: { ...flags, pre: !pacote && preLiberada(root) }, registro, pacote });
   } catch (err) {
     out.fail('a atualização parou', err.message);
   }
@@ -251,6 +337,8 @@ async function comRegistro({ root, home, deps, flags }) {
 export async function atualizar({ out, root, args = [], home = os.homedir(), deps = {} }) {
   const flags = parseFlags(args);
   if (flags['pos-atualizacao']) return afterUpdate({ out, root, home, deps });
-  if (flags.registro) return comRegistro({ root, home, deps, flags });
-  return atualizarAqui({ out, root, home, deps, flags });
+  // A base do pacote .deb (modo sistema); null no clone. Os testes passam uma base falsa.
+  const pacote = deps.pacote ?? (pastasDe(root).modo === 'sistema' ? caminhosDoPacote(root).base : null);
+  if (flags.registro) return comRegistro({ root, home, deps, flags, pacote });
+  return atualizarAqui({ out, root, home, deps, flags, pacote });
 }

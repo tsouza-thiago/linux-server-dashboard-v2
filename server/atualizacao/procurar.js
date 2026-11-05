@@ -2,7 +2,8 @@
 // novidades dela e o que impediria a troca de versão. Roda em processo próprio, com prioridade
 // baixa: o fetch pode levar até 2 min, a conferência das assinaturas é síncrona, e nada disso
 // pode segurar o painel. Não usa SSH nem a trava de coleta (I1). Só lê, menos as tags que o
-// fetch traz para o .git; a troca de versão fica com o `dashboard atualizar`.
+// fetch traz para o .git; a troca de versão fica com o `dashboard atualizar`. No pacote .deb, só
+// lê o estado/ do executor, sem git e sem rede (ADR 0048).
 import { spawnSync } from 'node:child_process';
 import fs from 'node:fs';
 import os from 'node:os';
@@ -10,7 +11,8 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { currentVersionStatus, newestSignedTag } from '../setup/assinatura.js';
 import { otherServiceRoot } from '../cli/servico.js';
-import { pastasDe } from '../config.js';
+import { caminhosDoPacote, envDe, pastasDe } from '../config.js';
+import { procurarNoPacote } from './pacote.js';
 import { recortarNovidades } from './novidades.js';
 import { preLiberada } from './registro.js';
 
@@ -29,34 +31,40 @@ export const versaoDaPasta = (root) => {
   try { return `v${JSON.parse(fs.readFileSync(path.join(root, 'package.json'), 'utf8')).version}`; } catch { return 'v0.0.0'; }
 };
 
-// Só a pasta da instalação troca de versão ou reconfigura pela tela (#118). No pacote .deb
-// (modo sistema), os 2 botões ficam desligados até a F9 trazer o executor para a tela (etapa 8):
-// eles rodariam o git e o ./dashboard da pasta do código, que em /opt é do executor (ADR 0043).
-const foraDaInstalacao = (root, home) => pastasDe(root).modo === 'sistema'
-  || !fs.existsSync(path.join(root, '.env')) || otherServiceRoot(root, home);
+// Só a pasta da instalação troca de versão ou reconfigura pela tela (#118): a que tem o .env e é a
+// do serviço. No pacote .deb (modo sistema), o .env fica na pasta XDG da pessoa, e o serviço roda o
+// código pelo link `atual`, que é esta pasta (ADR 0048).
+const foraDaInstalacao = (root, home) => !fs.existsSync(envDe(root)) || otherServiceRoot(root, home);
 
 // O que impediria o `dashboard atualizar` nesta pasta; null se nada impede. `--no-optional-locks`:
 // esta conferência não pode disputar o índice do git com um `dashboard atualizar` em andamento.
-export function bloqueioDaPasta(root, home = os.homedir(), run = spawnSync) {
+// No pacote não há git: o código em /opt é do executor, e ninguém o altera à mão.
+export function bloqueioDaPasta(root, home = os.homedir(), run = spawnSync, modo = pastasDe(root).modo) {
   if (foraDaInstalacao(root, home)) return 'outra-pasta';
+  if (modo === 'sistema') return null;
   return git(root, ['--no-optional-locks', 'status', '--porcelain', '--untracked-files=no'], run).stdout.trim() ? 'arquivos-alterados' : null;
 }
 
 /**
  * O que faria o `reconfigurar --pela-tela` recusar com o painel já esperando; null se nada impede.
- * Arquivo alterado não entra: o comando não troca de versão e aceita a pasta assim (ADR 0036).
+ * Arquivo alterado não entra: o comando não troca de versão e aceita a pasta assim (ADR 0036). No
+ * pacote, quem conferiu a assinatura foi o pacote ou o executor (ADR 0042), e não há git aqui.
  */
-export function bloqueioDaReconfiguracao(root, home = os.homedir(), run = spawnSync) {
+export function bloqueioDaReconfiguracao(root, home = os.homedir(), run = spawnSync, modo = pastasDe(root).modo) {
   if (foraDaInstalacao(root, home)) return 'outra-pasta';
+  if (modo === 'sistema') return null;
   return currentVersionStatus(root, { run }).ok ? null : 'sem-assinatura';
 }
 
 /**
  * Procura versão nova. Devolve `{ nova, novidades, bloqueio, erro }`. Sem acesso à internet
  * (`erro: 'sem-acesso'`), segue com as tags que já estão aqui: a versão achada antes continua
- * valendo.
+ * valendo. No pacote, só lê o estado/ do executor (`base`), sem git e sem rede (ADR 0048).
  */
-export function procurar(root, { run = spawnSync, home = os.homedir() } = {}) {
+export function procurar(root, { run = spawnSync, home = os.homedir(), modo = pastasDe(root).modo, base = caminhosDoPacote(root).base } = {}) {
+  if (modo === 'sistema') {
+    return { ...procurarNoPacote({ base, instalada: versaoDaPasta(root) }), bloqueio: bloqueioDaPasta(root, home, run, modo) };
+  }
   if (git(root, ['rev-parse', '--is-inside-work-tree'], run).status !== 0) {
     return { nova: null, novidades: null, bloqueio: 'sem-git', erro: null };
   }

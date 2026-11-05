@@ -1,9 +1,11 @@
 // Registro da troca de versão (ADR 0031): log, estado e trava em .atualizacao/, fora de data/,
 // porque a volta atrás apaga data/ e perderia o log. Quem escreve é o `dashboard atualizar
 // --registro`; o painel só prepara o início e lê. A pasta sobrevive à queda do painel, e é por
-// isso que a tela de progresso consegue continuar depois da troca de versão.
+// isso que a tela de progresso consegue continuar depois da troca de versão. No pacote .deb (modo
+// sistema), a pasta do código em /opt é só leitura: .atualizacao/ fica na pasta de dados da pessoa.
 import fs from 'node:fs';
 import path from 'node:path';
+import { pastasDe } from '../config.js';
 
 const PASTA = '.atualizacao';
 const LOG = 'ultima.log';
@@ -17,11 +19,14 @@ const GRACA_MS = 60000;
 // Quanto vale o `dashboard atualizar --pre` pelo painel: o tempo de olhar o diálogo e clicar.
 const PRE_MS = 30 * 60000;
 
-const arquivo = (root, nome) => path.join(root, PASTA, nome);
+/** A pasta .atualizacao/ da instalação de `root`: a do projeto no clone, a XDG no pacote. */
+export const pastaDoRegistro = (root) => path.join(pastasDe(root).dados, PASTA);
+const arquivo = (root, nome) => path.join(pastaDoRegistro(root), nome);
 
 /** Cria a pasta (0700) ou corrige a permissão dela. */
 export function garantirPasta(root) {
-  const dir = path.join(root, PASTA);
+  const dir = pastaDoRegistro(root);
+  fs.mkdirSync(path.dirname(dir), { recursive: true, mode: 0o700 });
   fs.mkdirSync(dir, { recursive: true, mode: 0o700 });
   fs.chmodSync(dir, 0o700);
 }

@@ -123,15 +123,11 @@ const COMMANDS = {
 
 /**
  * O que ainda não funciona na instalação pelo pacote .deb (modo sistema, ADR 0043). Estes
- * caminhos mexem no código da pasta (git checkout) ou apagam arquivos com as regras do clone;
- * no pacote, o código é do executor e fica em /opt. Cada um recusa com o motivo, até a etapa
- * da F9 que o traz: atualizar (4 e 8), reconfigurar pela tela (8), desinstalar e importar (10).
+ * caminhos apagam arquivos com as regras do clone; no pacote, o código é do executor e fica em
+ * /opt. Cada um recusa com o motivo, até a etapa 10 da F9, que os traz. O atualizar e o
+ * reconfigurar pela tela já funcionam no pacote (etapa 8, ADR 0048).
  */
 const RECUSA_NO_PACOTE = [
-  [(nome) => nome === 'atualizar', 'a troca de versão pelo pacote ainda não está pronta',
-    'por enquanto, troque de versão instalando o pacote .deb novo.'],
-  [(nome, args) => nome === 'reconfigurar' && args.includes('--pela-tela'), 'reconfigurar pela tela ainda não funciona no pacote',
-    'rode dashboard reconfigurar no terminal.'],
   [(nome) => nome === 'desinstalar', 'o desinstalar ainda não funciona no pacote',
     'nada foi apagado. Os seus dados continuam nas pastas pessoais do painel.'],
   [(nome, args) => nome === 'instalar' && args.includes('--importar-v1'), 'importar a V1 ainda não funciona no pacote',

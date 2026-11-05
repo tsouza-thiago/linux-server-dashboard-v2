@@ -28,13 +28,17 @@ const MAX_SAIDA = 256 * 1024;
 export const RECONFIGURAR_MS = 60000;
 const PROCURAR_JS = fileURLToPath(new URL('./procurar.js', import.meta.url));
 
+// No pacote .deb, a procura só lê o estado/ do executor, e o timer dele roda 1 vez por dia, com até
+// 6 h de atraso: o painel relê de hora em hora para não somar mais 1 dia de espera (ADR 0048).
+export const PERIODO_NO_PACOTE_MS = 3600000;
+
 /**
  * Milissegundos até a próxima procura. Reiniciar o painel não adianta a procura: conta da
- * última verificação guardada, 1 vez por dia, e nunca antes dos ~5 min depois de ligar.
+ * última verificação guardada, 1 vez por `periodoMs` (1 dia), e nunca antes dos ~5 min depois de ligar.
  */
-export function esperaAteProcurar({ agora, verificadoEm, aleatorio }) {
+export function esperaAteProcurar({ agora, verificadoEm, aleatorio, periodoMs = DIA_MS }) {
   const ultima = Date.parse(verificadoEm);
-  const falta = Number.isFinite(ultima) ? ultima + DIA_MS - agora : 0;
+  const falta = Number.isFinite(ultima) ? ultima + periodoMs - agora : 0;
   return Math.max(PRIMEIRA_MS, falta) + Math.floor(aleatorio * ESPALHO_MS);
 }
 
@@ -65,7 +69,7 @@ class ArquivoDeEstado extends JsonStore {
 
 /** Estado da verificação de versão, com a agenda diária. */
 export class Atualizacao {
-  constructor({ file, instalada, loginExigido, procurar, acessoRestrito = false, root = path.dirname(file), modo = null, executar = null, conferirPasta = () => null, executarReconfiguracao = null, conferirReconfiguracao = () => null, procDir = '/proc', onChange = () => {}, log = () => {}, agora = Date.now, aleatorio = Math.random }) {
+  constructor({ file, instalada, loginExigido, procurar, acessoRestrito = false, root = path.dirname(file), modo = null, executar = null, conferirPasta = () => null, executarReconfiguracao = null, conferirReconfiguracao = () => null, procDir = '/proc', periodoMs = DIA_MS, onChange = () => {}, log = () => {}, agora = Date.now, aleatorio = Math.random }) {
     this.instalada = instalada;
     this.loginExigido = loginExigido;
     this.procurar = procurar;
@@ -77,6 +81,7 @@ export class Atualizacao {
     this.executarReconfiguracao = executarReconfiguracao;
     this.conferirReconfiguracao = conferirReconfiguracao;
     this.procDir = procDir;
+    this.periodoMs = periodoMs;
     this.onChange = onChange;
     this.log = log;
     this.agora = agora;
@@ -193,8 +198,10 @@ export class Atualizacao {
     let r;
     try { r = await this.procurar(); } catch { r = { erro: 'falhou' }; }
     const anterior = this.arquivo.data;
-    // Procura que falhou inteira (sem `nova`) mantém o que já se sabia.
-    this.arquivo.data = { ...anterior, ...r, verificadoEm: new Date(this.agora()).toISOString() };
+    // Procura que falhou inteira (sem `nova`) mantém o que já se sabia. No pacote, a hora é a do
+    // executor (`verificadoEm` no resultado, null se ele nunca procurou), não a desta leitura.
+    const verificadoEm = r && 'verificadoEm' in r ? r.verificadoEm : new Date(this.agora()).toISOString();
+    this.arquivo.data = { ...anterior, ...r, verificadoEm };
     await this.arquivo.save();
     const e = this.estado();
     if (e.nova && e.nova !== anterior.nova) this.log(`[atualização] versão nova disponível: ${e.nova}`);
@@ -212,7 +219,7 @@ export class Atualizacao {
 
   /** Liga a agenda: a procura seguinte só é marcada quando esta termina. */
   iniciar() {
-    const espera = esperaAteProcurar({ agora: this.agora(), verificadoEm: this.arquivo.data.verificadoEm, aleatorio: this.aleatorio() });
+    const espera = esperaAteProcurar({ agora: this.agora(), verificadoEm: this.arquivo.data.verificadoEm, aleatorio: this.aleatorio(), periodoMs: this.periodoMs });
     this.timer = setTimeout(() => { this.verificar().then(() => this.iniciar()); }, espera);
     this.timer.unref();
   }
