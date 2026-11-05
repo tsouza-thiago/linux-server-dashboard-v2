@@ -1,0 +1,59 @@
+#!/bin/sh
+# ============================================================
+# Server Dashboard — lançador do modo sistema (pacote .deb, ADR 0042 e 0043)
+#
+# No pacote, este arquivo fica em /opt/server-dashboard/bin/dashboard, com o link
+# /usr/bin/dashboard. Ele troca o ./dashboard do clone: liga o modo sistema (.env e data/
+# nas pastas XDG da pessoa), acha o Node e o código da versão `atual` e passa a vez para a
+# mesma CLI de server/cli/. Não baixa nada e não grava nada.
+#
+# Layout esperado (ADR 0042, itens 1 e 2):
+#   <base>/bin/dashboard      este arquivo
+#   <base>/atual              link para versoes/vX.Y.Z (trocado só pelo executor)
+#   <base>/node/bin/node      o Node baixado pelo executor (etapa 7 da F9)
+# ============================================================
+set -eu
+
+# A pasta do pacote vem do caminho DESTE arquivo, com os links resolvidos, e nunca do
+# ambiente: assim o /usr/bin/dashboard sempre roda o código que está ao lado dele.
+ESTE=$(readlink -f "$0")
+BASE=$(dirname "$(dirname "$ESTE")")
+NODE_MIN_MAJOR=24
+
+# O código da versão atual, com o link resolvido 1 vez: a execução inteira usa a mesma
+# versão, mesmo que o executor troque o link no meio. O Node também precisa do caminho real
+# (a CLI só roda quando o arquivo chamado é ela mesma, com os links resolvidos).
+CODIGO=$(readlink -f "$BASE/atual" 2>/dev/null || true)
+if [ -z "$CODIGO" ] || [ ! -f "$CODIGO/server/cli/index.js" ]; then
+  echo "ERRO: nenhuma versão do painel instalada em $BASE/atual." >&2
+  echo "Reinstale o pacote: sudo apt install --reinstall server-dashboard" >&2
+  exit 1
+fi
+
+# Versão principal de um Node (0 se ele não roda ou responde outra coisa).
+node_major() {
+  m=$("$1" -p 'Number(process.versions.node.split(".")[0])' 2>/dev/null || true)
+  case "$m" in ''|*[!0-9]*) echo 0 ;; *) echo "$m" ;; esac
+}
+
+# Node: primeiro o do pacote (o executor o baixa e confere na etapa 7 da F9); sem ele, o do
+# sistema, se for 24 ou mais novo. Nada é baixado aqui: o lançador roda como a pessoa e
+# não grava em /opt.
+if [ -x "$BASE/node/bin/node" ]; then
+  NODE_BIN="$BASE/node/bin/node"
+  ORIGEM=pacote
+else
+  NODE_BIN=$(command -v node 2>/dev/null || true)
+  ORIGEM=sistema
+fi
+if [ -z "$NODE_BIN" ] || [ "$(node_major "$NODE_BIN")" -lt "$NODE_MIN_MAJOR" ]; then
+  echo "ERRO: sem Node.js $NODE_MIN_MAJOR para rodar o painel." >&2
+  echo "Instale o Node.js $NODE_MIN_MAJOR ou mais novo e rode: dashboard diagnosticar" >&2
+  exit 1
+fi
+
+# SERVER_DASHBOARD_MODO=sistema é o sinal lido pelo server/config.js (só o valor exato).
+SERVER_DASHBOARD_MODO=sistema
+DASHBOARD_NODE_ORIGEM=$ORIGEM
+export SERVER_DASHBOARD_MODO DASHBOARD_NODE_ORIGEM
+exec "$NODE_BIN" "$CODIGO/server/cli/index.js" "$@"

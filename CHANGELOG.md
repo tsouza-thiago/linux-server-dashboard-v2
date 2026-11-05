@@ -18,6 +18,11 @@ diante: `PATCH` corrige, `MINOR` acrescenta sem quebrar e `MAJOR` quebra.
   painel lê o `.env` de `~/.config/server-dashboard/` e guarda os dados em
   `~/.local/share/server-dashboard/`, com 0700/0600, e recusa caminho de dados fora dessa pasta,
   inclusive o do código. Sem a variável, nada muda. Quem liga o modo é o lançador, na etapa 3.
+- Lançador do pacote e modo sistema nos comandos (#92, F9, etapa 3 de 12, ADR 0043): o
+  `bin/dashboard` liga o modo sistema e roda a versão `atual` do pacote com o Node do pacote ou o
+  do sistema. Nesse modo, os comandos leem e gravam o `.env` e o `data/` nas pastas pessoais, e o
+  serviço de usuário e o atalho apontam para o pacote. `atualizar`, `desinstalar` e a importação da
+  V1 ainda recusam no pacote, com o motivo. A instalação por `git clone` não muda.
 
 ### Corrigido
 

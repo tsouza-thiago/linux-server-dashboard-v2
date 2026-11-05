@@ -47,3 +47,4 @@ Uma ADR aceita não é editada; se a decisão mudar, uma nova ADR a substitui.
 | [0040](0040-ci-em-jobs-paralelos-com-limite-de-tempo.md) | CI em jobs paralelos, com limite de tempo em cada etapa | Aceita |
 | [0041](0041-mutacao-repete-a-rodada-presa.md) | Mutação: a rodada presa repete 1 vez e diz qual teste prendeu | Aceita |
 | [0042](0042-modo-sistema-deb-e-executor-em-opt.md) | Modo sistema: pacote `.deb` em `/opt` e executor sem privilégio | Aceita |
+| [0043](0043-lancador-e-modo-sistema-nos-subcomandos.md) | Lançador do pacote e o modo sistema nos subcomandos | Aceita |

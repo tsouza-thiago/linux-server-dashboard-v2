@@ -3,7 +3,7 @@
 // verdade e sem NO_COLOR (funciona igual sem cores).
 import fs from 'node:fs';
 import path from 'node:path';
-import { ROOT } from '../config.js';
+import { ROOT, pastasDe } from '../config.js';
 
 /** 1º arquivo executável `dashboard` nas pastas do PATH (o que `command -v` acha), ou null. */
 export function primeiroNoPath(env = process.env) {
@@ -24,6 +24,8 @@ export function primeiroNoPath(env = process.env) {
  * programa antes dele no PATH).
  */
 export function comandoDashboard({ root = ROOT, env = process.env } = {}) {
+  // No pacote .deb (modo sistema), o comando é sempre o /usr/bin/dashboard do pacote.
+  if (pastasDe(root).modo === 'sistema') return 'dashboard';
   const file = primeiroNoPath(env);
   try {
     if (file && fs.realpathSync(file) === fs.realpathSync(path.join(root, 'dashboard'))) return 'dashboard';

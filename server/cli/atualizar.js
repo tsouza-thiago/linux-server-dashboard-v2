@@ -12,7 +12,7 @@ import { SIGNERS, newestSignedTag } from '../setup/assinatura.js';
 import { GIT_ENV, versaoDaPasta } from '../atualizacao/procurar.js';
 import { recortarNovidades } from '../atualizacao/novidades.js';
 import { abrirRegistro, cancelarPre, liberarPre, pegarTrava, preLiberada, soltarTrava } from '../atualizacao/registro.js';
-import { loadEnvFile } from '../config.js';
+import { backupsDe, dataDe, envDe, loadEnvFile } from '../config.js';
 import { installService, situacaoDoLink } from '../setup/local.js';
 import { motivoSemPainel, openBrowser, otherServiceRoot, panelHealthy, panelPort, panelStatus, panelUrl, startPanel, stopPanel, unitPath, systemctlUser, UNIT_NAME } from './servico.js';
 import { parseFlags } from './instalar.js';
@@ -31,12 +31,12 @@ function git(root, args, run = spawnSync, env = process.env) {
 
 /** Copia data/ para .backups/<data>-<versão>/ (0700) e mantém só os 3 mais novos. */
 export function backupData(root, label, now = new Date()) {
-  const base = path.join(root, '.backups');
+  const base = backupsDe(root);
   fs.mkdirSync(base, { recursive: true, mode: 0o700 });
   fs.chmodSync(base, 0o700);
   const dir = path.join(base, `${now.toISOString().replace(/[:.]/g, '-')}-${label}`);
   fs.mkdirSync(dir, { mode: 0o700 });
-  const data = path.join(root, 'data');
+  const data = dataDe(root);
   if (fs.existsSync(data)) fs.cpSync(data, path.join(dir, 'data'), { recursive: true, preserveTimestamps: true });
   const all = fs.readdirSync(base).sort();
   for (const old of all.slice(0, Math.max(0, all.length - KEEP_BACKUPS))) fs.rmSync(path.join(base, old), { recursive: true, force: true });
@@ -45,7 +45,7 @@ export function backupData(root, label, now = new Date()) {
 
 /** Volta o data/ da cópia de segurança (quando a versão nova falhou). */
 export function restoreData(root, backupDir) {
-  const data = path.join(root, 'data');
+  const data = dataDe(root);
   fs.rmSync(data, { recursive: true, force: true });
   if (fs.existsSync(path.join(backupDir, 'data'))) fs.cpSync(path.join(backupDir, 'data'), data, { recursive: true, preserveTimestamps: true });
 }
@@ -65,7 +65,7 @@ function installedElsewhere(root, home) {
  */
 function checkFolder({ out, root, home }) {
   const installed = installedElsewhere(root, home);
-  if (!fs.existsSync(path.join(root, '.env'))) {
+  if (!fs.existsSync(envDe(root))) {
     out.fail('esta pasta não é uma instalação do painel', 'não tem .env');
     out.explain(`o atualizar só vale na pasta da instalação. Nada foi alterado em ${root}.`, installed
       ? `a instalação está em ${installed}. Rode lá: cd "${installed}" && ./dashboard atualizar`
@@ -106,7 +106,7 @@ export async function afterUpdate({ out, root, home = os.homedir(), deps = {} })
 
 /** A versão nova muda o script de coleta? Só o acesso restrito guarda o script no servidor. */
 function exigeReconfigurar({ root, run, de, ate }) {
-  if (loadEnvFile(path.join(root, '.env')).SSH_ACESSO !== 'restrito') return false;
+  if (loadEnvFile(envDe(root)).SSH_ACESSO !== 'restrito') return false;
   const changelog = git(root, ['show', `${ate}:CHANGELOG.md`], run);
   return changelog.status === 0 && recortarNovidades(changelog.stdout, { de, ate }).exigeReconfigurar;
 }

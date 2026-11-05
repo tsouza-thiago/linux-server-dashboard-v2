@@ -5,7 +5,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { ROOT, isPlaceholderHost, loadEnvFile } from '../config.js';
+import { ROOT, envDe, isPlaceholderHost, loadEnvFile, pastasDe } from '../config.js';
 import { makeOutput } from './saida.js';
 import { openBrowser, panelStatus, panelUrl, startPanel, stopPanel } from './servico.js';
 import { instalar } from './instalar.js';
@@ -51,7 +51,7 @@ function version(root) {
 
 /** Instalação feita? (.env com SSH_HOST de verdade) */
 export function isConfigured(root) {
-  const env = loadEnvFile(path.join(root, '.env'));
+  const env = loadEnvFile(envDe(root));
   return Boolean(env.SSH_HOST) && !isPlaceholderHost(env.SSH_HOST);
 }
 
@@ -69,7 +69,8 @@ const COMMANDS = {
   async status({ out, root, home }) {
     const st = panelStatus({ root, home });
     // Com 2 pastas na máquina, o comando no PATH vale para só uma: diz qual respondeu.
-    out.line(out.c.dim(`pasta: ${root}`));
+    const pastas = pastasDe(root);
+    out.line(out.c.dim(pastas.modo === 'sistema' ? `pacote: ${root} · dados: ${pastas.dados}` : `pasta: ${root}`));
     if (!isConfigured(root)) out.warn('ainda não instalado', `rode ${out.cmd} instalar`);
     if (st.running) {
       const how = st.mode === 'servico'
@@ -120,6 +121,30 @@ const COMMANDS = {
   },
 };
 
+/**
+ * O que ainda não funciona na instalação pelo pacote .deb (modo sistema, ADR 0043). Estes
+ * caminhos mexem no código da pasta (git checkout) ou apagam arquivos com as regras do clone;
+ * no pacote, o código é do executor e fica em /opt. Cada um recusa com o motivo, até a etapa
+ * da F9 que o traz: atualizar (4 e 8), reconfigurar pela tela (8), desinstalar e importar (10).
+ */
+const RECUSA_NO_PACOTE = [
+  [(nome) => nome === 'atualizar', 'a troca de versão pelo pacote ainda não está pronta',
+    'por enquanto, troque de versão instalando o pacote .deb novo.'],
+  [(nome, args) => nome === 'reconfigurar' && args.includes('--pela-tela'), 'reconfigurar pela tela ainda não funciona no pacote',
+    'rode dashboard reconfigurar no terminal.'],
+  [(nome) => nome === 'desinstalar', 'o desinstalar ainda não funciona no pacote',
+    'nada foi apagado. Os seus dados continuam nas pastas pessoais do painel.'],
+  [(nome, args) => nome === 'instalar' && args.includes('--importar-v1'), 'importar a V1 ainda não funciona no pacote',
+    'instale a V2 pelo git clone para importar a V1.'],
+];
+
+/** Motivo da recusa do comando no modo sistema (null = pode seguir). */
+export function recusaNoPacote(nome, args, modo = pastasDe(ROOT).modo) {
+  if (modo !== 'sistema') return null;
+  const regra = RECUSA_NO_PACOTE.find(([vale]) => vale(nome, args));
+  return regra ? { texto: regra[1], oQueFazer: regra[2] } : null;
+}
+
 /** Nomes dos subcomandos (a documentação é conferida contra esta lista). */
 export const COMMAND_NAMES = Object.freeze(Object.keys(COMMANDS));
 
@@ -137,6 +162,12 @@ export async function main(argv = process.argv.slice(2), { root = ROOT, home = o
     out.fail(`comando desconhecido: ${name}`);
     out.line(help(out));
     return 2;
+  }
+  const recusa = recusaNoPacote(alias[name] ?? name, args, pastasDe(root).modo);
+  if (recusa) {
+    out.fail(recusa.texto);
+    out.explain('você instalou o painel pelo pacote .deb.', recusa.oQueFazer);
+    return 1;
   }
   return cmd({ out, root, home, args });
 }

@@ -9,7 +9,7 @@ import fs from 'node:fs';
 import net from 'node:net';
 import os from 'node:os';
 import path from 'node:path';
-import { clampInt, loadEnvFile } from '../config.js';
+import { clampInt, dataDe, envDe, loadEnvFile } from '../config.js';
 import { createLoginCode } from '../http/entrar.js';
 import { PANEL_NODE_FLAGS } from '../node-flags.js';
 
@@ -39,12 +39,12 @@ export function otherServiceRoot(root, home = os.homedir()) {
 }
 
 // PID do painel em segundo plano e o script que ele roda (para conferir que é ele mesmo).
-const pidFile = (root) => path.join(root, 'data', 'dashboard.pid');
+const pidFile = (root) => path.join(dataDe(root), 'dashboard.pid');
 const serverScript = (root) => path.join(root, 'server', 'index.js');
 
 /** Porta do painel (PORT do .env, padrão 3000). */
 export function panelPort(root) {
-  return clampInt(loadEnvFile(path.join(root, '.env')).PORT, 3000, 1, 65535);
+  return clampInt(loadEnvFile(envDe(root)).PORT, 3000, 1, 65535);
 }
 
 /** O processo `pid` é o painel desta pasta? (lê a linha de comando em /proc) */
@@ -163,7 +163,7 @@ export async function startPanel({ root, home = os.homedir(), nodeBin = process.
   if (!(await portFree(st.port))) {
     return { ok: false, error: `a porta ${st.port} já está em uso por outro programa (mude PORT no .env)`, ...st };
   }
-  const dataDir = path.join(root, 'data');
+  const dataDir = dataDe(root);
   fs.mkdirSync(dataDir, { recursive: true, mode: 0o700 });
   const errLog = path.join(dataDir, 'dashboard-erros.log');
   const fd = fs.openSync(errLog, 'a', 0o600);
@@ -208,10 +208,10 @@ export async function stopPanel({ root, home = os.homedir(), procDir = '/proc', 
  * `#...` da tela: o navegador o mantém no redirecionamento do /entrar, que não tem fragmento.
  */
 export function panelUrl(root, port, fragmento = '') {
-  const env = loadEnvFile(path.join(root, '.env'));
+  const env = loadEnvFile(envDe(root));
   const base = `http://127.0.0.1:${port}`;
   if (!env.DASH_TOKEN) return { url: `${base}/${fragmento}`, oneTime: false };
-  const code = createLoginCode(path.join(root, 'data'));
+  const code = createLoginCode(dataDe(root));
   return { url: `${base}/entrar?codigo=${code}${fragmento}`, oneTime: true };
 }
 
@@ -223,7 +223,7 @@ export function panelUrl(root, port, fragmento = '') {
 export async function motivoSemPainel({ root, home = os.homedir(), deps = {} }) {
   const env = deps.env ?? process.env;
   if (!env.DISPLAY && !env.WAYLAND_DISPLAY) return 'não há tela gráfica nesta sessão';
-  if (!loadEnvFile(path.join(root, '.env')).DASH_TOKEN) return 'este painel não tem login, e sem login o botão fica desligado';
+  if (!loadEnvFile(envDe(root)).DASH_TOKEN) return 'este painel não tem login, e sem login o botão fica desligado';
   const { running } = (deps.panelStatus ?? panelStatus)({ root, home });
   if (!running || !(await (deps.healthy ?? panelHealthy)(panelPort(root), { timeoutMs: 5000 }))) return 'o painel está parado';
   return null;

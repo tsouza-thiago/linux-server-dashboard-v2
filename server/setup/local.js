@@ -6,7 +6,7 @@ import crypto from 'node:crypto';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import { loadEnvFile } from '../config.js';
+import { caminhosDoPacote, envDe, loadEnvFile, pastasDe, prepararPastas } from '../config.js';
 import { KEY_COMMENT, NAME_PREFIX, installId, knownHostsName, machineLabel, sshConfigText, validHost, validPort } from './acesso.js';
 import { UNIT_NAME, unitPath, systemctlUser, hasSystemdUser } from '../cli/servico.js';
 import { PANEL_NODE_FLAGS } from '../node-flags.js';
@@ -24,9 +24,14 @@ const writeAtomic = (file, text, mode = 0o600) => {
   fs.renameSync(tmp, file);
 };
 
-/** data/ e data/ssh/ só para o dono (0700). */
-export function ensureDataDirs(root) {
-  const data = path.join(root, 'data');
+/**
+ * data/ e data/ssh/ só para o dono (0700). No pacote .deb (modo sistema), cria antes as pastas
+ * pessoais do painel (~/.config/server-dashboard e ~/.local/share/server-dashboard, ADR 0042).
+ * `pastas` existe para os testes; o padrão é o da instalação de `root`.
+ */
+export function ensureDataDirs(root, pastas = pastasDe(root)) {
+  prepararPastas(pastas);
+  const data = path.join(pastas.dados, 'data');
   const ssh = path.join(data, 'ssh');
   for (const dir of [data, ssh]) {
     fs.mkdirSync(dir, { recursive: true, mode: 0o700 });
@@ -111,8 +116,9 @@ export function writeSshConfig(root, { host, port = 22, keyFile, hostKeyType }) 
  * na memória de propósito: uma cópia velha no disco poderia desfazer uma configuração boa (ADR 0035).
  */
 export function guardarConfiguracao(root) {
-  const copias = ['.env', path.join('data', 'ssh', 'config'), path.join('data', 'ssh', 'known_hosts')].map((nome) => {
-    const file = path.join(root, nome);
+  const { config, dados } = pastasDe(root);
+  const arquivos = [path.join(config, '.env'), path.join(dados, 'data', 'ssh', 'config'), path.join(dados, 'data', 'ssh', 'known_hosts')];
+  const copias = arquivos.map((file) => {
     try { return { file, texto: fs.readFileSync(file, 'utf8') }; } catch { return { file, texto: null }; }
   });
   return () => {
@@ -128,7 +134,8 @@ export function guardarConfiguracao(root) {
  * acrescenta as que faltam. Sem .env, parte do .env.example.
  */
 export function updateEnv(root, updates) {
-  const file = path.join(root, '.env');
+  // O .env vai para a pasta da configuração; o .env.example é do código (no pacote, em /opt).
+  const file = envDe(root);
   let text = '';
   if (fs.existsSync(file)) text = fs.readFileSync(file, 'utf8');
   else if (fs.existsSync(path.join(root, '.env.example'))) text = fs.readFileSync(path.join(root, '.env.example'), 'utf8');
@@ -151,7 +158,7 @@ export function updateEnv(root, updates) {
 /** DASH_TOKEN do .env, gerando um novo (32 bytes) se ainda não houver. */
 export function ensureToken(root) {
   // Leitura linha a linha (a mesma do config.js): `DASH_TOKEN=` vazio não "pega" a linha seguinte.
-  const current = String(loadEnvFile(path.join(root, '.env')).DASH_TOKEN || '').trim();
+  const current = String(loadEnvFile(envDe(root)).DASH_TOKEN || '').trim();
   if (current) return { token: current, created: false };
   const token = crypto.randomBytes(32).toString('base64url');
   updateEnv(root, { DASH_TOKEN: token });
@@ -168,9 +175,21 @@ export function serviceNode(root, current = process.execPath) {
   return fs.existsSync(local) ? local : current;
 }
 
-/** Unidade systemd de usuário. Com hardening (isolamento do systemd), o painel só grava em data/. */
-export function unitText({ root, nodeBin, hardening = true }) {
-  if (/[\r\n]/.test(root) || /[\r\n]/.test(nodeBin)) throw new Error('caminho inválido');
+/**
+ * Unidade systemd de usuário. Com hardening (isolamento do systemd), o painel só grava em data/.
+ * No pacote .deb (modo sistema, ADR 0043), a unidade roda o código pelo link `atual` (a versão
+ * nova vale no próximo reinício) e leva no ambiente o sinal do modo e as pastas XDG da
+ * instalação: o systemd de usuário não herda o ambiente do terminal.
+ */
+export function unitText({ root, nodeBin, hardening = true, pastas = pastasDe(root) }) {
+  const sistema = pastas.modo === 'sistema';
+  const codigo = sistema ? caminhosDoPacote(root).atual : root;
+  const ambiente = sistema ? [
+    'SERVER_DASHBOARD_MODO=sistema',
+    `XDG_CONFIG_HOME=${path.dirname(pastas.config)}`,
+    `XDG_DATA_HOME=${path.dirname(pastas.dados)}`,
+  ] : [];
+  if ([codigo, nodeBin, pastas.dados, ...ambiente].some((t) => /[\r\n]/.test(t))) throw new Error('caminho inválido');
   return [
     '[Unit]',
     'Description=Server Dashboard (painel do servidor Linux)',
@@ -179,9 +198,10 @@ export function unitText({ root, nodeBin, hardening = true }) {
     '',
     '[Service]',
     'Type=simple',
-    `WorkingDirectory=${unitEscape(root)}`,
+    `WorkingDirectory=${unitEscape(codigo)}`,
+    ...(sistema ? [`Environment=${ambiente.map(unitQuote).join(' ')}`] : []),
     // As opções do Node (server/node-flags.js) não têm espaço nem caractere especial do systemd.
-    `ExecStart=${unitQuote(nodeBin)} ${PANEL_NODE_FLAGS.join(' ')} ${unitQuote(path.join(root, 'server', 'index.js'))}`,
+    `ExecStart=${unitQuote(nodeBin)} ${PANEL_NODE_FLAGS.join(' ')} ${unitQuote(path.join(codigo, 'server', 'index.js'))}`,
     'Restart=on-failure',
     'RestartSec=10',
     'UMask=0077',
@@ -191,7 +211,7 @@ export function unitText({ root, nodeBin, hardening = true }) {
       'PrivateTmp=yes',
       'ProtectSystem=strict',
       'ProtectHome=read-only',
-      `ReadWritePaths=${unitQuote(path.join(root, 'data'))}`,
+      `ReadWritePaths=${unitQuote(path.join(pastas.dados, 'data'))}`,
       'ProtectKernelTunables=yes',
       'ProtectControlGroups=yes',
       'RestrictSUIDSGID=yes',
@@ -258,17 +278,23 @@ export function removeService({ home = os.homedir(), run } = {}) {
 // Desktop Entry: argumentos com espaço vão entre aspas; dentro delas, \ " ` $ levam \.
 const desktopArg = (s) => `"${String(s).replace(/[\\"`$]/g, (c) => `\\${c}`).replace(/%/g, '%%')}"`;
 
-/** Texto do atalho do menu: abre o painel pelo `./dashboard abrir`. */
-export function desktopEntryText({ root }) {
-  if (/[\r\n]/.test(root)) throw new Error('caminho inválido');
+/**
+ * Texto do atalho do menu: abre o painel pelo `./dashboard abrir`. No pacote .deb, pelo
+ * lançador e com o ícone do link `atual`, que continuam valendo depois de trocar de versão.
+ */
+export function desktopEntryText({ root, pastas = pastasDe(root) }) {
+  const pacote = pastas.modo === 'sistema' ? caminhosDoPacote(root) : null;
+  const comando = pacote ? pacote.lancador : path.join(root, 'dashboard');
+  const codigo = pacote ? pacote.atual : root;
+  if (/[\r\n]/.test(comando) || /[\r\n]/.test(codigo)) throw new Error('caminho inválido');
   return [
     '[Desktop Entry]',
     'Type=Application',
     'Version=1.0',
     'Name=Server Dashboard',
     'Comment=Painel do seu servidor Linux',
-    `Exec=${desktopArg(path.join(root, 'dashboard'))} abrir`,
-    `Icon=${path.join(root, 'public', 'icone.svg')}`,
+    `Exec=${desktopArg(comando)} abrir`,
+    `Icon=${path.join(codigo, 'public', 'icone.svg')}`,
     'Terminal=false',
     'Categories=System;Monitor;',
     'StartupNotify=false',
@@ -527,7 +553,7 @@ export function situacaoDoComando({ root, home = os.homedir(), env = process.env
     estado, alvo, semLink, ...caminho,
     liga: !semLink && estado !== 'outra-pasta' && estado !== 'outro-programa',
     trava,
-    detalhe: semLink ? 'pulado pela opção --sem-link' : detalhes[estado],
+    detalhe: semLink ? (pastasDe(root).modo === 'sistema' ? 'já vem no pacote .deb' : 'pulado pela opção --sem-link') : detalhes[estado],
     pedeEdicao: !caminho.noPath && !caminho.cuidadoPor && !semLink && estado !== 'outro-programa',
     pedeBashrc: !auto.carrega && !semLink && estado !== 'outro-programa' && auto.estado !== 'outro-programa',
   };

@@ -8,6 +8,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { JsonStore } from '../stores.js';
+import { dataDe } from '../config.js';
 import { compareVersions } from '../setup/assinatura.js';
 import { criarCodigoPelaTela, lerResultadoPelaTela, retirarCodigoPelaTela } from '../setup/pela-tela.js';
 import { emAndamento, lerRegistro, prepararRegistro, registrarFalha } from './registro.js';
@@ -102,7 +103,7 @@ export class Atualizacao {
       modo: this.modo,
       bloqueio: this.bloqueio(),
       // As falhas da última reconfiguração pela tela: a tela compara o instante com o do clique.
-      reconfiguracao: lerResultadoPelaTela(path.join(this.root, 'data')),
+      reconfiguracao: lerResultadoPelaTela(dataDe(this.root)),
     };
   }
 
@@ -162,7 +163,7 @@ export class Atualizacao {
     const bloqueio = this.impedimento() ?? this.conferirReconfiguracao();
     if (bloqueio) return { status: 409, corpo: { error: 'não dá para reconfigurar agora', bloqueio } };
     this.reconfigurandoAte = this.agora() + RECONFIGURAR_MS;
-    const dados = path.join(this.root, 'data');
+    const dados = dataDe(this.root);
     try {
       const codigo = criarCodigoPelaTela(dados);
       if ((await this.executarReconfiguracao())?.ok) {

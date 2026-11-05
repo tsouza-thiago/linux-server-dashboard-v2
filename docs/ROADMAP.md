@@ -30,7 +30,7 @@ risco de segurança, os testes novos e o que muda para quem já usa o painel.
 | 6 | Skeleton em tudo o que carrega — **entregue na 2.3.0** | M | 2.3.0 | 3 (a entrada do conteúdo) | #89 | [f6-skeleton.md](roadmap/f6-skeleton.md) |
 | 7 | Atualização pelo painel, com aviso e log — **concluída, sai na 2.5.0** | G | 2.5.0 | — | #90 | [f7-atualizacao-pelo-painel.md](roadmap/f7-atualizacao-pelo-painel.md) |
 | 8 | Reconfigurar pelo painel — **concluída, sai na 2.5.0** | G | 2.5.0 | 7 (menu e executor) | #91 | [f8-reconfigurar-pela-tela.md](roadmap/f8-reconfigurar-pela-tela.md) |
-| 9 | Instalação em `/opt` por pacote `.deb` — **em implementação: etapas 1 e 2 de 12 feitas (ADR 0042)** | GG | 2.6.0 | 4, 5, 7 e 8 | #92 | [f9-deb-e-opt.md](roadmap/f9-deb-e-opt.md) |
+| 9 | Instalação em `/opt` por pacote `.deb` — **em implementação: etapas 1 a 3 de 12 feitas (ADR 0042 e 0043)** | GG | 2.6.0 | 4, 5, 7 e 8 | #92 | [f9-deb-e-opt.md](roadmap/f9-deb-e-opt.md) |
 | 10 | Hover mais visível em clicáveis, contêineres e gráficos — **entregue na 2.2.4** | M | 2.2.4 | 1 | #100 | [f10-hover-mais-visivel.md](roadmap/f10-hover-mais-visivel.md) |
 | 11 | README e TUTORIAL ilustrados com prints e elementos gráficos — **entregue na 2.4.0** | M | 2.4.0 | 6 (prints da interface final) | #106 | [f11-documentacao-ilustrada.md](roadmap/f11-documentacao-ilustrada.md) |
 

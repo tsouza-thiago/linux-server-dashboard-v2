@@ -10,6 +10,7 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { currentVersionStatus, newestSignedTag } from '../setup/assinatura.js';
 import { otherServiceRoot } from '../cli/servico.js';
+import { pastasDe } from '../config.js';
 import { recortarNovidades } from './novidades.js';
 import { preLiberada } from './registro.js';
 
@@ -28,8 +29,11 @@ export const versaoDaPasta = (root) => {
   try { return `v${JSON.parse(fs.readFileSync(path.join(root, 'package.json'), 'utf8')).version}`; } catch { return 'v0.0.0'; }
 };
 
-// Só a pasta da instalação troca de versão ou reconfigura pela tela (#118).
-const foraDaInstalacao = (root, home) => !fs.existsSync(path.join(root, '.env')) || otherServiceRoot(root, home);
+// Só a pasta da instalação troca de versão ou reconfigura pela tela (#118). No pacote .deb
+// (modo sistema), os 2 botões ficam desligados até a F9 trazer o executor para a tela (etapa 8):
+// eles rodariam o git e o ./dashboard da pasta do código, que em /opt é do executor (ADR 0043).
+const foraDaInstalacao = (root, home) => pastasDe(root).modo === 'sistema'
+  || !fs.existsSync(path.join(root, '.env')) || otherServiceRoot(root, home);
 
 // O que impediria o `dashboard atualizar` nesta pasta; null se nada impede. `--no-optional-locks`:
 // esta conferência não pode disputar o índice do git com um `dashboard atualizar` em andamento.

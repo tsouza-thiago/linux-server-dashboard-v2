@@ -12,9 +12,10 @@ import { Instalacao } from '../setup/instalacao.js';
 import { createWizardApp, makeSetupCode } from '../setup/web.js';
 import { currentVersionStatus, describeVersion, signedReleaseTags, installTag } from '../setup/assinatura.js';
 import { ensureDataDirs, guardarConfiguracao } from '../setup/local.js';
+import { dataDe, pastasDe } from '../config.js';
 import { LOG_PELA_TELA, retirarCodigoPelaTela } from '../setup/pela-tela.js';
 import { emAndamento } from '../atualizacao/registro.js';
-import { bloqueioDaReconfiguracao } from '../atualizacao/procurar.js';
+import { bloqueioDaReconfiguracao, versaoDaPasta } from '../atualizacao/procurar.js';
 import { UNIT_NAME, motivoSemPainel, openBrowser, panelHealthy, panelPort, panelStatus, panelUrl, portFree, startPanel, stopPanel, systemctlUser } from './servico.js';
 import { makeOutput, mostrarComando } from './saida.js';
 
@@ -63,15 +64,14 @@ const NODE_LINE = {
   baixado: ['Node.js 24 — baixado para .runtime/ e conferido', 'SHA-256'],
   pasta: ['Node.js 24 — em .runtime/', 'conferido ao baixar'],
   sistema: ['Node.js 24 — o do sistema', ''],
+  pacote: ['Node.js 24 — o do pacote', 'em /opt/server-dashboard/node'],
 };
 
 /**
- * Verificações antes de abrir o assistente: versão assinada (fixa na tag certa se for um
- * clone do main), Node, arquivos de terceiros, SSH e a pasta data/. Devolve true para seguir,
- * false se algo impede continuar, ou o código de saída da nova execução depois de trocar de
- * versão (o ./dashboard da tag escolhida roda de novo, com o Node que ela pede).
+ * A versão da pasta do clone: assinada pela chave do projeto ou, no main, trocada para a tag
+ * assinada mais nova (devolve o código da nova execução). true segue, false para.
  */
-export function preflight({ out, root, flags, env = process.env, run = spawnSync, reexec }) {
+function conferirVersaoDoClone({ out, root, flags, run, reexec }) {
   const ver = currentVersionStatus(root);
   // A pasta tem arquivo do painel alterado? (nesse caso, nunca troca de versão sozinho)
   const isDirty = () => Boolean(run('git', ['-C', root, 'status', '--porcelain', '--untracked-files=no'], { encoding: 'utf8' }).stdout?.trim());
@@ -115,6 +115,24 @@ export function preflight({ out, root, flags, env = process.env, run = spawnSync
     out.explain('a versão desta pasta não passou na conferência da assinatura.', 'não use esta cópia: baixe de novo com o comando do README.');
     return false;
   }
+  return true;
+}
+
+/**
+ * Verificações antes de abrir o assistente: versão assinada (fixa na tag certa se for um
+ * clone do main), Node, arquivos de terceiros, SSH e a pasta data/. Devolve true para seguir,
+ * false se algo impede continuar, ou o código de saída da nova execução depois de trocar de
+ * versão (o ./dashboard da tag escolhida roda de novo, com o Node que ela pede).
+ */
+export function preflight({ out, root, flags, env = process.env, run = spawnSync, reexec }) {
+  // Pacote .deb (modo sistema, ADR 0043): o código em /opt veio do pacote ou do executor, que
+  // conferem a assinatura (ADR 0042). Aqui não há git e a versão nunca é trocada.
+  if (pastasDe(root).modo === 'sistema') {
+    out.ok(`versão ${versaoDaPasta(root)}`, 'instalada pelo pacote .deb');
+  } else {
+    const versao = conferirVersaoDoClone({ out, root, flags, run, reexec });
+    if (versao !== true) return versao;
+  }
 
   // Depois de trocar de versão (reexec), o Node baixado agora há pouco aparece como "da pasta".
   const origem = env.DASHBOARD_NODE_BAIXADO === '1' ? 'baixado' : env.DASHBOARD_NODE_ORIGEM;
@@ -136,8 +154,8 @@ export function preflight({ out, root, flags, env = process.env, run = spawnSync
     out.explain('o painel fala com o servidor por SSH (ssh, ssh-keygen e ssh-keyscan).', 'instale com: sudo apt install openssh-client (Debian/Ubuntu/Mint) ou sudo dnf install openssh-clients (Fedora).');
     return false;
   }
-  ensureDataDirs(root);
-  out.ok('pasta de dados data/ criada', 'só você lê · 0700');
+  const { data } = ensureDataDirs(root);
+  out.ok('pasta de dados data/ criada', `só você lê · 0700${pastasDe(root).modo === 'sistema' ? ` · ${data}` : ''}`);
   return true;
 }
 
@@ -243,7 +261,7 @@ async function assistentePelaTela({ out, root, home, deps }) {
     out.fail('há uma atualização em andamento', 'o painel continua no ar');
     return 1;
   }
-  const codigo = retirarCodigoPelaTela(path.join(root, 'data'));
+  const codigo = retirarCodigoPelaTela(dataDe(root));
   if (!codigo) {
     out.fail('sem código válido da tela', 'o painel continua no ar');
     return 1;
@@ -305,7 +323,7 @@ async function assistentePelaTela({ out, root, home, deps }) {
 
 /** `./dashboard reconfigurar --pela-tela` (interna): sem terminal, a saída vai para data/. */
 async function reconfigurarPelaTela({ root, home, deps }) {
-  const dataDir = path.join(root, 'data');
+  const dataDir = dataDe(root);
   fs.mkdirSync(dataDir, { recursive: true, mode: 0o700 });
   const fd = fs.openSync(path.join(dataDir, LOG_PELA_TELA), 'w', 0o600);
   fs.fchmodSync(fd, 0o600);
@@ -403,7 +421,8 @@ export async function instalar({ out, root, args, home, reconfigurar = false, de
   out.ok(`porta ${port} livre · painel só nesta máquina`, '127.0.0.1');
 
   const inst = deps.inst ?? new Instalacao({ root, home });
-  inst.semLink = Boolean(flags['sem-link']);
+  // No pacote .deb, o comando e o autocomplete vêm do pacote (/usr/bin, /usr/share): sem link pessoal.
+  inst.semLink = Boolean(flags['sem-link']) || pastasDe(root).modo === 'sistema';
   if (flags.terminal) {
     const { runTui } = await import('../setup/tui.js');
     return runTui({ out, inst, open: deps.open ?? openBrowser });
