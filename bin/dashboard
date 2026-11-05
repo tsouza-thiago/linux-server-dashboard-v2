@@ -49,7 +49,8 @@ else
 fi
 if [ -z "$NODE_BIN" ] || [ "$(node_major "$NODE_BIN")" -lt "$NODE_MIN_MAJOR" ]; then
   echo "ERRO: sem Node.js $NODE_MIN_MAJOR para rodar o painel." >&2
-  echo "Instale o Node.js $NODE_MIN_MAJOR ou mais novo e rode: dashboard diagnosticar" >&2
+  echo "Reinstale o pacote, que baixa o Node: sudo apt install --reinstall server-dashboard" >&2
+  echo "Ou instale o Node.js $NODE_MIN_MAJOR ou mais novo e rode: dashboard diagnosticar" >&2
   exit 1
 fi
 

@@ -6,4 +6,6 @@
 # assina as tags até a v2.1.0; apagada em 24/10/2026, fica para conferir essas tags.
 tsouza-thiago namespaces="git" ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIGMypWrHHf5RVZy/Fb4jgvqvH2MfgGqZsGVMdYMQLJP7
 # Chave nova (SHA256:+lhwOq4NRayHFtM7CY5IXXAeN+6wnijpjd7UWHhL2SU), desde a v2.1.1 (#64).
-tsouza-thiago namespaces="git" ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIDnYsXcStBkPcaNMFPpswKiIautYac3UeWKKOqfTcpKA
+# Ela também assina o SHA256SUMS do pacote .deb (namespace server-dashboard, ADR 0049):
+#   ssh-keygen -Y verify -f allowed_signers -I tsouza-thiago -n server-dashboard -s SHA256SUMS.sig < SHA256SUMS
+tsouza-thiago namespaces="git,server-dashboard" ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIDnYsXcStBkPcaNMFPpswKiIautYac3UeWKKOqfTcpKA

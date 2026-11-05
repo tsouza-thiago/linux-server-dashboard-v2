@@ -1,0 +1,66 @@
+# Conferência do pacote .deb publicado (ADR 0042 item 10 e ADR 0049). A cada Release (ou à mão,
+# com a tag), gera de novo o .deb da tag, confere a assinatura do SHA256SUMS com a chave das tags
+# (docs/allowed_signers da própria tag, namespace server-dashboard) e compara: o SHA256SUMS
+# assinado, o .deb do Release e o .deb gerado aqui precisam ter o mesmo hash.
+#
+# Só o dpkg-deb, o curl e o ssh-keygen do próprio runner, sem action de terceiros (ADR 0017).
+# A tag entra só pelo ambiente e passa pelo padrão das versões antes de qualquer uso.
+name: pacote
+
+on:
+  release:
+    types: [published]
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: 'Tag da versão (vX.Y.Z)'
+        required: true
+
+permissions:
+  contents: read
+
+jobs:
+  conferir:
+    name: conferir o .deb do Release
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    env:
+      TAG: ${{ github.event.release.tag_name || inputs.tag }}
+    steps:
+      - name: Tag no formato das versões
+        timeout-minutes: 1
+        run: printf '%s\n' "$TAG" | grep -Eq '^v2\.[0-9]+\.[0-9]+(-(alpha|beta|rc)\.[0-9]+)?$'
+
+      - name: Código da tag
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ env.TAG }}
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Node 24 (a mesma versão que o ./dashboard baixa)
+        uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: 24.21.0
+
+      - name: Gera o .deb da tag
+        timeout-minutes: 3
+        run: npm run empacotar-deb -- --ref "$TAG" --saida "$RUNNER_TEMP/novo"
+
+      - name: Baixa o SHA256SUMS, a assinatura e o .deb do Release
+        timeout-minutes: 3
+        run: |
+          base="https://github.com/$GITHUB_REPOSITORY/releases/download/$TAG"
+          for f in SHA256SUMS SHA256SUMS.sig; do
+            curl -fsSL --proto '=https' -o "$f" "$base/$f"
+          done
+          nome=$(cut -d' ' -f3 SHA256SUMS)
+          printf '%s\n' "$nome" | grep -Eq '^server-dashboard_[0-9a-z.~]+_all\.deb$'
+          curl -fsSL --proto '=https' -o "$nome" "$base/$nome"
+
+      - name: Assinatura da chave das tags e o mesmo hash nos 3
+        timeout-minutes: 1
+        run: |
+          ssh-keygen -Y verify -f docs/allowed_signers -I tsouza-thiago -n server-dashboard -s SHA256SUMS.sig < SHA256SUMS
+          sha256sum -c SHA256SUMS
+          cmp SHA256SUMS "$RUNNER_TEMP/novo/SHA256SUMS"

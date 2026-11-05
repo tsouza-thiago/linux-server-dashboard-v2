@@ -18,7 +18,8 @@
     "migrar-v1": "node server/storage/migrate-v1.js",
     "soak": "node --expose-gc --max-semi-space-size=2 --optimize-for-size scripts/soak-acelerado.mjs",
     "painel-teste": "node --max-semi-space-size=2 --optimize-for-size scripts/painel-teste.mjs",
-    "test:e2e": "node --test \"test/e2e/**/*.test.js\""
+    "test:e2e": "node --test \"test/e2e/**/*.test.js\"",
+    "empacotar-deb": "node scripts/empacotar-deb.mjs"
   },
   "engines": {
     "node": ">=24"

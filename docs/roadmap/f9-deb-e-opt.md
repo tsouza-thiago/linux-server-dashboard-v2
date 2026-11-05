@@ -137,7 +137,7 @@ O código em `/opt` pertence ao root. A pergunta é: quem grava a versão nova l
 6. **Feita (ADR 0046).** Regra do polkit e o grupo; teste de que outra unidade e outra ação são recusadas.
 7. **Feita (ADR 0047).** Node baixado pelo executor, com a soma SHA-256 conferida.
 8. **Feita (ADR 0048).** F7 no modo sistema: o painel usa o executor no lugar do `git checkout`.
-9. `npm run empacotar-deb` reprodutível, `SHA256SUMS` assinado e conferência no CI.
+9. **Feita (ADR 0049).** `npm run empacotar-deb` reprodutível, `SHA256SUMS` assinado e conferência no CI.
 10. `--importar-pasta`, `desinstalar` e `apt purge`.
 11. `scripts/e2e-instalacao/`: instalar o `.deb`, atualizar, voltar, desinstalar, em
     Debian e Ubuntu.
