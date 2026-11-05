@@ -18,6 +18,8 @@
 #                                troca; ADR 0045)
 #   <base>/atual                 link fixo do pacote para versoes/atual (o lançador segue)
 #   <base>/estado/               disponivel, troca, novidades.md e registro.log (leitura para todos)
+#   <base>/node/node-vN-linux-A/ o Node baixado da versão (soma SHA-256 fixada na tag)
+#   <base>/node/bin              link para node-vN-linux-A/bin (o lançador usa node/bin/node)
 #   <base>/share/allowed_signers chaves de partida, se a versão atual não trouxer as dela
 # ============================================================
 set -eu
@@ -36,6 +38,7 @@ BASE=$(dirname "$(dirname "$ESTE")")
 REPO="$BASE/repo.git"
 VERSOES="$BASE/versoes"
 ESTADO="$BASE/estado"
+NODE="$BASE/node"
 # Origem das versões. Só vale na criação do repo.git; depois, vale o remote gravado nele.
 ORIGEM_PADRAO=https://github.com/tsouza-thiago/linux-server-dashboard-v2.git
 # Mesmo padrão do RELEASE_TAG de server/setup/assinatura.js.
@@ -141,6 +144,15 @@ tag_confere() {
     -c "gpg.ssh.allowedSignersFile=$2" verify-tag "$1" > /dev/null 2>&1
 }
 
+# Pastas temporárias da operação em curso: saem no fim, com sucesso ou não (trap do travar).
+TMP_VERSAO=
+TMP_NODE=
+limpar() {
+  [ -z "$TMP_VERSAO" ] || rm -rf "$TMP_VERSAO"
+  [ -z "$TMP_NODE" ] || rm -rf "$TMP_NODE"
+  rm -rf "$ESTADO/trava"
+}
+
 # Trava: 1 operação por vez (verificar e atualizar são unidades diferentes). Trava de um
 # processo que já morreu é tirada.
 travar() {
@@ -153,7 +165,7 @@ travar() {
     mkdir "$ESTADO/trava" || falhar "não deu para criar a trava em estado/"
   fi
   echo $$ > "$ESTADO/trava/pid"
-  trap 'rm -rf "$ESTADO/trava"' EXIT
+  trap limpar EXIT
   trap 'exit 1' HUP INT TERM
 }
 
@@ -164,6 +176,85 @@ travar() {
 trocar_link() {
   ln -sfn "$2" "$VERSOES/.$1.novo"
   mv -fT "$VERSOES/.$1.novo" "$VERSOES/$1"
+}
+
+# ------------------------------------------------------------ Node (etapa 7 da F9)
+
+# Arquitetura no nome do pacote oficial do Node (como o node_arch do scripts/node-runtime.sh).
+arquitetura_node() {
+  case "$(uname -m)" in
+    x86_64 | amd64) echo x64 ;;
+    aarch64 | arm64) echo arm64 ;;
+    *) echo '' ;;
+  esac
+}
+
+# Baixa $1 para o arquivo $2: curl ou wget, só https (file só no curl, para os testes; não sai
+# da máquina). Um download cortado não passa: a soma é conferida depois.
+baixar() {
+  if command -v curl > /dev/null 2>&1; then
+    curl -fsSL --proto '=https,file' --proto-redir '=https' --max-filesize 209715200 \
+      --connect-timeout 20 --retry 2 -o "$2" "$1" 2>> "$ESTADO/registro.log"
+  elif command -v wget > /dev/null 2>&1; then
+    case "$1" in https://*) wget -q --https-only -O "$2" "$1" 2>> "$ESTADO/registro.log" ;; *) return 1 ;; esac
+  else
+    registrar "sem curl nem wget para baixar o Node"
+    return 1
+  fi
+}
+
+# Prepara o Node da versão extraída em $1 (tag $2): versão, soma SHA-256 e endereço vêm do
+# scripts/node-runtime.sh DESSA versão, que veio na tag assinada. O arquivo só é lido como
+# texto, nunca executado. Soma errada, download cortado ou arquitetura sem Node oficial: falha
+# antes de trocar qualquer link. O Node certo já presente não é baixado de novo.
+preparar_node() {
+  arquivo="$1/scripts/node-runtime.sh"
+  [ -d "$NODE" ] || falhar "pacote incompleto: falta a pasta node/"
+  [ -f "$arquivo" ] || falhar "$2 não traz o scripts/node-runtime.sh"
+  arq=$(arquitetura_node)
+  [ -n "$arq" ] || falhar "esta máquina ($(uname -m)) não tem Node oficial"
+  versao_node=$(sed -n 's/^NODE_VERSION="\([0-9][0-9]*\.[0-9][0-9]*\.[0-9][0-9]*\)"$/\1/p' "$arquivo" | head -n 1)
+  soma=$(sed -n "s/^NODE_SHA256_$arq=\"\([0-9a-f]\{64\}\)\"\$/\1/p" "$arquivo" | head -n 1)
+  # O ${…} é texto do arquivo lido, não uma expansão daqui.
+  # shellcheck disable=SC2016
+  dist=$(sed -n 's/^NODE_DIST="\${DASHBOARD_NODE_DIST:-\([^"}]*\)}"$/\1/p' "$arquivo" | head -n 1)
+  [ -n "$versao_node" ] && [ -n "$soma" ] || falhar "$2 não fixa a versão e a soma do Node para $arq"
+  [ "${versao_node%%.*}" -ge 24 ] || falhar "$2 pede o Node $versao_node; o mínimo é o 24"
+  printf '%s\n' "$dist" | grep -Eq '^(https|file)://[A-Za-z0-9._~/:-]+$' ||
+    falhar "$2 traz um endereço inválido para baixar o Node"
+  nome="node-v$versao_node-linux-$arq"
+
+  # A marca .soma só é gravada depois da conferência: com ela igual, o Node já está certo.
+  if [ -x "$NODE/$nome/bin/node" ] && [ "$(cat "$NODE/$nome/.soma" 2> /dev/null || true)" = "$soma" ]; then
+    registrar "atualizar: Node $versao_node já presente, sem baixar"
+  else
+    registrar "atualizar: baixando o Node $versao_node ($arq)"
+    rm -rf "$NODE"/.baixando.*
+    TMP_NODE=$(mktemp -d "$NODE/.baixando.XXXXXX") || falhar "não deu para criar a pasta temporária em node/"
+    baixar "$dist/v$versao_node/$nome.tar.gz" "$TMP_NODE/node.tar.gz" ||
+      falhar "não deu para baixar o Node $versao_node; nada foi trocado"
+    [ "$(sha256sum "$TMP_NODE/node.tar.gz" | cut -d' ' -f1)" = "$soma" ] ||
+      falhar "o Node baixado não confere com a soma SHA-256 de $2; nada foi trocado"
+    tar -xzf "$TMP_NODE/node.tar.gz" -C "$TMP_NODE" --no-same-owner 2>> "$ESTADO/registro.log" &&
+      [ -x "$TMP_NODE/$nome/bin/node" ] || falhar "o Node $versao_node veio incompleto; nada foi trocado"
+    printf '%s\n' "$soma" > "$TMP_NODE/$nome/.soma"
+    rm -rf "${NODE:?}/${nome:?}"
+    mv "$TMP_NODE/$nome" "$NODE/$nome"
+    rm -rf "$TMP_NODE"
+    TMP_NODE=
+  fi
+
+  # Troca atômica do link node/bin (como o trocar_link). O Node novo vale antes do código novo:
+  # ele é da mesma versão principal e roda o código anterior se a troca parar no meio.
+  antes=$(readlink "$NODE/bin" 2> /dev/null || true)
+  antes=${antes%/bin}
+  ln -sfn "$nome/bin" "$NODE/.bin.novo"
+  mv -fT "$NODE/.bin.novo" "$NODE/bin"
+  # Só ficam o Node em uso e o anterior.
+  for dir in "$NODE"/node-v*; do
+    [ -d "$dir" ] || continue
+    case "$(basename "$dir")" in "$nome" | "$antes") ;; *) rm -rf "$dir" ;; esac
+  done
 }
 
 # ------------------------------------------------------------ subcomandos
@@ -224,10 +315,12 @@ atualizar() {
   tag_confere "$nova" "$lista" || falhar "a assinatura de $nova não confere"
   registrar "atualizar: instalando $nova (instalada: $atual)"
 
-  if [ ! -d "$VERSOES/$nova" ]; then
+  pasta="$VERSOES/$nova"
+  if [ ! -d "$pasta" ]; then
     tmp="$VERSOES/$nova.tmp"
     rm -rf "$tmp" "$tmp.falhou"
     mkdir "$tmp"
+    TMP_VERSAO=$tmp
     # O sh não tem pipefail: a falha do git archive fica num arquivo-marca.
     { git_repo archive --format=tar "refs/tags/$nova" || : > "$tmp.falhou"; } | tar -x -f - -C "$tmp" ||
       : > "$tmp.falhou"
@@ -235,9 +328,13 @@ atualizar() {
       rm -rf "$tmp" "$tmp.falhou"
       falhar "a extração de $nova falhou ou veio incompleta"
     fi
-    # Ponto da etapa 7 da F9: conferir e baixar aqui o Node da versão nova (SHA-256 fixado no
-    # scripts/node-runtime.sh dela), antes de a versão ficar disponível.
+    pasta=$tmp
+  fi
+  # O Node da versão nova (etapa 7 da F9), antes de ela ficar disponível em versoes/.
+  preparar_node "$pasta" "$nova"
+  if [ "$pasta" != "$VERSOES/$nova" ]; then
     mv "$tmp" "$VERSOES/$nova"
+    TMP_VERSAO=
   fi
 
   # Ordem: primeiro o anterior, depois o atual. Uma queda no meio deixa o atual intacto.

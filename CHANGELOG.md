@@ -35,6 +35,10 @@ diante: `PATCH` corrige, `MINOR` acrescenta sem quebrar e `MAJOR` quebra.
   `server-dashboard` pode só iniciar a troca de versão e a volta atrás, sem senha; qualquer outro pedido
   ao systemd continua pedindo a senha do administrador. Um arquivo `sysusers.d` cria esse grupo e o
   usuário de sistema do executor, sem login. Só valem no pacote, a partir da etapa 9.
+- Node baixado pelo executor (#92, F9, etapa 7 de 12, ADR 0047): na troca de versão, o executor baixa
+  o Node que a versão nova pede e confere a soma SHA-256 fixada nela, que veio na tag assinada. Soma
+  errada, download cortado ou máquina sem Node oficial: a troca não acontece. O Node certo já presente
+  não é baixado de novo. A unidade `atualizar` passa a ter rede só para isso.
 
 ### Corrigido
 

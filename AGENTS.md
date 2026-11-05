@@ -427,13 +427,22 @@ em `versoes/vX.Y.Z.tmp`, rename e troca atômica dos links `versoes/anterior` e 
 por `anterior` 1 vez, só até 24 h depois da troca (`estado/troca`). Em `estado/` (0644, sem segredo)
 ficam também `novidades.md`, `registro.log` e a `trava/`.
 
+Antes de a versão nova entrar em `versoes/`, o `atualizar` baixa o Node dela (ADR 0047). Versão, soma
+SHA-256 da arquitetura (`x64` ou `arm64`) e endereço saem do `scripts/node-runtime.sh` da versão nova,
+lido como texto, nunca executado. O pacote vai para `node/.baixando.*` por `curl` ou `wget`, só
+`https`. Só com a soma certa ele vira `node/node-vN-linux-A/` (com a marca `.soma`), e o link
+`node/bin` troca por rename; o lançador usa `<base>/node/bin/node`. Soma errada, download cortado ou
+outra arquitetura: nada muda. Com a pasta e a marca certas, não baixa de novo. Ficam o Node em uso e
+o anterior; o `voltar` não troca o Node.
+
 As unidades do executor (`pacote/systemd/`, ADR 0045; no pacote, `/usr/lib/systemd/system/`) são
 `server-dashboard-{verificar,atualizar,voltar}.service`, de uso único, com o subcomando fixo no
 `ExecStart=`, e o `server-dashboard-verificar.timer` (1 vez por dia, `RandomizedDelaySec=6h`,
 `Persistent=true`). Rodam como `_server-dashboard`, com `ProtectSystem=strict` e gravação só em
-`repo.git` e `estado` (verificar) ou `versoes` e `estado` (atualizar e voltar). Só o `verificar` tem
-rede. `test/unit/unidades-systemd.test.js` exige cada diretiva e a nota do
-`systemd-analyze security` (até 1,5 no verificar e 0,5 nos outros).
+`repo.git` e `estado` (verificar), `versoes`, `estado` e `node` (atualizar) ou `versoes` e `estado`
+(voltar). Só o `verificar` (git fetch) e o `atualizar` (Node, ADR 0047) têm rede.
+`test/unit/unidades-systemd.test.js` exige cada diretiva e a nota do `systemd-analyze security` (até
+1,5 no verificar e no atualizar e 0,5 no voltar).
 
 A regra do polkit (`pacote/polkit/50-server-dashboard.rules`, ADR 0046; no pacote,
 `/usr/share/polkit-1/rules.d/`) libera sem senha só a ação `org.freedesktop.systemd1.manage-units`,
