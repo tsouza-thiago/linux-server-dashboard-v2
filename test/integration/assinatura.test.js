@@ -62,6 +62,21 @@ test('assinatura: só passa a tag assinada pela chave de docs/allowed_signers', 
   assert.equal(currentVersionStatus(os.tmpdir()).ok, false);
 });
 
+test('assinatura: tag velha assinada publicada com outro nome é recusada (#155)', { skip: !hasTools }, async (t) => {
+  const { newestSignedTag } = await import('../../server/setup/assinatura.js');
+  const { dir, git, sign } = repo(t);
+  sign('v2.90.0');
+  git('commit', '-q', '--allow-empty', '-m', 'correção');
+  sign('v2.91.0');
+  // O objeto da v2.90.0 (assinado, com "tag v2.90.0" dentro) sob o nome de uma versão mais nova.
+  git('tag', 'v2.93.0', git('rev-parse', 'refs/tags/v2.90.0'));
+  assert.deepEqual(verifyTag(dir, 'v2.93.0'), { ok: false, reason: 'nome-trocado', tag: 'v2.93.0' });
+  assert.equal(verifyTag(dir, 'v2.91.0').ok, true, 'a tag com o próprio nome segue valendo');
+  assert.equal(newestSignedTag(dir, { current: 'v2.90.0' }), 'v2.91.0', 'a procura pula a renomeada');
+  assert.deepEqual(signedReleaseTags(dir), ['v2.91.0', 'v2.90.0']);
+  assert.match(describeVersion(verifyTag(dir, 'v2.93.0')), /guarda o nome de outra versão/);
+});
+
 test('versões: ordem SemVer com alpha < beta < rc < final; frases para a tela', () => {
   const list = ['v2.0.0', 'v2.0.0-rc.1', 'v2.0.0-alpha.10', 'v2.0.0-alpha.9', 'v2.0.0-beta.2', 'v2.1.0-alpha.1'];
   assert.deepEqual([...list].sort(compareVersions), ['v2.0.0-alpha.9', 'v2.0.0-alpha.10', 'v2.0.0-beta.2', 'v2.0.0-rc.1', 'v2.0.0', 'v2.1.0-alpha.1']);
