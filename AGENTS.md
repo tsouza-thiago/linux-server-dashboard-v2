@@ -136,7 +136,8 @@ O teste `test/unit/docs.test.js` confere esta documentação contra o código.
   `bash-completion` e com o sim (`--editar-profile` no modo sem perguntas), com as mesmas garantias
   do arquivo de login. `test/unit/autocomplete.test.js` confere comandos e opções contra o código.
 - **Versões assinadas** (ADR 0012): o instalador e o `./dashboard atualizar` só aceitam
-  tags assinadas por uma chave de `docs/allowed_signers`.
+  tags assinadas por uma chave de `docs/allowed_signers`, e com o nome gravado dentro
+  da tag igual ao da ref (`verifyTag`, motivo `nome-trocado`, #155).
 - **Versão nova** (ADR 0030): o painel procura 1 vez por dia, em processo à parte
   (`server/atualizacao/procurar.js`, `nice -n 19`), com `git fetch --tags origin`, sem perguntas
   (`GIT_TERMINAL_PROMPT=0`, `BatchMode=yes`). É a única saída para a internet. Só vale tag assinada,

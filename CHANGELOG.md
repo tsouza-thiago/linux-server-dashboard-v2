@@ -49,6 +49,13 @@ diante: `PATCH` corrige, `MINOR` acrescenta sem quebrar e `MAJOR` quebra.
   `painel-teste.test.js`, `http-router.test.js` e do e2e. `test/unit/limpeza.test.js` tem uma regra
   que impede a volta do padrão.
 
+### Segurança
+
+- Tag com nome trocado (#155): o instalador, o `dashboard atualizar` e a procura diária recusam uma
+  tag cujo nome gravado dentro dela não é o nome da versão. Antes, uma tag velha assinada, publicada
+  com outro nome (ex.: o objeto da `v2.90.0` como `v2.93.0`), passava na conferência e forçava a
+  volta a uma versão com falha conhecida. O executor do pacote já fazia esta conferência (ADR 0044).
+
 ### Mudado
 
 - Mutação dos guardas (#128, ADR 0041): cada teste da rodada tem limite (`--test-timeout`), e o

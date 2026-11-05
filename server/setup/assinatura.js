@@ -48,7 +48,16 @@ export function verifyTag(root, tag, { signersFile = SIGNERS(root), run } = {}) 
     '-c', 'gpg.format=ssh', '-c', 'gpg.ssh.program=ssh-keygen', '-c', `gpg.ssh.allowedSignersFile=${signersFile}`,
     'verify-tag', tag,
   ], run);
-  if (r.status === 0) return { ok: true, tag };
+  if (r.status === 0) {
+    // A assinatura cobre o nome gravado dentro do objeto tag, não o nome da ref. Sem esta
+    // conferência, uma tag velha assinada publicada com outro nome (`git tag v2.93.0 <objeto
+    // da v2.90.0>`) passaria e forçaria a volta a uma versão com falha conhecida (#155, como
+    // o executor do pacote faz na ADR 0044).
+    const obj = git(root, ['cat-file', 'tag', `refs/tags/${tag}`], run);
+    const nome = /^tag (.*)$/m.exec(obj.stdout)?.[1];
+    if (obj.status !== 0 || nome !== tag) return { ok: false, reason: 'nome-trocado', tag };
+    return { ok: true, tag };
+  }
   if (/no signature found|cannot verify a non-tag/i.test(r.stderr)) return { ok: false, reason: 'sem-assinatura', tag };
   return { ok: false, reason: 'invalida', tag, detail: r.stderr.split('\n').pop() };
 }
@@ -115,6 +124,7 @@ export function describeVersion(st) {
     'sem-chaves': 'docs/allowed_signers está vazio: nenhuma chave para conferir',
     'sem-assinatura': `a versão ${st.tag} não tem assinatura`,
     invalida: `a assinatura da versão ${st.tag} não confere`,
+    'nome-trocado': `a tag ${st.tag} guarda o nome de outra versão: recusada`,
     'tag-invalida': 'nome de versão inválido',
   }[st.reason] || 'versão não conferida';
 }
