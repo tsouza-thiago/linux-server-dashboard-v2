@@ -397,6 +397,13 @@ log).
 Mudar alvos (pastas, discos, serviços) à mão quebra a chave restrita: o script no
 `authorized_keys` deixa de bater (`hashMismatch`). Use `./dashboard reconfigurar`.
 
+**Modo sistema** (ADR 0042, F9; em implementação): o lançador do pacote `.deb` define
+`SERVER_DASHBOARD_MODO=sistema` no ambiente (só o valor exato vale, e nunca pelo `.env`). Nesse modo,
+o `.env` fica em `~/.config/server-dashboard/` e o `data/` em `~/.local/share/server-dashboard/`
+(seguem `XDG_CONFIG_HOME` e `XDG_DATA_HOME`; valor relativo é ignorado), com 0700/0600. Os caminhos
+de dados ficam presos no `data/` dessa pasta, nunca no código em `/opt`. Sem a variável, tudo segue
+na pasta do projeto, como sempre (modo clone).
+
 ## Comando SSH de coleta
 
 O script é montado por `server/collector/builder.js`. É um único script POSIX `sh`,
@@ -513,7 +520,8 @@ trata campos ausentes.
 
 ## Persistência
 
-Tudo fica no disco local. Nada é gravado no servidor.
+Tudo fica no disco local. Nada é gravado no servidor. Os caminhos abaixo são os do modo clone; no
+modo sistema, `.env` e `data/` ficam nas pastas XDG (veja [Configuração](#configuração)).
 
 | Caminho | O que guarda |
 |---|---|

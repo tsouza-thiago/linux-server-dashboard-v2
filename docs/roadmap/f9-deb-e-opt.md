@@ -128,7 +128,8 @@ O código em `/opt` pertence ao root. A pergunta é: quem grava a versão nova l
 ## Etapas
 
 1. **Feita (ADR 0042).** ADR do modo sistema e do executor (com a tabela de opções acima).
-2. `server/config.js`: modo sistema, pastas XDG, `clampPathToData` pela pasta de dados.
+2. **Feita.** `server/config.js`: modo sistema (sinal `SERVER_DASHBOARD_MODO=sistema`), pastas XDG,
+   `clampPathToData` pela pasta de dados.
 3. Lançador `bin/dashboard` e detecção do modo nos subcomandos.
 4. Executor `atualizador` em `sh` (verificar, atualizar, voltar), com ShellCheck e
    testes em contêiner.

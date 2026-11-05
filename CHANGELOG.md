@@ -14,6 +14,10 @@ diante: `PATCH` corrige, `MINOR` acrescenta sem quebrar e `MAJOR` quebra.
 - ADR 0042 (#92, F9, etapa 1 de 12): o modo sistema, com o pacote `.deb` em `/opt`. Depois da
   instalação, nada roda como root: um usuário de sistema sem login grava a versão nova, e a pessoa só
   pede a troca pelo polkit. Só a decisão; o código vem nas próximas etapas.
+- Modo sistema na configuração (#92, F9, etapa 2 de 12): com `SERVER_DASHBOARD_MODO=sistema`, o
+  painel lê o `.env` de `~/.config/server-dashboard/` e guarda os dados em
+  `~/.local/share/server-dashboard/`, com 0700/0600, e recusa caminho de dados fora dessa pasta,
+  inclusive o do código. Sem a variável, nada muda. Quem liga o modo é o lançador, na etapa 3.
 
 ### Corrigido
 

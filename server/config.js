@@ -7,20 +7,91 @@
 //     ANTES de entrar no script que roda no servidor (anti-injeção, CWE-78);
 //   - todo caminho de arquivo de dados é forçado para dentro de data/ (clampPathToData).
 // O .env é lido uma vez, quando o módulo carrega; process.env tem prioridade sobre ele.
+//
+// Dois modos de instalação (ADR 0042, decisão 3):
+//   - clone (padrão): código, .env e data/ ficam na mesma pasta, a do projeto;
+//   - sistema (pacote .deb): o código fica em /opt, só leitura, e os dados de cada pessoa
+//     ficam nas pastas XDG dela (~/.config/server-dashboard/.env e
+//     ~/.local/share/server-dashboard/data/).
 import fs from 'node:fs';
+import os from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
-/** Raiz do projeto (a pasta que contém server/, public/ e data/). */
+/** Raiz do código (a pasta que contém server/ e public/; no modo clone, também .env e data/). */
 export const ROOT = path.join(__dirname, '..');
+
+/**
+ * Variável de ambiente que liga o modo sistema. Só o lançador do pacote
+ * (/opt/server-dashboard/bin/dashboard, etapa 3 da F9) a define, com o valor exato `sistema`.
+ * Por que uma variável de ambiente, e não um arquivo marcador ou o caminho do código:
+ *   - o modo decide ONDE fica o .env, então não pode vir do .env (process.env só);
+ *   - o lançador é quem escolhe o modo (ADR 0042), e a variável passa dele para o Node, para
+ *     o serviço systemd e para os processos filhos sem nenhum arquivo a mais;
+ *   - os testes trocam o modo sem mexer no disco.
+ * Ela não dá privilégio nenhum: só muda para qual pasta da própria pessoa vão os dados dela.
+ * Sem ela (ou com outro valor), tudo fica como no modo clone, sem mudança nenhuma.
+ */
+export const SINAL_MODO_SISTEMA = 'SERVER_DASHBOARD_MODO';
+
+/** O modo da instalação: `sistema` só com o sinal exato; qualquer outra coisa é `clone`. */
+export function modoDaInstalacao(ambiente = process.env) {
+  return ambiente[SINAL_MODO_SISTEMA] === 'sistema' ? 'sistema' : 'clone';
+}
+
+// Pasta base XDG: a especificação manda ignorar valor relativo (ele dependeria da pasta
+// atual, e o painel gravaria dados num lugar imprevisível). Vazio ou relativo usa o padrão.
+function pastaXdg(valor, home, padrao) {
+  return typeof valor === 'string' && path.isAbsolute(valor) ? valor : path.join(home, padrao);
+}
+
+/**
+ * As pastas da instalação: `codigo` (server/, public/), `config` (a do .env) e `dados` (a
+ * que contém data/ e .backups/). No modo clone, as 3 são a pasta do projeto, como sempre.
+ * No modo sistema, `config` e `dados` seguem o XDG_CONFIG_HOME e o XDG_DATA_HOME.
+ */
+export function pastasDaInstalacao({ ambiente = process.env, home = os.homedir(), codigo = ROOT } = {}) {
+  if (modoDaInstalacao(ambiente) !== 'sistema') return { modo: 'clone', codigo, config: codigo, dados: codigo };
+  // Sem pasta pessoal absoluta, os dados iriam para a pasta atual (talvez /opt): recusa.
+  if (!path.isAbsolute(String(home || ''))) throw new Error('modo sistema sem pasta pessoal (HOME)');
+  return {
+    modo: 'sistema',
+    codigo,
+    config: path.join(pastaXdg(ambiente.XDG_CONFIG_HOME, home, '.config'), 'server-dashboard'),
+    dados: path.join(pastaXdg(ambiente.XDG_DATA_HOME, home, path.join('.local', 'share')), 'server-dashboard'),
+  };
+}
+
+/** As pastas desta instalação, decididas 1 vez, quando o módulo carrega. */
+export const PASTAS = pastasDaInstalacao();
+/** Pasta que contém data/ (e .backups/): a do projeto no modo clone, a XDG no modo sistema. */
+export const DATA_ROOT = PASTAS.dados;
+/** O .env desta instalação. */
+export const ENV_FILE = path.join(PASTAS.config, '.env');
+
+/**
+ * Cria as pastas pessoais do modo sistema com 0700 (as de hoje: AGENTS, "Permissões") e
+ * fecha as que já existem abertas. Só mexe nas pastas do painel, nunca nas pastas XDG de
+ * cima (~/.config, ~/.local/share), que são da pessoa. No modo clone não faz nada: lá a
+ * instalação (server/setup/local.js) cuida das permissões. Devolve as pastas tratadas.
+ */
+export function prepararPastas(pastas = PASTAS) {
+  if (pastas.modo !== 'sistema') return [];
+  const lista = [pastas.config, pastas.dados, path.join(pastas.dados, 'data')];
+  for (const dir of lista) {
+    fs.mkdirSync(dir, { recursive: true, mode: 0o700 });
+    fs.chmodSync(dir, 0o700);
+  }
+  return lista;
+}
 
 /**
  * Lê um arquivo no formato .env (`CHAVE=valor`, uma por linha) e devolve `{ CHAVE: valor }`.
  * Linhas comentadas (#) e linhas fora do formato são ignoradas; aspas nas pontas do valor
  * saem. Arquivo ausente devolve `{}` (o .env é opcional: tudo tem padrão).
  */
-export function loadEnvFile(filePath = path.join(ROOT, '.env')) {
+export function loadEnvFile(filePath = ENV_FILE) {
   const out = {};
   try {
     for (const line of fs.readFileSync(filePath, 'utf8').split('\n')) {
@@ -103,10 +174,12 @@ export function alertThresholds(get = (k) => env(k, ''), warnings = []) {
 
 /**
  * Caminho de arquivo de dados SEMPRE dentro de data/ (CWE-22): um `HISTORY_FILE=../../etc/x`
- * ou um caminho absoluto fora de data/ vira `data/<fallbackBasename>`. `root` é a pasta do
- * projeto (a do painel; a CLI passa a pasta que está examinando).
+ * ou um caminho absoluto fora de data/ vira `data/<fallbackBasename>`. `root` é a pasta que
+ * contém data/: a de dados (DATA_ROOT), nunca a do código. No modo clone as 2 são a mesma; no
+ * modo sistema, um caminho que aponte para o código em /opt também é recusado. A CLI passa a
+ * pasta que está examinando.
  */
-export function clampPathToData(value, fallbackBasename, root = ROOT) {
+export function clampPathToData(value, fallbackBasename, root = DATA_ROOT) {
   const p = path.resolve(root, value || '');
   const dataDir = path.join(root, 'data');
   if (p === dataDir || p.startsWith(dataDir + path.sep)) return p;
@@ -143,7 +216,7 @@ export function sshAccess(value) {
 }
 
 /** Arquivo de configuração SSH próprio (`ssh -F`), sempre dentro de data/; vazio = nenhum. */
-export function sshConfigFile(value, root = ROOT) {
+export function sshConfigFile(value, root = DATA_ROOT) {
   return String(value || '').trim() ? clampPathToData(String(value).trim(), 'ssh/config', root) : '';
 }
 
