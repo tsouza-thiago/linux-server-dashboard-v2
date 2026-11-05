@@ -18,7 +18,7 @@ import { spansToIso } from './storage/coverage.js';
 import { AlertEngine } from './alerts/engine.js';
 import { collect, configTargets } from './poller.js';
 import { VERSION } from './version.js';
-import { config, configWarnings, ROOT, isPlaceholderHost } from './config.js';
+import { config, configWarnings, ROOT, DATA_ROOT, isPlaceholderHost } from './config.js';
 import { hostCheck, csrfCheck, securityHeaders, makeRequireAuth, issueCsrfCookie, makeRateLimit, parseCookies } from './security.js';
 import { toCSV } from './csv.js';
 import { createLogFile } from './logfile.js';
@@ -52,10 +52,10 @@ export function createApp(deps = {}) {
   }
   // Alertas, anotações e quedas: arquivos em data/ (os testes passam caminhos temporários).
   const alertsStore = deps.alertsStore || new AlertsStore({
-    file: deps.alertsFile ?? path.join(ROOT, 'data/alerts.json'),
+    file: deps.alertsFile ?? path.join(DATA_ROOT, 'data/alerts.json'),
   });
   const annotationsStore = deps.annotationsStore || new AnnotationsStore({
-    file: deps.annotationsFile ?? path.join(ROOT, 'data/annotations.json'),
+    file: deps.annotationsFile ?? path.join(DATA_ROOT, 'data/annotations.json'),
   });
   const thresholds = deps.thresholds ?? config.ALERTS;
   const outages = deps.outages || new OutageLog({
