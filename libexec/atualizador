@@ -1,0 +1,290 @@
+#!/bin/sh
+# ============================================================
+# Server Dashboard — executor da atualização no modo sistema (ADR 0042 e 0044)
+#
+# No pacote .deb, este arquivo fica em /opt/server-dashboard/libexec/atualizador e roda
+# como o usuário de sistema _server-dashboard, nunca como root, pelas unidades systemd de
+# uso único (etapa 5 da F9). Ele é o único que grava o código do painel em /opt.
+#
+#   atualizador verificar   busca as tags, acha a assinada mais nova e grava em estado/
+#   atualizador atualizar   instala só a versão que o verificar gravou (sem parâmetro)
+#   atualizador voltar      troca atual por anterior, só até 24 h depois da troca
+#
+# Layout (ADR 0042, itens 1 e 2), tudo a partir da pasta deste arquivo:
+#   <base>/libexec/atualizador   este arquivo
+#   <base>/repo.git              clone sem pasta de trabalho (só tags)
+#   <base>/versoes/vX.Y.Z/       cada versão extraída da tag
+#   <base>/atual, <base>/anterior  links relativos para versoes/vX.Y.Z
+#   <base>/estado/               disponivel, troca, novidades.md e registro.log (leitura para todos)
+#   <base>/share/allowed_signers chaves de partida, se a versão atual não trouxer as dela
+# ============================================================
+set -eu
+
+# Ambiente limpo: nenhuma variável de quem chamou (GIT_DIR, GIT_CONFIG_*, GIT_SSH, PATH…)
+# muda o que o executor faz. Ele se roda de novo 1 vez com só o que precisa.
+if [ "${ATUALIZADOR_AMBIENTE:-}" != limpo ]; then
+  exec env -i ATUALIZADOR_AMBIENTE=limpo PATH=/usr/sbin:/usr/bin:/sbin:/bin LC_ALL=C \
+    HOME=/nonexistent "$0" "$@"
+fi
+
+# A pasta base vem do caminho real DESTE arquivo, nunca do ambiente nem de argumento: o
+# executor só mexe no pacote onde ele mesmo está.
+ESTE=$(readlink -f "$0")
+BASE=$(dirname "$(dirname "$ESTE")")
+REPO="$BASE/repo.git"
+VERSOES="$BASE/versoes"
+ESTADO="$BASE/estado"
+# Origem das versões. Só vale na criação do repo.git; depois, vale o remote gravado nele.
+ORIGEM_PADRAO=https://github.com/tsouza-thiago/linux-server-dashboard-v2.git
+# Mesmo padrão do RELEASE_TAG de server/setup/assinatura.js.
+PADRAO_TAG='^v2\.[0-9]+\.[0-9]+(-(alpha|beta|rc)\.[0-9]+)?$'
+# Prazo da volta atrás manual (ADR 0042, item 8): 24 h.
+PRAZO_VOLTAR=86400
+umask 022
+# Sem prompt de senha nem configuração do sistema ou da pessoa: o git só lê o repo.git.
+GIT_TERMINAL_PROMPT=0
+GIT_CONFIG_NOSYSTEM=1
+GIT_CONFIG_GLOBAL=/dev/null
+export GIT_TERMINAL_PROMPT GIT_CONFIG_NOSYSTEM GIT_CONFIG_GLOBAL
+
+# ------------------------------------------------------------ utilidades
+
+# Registro: 1 linha com data no estado/registro.log e na saída de erro (o journal da
+# unidade). Nunca na saída padrão: as funções que devolvem valor por ela também registram.
+registrar() {
+  linha="$(date -u +%Y-%m-%dT%H:%M:%SZ) $*"
+  printf '%s\n' "$linha" >&2
+  if [ -d "$ESTADO" ]; then
+    # Gira em 256 KB: o log não cresce sem limite no disco.
+    if [ -f "$ESTADO/registro.log" ] && [ "$(wc -c < "$ESTADO/registro.log")" -gt 262144 ]; then
+      mv -f "$ESTADO/registro.log" "$ESTADO/registro.log.1"
+    fi
+    printf '%s\n' "$linha" >> "$ESTADO/registro.log"
+  fi
+}
+
+falhar() {
+  registrar "ERRO: $*"
+  exit 1
+}
+
+# git só no repo.git, com as proteções fixadas na linha de comando: nada de hooks e só os
+# protocolos https e file (o file serve aos testes e não sai da máquina).
+git_repo() {
+  git -C "$REPO" -c core.hooksPath=/dev/null -c protocol.allow=never \
+    -c protocol.https.allow=always -c protocol.file.allow=always "$@"
+}
+
+# Grava um arquivo de estado de forma atômica (cópia temporária e rename), legível por todos.
+gravar_estado() {
+  arquivo="$ESTADO/$1"
+  cat > "$arquivo.tmp"
+  chmod 0644 "$arquivo.tmp"
+  mv -f "$arquivo.tmp" "$arquivo"
+}
+
+# Valor de uma chave (chave=valor) de um arquivo de estado; vazio se faltar.
+ler_estado() {
+  [ -f "$ESTADO/$1" ] || return 0
+  sed -n "s/^$2=//p" "$ESTADO/$1" | head -n 1
+}
+
+# Chave de ordenação de uma versão: largura fixa, para o `sort` comparar como texto.
+# A pré-versão vem antes da final: alpha 0, beta 1, rc 2, final 3 (como o compareVersions).
+chave_versao() {
+  printf '%s\n' "$1" | awk -F'[.-]' '{
+    sub(/^v/, "", $1)
+    r = 3; n = 0
+    if ($4 == "alpha") r = 0; else if ($4 == "beta") r = 1; else if ($4 == "rc") r = 2
+    if ($5 != "") n = $5
+    printf "%06d%06d%06d%d%06d\n", $1, $2, $3, r, n
+  }'
+}
+
+# Sucesso se a versão $1 for mais nova que $2.
+mais_nova() {
+  a=$(chave_versao "$1")
+  b=$(chave_versao "$2")
+  [ "$a" != "$b" ] && [ "$(printf '%s\n%s\n' "$a" "$b" | sort | tail -n 1)" = "$a" ]
+}
+
+# Versão do link atual (vX.Y.Z), conferida contra o padrão.
+versao_atual() {
+  alvo=$(readlink "$BASE/atual" 2>/dev/null || true)
+  v=$(basename "${alvo:-nada}")
+  printf '%s\n' "$v" | grep -Eq "$PADRAO_TAG" || falhar "o link atual não aponta para uma versão: $alvo"
+  [ -d "$VERSOES/$v" ] || falhar "a versão atual $v não está em versoes/"
+  printf '%s\n' "$v"
+}
+
+# Chaves que podem assinar: as da versão ATUAL (a versão nova nunca se autoaprova). Sem
+# elas, as de partida do pacote.
+chaves() {
+  if [ -s "$VERSOES/$1/docs/allowed_signers" ]; then
+    printf '%s\n' "$VERSOES/$1/docs/allowed_signers"
+  elif [ -s "$BASE/share/allowed_signers" ]; then
+    printf '%s\n' "$BASE/share/allowed_signers"
+  else
+    falhar "nenhuma lista de chaves para conferir a assinatura"
+  fi
+}
+
+# Sucesso se a tag $1 tiver assinatura válida pelas chaves de $2 e o nome gravado DENTRO da
+# tag for o mesmo da ref: uma tag velha assinada, publicada com outro nome, é recusada.
+tag_confere() {
+  printf '%s\n' "$1" | grep -Eq "$PADRAO_TAG" || return 1
+  [ "$(git_repo cat-file -t "refs/tags/$1" 2>/dev/null)" = tag ] || return 1
+  [ "$(git_repo cat-file tag "refs/tags/$1" | sed -n 's/^tag //p' | head -n 1)" = "$1" ] || return 1
+  git_repo -c gpg.format=ssh -c gpg.ssh.program=ssh-keygen \
+    -c "gpg.ssh.allowedSignersFile=$2" verify-tag "$1" > /dev/null 2>&1
+}
+
+# Trava: 1 operação por vez (verificar e atualizar são unidades diferentes). Trava de um
+# processo que já morreu é tirada.
+travar() {
+  if ! mkdir "$ESTADO/trava" 2> /dev/null; then
+    dono=$(cat "$ESTADO/trava/pid" 2> /dev/null || true)
+    if [ -n "$dono" ] && kill -0 "$dono" 2> /dev/null; then
+      falhar "outra operação do executor está em andamento (PID $dono)"
+    fi
+    rm -rf "$ESTADO/trava"
+    mkdir "$ESTADO/trava" || falhar "não deu para criar a trava em estado/"
+  fi
+  echo $$ > "$ESTADO/trava/pid"
+  trap 'rm -rf "$ESTADO/trava"' EXIT
+  trap 'exit 1' HUP INT TERM
+}
+
+# Troca um link de forma atômica: cria o novo ao lado e renomeia por cima (rename(2)). O
+# `mv -T` (GNU, presente no Debian e no Ubuntu) trata o destino como arquivo, não como pasta.
+trocar_link() {
+  ln -sfn "$2" "$BASE/.$1.novo"
+  mv -fT "$BASE/.$1.novo" "$BASE/$1"
+}
+
+# ------------------------------------------------------------ subcomandos
+
+verificar() {
+  atual=$(versao_atual)
+  lista=$(chaves "$atual")
+  if [ ! -d "$REPO" ]; then
+    git init -q --bare "$REPO" || falhar "não deu para criar o repo.git"
+    git_repo remote add origin "$ORIGEM_PADRAO"
+  fi
+  registrar "verificar: procurando versão nova (instalada: $atual)"
+  # Só as tags, sem forçar: uma tag já conhecida nunca é trocada por outra com o mesmo nome.
+  if ! git_repo fetch -q --no-tags origin 'refs/tags/*:refs/tags/*' 2>> "$ESTADO/registro.log"; then
+    agora=$(date +%s)
+    printf 'versao=\nobjeto=\nverificado=%s\nerro=falhou\n' "$agora" | gravar_estado disponivel
+    falhar "não deu para buscar as versões (git fetch)"
+  fi
+  # Pré-versão só para quem já está numa (a liberação do --pre fica para a etapa 8).
+  case "$atual" in *-*) filtro='.' ;; *) filtro='^v[0-9.]+$' ;; esac
+  nova=
+  # Da mais nova para a mais antiga; para na 1ª assinada (como o newestSignedTag).
+  for tag in $(git_repo tag --list 'v2.*' | grep -E "$PADRAO_TAG" | grep -E "$filtro" |
+    while read -r t; do printf '%s %s\n' "$(chave_versao "$t")" "$t"; done | sort -r | cut -d' ' -f2); do
+    mais_nova "$tag" "$atual" || break
+    if tag_confere "$tag" "$lista"; then
+      nova=$tag
+      break
+    fi
+    registrar "verificar: $tag recusada (sem assinatura válida ou nome trocado)"
+  done
+  agora=$(date +%s)
+  if [ -z "$nova" ]; then
+    printf 'versao=\nobjeto=\nverificado=%s\nerro=\n' "$agora" | gravar_estado disponivel
+    registrar "verificar: nenhuma versão nova"
+    return 0
+  fi
+  objeto=$(git_repo rev-parse "refs/tags/$nova")
+  # As novidades vão como texto para o painel (até 256 KB); o painel nunca executa nada delas.
+  git_repo show "$nova:CHANGELOG.md" 2> /dev/null | head -c 262144 | gravar_estado novidades.md
+  printf 'versao=%s\nobjeto=%s\nverificado=%s\nerro=\n' "$nova" "$objeto" "$agora" | gravar_estado disponivel
+  registrar "verificar: versão nova $nova (assinatura conferida)"
+}
+
+atualizar() {
+  atual=$(versao_atual)
+  nova=$(ler_estado disponivel versao)
+  objeto=$(ler_estado disponivel objeto)
+  [ -n "$nova" ] || falhar "nenhuma versão verificada: rode o verificar antes"
+  printf '%s\n' "$nova" | grep -Eq "$PADRAO_TAG" || falhar "versão inválida em estado/disponivel"
+  mais_nova "$nova" "$atual" || falhar "$nova não é mais nova que a instalada ($atual)"
+  # A tag precisa ser a MESMA que o verificar conferiu, e a assinatura confere de novo.
+  [ "$(git_repo rev-parse -q --verify "refs/tags/$nova" 2> /dev/null || true)" = "$objeto" ] ||
+    falhar "a tag $nova mudou depois do verificar"
+  lista=$(chaves "$atual")
+  tag_confere "$nova" "$lista" || falhar "a assinatura de $nova não confere"
+  registrar "atualizar: instalando $nova (instalada: $atual)"
+
+  if [ ! -d "$VERSOES/$nova" ]; then
+    tmp="$VERSOES/$nova.tmp"
+    rm -rf "$tmp" "$tmp.falhou"
+    mkdir "$tmp"
+    # O sh não tem pipefail: a falha do git archive fica num arquivo-marca.
+    { git_repo archive --format=tar "refs/tags/$nova" || : > "$tmp.falhou"; } | tar -x -f - -C "$tmp" ||
+      : > "$tmp.falhou"
+    if [ -e "$tmp.falhou" ] || [ ! -f "$tmp/server/cli/index.js" ]; then
+      rm -rf "$tmp" "$tmp.falhou"
+      falhar "a extração de $nova falhou ou veio incompleta"
+    fi
+    # Ponto da etapa 7 da F9: conferir e baixar aqui o Node da versão nova (SHA-256 fixado no
+    # scripts/node-runtime.sh dela), antes de a versão ficar disponível.
+    mv "$tmp" "$VERSOES/$nova"
+  fi
+
+  # Ordem: primeiro o anterior, depois o atual. Uma queda no meio deixa o atual intacto.
+  trocar_link anterior "versoes/$atual"
+  trocar_link atual "versoes/$nova"
+  printf 'em=%s\nde=%s\npara=%s\n' "$(date +%s)" "$atual" "$nova" | gravar_estado troca
+  printf 'versao=\nobjeto=\nverificado=%s\nerro=\n' "$(ler_estado disponivel verificado)" | gravar_estado disponivel
+  # Só ficam a versão atual e a anterior no disco.
+  for dir in "$VERSOES"/v*; do
+    [ -d "$dir" ] || continue
+    case "$(basename "$dir")" in "$nova" | "$atual") ;; *) rm -rf "$dir" ;; esac
+  done
+  registrar "atualizar: $atual -> $nova"
+}
+
+voltar() {
+  atual=$(versao_atual)
+  em=$(ler_estado troca em)
+  de=$(ler_estado troca de)
+  para=$(ler_estado troca para)
+  [ -n "$em" ] && [ -n "$de" ] && [ "$para" = "$atual" ] || falhar "nenhuma troca para desfazer"
+  anterior=$(basename "$(readlink "$BASE/anterior" 2> /dev/null || echo nada)")
+  [ "$anterior" = "$de" ] && [ -d "$VERSOES/$de" ] || falhar "a versão anterior $de não está disponível"
+  case "$em" in '' | *[!0-9]*) falhar "data da troca inválida em estado/troca" ;; esac
+  passou=$(( $(date +%s) - em ))
+  # Só até 24 h depois da troca (ADR 0042, item 8): ninguém força uma versão velha depois.
+  [ "$passou" -ge 0 ] && [ "$passou" -le "$PRAZO_VOLTAR" ] ||
+    falhar "a volta atrás só vale até 24 h depois da troca"
+  trocar_link atual "versoes/$de"
+  rm -f "$BASE/anterior"
+  # A troca fica marcada como desfeita: um 2º voltar é recusado.
+  printf 'em=\nde=\npara=\nvoltou=%s\n' "$(date +%s)" | gravar_estado troca
+  registrar "voltar: $atual -> $de"
+}
+
+# ------------------------------------------------------------ entrada
+
+if [ "$(id -u)" = 0 ]; then
+  echo "ERRO: o executor não roda como root; ele roda como _server-dashboard." >&2
+  exit 1
+fi
+if [ "$#" -ne 1 ]; then
+  echo "uso: atualizador verificar|atualizar|voltar" >&2
+  exit 2
+fi
+[ -d "$ESTADO" ] && [ -d "$VERSOES" ] || { echo "ERRO: pacote incompleto em $BASE" >&2; exit 1; }
+case "$1" in
+  verificar | atualizar | voltar)
+    travar
+    "$1"
+    ;;
+  *)
+    echo "uso: atualizador verificar|atualizar|voltar" >&2
+    exit 2
+    ;;
+esac
