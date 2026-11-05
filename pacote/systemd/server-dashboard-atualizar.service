@@ -5,19 +5,21 @@
 [Unit]
 Description=Server Dashboard: instalar a versão nova já verificada
 Documentation=https://github.com/tsouza-thiago/linux-server-dashboard-v2/blob/main/docs/adr/0045-unidades-systemd-do-executor.md
+Documentation=https://github.com/tsouza-thiago/linux-server-dashboard-v2/blob/main/docs/adr/0047-rede-do-atualizar-para-o-node.md
+After=network-online.target
+Wants=network-online.target
 
 [Service]
 Type=oneshot
 ExecStart=/opt/server-dashboard/libexec/atualizador atualizar
-TimeoutStartSec=10min
+TimeoutStartSec=20min
 MemoryMax=256M
 # Só estas pastas aceitam gravação; o resto do sistema, inclusive a pasta base do pacote, é
 # só leitura (ProtectSystem=strict).
-ReadWritePaths=/opt/server-dashboard/versoes /opt/server-dashboard/estado
-# Sem rede: instala a tag que o verificar já trouxe para o repo.git (o Node da etapa 7 muda isto).
-PrivateNetwork=yes
-IPAddressDeny=any
-RestrictAddressFamilies=none
+ReadWritePaths=/opt/server-dashboard/versoes /opt/server-dashboard/estado /opt/server-dashboard/node
+# Rede só para baixar o Node da versão nova (https, soma SHA-256 da tag; ADR 0047). A tag em si o
+# verificar já trouxe para o repo.git.
+RestrictAddressFamilies=AF_INET AF_INET6
 # --- Isolamento (ADR 0042, item 7, e ADR 0045). Conferido por test/unit/unidades-systemd.test.js.
 User=_server-dashboard
 Group=_server-dashboard

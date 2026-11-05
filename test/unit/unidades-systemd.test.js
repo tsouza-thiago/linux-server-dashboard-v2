@@ -20,9 +20,10 @@ const TIMER = 'server-dashboard-verificar.timer';
 const servico = (sub) => `server-dashboard-${sub}.service`;
 
 // Nota máxima aceita do `systemd-analyze security` (0 = isolado, 10 = exposto). Medida no
-// systemd 259: verificar 1,1 (precisa de rede) e 0,2 nos outros. A folga cobre versões do
-// systemd que pesam as diretivas de outro jeito; subir este número pede uma ADR nova.
-const NOTA_MAXIMA = { verificar: 1.5, atualizar: 0.5, voltar: 0.5 };
+// systemd 259: verificar e atualizar 1,1 (precisam de rede: git fetch e o Node, ADR 0047) e 0,2 no
+// voltar. A folga cobre versões do systemd que pesam as diretivas de outro jeito; subir este número
+// pede uma ADR nova.
+const NOTA_MAXIMA = { verificar: 1.5, atualizar: 1.5, voltar: 0.5 };
 
 // Isolamento que as 3 unidades exigem (ADR 0042, item 7, e ADR 0045), com o valor exato.
 const ISOLAMENTO = {
@@ -58,10 +59,11 @@ const ISOLAMENTO = {
   Type: 'oneshot',
 };
 
-// Por unidade: rede e pastas de gravação. Só o verificar sai para a rede (git fetch).
+// Por unidade: rede e pastas de gravação. O verificar sai para a rede (git fetch) e o atualizar
+// para baixar o Node (ADR 0047); o voltar fica sem rede.
 const POR_UNIDADE = {
   verificar: { rede: ['AF_INET AF_INET6'], privada: null, grava: ['repo.git', 'estado'] },
-  atualizar: { rede: ['none'], privada: 'yes', grava: ['versoes', 'estado'] },
+  atualizar: { rede: ['AF_INET AF_INET6'], privada: null, grava: ['versoes', 'estado', 'node'] },
   voltar: { rede: ['none'], privada: 'yes', grava: ['versoes', 'estado'] },
 };
 

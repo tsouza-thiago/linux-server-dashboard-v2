@@ -2,10 +2,13 @@
 // temporária com o layout do pacote (<base>/libexec, repo.git, versoes, atual, estado), contra uma
 // origem git local com tags assinadas por uma chave de teste. Confere que só tag assinada pelas
 // chaves da versão atual passa, que o atualizar só instala o que o verificar gravou, que a troca
-// de link é completa ou nenhuma e que o voltar vale só por 24 h. Nada sai da máquina.
+// de link é completa ou nenhuma e que o voltar vale só por 24 h. O Node vem de uma pasta local
+// (file://) com um pacote falso, com a soma fixada no scripts/node-runtime.sh de cada tag (etapa 7
+// da F9). Nada sai da máquina.
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { spawnSync } from 'node:child_process';
+import crypto from 'node:crypto';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
@@ -14,6 +17,9 @@ import { aoFim } from '../../test-support/limpeza.js';
 
 const EXECUTOR = path.join(ROOT, 'libexec', 'atualizador');
 const ENV_GIT = { GIT_CONFIG_GLOBAL: '/dev/null', GIT_CONFIG_NOSYSTEM: '1' };
+// Arquitetura no nome do pacote do Node, como o executor calcula pelo uname -m.
+const ARQ = { x64: 'x64', arm64: 'arm64' }[os.arch()];
+const SOMA_ERRADA = '0'.repeat(64);
 
 // Pacote falso com a versão 2.90.0 instalada (o que a semente do .deb faria) e uma origem.
 function montar(t) {
@@ -21,7 +27,7 @@ function montar(t) {
   aoFim(t, () => fs.rmSync(dir, { recursive: true, force: true }));
   const base = path.join(dir, 'base');
   const origem = path.join(dir, 'origem');
-  for (const d of ['libexec', 'versoes', 'estado']) fs.mkdirSync(path.join(base, d), { recursive: true });
+  for (const d of ['libexec', 'versoes', 'estado', 'node']) fs.mkdirSync(path.join(base, d), { recursive: true });
   fs.copyFileSync(EXECUTOR, path.join(base, 'libexec', 'atualizador'));
   fs.chmodSync(path.join(base, 'libexec', 'atualizador'), 0o755);
 
@@ -37,6 +43,25 @@ function montar(t) {
   const boa = chave('chave');
   chave('estranha');
 
+  // "nodejs.org" local: dist/vN/node-vN-linux-ARQ.tar.gz, com um node falso dentro.
+  const dist = path.join(dir, 'dist');
+  const somas = {};
+  /** Cria o pacote falso do Node `v` e devolve a soma SHA-256 dele. */
+  const nodeFalso = (v) => {
+    if (somas[v]) return somas[v];
+    const nome = `node-v${v}-linux-${ARQ}`;
+    const fonte = path.join(dir, 'fonte-node', nome, 'bin');
+    fs.mkdirSync(fonte, { recursive: true });
+    fs.writeFileSync(path.join(fonte, 'node'), `#!/bin/sh\necho v${v}\n`, { mode: 0o755 });
+    fs.mkdirSync(path.join(dist, `v${v}`), { recursive: true });
+    const tar = path.join(dist, `v${v}`, `${nome}.tar.gz`);
+    const r = spawnSync('tar', ['-czf', tar, '-C', path.join(dir, 'fonte-node'), nome]);
+    assert.equal(r.status, 0);
+    somas[v] = crypto.createHash('sha256').update(fs.readFileSync(tar)).digest('hex');
+    return somas[v];
+  };
+  const pacoteNode = (v) => path.join(dist, `v${v}`, `node-v${v}-linux-${ARQ}.tar.gz`);
+
   fs.mkdirSync(path.join(origem, 'server', 'cli'), { recursive: true });
   fs.mkdirSync(path.join(origem, 'docs'));
   fs.writeFileSync(path.join(origem, 'docs', 'allowed_signers'), `teste@example.com namespaces="git" ${boa}\n`);
@@ -44,8 +69,20 @@ function montar(t) {
   git(origem, 'config', 'user.email', 'teste@example.com');
   git(origem, 'config', 'user.name', 'Mantenedor (teste)');
 
-  /** Commit e tag de `v`: assinada pela chave boa (padrão), pela `estranha` ou sem assinatura. */
-  const publicar = (v, { assinatura = 'chave', semCodigo = false } = {}) => {
+  /**
+   * Commit e tag de `v`: assinada pela chave boa (padrão), pela `estranha` ou sem assinatura. O
+   * scripts/node-runtime.sh da tag fixa o Node `node` com a soma `soma` (padrão: a do pacote falso).
+   */
+  const publicar = (v, { assinatura = 'chave', semCodigo = false, node = '24.99.0', soma, endereco } = {}) => {
+    fs.mkdirSync(path.join(origem, 'scripts'), { recursive: true });
+    const certa = nodeFalso(node);
+    fs.writeFileSync(path.join(origem, 'scripts', 'node-runtime.sh'), [
+      `NODE_VERSION="${node}"`,
+      `NODE_SHA256_x64="${ARQ === 'x64' ? soma ?? certa : 'a'.repeat(64)}"`,
+      `NODE_SHA256_arm64="${ARQ === 'arm64' ? soma ?? certa : 'a'.repeat(64)}"`,
+      `NODE_DIST="\${DASHBOARD_NODE_DIST:-${endereco ?? `file://${dist}`}}"`,
+      '',
+    ].join('\n'));
     const cli = path.join(origem, 'server', 'cli', 'index.js');
     if (semCodigo) fs.rmSync(cli, { force: true });
     else fs.writeFileSync(cli, `// versão ${v}\n`);
@@ -92,7 +129,12 @@ function montar(t) {
   };
   /** As versões extraídas em versoes/, sem os links. */
   const versoes = () => fs.readdirSync(path.join(base, 'versoes')).filter((n) => /^v/.test(n)).sort();
-  return { dir, base, origem, git, publicar, rodar, estado, link, versoes };
+  /** O link node/bin e as pastas do Node em node/ (sem o link). */
+  const node = () => ({
+    bin: (() => { try { return fs.readlinkSync(path.join(base, 'node', 'bin')); } catch { return null; } })(),
+    pastas: fs.readdirSync(path.join(base, 'node')).filter((n) => n !== 'bin').sort(),
+  });
+  return { dir, base, origem, git, publicar, rodar, estado, link, versoes, node, pacoteNode };
 }
 
 test('atualizador: verificar acha a assinada mais nova e grava em estado/', (t) => {
@@ -241,7 +283,7 @@ test('atualizador: a pasta vem do caminho real, e a entrada é só 1 subcomando 
 test('atualizador: cada subcomando grava só nas pastas que a sua unidade systemd libera', (t) => {
   const p = montar(t);
   p.publicar('2.91.0');
-  const pastas = ['repo.git', 'versoes', 'estado'];
+  const pastas = ['repo.git', 'versoes', 'estado', 'node'];
   /** Pastas (relativas à base) do ReadWritePaths= da unidade do subcomando. */
   const liberadas = (sub) => {
     const texto = fs.readFileSync(path.join(ROOT, 'pacote', 'systemd', `server-dashboard-${sub}.service`), 'utf8');
@@ -256,11 +298,104 @@ test('atualizador: cada subcomando grava só nas pastas que a sua unidade system
   aoFim(t, () => { for (const d of pastas) modo(path.join(p.base, d), 0o755); });
   for (const sub of ['verificar', 'atualizar', 'voltar']) {
     const livres = liberadas(sub);
-    assert.ok(livres.every((d) => pastas.includes(d) || d === 'node'), `${sub}: ${livres}`);
+    assert.ok(livres.every((d) => pastas.includes(d)), `${sub}: ${livres}`);
     for (const d of pastas) modo(path.join(p.base, d), livres.includes(d) ? 0o755 : 0o555);
     const r = p.rodar(sub);
     assert.equal(r.codigo, 0, `${sub}: ${r.texto}`);
   }
   assert.equal(p.link('atual'), 'v2.90.0');
   assert.match(p.estado('troca').voltou, /^\d+$/);
+});
+
+// ------------------------------------------------------------ Node (etapa 7 da F9)
+
+test('atualizar baixa o Node da versão nova, confere a soma e troca o link node/bin', (t) => {
+  const p = montar(t);
+  p.publicar('2.91.0');
+  assert.equal(p.rodar('verificar').codigo, 0);
+  const r = p.rodar('atualizar');
+  assert.equal(r.codigo, 0, r.texto);
+  const nome = `node-v24.99.0-linux-${ARQ}`;
+  assert.deepEqual(p.node(), { bin: `${nome}/bin`, pastas: [nome] });
+  // O lançador usa <base>/node/bin/node: pelo link, ele chega ao Node baixado.
+  const versao = spawnSync(path.join(p.base, 'node', 'bin', 'node'), { encoding: 'utf8' });
+  assert.equal(versao.stdout, 'v24.99.0\n');
+  assert.match(fs.readFileSync(path.join(p.base, 'estado', 'registro.log'), 'utf8'), /baixando o Node 24\.99\.0/);
+});
+
+test('atualizar com soma errada ou download cortado não troca nada', (t) => {
+  /** Confere que nada mudou: versão, links, Node e pastas temporárias. */
+  const intacto = (p, r, motivo) => {
+    assert.equal(r.codigo, 1, r.texto);
+    assert.match(r.texto, motivo);
+    assert.equal(p.link('atual'), 'v2.90.0');
+    assert.equal(p.link('anterior'), null);
+    assert.deepEqual(p.versoes(), ['v2.90.0']);
+    assert.deepEqual(p.node(), { bin: null, pastas: [] });
+    assert.ok(!fs.readdirSync(path.join(p.base, 'versoes')).some((n) => n.endsWith('.tmp')));
+  };
+  // A soma da tag não é a do pacote.
+  const errada = montar(t);
+  errada.publicar('2.91.0', { soma: SOMA_ERRADA });
+  assert.equal(errada.rodar('verificar').codigo, 0);
+  intacto(errada, errada.rodar('atualizar'), /não confere com a soma SHA-256 de v2\.91\.0/);
+  // O pacote chegou pela metade.
+  const cortado = montar(t);
+  cortado.publicar('2.91.0');
+  assert.equal(cortado.rodar('verificar').codigo, 0);
+  const pacote = cortado.pacoteNode('24.99.0');
+  fs.truncateSync(pacote, Math.floor(fs.statSync(pacote).size / 2));
+  intacto(cortado, cortado.rodar('atualizar'), /não confere com a soma SHA-256/);
+  // O pacote não existe no endereço.
+  fs.rmSync(pacote);
+  intacto(cortado, cortado.rodar('atualizar'), /não deu para baixar o Node 24\.99\.0/);
+});
+
+test('atualizar recusa versão que não fixa o Node direito', (t) => {
+  const casos = [
+    [{ endereco: 'http://192.0.2.10/dist' }, /endereço inválido/],
+    [{ soma: 'abc' }, /não fixa a versão e a soma do Node/],
+    [{ node: '22.1.0' }, /o mínimo é o 24/],
+  ];
+  for (const [opcoes, motivo] of casos) {
+    const p = montar(t);
+    p.publicar('2.91.0', opcoes);
+    assert.equal(p.rodar('verificar').codigo, 0);
+    const r = p.rodar('atualizar');
+    assert.equal(r.codigo, 1, r.texto);
+    assert.match(r.texto, motivo);
+    assert.equal(p.link('atual'), 'v2.90.0');
+    assert.deepEqual(p.versoes(), ['v2.90.0']);
+  }
+});
+
+test('atualizar não baixa de novo o Node já presente e guarda só o atual e o anterior', (t) => {
+  const p = montar(t);
+  p.publicar('2.91.0');
+  p.rodar('verificar');
+  assert.equal(p.rodar('atualizar').codigo, 0);
+  // Mesma versão do Node: sem o pacote no endereço, a troca passa assim mesmo.
+  fs.rmSync(p.pacoteNode('24.99.0'));
+  p.publicar('2.92.0');
+  p.rodar('verificar');
+  const r = p.rodar('atualizar');
+  assert.equal(r.codigo, 0, r.texto);
+  assert.match(r.texto, /Node 24\.99\.0 já presente, sem baixar/);
+  // Node novo na tag: ele vale, e só o atual e o anterior ficam no disco.
+  for (const [v, node] of [['2.93.0', '24.99.1'], ['2.94.0', '24.99.2']]) {
+    p.publicar(v, { node });
+    p.rodar('verificar');
+    assert.equal(p.rodar('atualizar').codigo, 0);
+  }
+  assert.deepEqual(p.node(), {
+    bin: `node-v24.99.2-linux-${ARQ}/bin`,
+    pastas: [`node-v24.99.1-linux-${ARQ}`, `node-v24.99.2-linux-${ARQ}`],
+  });
+  // Uma pasta do Node sem a marca da soma (download antigo pela metade) não é reaproveitada.
+  fs.rmSync(path.join(p.base, 'node', `node-v24.99.2-linux-${ARQ}`, '.soma'));
+  fs.rmSync(p.pacoteNode('24.99.2'));
+  p.publicar('2.95.0', { node: '24.99.2' });
+  p.rodar('verificar');
+  assert.match(p.rodar('atualizar').texto, /não deu para baixar o Node 24\.99\.2/);
+  assert.equal(p.link('atual'), 'v2.94.0');
 });
