@@ -129,6 +129,11 @@ const MUTACOES = [
   { nome: 'unidade sem ProtectSystem', arquivo: 'pacote/systemd/server-dashboard-atualizar.service', de: 'ProtectSystem=strict\n', para: '', testes: ['test/unit/unidades-systemd.test.js'] },
   { nome: 'unidade grava na pasta base', arquivo: 'pacote/systemd/server-dashboard-verificar.service', de: 'ReadWritePaths=/opt/server-dashboard/repo.git ', para: 'ReadWritePaths=/opt/server-dashboard /opt/server-dashboard/repo.git ', testes: ['test/unit/unidades-systemd.test.js'] },
   { nome: 'unidade com parâmetro de fora', arquivo: 'pacote/systemd/server-dashboard-voltar.service', de: 'libexec/atualizador voltar\n', para: 'libexec/atualizador voltar %i\n', testes: ['test/unit/unidades-systemd.test.js'] },
+  { nome: 'polkit libera outro verbo', arquivo: 'pacote/polkit/50-server-dashboard.rules', de: "action.lookup('verb') !== 'start'", para: "action.lookup('verb') === 'kill'", testes: ['test/unit/polkit-e-grupo.test.js'] },
+  { nome: 'polkit libera outra unidade', arquivo: 'pacote/polkit/50-server-dashboard.rules', de: "unidade !== 'server-dashboard-voltar.service'", para: "unidade.indexOf('server-dashboard-') !== 0", testes: ['test/unit/polkit-e-grupo.test.js'] },
+  { nome: 'polkit sem conferir o grupo', arquivo: 'pacote/polkit/50-server-dashboard.rules', de: "!subject.isInGroup('server-dashboard')", para: 'false', testes: ['test/unit/polkit-e-grupo.test.js'] },
+  { nome: 'polkit libera outra ação', arquivo: 'pacote/polkit/50-server-dashboard.rules', de: "action.id !== 'org.freedesktop.systemd1.manage-units'", para: "action.id.indexOf('org.freedesktop.systemd1.') !== 0", testes: ['test/unit/polkit-e-grupo.test.js'] },
+  { nome: 'executor no grupo do polkit', arquivo: 'pacote/sysusers/server-dashboard.conf', de: 'g server-dashboard - -\n', para: 'g server-dashboard - -\nm _server-dashboard server-dashboard\n', testes: ['test/unit/polkit-e-grupo.test.js'] },
   { nome: 'exec com shell importado', arquivo: 'server/cli/servico.js', de: "import { spawn, spawnSync } from 'node:child_process';", para: "import { exec, spawn, spawnSync } from 'node:child_process';" },
 ];
 

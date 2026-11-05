@@ -31,6 +31,10 @@ diante: `PATCH` corrige, `MINOR` acrescenta sem quebrar e `MAJOR` quebra.
   `voltar` rodam como serviços de uso único, isolados (sem root, sem rede no `atualizar` e no
   `voltar`, gravação só nas pastas do executor), e um timer procura a versão nova 1 vez por dia. Os
   links da versão passam para `versoes/`, e a pasta do pacote fica só do root.
+- Regra do polkit e grupos do pacote (#92, F9, etapa 6 de 12, ADR 0046): quem está no grupo
+  `server-dashboard` pode só iniciar a troca de versão e a volta atrás, sem senha; qualquer outro pedido
+  ao systemd continua pedindo a senha do administrador. Um arquivo `sysusers.d` cria esse grupo e o
+  usuário de sistema do executor, sem login. Só valem no pacote, a partir da etapa 9.
 
 ### Corrigido
 

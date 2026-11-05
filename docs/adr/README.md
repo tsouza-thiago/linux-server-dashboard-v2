@@ -50,3 +50,4 @@ Uma ADR aceita não é editada; se a decisão mudar, uma nova ADR a substitui.
 | [0043](0043-lancador-e-modo-sistema-nos-subcomandos.md) | Lançador do pacote e o modo sistema nos subcomandos | Aceita |
 | [0044](0044-executor-atualizador-do-pacote.md) | Executor `atualizador` do pacote | Aceita |
 | [0045](0045-unidades-systemd-do-executor.md) | Unidades systemd do executor e links em `versoes/` | Aceita |
+| [0046](0046-regra-do-polkit-e-grupos-do-pacote.md) | Regra do polkit e grupos do pacote | Aceita |

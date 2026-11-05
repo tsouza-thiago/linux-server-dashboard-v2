@@ -134,7 +134,7 @@ O código em `/opt` pertence ao root. A pergunta é: quem grava a versão nova l
 4. **Feita (ADR 0044).** Executor `atualizador` em `sh` (verificar, atualizar, voltar), com ShellCheck e
    testes numa pasta temporária com tags assinadas.
 5. **Feita (ADR 0045).** Unidades systemd isoladas e o timer; conferir com `systemd-analyze security`.
-6. Regra do polkit e o grupo; teste de que outra unidade e outra ação são recusadas.
+6. **Feita (ADR 0046).** Regra do polkit e o grupo; teste de que outra unidade e outra ação são recusadas.
 7. Node baixado pelo executor, com a soma SHA-256 conferida.
 8. F7 no modo sistema: o painel usa o executor no lugar do `git checkout`.
 9. `npm run empacotar-deb` reprodutível, `SHA256SUMS` assinado e conferência no CI.

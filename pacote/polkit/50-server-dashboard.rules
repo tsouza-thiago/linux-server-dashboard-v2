@@ -1,0 +1,39 @@
+// Regra do polkit do pacote .deb (F9 etapa 6, ADR 0042 item 5 e ADR 0046).
+// No pacote: /usr/share/polkit-1/rules.d/50-server-dashboard.rules (root, 0644).
+//
+// Quem está no grupo server-dashboard pode só INICIAR (verbo start) só as unidades
+// server-dashboard-atualizar.service e server-dashboard-voltar.service, sem senha. É assim que o
+// painel, que roda sem privilégio, pede a troca de versão e a volta atrás. O pedido não leva dado
+// nenhum: o executor só instala o que ele mesmo conferiu (ADR 0044).
+//
+// Todo o resto não é tratado aqui (a função não devolve nada) e cai no padrão do polkit, que pede
+// a senha do administrador: outra ação, outra unidade (inclusive o verificar, que é do timer),
+// outro verbo (stop, restart, reload…) e quem está fora do grupo.
+//
+// Escrita em ES5 de propósito: o polkit roda as regras num motor JavaScript próprio (Duktape ou
+// SpiderMonkey, conforme a versão), e ES5 vale nos 2. O teste test/unit/polkit-e-grupo.test.js
+// avalia esta regra contra cada combinação de ação, unidade, verbo e grupo.
+polkit.addRule(function (action, subject) {
+  // Só a ação de gerenciar unidades do systemd; nenhuma outra ação do sistema.
+  if (action.id !== 'org.freedesktop.systemd1.manage-units') {
+    return;
+  }
+
+  // Só quem está no grupo do pacote. A instalação põe a pessoa no grupo (ADR 0046).
+  if (!subject.isInGroup('server-dashboard')) {
+    return;
+  }
+
+  // Só as 2 unidades que o painel inicia. O systemd manda o nome completo, com o ".service".
+  var unidade = action.lookup('unit');
+  if (unidade !== 'server-dashboard-atualizar.service' && unidade !== 'server-dashboard-voltar.service') {
+    return;
+  }
+
+  // Só iniciar. Parar ou reiniciar no meio deixaria a troca pela metade.
+  if (action.lookup('verb') !== 'start') {
+    return;
+  }
+
+  return polkit.Result.YES;
+});
