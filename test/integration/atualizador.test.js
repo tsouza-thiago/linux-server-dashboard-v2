@@ -65,9 +65,14 @@ function montar(t) {
   fs.mkdirSync(path.join(base, 'versoes', 'v2.90.0'));
   const arq = spawnSync('sh', ['-c', `git -C "${origem}" archive v2.90.0 | tar -x -C "${path.join(base, 'versoes', 'v2.90.0')}"`]);
   assert.equal(arq.status, 0);
-  fs.symlinkSync('versoes/v2.90.0', path.join(base, 'atual'));
+  // O link que o executor troca fica em versoes/; o da base é fixo, do pacote (ADR 0045).
+  fs.symlinkSync('v2.90.0', path.join(base, 'versoes', 'atual'));
+  fs.symlinkSync('versoes/atual', path.join(base, 'atual'));
   spawnSync('git', ['init', '-q', '--bare', path.join(base, 'repo.git')], { env: { ...process.env, ...ENV_GIT } });
   git(path.join(base, 'repo.git'), 'remote', 'add', 'origin', origem);
+  // A base é do pacote (root) e a unidade systemd não deixa gravar nela: aqui, só leitura.
+  fs.chmodSync(base, 0o555);
+  aoFim(t, () => fs.chmodSync(base, 0o755));
 
   // Roda pelo caminho dado (o link do teste da base) com variáveis que o executor precisa ignorar.
   const rodar = (sub, { via = path.join(base, 'libexec', 'atualizador') } = {}) => {
@@ -83,9 +88,11 @@ function montar(t) {
     return Object.fromEntries(fs.readFileSync(f, 'utf8').trim().split('\n').map((l) => [l.slice(0, l.indexOf('=')), l.slice(l.indexOf('=') + 1)]));
   };
   const link = (nome) => {
-    try { return fs.readlinkSync(path.join(base, nome)); } catch { return null; }
+    try { return fs.readlinkSync(path.join(base, 'versoes', nome)); } catch { return null; }
   };
-  return { dir, base, origem, git, publicar, rodar, estado, link };
+  /** As versões extraídas em versoes/, sem os links. */
+  const versoes = () => fs.readdirSync(path.join(base, 'versoes')).filter((n) => /^v/.test(n)).sort();
+  return { dir, base, origem, git, publicar, rodar, estado, link, versoes };
 }
 
 test('atualizador: verificar acha a assinada mais nova e grava em estado/', (t) => {
@@ -127,7 +134,7 @@ test('atualizar sem verificar é recusado e não mexe no atual', (t) => {
   const r = p.rodar('atualizar');
   assert.equal(r.codigo, 1);
   assert.match(r.texto, /nenhuma versão verificada/);
-  assert.equal(p.link('atual'), 'versoes/v2.90.0');
+  assert.equal(p.link('atual'), 'v2.90.0');
   assert.equal(p.link('anterior'), null);
 });
 
@@ -137,12 +144,14 @@ test('atualizar troca atual e anterior, sem sobra, e confere a tag de novo', (t)
   assert.equal(p.rodar('verificar').codigo, 0);
   const r = p.rodar('atualizar');
   assert.equal(r.codigo, 0, r.texto);
-  assert.equal(p.link('atual'), 'versoes/v2.91.0');
-  assert.equal(p.link('anterior'), 'versoes/v2.90.0');
+  assert.equal(p.link('atual'), 'v2.91.0');
+  assert.equal(p.link('anterior'), 'v2.90.0');
   assert.equal(fs.readFileSync(path.join(p.base, 'atual', 'server', 'cli', 'index.js'), 'utf8'), '// versão 2.91.0\n');
   // Nada temporário fica para trás (nem a versão .tmp, nem o link .novo).
-  assert.deepEqual(fs.readdirSync(path.join(p.base, 'versoes')).sort(), ['v2.90.0', 'v2.91.0']);
-  assert.ok(!fs.readdirSync(p.base).some((n) => n.endsWith('.novo')));
+  assert.deepEqual(p.versoes(), ['v2.90.0', 'v2.91.0']);
+  assert.ok(!fs.readdirSync(path.join(p.base, 'versoes')).some((n) => n.endsWith('.novo')));
+  // O link fixo da base não muda: ele segue versoes/atual.
+  assert.equal(fs.readlinkSync(path.join(p.base, 'atual')), 'versoes/atual');
   const troca = p.estado('troca');
   assert.equal(troca.de, 'v2.90.0');
   assert.equal(troca.para, 'v2.91.0');
@@ -166,7 +175,7 @@ test('atualizar recusa versão gravada que não confere com a tag', (t) => {
   const objeto = p.git(path.join(p.base, 'repo.git'), 'rev-parse', 'refs/tags/v2.92.0');
   fs.writeFileSync(arq, `versao=v2.92.0\nobjeto=${objeto}\nverificado=1\nerro=\n`);
   assert.match(p.rodar('atualizar').texto, /assinatura de v2\.92\.0 não confere/);
-  assert.equal(p.link('atual'), 'versoes/v2.90.0');
+  assert.equal(p.link('atual'), 'v2.90.0');
 });
 
 test('atualizar com extração incompleta não troca nada', (t) => {
@@ -176,8 +185,8 @@ test('atualizar com extração incompleta não troca nada', (t) => {
   const r = p.rodar('atualizar');
   assert.equal(r.codigo, 1);
   assert.match(r.texto, /incompleta/);
-  assert.equal(p.link('atual'), 'versoes/v2.90.0');
-  assert.deepEqual(fs.readdirSync(path.join(p.base, 'versoes')), ['v2.90.0']);
+  assert.equal(p.link('atual'), 'v2.90.0');
+  assert.deepEqual(p.versoes(), ['v2.90.0']);
 });
 
 test('voltar troca atual por anterior uma vez, só até 24 h depois da troca', (t) => {
@@ -188,7 +197,7 @@ test('voltar troca atual por anterior uma vez, só até 24 h depois da troca', (
   assert.equal(p.rodar('atualizar').codigo, 0);
   const r = p.rodar('voltar');
   assert.equal(r.codigo, 0, r.texto);
-  assert.equal(p.link('atual'), 'versoes/v2.90.0');
+  assert.equal(p.link('atual'), 'v2.90.0');
   assert.equal(p.link('anterior'), null);
   assert.equal(p.rodar('voltar').codigo, 1, 'um 2º voltar nunca vale');
 
@@ -203,7 +212,7 @@ test('voltar troca atual por anterior uma vez, só até 24 h depois da troca', (
   const fora = q.rodar('voltar');
   assert.equal(fora.codigo, 1);
   assert.match(fora.texto, /só vale até 24 h/);
-  assert.equal(q.link('atual'), 'versoes/v2.91.0');
+  assert.equal(q.link('atual'), 'v2.91.0');
 });
 
 test('atualizador: a pasta vem do caminho real, e a entrada é só 1 subcomando conhecido', (t) => {
@@ -224,4 +233,34 @@ test('atualizador: a pasta vem do caminho real, e a entrada é só 1 subcomando 
   fs.writeFileSync(path.join(p.base, 'estado', 'trava', 'pid'), '999999999\n');
   assert.equal(p.rodar('verificar').codigo, 0);
   assert.ok(!fs.existsSync(path.join(p.base, 'estado', 'trava')));
+});
+
+// Cada unidade systemd (pacote/systemd/, ADR 0045) só deixa gravar nas pastas do seu
+// ReadWritePaths=. Aqui as outras pastas do pacote ficam só leitura, e cada subcomando precisa
+// funcionar assim. Uma gravação nova fora da lista quebra este teste antes de quebrar o pacote.
+test('atualizador: cada subcomando grava só nas pastas que a sua unidade systemd libera', (t) => {
+  const p = montar(t);
+  p.publicar('2.91.0');
+  const pastas = ['repo.git', 'versoes', 'estado'];
+  /** Pastas (relativas à base) do ReadWritePaths= da unidade do subcomando. */
+  const liberadas = (sub) => {
+    const texto = fs.readFileSync(path.join(ROOT, 'pacote', 'systemd', `server-dashboard-${sub}.service`), 'utf8');
+    return texto.match(/^ReadWritePaths=(.*)$/m)[1].split(/\s+/).map((c) => path.relative('/opt/server-dashboard', c));
+  };
+  /** Trava (0555) ou solta (0755) todas as pastas abaixo de `raiz`, inclusive ela. */
+  const modo = (raiz, m) => {
+    for (const d of [raiz, ...fs.readdirSync(raiz, { recursive: true }).map((n) => path.join(raiz, n))]) {
+      if (fs.lstatSync(d).isDirectory()) fs.chmodSync(d, m);
+    }
+  };
+  aoFim(t, () => { for (const d of pastas) modo(path.join(p.base, d), 0o755); });
+  for (const sub of ['verificar', 'atualizar', 'voltar']) {
+    const livres = liberadas(sub);
+    assert.ok(livres.every((d) => pastas.includes(d) || d === 'node'), `${sub}: ${livres}`);
+    for (const d of pastas) modo(path.join(p.base, d), livres.includes(d) ? 0o755 : 0o555);
+    const r = p.rodar(sub);
+    assert.equal(r.codigo, 0, `${sub}: ${r.texto}`);
+  }
+  assert.equal(p.link('atual'), 'v2.90.0');
+  assert.match(p.estado('troca').voltou, /^\d+$/);
 });

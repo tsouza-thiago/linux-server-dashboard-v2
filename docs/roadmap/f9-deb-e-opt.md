@@ -9,7 +9,7 @@
   - o critério principal do desenho da atualização é a **segurança**.
 - **Decidido em 26/10/2026:** o desenho híbrido (C) está aprovado; o Node é baixado pelo
   executor (item 6); a 1ª versão atende 1 pessoa por máquina (item "Riscos").
-- **Situação:** em implementação. Etapas 1 a 4 feitas (ADR 0042 a 0044, 05/11/2026).
+- **Situação:** em implementação. Etapas 1 a 5 feitas (ADR 0042 a 0045, 05/11/2026).
 
 ## Objetivo
 
@@ -66,8 +66,8 @@ O código em `/opt` pertence ao root. A pergunta é: quem grava a versão nova l
 2. **Arquivos do executor** (usuário de sistema `_server-dashboard`, fora da lista do
    `dpkg`): `/opt/server-dashboard/repo.git` (clone sem pasta de trabalho),
    `versoes/vX.Y.Z/` (cada versão, só leitura para os outros), os links `atual` e
-   `anterior`, e `estado/` (versão disponível, log, data da última troca; leitura para
-   todos, sem segredo).
+   `anterior` (dentro de `versoes/`, ADR 0045), e `estado/` (versão disponível, log, data
+   da última troca; leitura para todos, sem segredo).
 3. **Dados de cada pessoa** (XDG, como hoje 0700/0600): `~/.config/server-dashboard/.env`
    e `~/.local/share/server-dashboard/` (`data/`, backups). O `server/config.js` ganha o
    "modo sistema", escolhido pelo lançador; `clampPathToData` passa a usar a pasta de
@@ -133,7 +133,7 @@ O código em `/opt` pertence ao root. A pergunta é: quem grava a versão nova l
 3. **Feita (ADR 0043).** Lançador `bin/dashboard` e detecção do modo nos subcomandos.
 4. **Feita (ADR 0044).** Executor `atualizador` em `sh` (verificar, atualizar, voltar), com ShellCheck e
    testes numa pasta temporária com tags assinadas.
-5. Unidades systemd isoladas e o timer; conferir com `systemd-analyze security`.
+5. **Feita (ADR 0045).** Unidades systemd isoladas e o timer; conferir com `systemd-analyze security`.
 6. Regra do polkit e o grupo; teste de que outra unidade e outra ação são recusadas.
 7. Node baixado pelo executor, com a soma SHA-256 conferida.
 8. F7 no modo sistema: o painel usa o executor no lugar do `git checkout`.

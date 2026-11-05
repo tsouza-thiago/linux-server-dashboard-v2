@@ -27,6 +27,10 @@ diante: `PATCH` corrige, `MINOR` acrescenta sem quebrar e `MAJOR` quebra.
   nova (`verificar`), instala só a que ele mesmo conferiu (`atualizar`) e desfaz a última troca por
   até 24 h (`voltar`). Ele aceita só tag assinada pelas chaves da versão instalada e com o nome
   certo, e troca a versão por links, sem meio-termo. O painel passa a usá-lo na etapa 8.
+- Unidades systemd do executor (#92, F9, etapa 5 de 12, ADR 0045): `verificar`, `atualizar` e
+  `voltar` rodam como serviços de uso único, isolados (sem root, sem rede no `atualizar` e no
+  `voltar`, gravação só nas pastas do executor), e um timer procura a versão nova 1 vez por dia. Os
+  links da versão passam para `versoes/`, e a pasta do pacote fica só do root.
 
 ### Corrigido
 
