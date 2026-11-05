@@ -345,6 +345,7 @@ navegador. O backend só coleta, persiste e serve. O limite de 1 SSH por minuto 
 ./dashboard desinstalar         # remove daqui e oferece limpar a parte deste computador no servidor
 ./dashboard versao              # versão instalada
 bin/dashboard <comando>         # lançador do pacote .deb (/usr/bin/dashboard): os mesmos comandos no modo sistema; atualizar, desinstalar e --importar-v1 ainda recusam
+libexec/atualizador verificar|atualizar|voltar  # executor do pacote (usuário _server-dashboard, nunca root): versão nova, troca e volta atrás
 npm start                       # o painel em primeiro plano (node --max-semi-space-size=2 --optimize-for-size server/index.js)
 npm run poll                    # 1 coleta, sem o servidor web (node server/poller.js --once)
 npm test                        # suíte de testes (node --test)
@@ -411,8 +412,18 @@ do sistema. A CLI acha o `.env` e o `data/` por `pastasDe(root)` (`envDe`, `data
 pasta do código que roda segue o modo; qualquer outra é um clone. No pacote, a instalação não cria o
 link nem o autocomplete pessoais (vêm do pacote), e o serviço de usuário roda pelo link `atual` com
 o sinal e as pastas XDG no `Environment=`. `atualizar`, `desinstalar`, `reconfigurar --pela-tela` e
-`instalar --importar-v1` recusam com o motivo até as etapas 4, 8 e 10; no painel, os botões
+`instalar --importar-v1` recusam com o motivo até as etapas 8 e 10; no painel, os botões
 Atualizar e Reconfigurar ficam com o bloqueio `outra-pasta`.
+
+O executor (`libexec/atualizador`, ADR 0044) é o único que grava o código em `/opt`, como o usuário
+`_server-dashboard` e nunca como root. Ele acha a pasta pelo próprio caminho real e roda com o
+ambiente limpo (`env -i`). `verificar` busca só as tags em `<base>/repo.git` e grava em
+`<base>/estado/disponivel` a versão nova aceita: assinada pelas chaves da versão `atual` (ou as de
+partida, `share/allowed_signers`) e com o nome gravado dentro da tag igual ao da ref. `atualizar`, sem
+parâmetro, instala só essa versão, se a tag não mudou e a assinatura conferir de novo: `git archive`
+em `versoes/vX.Y.Z.tmp`, rename e troca atômica dos links `anterior` e `atual`. `voltar` troca
+`atual` por `anterior` 1 vez, só até 24 h depois da troca (`estado/troca`). Em `estado/` (0644, sem
+segredo) ficam também `novidades.md`, `registro.log` e a `trava/`.
 
 ## Comando SSH de coleta
 
@@ -685,6 +696,7 @@ linux-server-dashboard-v2/
 ├── AGENTS.md · README.md · TUTORIAL.md · SECURITY.md · CONTRIBUTING.md · CHANGELOG.md · LICENSE (MIT)
 ├── dashboard               comando único: garante o Node 24 (scripts/node-runtime.sh) e chama server/cli/
 ├── bin/dashboard           lançador do pacote .deb (modo sistema, ADR 0043): Node do pacote ou do sistema, código do link atual
+├── libexec/atualizador     executor do pacote .deb (ADR 0044): verificar, atualizar e voltar, como _server-dashboard
 ├── package.json            sem dependências de runtime; devDependency: playwright-core (e2e)
 ├── .env.example            modelo do .env (sem valores reais)
 ├── .github/                workflows/: seguranca.yml (CI, ADR 0014), dependencias.yml e

@@ -9,7 +9,7 @@
   - o critério principal do desenho da atualização é a **segurança**.
 - **Decidido em 26/10/2026:** o desenho híbrido (C) está aprovado; o Node é baixado pelo
   executor (item 6); a 1ª versão atende 1 pessoa por máquina (item "Riscos").
-- **Situação:** em implementação. Etapas 1 a 3 feitas (ADR 0042 e 0043, 05/11/2026).
+- **Situação:** em implementação. Etapas 1 a 4 feitas (ADR 0042 a 0044, 05/11/2026).
 
 ## Objetivo
 
@@ -131,8 +131,8 @@ O código em `/opt` pertence ao root. A pergunta é: quem grava a versão nova l
 2. **Feita.** `server/config.js`: modo sistema (sinal `SERVER_DASHBOARD_MODO=sistema`), pastas XDG,
    `clampPathToData` pela pasta de dados.
 3. **Feita (ADR 0043).** Lançador `bin/dashboard` e detecção do modo nos subcomandos.
-4. Executor `atualizador` em `sh` (verificar, atualizar, voltar), com ShellCheck e
-   testes em contêiner.
+4. **Feita (ADR 0044).** Executor `atualizador` em `sh` (verificar, atualizar, voltar), com ShellCheck e
+   testes numa pasta temporária com tags assinadas.
 5. Unidades systemd isoladas e o timer; conferir com `systemd-analyze security`.
 6. Regra do polkit e o grupo; teste de que outra unidade e outra ação são recusadas.
 7. Node baixado pelo executor, com a soma SHA-256 conferida.

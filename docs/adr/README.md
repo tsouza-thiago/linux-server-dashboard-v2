@@ -48,3 +48,4 @@ Uma ADR aceita não é editada; se a decisão mudar, uma nova ADR a substitui.
 | [0041](0041-mutacao-repete-a-rodada-presa.md) | Mutação: a rodada presa repete 1 vez e diz qual teste prendeu | Aceita |
 | [0042](0042-modo-sistema-deb-e-executor-em-opt.md) | Modo sistema: pacote `.deb` em `/opt` e executor sem privilégio | Aceita |
 | [0043](0043-lancador-e-modo-sistema-nos-subcomandos.md) | Lançador do pacote e o modo sistema nos subcomandos | Aceita |
+| [0044](0044-executor-atualizador-do-pacote.md) | Executor `atualizador` do pacote | Aceita |

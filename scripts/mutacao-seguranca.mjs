@@ -121,6 +121,10 @@ const MUTACOES = [
   { nome: 'cancelar o assistente fora da tela', arquivo: 'server/setup/web.js', de: '  if (onCancel) {\n', para: '  if (true) {\n', testes: ['test/integration/assistente-http.test.js'] },
   { nome: 'log inteiro do --pela-tela na tela', arquivo: 'server/setup/pela-tela.js', de: "      .filter((l) => l.startsWith('✗ '))\n", para: '', testes: ['test/unit/setup-pela-tela.test.js'] },
   { nome: 'motivos do --pela-tela sem limite', arquivo: 'server/setup/pela-tela.js', de: '      .slice(0, MAX_MOTIVOS);\n', para: ';\n', testes: ['test/unit/setup-pela-tela.test.js'] },
+  { nome: 'executor aceita tag com nome trocado', arquivo: 'libexec/atualizador', de: '  [ "$(git_repo cat-file tag "refs/tags/$1" | sed -n \'s/^tag //p\' | head -n 1)" = "$1" ] || return 1\n', para: '', testes: ['test/integration/atualizador.test.js'] },
+  { nome: 'executor sem conferir a assinatura de novo', arquivo: 'libexec/atualizador', de: '  tag_confere "$nova" "$lista" || falhar', para: '  true || falhar', testes: ['test/integration/atualizador.test.js'] },
+  { nome: 'executor volta depois das 24 h', arquivo: 'libexec/atualizador', de: 'PRAZO_VOLTAR=86400', para: 'PRAZO_VOLTAR=999999999', testes: ['test/integration/atualizador.test.js'] },
+  { nome: 'executor herdando o ambiente de quem chamou', arquivo: 'libexec/atualizador', de: 'if [ "${ATUALIZADOR_AMBIENTE:-}" != limpo ]; then', para: 'if false; then', testes: ['test/integration/atualizador.test.js'] },
   { nome: 'exec com shell importado', arquivo: 'server/cli/servico.js', de: "import { spawn, spawnSync } from 'node:child_process';", para: "import { exec, spawn, spawnSync } from 'node:child_process';" },
 ];
 

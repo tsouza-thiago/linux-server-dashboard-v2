@@ -23,6 +23,10 @@ diante: `PATCH` corrige, `MINOR` acrescenta sem quebrar e `MAJOR` quebra.
   do sistema. Nesse modo, os comandos leem e gravam o `.env` e o `data/` nas pastas pessoais, e o
   serviço de usuário e o atalho apontam para o pacote. `atualizar`, `desinstalar` e a importação da
   V1 ainda recusam no pacote, com o motivo. A instalação por `git clone` não muda.
+- Executor do pacote (#92, F9, etapa 4 de 12, ADR 0044): o `libexec/atualizador` procura a versão
+  nova (`verificar`), instala só a que ele mesmo conferiu (`atualizar`) e desfaz a última troca por
+  até 24 h (`voltar`). Ele aceita só tag assinada pelas chaves da versão instalada e com o nome
+  certo, e troca a versão por links, sem meio-termo. O painel passa a usá-lo na etapa 8.
 
 ### Corrigido
 
