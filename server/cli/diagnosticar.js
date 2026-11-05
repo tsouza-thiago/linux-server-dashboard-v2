@@ -5,7 +5,7 @@
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import { clampInt, loadEnvFile, isPlaceholderHost, sanitizeToken, sshAccess, sshConfigFile } from '../config.js';
+import { clampInt, dataDe, envDe, loadEnvFile, isPlaceholderHost, pastasDe, sanitizeToken, sshAccess, sshConfigFile } from '../config.js';
 import { listDays, readNdjson } from '../storage/ndjson.js';
 import { collect, runSSH } from '../collector/index.js';
 import { normalizeTargets } from '../collector/builder.js';
@@ -19,7 +19,7 @@ const comma = (n, d = 1) => n.toFixed(d).replace('.', ',');
 
 /** Última amostra gravada em data/history/ (ou null). */
 export function latestSample(root) {
-  const dir = path.join(root, 'data', 'history');
+  const dir = path.join(dataDe(root), 'history');
   const days = listDays(dir);
   for (let i = days.length - 1; i >= 0; i -= 1) {
     const { items } = readNdjson(path.join(dir, `${days[i]}.ndjson`));
@@ -36,8 +36,8 @@ function mode(file) {
 /** Arquivos que precisam ser só do dono, com a permissão esperada. */
 export function permissionProblems(root, keyFile) {
   const want = [
-    [path.join(root, '.env'), 0o600], [path.join(root, 'data'), 0o700], [path.join(root, 'data', 'ssh'), 0o700],
-    [path.join(root, 'data', 'ssh', 'config'), 0o600], [path.join(root, 'data', 'ssh', 'known_hosts'), 0o600],
+    [envDe(root), 0o600], [dataDe(root), 0o700], [path.join(dataDe(root), 'ssh'), 0o700],
+    [path.join(dataDe(root), 'ssh', 'config'), 0o600], [path.join(dataDe(root), 'ssh', 'known_hosts'), 0o600],
     ...(keyFile ? [[keyFile, 0o600]] : []),
   ];
   // Só reclama do que está aberto para grupo/outros e diferente do esperado.
@@ -48,7 +48,7 @@ export function permissionProblems(root, keyFile) {
 /** Caminho da chave do painel, lido do `IdentityFile` do data/ssh/config (null sem ele). */
 export function keyFileFromConfig(root) {
   try {
-    const m = /^\s*IdentityFile\s+"?([^"\n]+)"?/m.exec(fs.readFileSync(path.join(root, 'data', 'ssh', 'config'), 'utf8'));
+    const m = /^\s*IdentityFile\s+"?([^"\n]+)"?/m.exec(fs.readFileSync(path.join(dataDe(root), 'ssh', 'config'), 'utf8'));
     return m ? m[1].trim() : null;
   } catch {
     return null;
@@ -62,7 +62,7 @@ export function keyFileFromConfig(root) {
  * coleta de teste conecta exatamente como o painel conectaria.
  */
 export function sshSettings(env, root) {
-  return { access: sshAccess(env.SSH_ACESSO), configFile: sshConfigFile(env.SSH_CONFIG, root) };
+  return { access: sshAccess(env.SSH_ACESSO), configFile: sshConfigFile(env.SSH_CONFIG, pastasDe(root).dados) };
 }
 
 /** Alvos do .env desta pasta (os mesmos que o painel usa). */
@@ -105,6 +105,9 @@ function conferirAutocomplete({ out, root, home, env, cmd, pacotes }) {
  * Link criado que só vale no próximo login também não: a instalação já explicou.
  */
 function conferirComando({ out, warn, root, home, env, pacotes }) {
+  // No pacote .deb, o comando e o autocomplete são do pacote (/usr/bin, /usr/share): não há
+  // link pessoal para conferir (ADR 0043).
+  if (pastasDe(root).modo === 'sistema') return;
   const c = situacaoDoComando({ root, home, env, pacotes });
   const cmd = comandoDashboard({ root, env });
   if (c.estado === 'este') conferirAutocomplete({ out, root, home, env, cmd, pacotes });
@@ -140,7 +143,7 @@ export async function diagnosticar({ out, root, home = os.homedir(), deps = {} }
   const fail = (t, d) => { errors += 1; out.fail(t, d); };
   out.title('Server Dashboard · diagnóstico');
 
-  const env = loadEnvFile(path.join(root, '.env'));
+  const env = loadEnvFile(envDe(root));
   if (!env.SSH_HOST || isPlaceholderHost(env.SSH_HOST)) {
     fail('ainda não instalado');
     out.explain('não há servidor configurado nesta pasta.', `rode ${out.cmd} instalar.`);
@@ -161,7 +164,7 @@ export async function diagnosticar({ out, root, home = os.homedir(), deps = {} }
   const perms = permissionProblems(root, keyFile);
   if (!perms.length) out.ok('permissões dos arquivos corretas', '700 / 600');
   else {
-    fail('arquivos com permissão aberta demais', perms.map((p) => `${path.relative(root, p.file) || p.file} ${p.got}`).join(', '));
+    fail('arquivos com permissão aberta demais', perms.map((p) => `${pastasDe(root).modo === 'sistema' ? p.file : path.relative(root, p.file) || p.file} ${p.got}`).join(', '));
     out.explain('outros usuários desta máquina poderiam ler a configuração ou a chave.', `rode: ${perms.map((p) => `chmod ${p.want} "${p.file}"`).join('; ')}`);
   }
 

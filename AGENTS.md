@@ -344,6 +344,7 @@ navegador. O backend só coleta, persiste e serve. O limite de 1 SSH por minuto 
 ./dashboard atualizar --terminal  # tudo no terminal: tag assinada mais nova, backup de data/, volta atrás se falhar
 ./dashboard desinstalar         # remove daqui e oferece limpar a parte deste computador no servidor
 ./dashboard versao              # versão instalada
+bin/dashboard <comando>         # lançador do pacote .deb (/usr/bin/dashboard): os mesmos comandos no modo sistema; atualizar, desinstalar e --importar-v1 ainda recusam
 npm start                       # o painel em primeiro plano (node --max-semi-space-size=2 --optimize-for-size server/index.js)
 npm run poll                    # 1 coleta, sem o servidor web (node server/poller.js --once)
 npm test                        # suíte de testes (node --test)
@@ -403,6 +404,15 @@ o `.env` fica em `~/.config/server-dashboard/` e o `data/` em `~/.local/share/se
 (seguem `XDG_CONFIG_HOME` e `XDG_DATA_HOME`; valor relativo é ignorado), com 0700/0600. Os caminhos
 de dados ficam presos no `data/` dessa pasta, nunca no código em `/opt`. Sem a variável, tudo segue
 na pasta do projeto, como sempre (modo clone).
+
+O lançador (`bin/dashboard`, ADR 0043) acha a pasta do pacote pelo próprio caminho real, nunca pelo
+ambiente, e roda o código do link `atual` com o Node de `<base>/node/bin/node` ou, sem ele, o Node 24
+do sistema. A CLI acha o `.env` e o `data/` por `pastasDe(root)` (`envDe`, `dataDe`, `backupsDe`): a
+pasta do código que roda segue o modo; qualquer outra é um clone. No pacote, a instalação não cria o
+link nem o autocomplete pessoais (vêm do pacote), e o serviço de usuário roda pelo link `atual` com
+o sinal e as pastas XDG no `Environment=`. `atualizar`, `desinstalar`, `reconfigurar --pela-tela` e
+`instalar --importar-v1` recusam com o motivo até as etapas 4, 8 e 10; no painel, os botões
+Atualizar e Reconfigurar ficam com o bloqueio `outra-pasta`.
 
 ## Comando SSH de coleta
 
@@ -542,6 +552,10 @@ modo sistema, `.env` e `data/` ficam nas pastas XDG (veja [Configuração](#conf
 | `.backups/` | Cópias de `data/` feitas pelo `atualizar` (as 3 mais novas, 0700) |
 | `.atualizacao/` | `ultima.log`, `estado.json`, `trava.pid` e `pre.json` (liberação do `--pre`, ADR 0032) da atualização pelo painel (0700, fora do git). Fica fora de `data/` porque a volta atrás apaga `data/` (ADR 0031) |
 
+No pacote `.deb` (modo sistema, ADR 0043), `data/` e `.backups/` ficam em
+`~/.local/share/server-dashboard/` e o `.env` em `~/.config/server-dashboard/`, com as mesmas
+permissões; nada é gravado na pasta do código em `/opt`.
+
 No navegador, o `localStorage` guarda só conveniências: o tema, a versão nova dispensada e as
 contagens de pastas, discos, SMART e serviços para o esqueleto (`dash_formato`, ADR 0033), sem nomes.
 
@@ -670,6 +684,7 @@ codificação gera lixo na carga). A meta antiga de 80 MB não é alcançável a
 linux-server-dashboard-v2/
 ├── AGENTS.md · README.md · TUTORIAL.md · SECURITY.md · CONTRIBUTING.md · CHANGELOG.md · LICENSE (MIT)
 ├── dashboard               comando único: garante o Node 24 (scripts/node-runtime.sh) e chama server/cli/
+├── bin/dashboard           lançador do pacote .deb (modo sistema, ADR 0043): Node do pacote ou do sistema, código do link atual
 ├── package.json            sem dependências de runtime; devDependency: playwright-core (e2e)
 ├── .env.example            modelo do .env (sem valores reais)
 ├── .github/                workflows/: seguranca.yml (CI, ADR 0014), dependencias.yml e

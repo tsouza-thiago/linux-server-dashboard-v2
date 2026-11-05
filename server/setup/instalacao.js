@@ -10,7 +10,7 @@ import { spawnSync } from 'node:child_process';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import { alertThresholds, loadEnvFile } from '../config.js';
+import { alertThresholds, dataDe, envDe, loadEnvFile } from '../config.js';
 import { collect as collectV2, runSSH } from '../collector/index.js';
 import { normalizeTargets } from '../collector/builder.js';
 import { SSH_ALIAS, validHost, validIp, validPort, validUser } from './acesso.js';
@@ -53,7 +53,7 @@ const fail = (msg, opts) => { throw new InstallError(msg, opts); };
 /** Endereço e porta atuais do data/ssh/config (para o reconfigurar já vir preenchido). */
 export function currentServer(root) {
   try {
-    const text = fs.readFileSync(path.join(root, 'data', 'ssh', 'config'), 'utf8');
+    const text = fs.readFileSync(path.join(dataDe(root), 'ssh', 'config'), 'utf8');
     const host = (/^\s*HostName\s+(\S+)/m.exec(text) || [])[1] || '';
     const port = Number((/^\s*Port\s+(\d+)/m.exec(text) || [])[1] || 22);
     return validHost(host) ? { host, port } : null;
@@ -123,7 +123,7 @@ export class Instalacao {
     const chave = this.acesso.modo === 'chave' ? { identityFile: this.acesso.identityFile, identityAgent: this.acesso.identityAgent } : {};
     return {
       host: this.servidor.host, port: this.servidor.port, user: this.servidor.user, password: this.#senhaSsh, ...chave,
-      knownHosts: path.join(this.root, 'data', 'ssh', 'known_hosts'), hostKeyType: this.identidade?.type,
+      knownHosts: path.join(dataDe(this.root), 'ssh', 'known_hosts'), hostKeyType: this.identidade?.type,
     };
   }
 
@@ -136,7 +136,7 @@ export class Instalacao {
       return !r.error;
     };
     const ver = this.deps.versionStatus();
-    const env = loadEnvFile(path.join(this.root, '.env'));
+    const env = loadEnvFile(envDe(this.root));
     return {
       versao: { ok: ver.ok, texto: ver.ok ? `versão ${ver.tag} assinada` : describeVersion(ver) },
       node: { ok: Number(process.versions.node.split('.')[0]) >= 24, texto: `Node.js ${process.versions.node.split('.')[0]} pronto` },
@@ -220,7 +220,7 @@ export class Instalacao {
   /** Essa identidade já está no known_hosts do painel? (reconfigurar o mesmo servidor) */
   #identidadeConhecida(k) {
     try {
-      return fs.readFileSync(path.join(this.root, 'data', 'ssh', 'known_hosts'), 'utf8').includes(`${k.type} ${k.key}`);
+      return fs.readFileSync(path.join(dataDe(this.root), 'ssh', 'known_hosts'), 'utf8').includes(`${k.type} ${k.key}`);
     } catch {
       return false;
     }
@@ -266,7 +266,7 @@ export class Instalacao {
     const rec = recommendedChoices(det);
     // Limiares do .env (reconfigurar) com as faixas do painel: valor que o painel recusaria
     // vira o padrão aqui também, em vez de travar o passo 4 com "fora da faixa".
-    const env = loadEnvFile(path.join(this.root, '.env'));
+    const env = loadEnvFile(envDe(this.root));
     const { diskPct, ramPct, tempC } = alertThresholds((k) => env[k] ?? '');
     this.limiares = { diskPct, ramPct, tempC };
     this.escolhas = { ...rec };
@@ -421,7 +421,7 @@ export class Instalacao {
   /** Uma coleta de verdade com o usuário do painel, como vai ser todo minuto. */
   async testarColeta({ smart = false } = {}) {
     const t = this.#configurarLocal();
-    const configFile = path.join(this.root, 'data', 'ssh', 'config');
+    const configFile = path.join(dataDe(this.root), 'ssh', 'config');
     const targets = smart ? t : { ...t, smartDevs: [] };
     const res = await this.deps.collect({
       host: SSH_ALIAS, targets, access: 'restrito',
@@ -574,7 +574,7 @@ export class Instalacao {
       if (!r.ok) return { ok: false, erro: r.error, servico };
     }
     const port = panelPort(this.root);
-    const code = createLoginCode(path.join(this.root, 'data'));
+    const code = createLoginCode(dataDe(this.root));
     return { ok: true, servico, url: `http://127.0.0.1:${port}/entrar?codigo=${code}` };
   }
 }

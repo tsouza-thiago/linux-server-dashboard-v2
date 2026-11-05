@@ -71,6 +71,40 @@ export const DATA_ROOT = PASTAS.dados;
 export const ENV_FILE = path.join(PASTAS.config, '.env');
 
 /**
+ * As pastas da instalação cujo código está em `root` (ADR 0043). A CLI e a instalação recebem
+ * a pasta do código e, a partir dela, acham o .env e o data/:
+ *   - a instalação que roda agora (root = ROOT) segue o modo do lançador (PASTAS);
+ *   - qualquer outra pasta (a de um teste, a da V1 a importar) é um clone, com o .env e o
+ *     data/ dentro dela, como sempre foi.
+ * Assim o modo clone fica igual, e o modo sistema nunca grava na pasta do código (/opt).
+ * `raiz` e `pastas` existem para os testes simularem o modo sistema sem trocar de processo.
+ */
+export function pastasDe(root, { raiz = ROOT, pastas = PASTAS } = {}) {
+  if (path.resolve(root) === path.resolve(raiz)) return pastas;
+  return { modo: 'clone', codigo: root, config: root, dados: root };
+}
+/** O .env da instalação de `root`. */
+export const envDe = (root, opcoes) => path.join(pastasDe(root, opcoes).config, '.env');
+/** A pasta data/ da instalação de `root`. */
+export const dataDe = (root, opcoes) => path.join(pastasDe(root, opcoes).dados, 'data');
+/** A pasta das cópias de data/ (.backups/) da instalação de `root`. */
+export const backupsDe = (root, opcoes) => path.join(pastasDe(root, opcoes).dados, '.backups');
+
+/** Onde o pacote .deb fica, se o código não estiver no layout dele (ADR 0042, item 1). */
+export const PASTA_DO_PACOTE = '/opt/server-dashboard';
+
+/**
+ * Os caminhos fixos do pacote para o código em `codigo` (<base>/versoes/vX.Y.Z): o link
+ * `atual` (o que o serviço de usuário roda, para valer a versão nova depois da troca) e o
+ * lançador. Fora desse layout, usa o /opt/server-dashboard do pacote.
+ */
+export function caminhosDoPacote(codigo = ROOT) {
+  const versoes = path.dirname(path.resolve(codigo));
+  const base = path.basename(versoes) === 'versoes' ? path.dirname(versoes) : PASTA_DO_PACOTE;
+  return { base, atual: path.join(base, 'atual'), lancador: path.join(base, 'bin', 'dashboard') };
+}
+
+/**
  * Cria as pastas pessoais do modo sistema com 0700 (as de hoje: AGENTS, "Permissões") e
  * fecha as que já existem abertas. Só mexe nas pastas do painel, nunca nas pastas XDG de
  * cima (~/.config, ~/.local/share), que são da pessoa. No modo clone não faz nada: lá a

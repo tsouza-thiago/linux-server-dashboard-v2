@@ -12,6 +12,7 @@ import { safeEqual } from '../http/session.js';
 import { hostCheck, csrfCheck, securityHeaders, issueCsrfCookie, makeRateLimit, parseCookies } from '../security.js';
 import { InstallError, STEPS } from './instalacao.js';
 import { createLoginCode } from '../http/entrar.js';
+import { dataDe } from '../config.js';
 
 const PUBLIC = path.join(path.dirname(fileURLToPath(import.meta.url)), '..', '..', 'public');
 // Cookie da sessão do assistente; validade do código (30 min) e tentativas erradas (20).
@@ -165,7 +166,7 @@ export function createWizardApp({ inst, code, codeHash = null, onFinish = () => 
     try {
       const prefs = inst.concluir({ iniciarComComputador: req.body?.iniciarComComputador !== false, atalho: req.body?.atalho !== false, link: req.body?.link !== false, editarProfile: req.body?.editarProfile === true, editarBashrc: req.body?.editarBashrc === true });
       // Link de entrada criado antes de fechar: o painel o aceita assim que subir.
-      const codigo = createLoginCode(path.join(inst.root, 'data'), { ttlMs: 10 * 60 * 1000 });
+      const codigo = createLoginCode(dataDe(inst.root), { ttlMs: 10 * 60 * 1000 });
       res.on('finish', () => onFinish(prefs));
       res.json({ ok: true, url: `/entrar?codigo=${codigo}` });
     } catch (err) {
