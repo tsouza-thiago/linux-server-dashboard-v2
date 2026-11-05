@@ -9,6 +9,12 @@ diante: `PATCH` corrige, `MINOR` acrescenta sem quebrar e `MAJOR` quebra.
 
 ## [Não publicado]
 
+### Adicionado
+
+- ADR 0042 (#92, F9, etapa 1 de 12): o modo sistema, com o pacote `.deb` em `/opt`. Depois da
+  instalação, nada roda como root: um usuário de sistema sem login grava a versão nova, e a pessoa só
+  pede a troca pelo polkit. Só a decisão; o código vem nas próximas etapas.
+
 ### Corrigido
 
 - Mutação dos guardas: a rodada que travava ao acaso (#148). A causa estava na limpeza dos testes do
