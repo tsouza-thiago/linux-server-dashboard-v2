@@ -9,7 +9,7 @@
   - o critério principal do desenho da atualização é a **segurança**.
 - **Decidido em 26/10/2026:** o desenho híbrido (C) está aprovado; o Node é baixado pelo
   executor (item 6); a 1ª versão atende 1 pessoa por máquina (item "Riscos").
-- **Situação:** em implementação. Etapas 1 a 5 feitas (ADR 0042 a 0045, 05/11/2026).
+- **Situação:** em implementação. Etapas 1 a 8 feitas (ADR 0042 a 0048, 05/11/2026).
 
 ## Objetivo
 
@@ -136,7 +136,7 @@ O código em `/opt` pertence ao root. A pergunta é: quem grava a versão nova l
 5. **Feita (ADR 0045).** Unidades systemd isoladas e o timer; conferir com `systemd-analyze security`.
 6. **Feita (ADR 0046).** Regra do polkit e o grupo; teste de que outra unidade e outra ação são recusadas.
 7. **Feita (ADR 0047).** Node baixado pelo executor, com a soma SHA-256 conferida.
-8. F7 no modo sistema: o painel usa o executor no lugar do `git checkout`.
+8. **Feita (ADR 0048).** F7 no modo sistema: o painel usa o executor no lugar do `git checkout`.
 9. `npm run empacotar-deb` reprodutível, `SHA256SUMS` assinado e conferência no CI.
 10. `--importar-pasta`, `desinstalar` e `apt purge`.
 11. `scripts/e2e-instalacao/`: instalar o `.deb`, atualizar, voltar, desinstalar, em

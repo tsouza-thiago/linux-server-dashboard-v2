@@ -345,7 +345,7 @@ navegador. O backend só coleta, persiste e serve. O limite de 1 SSH por minuto 
 ./dashboard atualizar --terminal  # tudo no terminal: tag assinada mais nova, backup de data/, volta atrás se falhar
 ./dashboard desinstalar         # remove daqui e oferece limpar a parte deste computador no servidor
 ./dashboard versao              # versão instalada
-bin/dashboard <comando>         # lançador do pacote .deb (/usr/bin/dashboard): os mesmos comandos no modo sistema; atualizar, desinstalar e --importar-v1 ainda recusam
+bin/dashboard <comando>         # lançador do pacote .deb (/usr/bin/dashboard): os mesmos comandos no modo sistema; desinstalar e --importar-v1 ainda recusam
 libexec/atualizador verificar|atualizar|voltar  # executor do pacote (usuário _server-dashboard, nunca root): versão nova, troca e volta atrás
 npm start                       # o painel em primeiro plano (node --max-semi-space-size=2 --optimize-for-size server/index.js)
 npm run poll                    # 1 coleta, sem o servidor web (node server/poller.js --once)
@@ -412,9 +412,19 @@ ambiente, e roda o código do link `atual` com o Node de `<base>/node/bin/node` 
 do sistema. A CLI acha o `.env` e o `data/` por `pastasDe(root)` (`envDe`, `dataDe`, `backupsDe`): a
 pasta do código que roda segue o modo; qualquer outra é um clone. No pacote, a instalação não cria o
 link nem o autocomplete pessoais (vêm do pacote), e o serviço de usuário roda pelo link `atual` com
-o sinal e as pastas XDG no `Environment=`. `atualizar`, `desinstalar`, `reconfigurar --pela-tela` e
-`instalar --importar-v1` recusam com o motivo até as etapas 8 e 10; no painel, os botões
-Atualizar e Reconfigurar ficam com o bloqueio `outra-pasta`.
+o sinal e as pastas XDG no `Environment=`. `desinstalar` e `instalar --importar-v1` recusam com o
+motivo até a etapa 10.
+
+No pacote, a troca de versão usa o executor (ADR 0048): o painel lê `<base>/estado/disponivel` e o
+`novidades.md` de hora em hora, sem git e sem rede. O `dashboard atualizar` (pelo terminal ou pelo
+botão, com o mesmo registro da F7) para o painel, copia o `data/` da pessoa, pede
+`systemctl --no-ask-password start server-dashboard-atualizar.service` (nome fixo, sem parâmetro) e
+confere o link `versoes/atual`. A versão do link liga o painel pelo lançador; se ele não responder,
+pede `server-dashboard-voltar.service` e devolve os dados da cópia. As linhas novas do
+`estado/registro.log` entram no log da troca com o prefixo `executor:`. O `--pre` é recusado no pacote.
+O disparo pela tela roda o lançador do pacote com as pastas XDG em `--setenv`, e o serviço de usuário
+usa o link `<base>/node/bin/node`. O `reconfigurar --pela-tela` também funciona no pacote: lá, o
+bloqueio `outra-pasta` só vem sem o `.env` da pessoa, e não há `sem-assinatura`.
 
 O executor (`libexec/atualizador`, ADR 0044) é o único que grava o código em `/opt`, como o usuário
 `_server-dashboard` e nunca como root. Ele acha a pasta pelo próprio caminho real e roda com o
@@ -589,7 +599,7 @@ modo sistema, `.env` e `data/` ficam nas pastas XDG (veja [Configuração](#conf
 | `data/dashboard.pid`, `data/dashboard-erros.log` | Modo segundo plano (sem systemd): PID e erros de inicialização |
 | `.runtime/node/` | Node 24 baixado pelo `./dashboard`, se o do sistema faltar |
 | `.backups/` | Cópias de `data/` feitas pelo `atualizar` (as 3 mais novas, 0700) |
-| `.atualizacao/` | `ultima.log`, `estado.json`, `trava.pid` e `pre.json` (liberação do `--pre`, ADR 0032) da atualização pelo painel (0700, fora do git). Fica fora de `data/` porque a volta atrás apaga `data/` (ADR 0031) |
+| `.atualizacao/` | `ultima.log`, `estado.json`, `trava.pid` e `pre.json` (liberação do `--pre`, ADR 0032) da atualização pelo painel (0700, fora do git). Fica fora de `data/` porque a volta atrás apaga `data/` (ADR 0031). No pacote, fica na pasta de dados XDG (ADR 0048) |
 
 No pacote `.deb` (modo sistema, ADR 0043), `data/` e `.backups/` ficam em
 `~/.local/share/server-dashboard/` e o `.env` em `~/.config/server-dashboard/`, com as mesmas
@@ -758,7 +768,8 @@ linux-server-dashboard-v2/
 │   ├── storage/            ndjson (72 h), rollup (5 min/90 d), buckets, migrate-v1, outages,
 │   │                       coverage (tempo medido), index
 │   ├── atualizacao/        index (agenda e estado), procurar (processo à parte), novidades,
-│   │                       registro (.atualizacao/), executor (fora do serviço)
+│   │                       registro (.atualizacao/), executor (fora do serviço),
+│   │                       pacote (estado/ e unidades do executor do .deb)
 │   └── alerts/             rules, health, engine
 ├── public/
 │   ├── index.html          casca das 8 telas, login e avisos

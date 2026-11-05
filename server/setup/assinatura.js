@@ -9,7 +9,7 @@ import path from 'node:path';
 export const SIGNERS = (root) => path.join(root, 'docs', 'allowed_signers');
 // Nomes de versão aceitos: v2.X.Y e as pré-versões. Uma V3 (MAJOR) exige mudar este padrão
 // numa versão 2.x antes, para quem está na V2 conseguir atualizar.
-const RELEASE_TAG = /^v2\.\d+\.\d+(-(alpha|beta|rc)\.\d+)?$/;
+export const RELEASE_TAG = /^v2\.\d+\.\d+(-(alpha|beta|rc)\.\d+)?$/;
 
 /** Roda o git na pasta (argumentos em lista); sem git instalado, status -1. */
 function git(root, args, run = spawnSync) {

@@ -77,14 +77,16 @@ test('lançador: liga o modo sistema e lê o .env da pasta XDG da pessoa', (t) =
   assert.equal(r.status, 3);
 });
 
-test('lançador: atualizar e desinstalar recusam no pacote, sem mexer em nada', (t) => {
+test('lançador: desinstalar recusa no pacote; atualizar sem instalação para antes de tudo', (t) => {
   const p = montarPacote(t);
-  for (const [cmd, texto] of [['atualizar', /a troca de versão pelo pacote ainda não está pronta/], ['desinstalar', /o desinstalar ainda não funciona no pacote/]]) {
-    const r = rodar(p, [cmd]);
-    assert.equal(r.status, 1, cmd);
-    assert.match(r.stdout, texto);
-    assert.match(r.stdout, /você instalou o painel pelo pacote \.deb/);
-  }
+  let r = rodar(p, ['desinstalar']);
+  assert.equal(r.status, 1);
+  assert.match(r.stdout, /o desinstalar ainda não funciona no pacote/);
+  assert.match(r.stdout, /você instalou o painel pelo pacote \.deb/);
+  // O atualizar funciona no pacote (etapa 8, ADR 0048), mas só com o .env da pessoa.
+  r = rodar(p, ['atualizar', '--terminal']);
+  assert.equal(r.status, 1);
+  assert.match(r.stdout, /esta pasta não é uma instalação do painel/);
   assert.deepEqual(fs.readdirSync(p.home), [], 'nenhuma pasta criada');
 });
 

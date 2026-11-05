@@ -52,3 +52,4 @@ Uma ADR aceita não é editada; se a decisão mudar, uma nova ADR a substitui.
 | [0045](0045-unidades-systemd-do-executor.md) | Unidades systemd do executor e links em `versoes/` | Aceita |
 | [0046](0046-regra-do-polkit-e-grupos-do-pacote.md) | Regra do polkit e grupos do pacote | Aceita |
 | [0047](0047-rede-do-atualizar-para-o-node.md) | Node baixado pelo executor e rede do `atualizar` | Aceita |
+| [0048](0048-painel-usa-o-executor-do-pacote.md) | O painel usa o executor do pacote para trocar de versão | Aceita |

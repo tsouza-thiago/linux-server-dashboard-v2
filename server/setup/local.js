@@ -169,9 +169,15 @@ export function ensureToken(root) {
 const unitEscape = (s) => String(s).replace(/%/g, '%%');
 const unitQuote = (s) => `"${unitEscape(s).replace(/\\/g, '\\\\').replace(/"/g, '\\"')}"`;
 
-/** Node usado pelo serviço: o da pasta (.runtime) se existir, senão o que roda agora. */
-export function serviceNode(root, current = process.execPath) {
-  const local = path.join(root, '.runtime', 'node', 'bin', 'node');
+/**
+ * Node usado pelo serviço: o da pasta (.runtime) se existir, senão o que roda agora. No pacote .deb,
+ * o do link `<base>/node/bin` (ADR 0047): o `process.execPath` é o caminho real, numa pasta do Node
+ * que o executor apaga depois de 2 trocas, e o serviço pararia de subir (ADR 0048).
+ */
+export function serviceNode(root, current = process.execPath, pastas = pastasDe(root)) {
+  const local = pastas.modo === 'sistema'
+    ? path.join(caminhosDoPacote(root).base, 'node', 'bin', 'node')
+    : path.join(root, '.runtime', 'node', 'bin', 'node');
   return fs.existsSync(local) ? local : current;
 }
 

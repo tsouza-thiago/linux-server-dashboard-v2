@@ -39,6 +39,11 @@ diante: `PATCH` corrige, `MINOR` acrescenta sem quebrar e `MAJOR` quebra.
   o Node que a versão nova pede e confere a soma SHA-256 fixada nela, que veio na tag assinada. Soma
   errada, download cortado ou máquina sem Node oficial: a troca não acontece. O Node certo já presente
   não é baixado de novo. A unidade `atualizar` passa a ter rede só para isso.
+- Atualizar pelo pacote (#92, F9, etapa 8 de 12, ADR 0048): no pacote, o painel lê a versão nova que
+  o executor achou, sem git e sem rede. O botão Atualizar e o `dashboard atualizar` copiam os seus
+  dados, pedem a troca ao executor, ligam a versão nova e, se ela não responder, voltam para a anterior
+  com os dados da cópia. O registro do executor aparece junto na tela de progresso. O Reconfigurar
+  pela tela também passa a funcionar no pacote. O `--pre` fica de fora no pacote.
 
 ### Corrigido
 
