@@ -52,11 +52,18 @@ function repo(t, v = 'v2.90.0-rc.1') {
   return { dir, r, git };
 }
 
-/** Roda o script com um umask e um fuso; devolve o código e o texto. */
-function empacotar(args, { umask = '022', tz = 'UTC' } = {}) {
-  const x = spawnSync('sh', ['-c', `umask ${umask}; exec "$0" "$@"`, process.execPath, SCRIPT, ...args],
-    { encoding: 'utf8', env: { ...process.env, TZ: tz } });
-  return { codigo: x.status, texto: `${x.stdout}${x.stderr}` };
+/**
+ * Roda o script com um umask e um fuso; devolve o código e o texto. Sem shell: o umask vale para
+ * este processo só durante a chamada e passa ao filho, e os argumentos vão em lista.
+ */
+function empacotar(args, { umask = 0o022, tz = 'UTC' } = {}) {
+  const antes = process.umask(umask);
+  try {
+    const x = spawnSync(process.execPath, [SCRIPT, ...args], { encoding: 'utf8', env: { ...process.env, TZ: tz } });
+    return { codigo: x.status, texto: `${x.stdout}${x.stderr}` };
+  } finally {
+    process.umask(antes);
+  }
 }
 
 const sha256 = (f) => crypto.createHash('sha256').update(fs.readFileSync(f)).digest('hex');
@@ -67,7 +74,7 @@ test('empacotar-deb: a mesma tag dá os mesmos bytes, com qualquer umask e fuso'
   assert.equal(a.codigo, 0, a.texto);
   // Mudança na pasta de trabalho sem commit não entra no pacote: tudo sai da ref.
   fs.appendFileSync(path.join(r, 'bin', 'dashboard'), '# fora do commit\n');
-  const b = empacotar(['--repo', r, '--ref', 'v2.90.0-rc.1', '--saida', path.join(dir, 'b')], { umask: '077', tz: 'America/Sao_Paulo' });
+  const b = empacotar(['--repo', r, '--ref', 'v2.90.0-rc.1', '--saida', path.join(dir, 'b')], { umask: 0o077, tz: 'America/Sao_Paulo' });
   assert.equal(b.codigo, 0, b.texto);
   const nome = 'server-dashboard_2.90.0~rc.1_all.deb';
   assert.equal(sha256(path.join(dir, 'a', nome)), sha256(path.join(dir, 'b', nome)));
