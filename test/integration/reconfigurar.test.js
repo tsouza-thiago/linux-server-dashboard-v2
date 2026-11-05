@@ -141,6 +141,8 @@ test('bloqueios: a conferência olha a instalação, a assinatura e não os arqu
   const git = (tags) => (cmd, args) => {
     if (args.includes('rev-parse')) return { status: 0, stdout: 'true\n', stderr: '' };
     if (args.includes('--points-at')) return { status: 0, stdout: tags, stderr: '' };
+    // O objeto tag guarda o próprio nome (#155): o falso devolve o nome da ref pedida.
+    if (args.includes('cat-file')) return { status: 0, stdout: `type commit\ntag ${args.at(-1).replace('refs/tags/', '')}\n`, stderr: '' };
     return { status: 0, stdout: '', stderr: '' };
   };
   assert.equal(bloqueioDaReconfiguracao(pasta, home, git('')), 'outra-pasta', 'sem .env');

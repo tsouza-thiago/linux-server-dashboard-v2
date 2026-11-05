@@ -122,6 +122,7 @@ const MUTACOES = [
   { nome: 'log inteiro do --pela-tela na tela', arquivo: 'server/setup/pela-tela.js', de: "      .filter((l) => l.startsWith('✗ '))\n", para: '', testes: ['test/unit/setup-pela-tela.test.js'] },
   { nome: 'motivos do --pela-tela sem limite', arquivo: 'server/setup/pela-tela.js', de: '      .slice(0, MAX_MOTIVOS);\n', para: ';\n', testes: ['test/unit/setup-pela-tela.test.js'] },
   { nome: 'executor aceita tag com nome trocado', arquivo: 'libexec/atualizador', de: '  [ "$(git_repo cat-file tag "refs/tags/$1" | sed -n \'s/^tag //p\' | head -n 1)" = "$1" ] || return 1\n', para: '', testes: ['test/integration/atualizador.test.js'] },
+  { nome: 'modo clone aceita tag com nome trocado', arquivo: 'server/setup/assinatura.js', de: "    if (obj.status !== 0 || nome !== tag) return { ok: false, reason: 'nome-trocado', tag };\n", para: '', testes: ['test/integration/assinatura.test.js'] },
   { nome: 'executor sem conferir a assinatura de novo', arquivo: 'libexec/atualizador', de: '  tag_confere "$nova" "$lista" || falhar', para: '  true || falhar', testes: ['test/integration/atualizador.test.js'] },
   { nome: 'executor volta depois das 24 h', arquivo: 'libexec/atualizador', de: 'PRAZO_VOLTAR=86400', para: 'PRAZO_VOLTAR=999999999', testes: ['test/integration/atualizador.test.js'] },
   { nome: 'executor herdando o ambiente de quem chamou', arquivo: 'libexec/atualizador', de: 'if [ "${ATUALIZADOR_AMBIENTE:-}" != limpo ]; then', para: 'if false; then', testes: ['test/integration/atualizador.test.js'] },
