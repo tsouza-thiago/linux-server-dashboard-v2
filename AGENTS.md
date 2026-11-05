@@ -422,9 +422,18 @@ ambiente limpo (`env -i`). `verificar` busca só as tags em `<base>/repo.git` e 
 `<base>/estado/disponivel` a versão nova aceita: assinada pelas chaves da versão `atual` (ou as de
 partida, `share/allowed_signers`) e com o nome gravado dentro da tag igual ao da ref. `atualizar`, sem
 parâmetro, instala só essa versão, se a tag não mudou e a assinatura conferir de novo: `git archive`
-em `versoes/vX.Y.Z.tmp`, rename e troca atômica dos links `anterior` e `atual`. `voltar` troca
-`atual` por `anterior` 1 vez, só até 24 h depois da troca (`estado/troca`). Em `estado/` (0644, sem
-segredo) ficam também `novidades.md`, `registro.log` e a `trava/`.
+em `versoes/vX.Y.Z.tmp`, rename e troca atômica dos links `versoes/anterior` e `versoes/atual`
+(ADR 0045; o `<base>/atual` é um link fixo do pacote para `versoes/atual`). `voltar` troca `atual`
+por `anterior` 1 vez, só até 24 h depois da troca (`estado/troca`). Em `estado/` (0644, sem segredo)
+ficam também `novidades.md`, `registro.log` e a `trava/`.
+
+As unidades do executor (`pacote/systemd/`, ADR 0045; no pacote, `/usr/lib/systemd/system/`) são
+`server-dashboard-{verificar,atualizar,voltar}.service`, de uso único, com o subcomando fixo no
+`ExecStart=`, e o `server-dashboard-verificar.timer` (1 vez por dia, `RandomizedDelaySec=6h`,
+`Persistent=true`). Rodam como `_server-dashboard`, com `ProtectSystem=strict` e gravação só em
+`repo.git` e `estado` (verificar) ou `versoes` e `estado` (atualizar e voltar). Só o `verificar` tem
+rede. `test/unit/unidades-systemd.test.js` exige cada diretiva e a nota do
+`systemd-analyze security` (até 1,5 no verificar e 0,5 nos outros).
 
 ## Comando SSH de coleta
 
@@ -698,6 +707,7 @@ linux-server-dashboard-v2/
 ├── dashboard               comando único: garante o Node 24 (scripts/node-runtime.sh) e chama server/cli/
 ├── bin/dashboard           lançador do pacote .deb (modo sistema, ADR 0043): Node do pacote ou do sistema, código do link atual
 ├── libexec/atualizador     executor do pacote .deb (ADR 0044): verificar, atualizar e voltar, como _server-dashboard
+├── pacote/systemd/         unidades do executor e o timer diário (ADR 0045), isoladas
 ├── package.json            sem dependências de runtime; devDependency: playwright-core (e2e)
 ├── .env.example            modelo do .env (sem valores reais)
 ├── .github/                workflows/: seguranca.yml (CI, ADR 0014), dependencias.yml e

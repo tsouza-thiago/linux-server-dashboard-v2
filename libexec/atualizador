@@ -14,7 +14,9 @@
 #   <base>/libexec/atualizador   este arquivo
 #   <base>/repo.git              clone sem pasta de trabalho (só tags)
 #   <base>/versoes/vX.Y.Z/       cada versão extraída da tag
-#   <base>/atual, <base>/anterior  links relativos para versoes/vX.Y.Z
+#   <base>/versoes/atual, <base>/versoes/anterior  links relativos para vX.Y.Z (só o executor
+#                                troca; ADR 0045)
+#   <base>/atual                 link fixo do pacote para versoes/atual (o lançador segue)
 #   <base>/estado/               disponivel, troca, novidades.md e registro.log (leitura para todos)
 #   <base>/share/allowed_signers chaves de partida, se a versão atual não trouxer as dela
 # ============================================================
@@ -110,7 +112,7 @@ mais_nova() {
 
 # Versão do link atual (vX.Y.Z), conferida contra o padrão.
 versao_atual() {
-  alvo=$(readlink "$BASE/atual" 2>/dev/null || true)
+  alvo=$(readlink "$VERSOES/atual" 2>/dev/null || true)
   v=$(basename "${alvo:-nada}")
   printf '%s\n' "$v" | grep -Eq "$PADRAO_TAG" || falhar "o link atual não aponta para uma versão: $alvo"
   [ -d "$VERSOES/$v" ] || falhar "a versão atual $v não está em versoes/"
@@ -157,9 +159,11 @@ travar() {
 
 # Troca um link de forma atômica: cria o novo ao lado e renomeia por cima (rename(2)). O
 # `mv -T` (GNU, presente no Debian e no Ubuntu) trata o destino como arquivo, não como pasta.
+# Os links ficam em versoes/, nunca na pasta base: a base é do pacote (root) e as unidades
+# systemd só deixam gravar em repo.git, versoes e estado (ADR 0045).
 trocar_link() {
-  ln -sfn "$2" "$BASE/.$1.novo"
-  mv -fT "$BASE/.$1.novo" "$BASE/$1"
+  ln -sfn "$2" "$VERSOES/.$1.novo"
+  mv -fT "$VERSOES/.$1.novo" "$VERSOES/$1"
 }
 
 # ------------------------------------------------------------ subcomandos
@@ -167,7 +171,9 @@ trocar_link() {
 verificar() {
   atual=$(versao_atual)
   lista=$(chaves "$atual")
-  if [ ! -d "$REPO" ]; then
+  # O pacote cria o repo.git vazio (a base não aceita gravação na unidade); o executor só o
+  # inicia. git init numa pasta vazia que já existe funciona.
+  if [ ! -f "$REPO/HEAD" ]; then
     git init -q --bare "$REPO" || falhar "não deu para criar o repo.git"
     git_repo remote add origin "$ORIGEM_PADRAO"
   fi
@@ -235,8 +241,8 @@ atualizar() {
   fi
 
   # Ordem: primeiro o anterior, depois o atual. Uma queda no meio deixa o atual intacto.
-  trocar_link anterior "versoes/$atual"
-  trocar_link atual "versoes/$nova"
+  trocar_link anterior "$atual"
+  trocar_link atual "$nova"
   printf 'em=%s\nde=%s\npara=%s\n' "$(date +%s)" "$atual" "$nova" | gravar_estado troca
   printf 'versao=\nobjeto=\nverificado=%s\nerro=\n' "$(ler_estado disponivel verificado)" | gravar_estado disponivel
   # Só ficam a versão atual e a anterior no disco.
@@ -253,15 +259,15 @@ voltar() {
   de=$(ler_estado troca de)
   para=$(ler_estado troca para)
   [ -n "$em" ] && [ -n "$de" ] && [ "$para" = "$atual" ] || falhar "nenhuma troca para desfazer"
-  anterior=$(basename "$(readlink "$BASE/anterior" 2> /dev/null || echo nada)")
+  anterior=$(basename "$(readlink "$VERSOES/anterior" 2> /dev/null || echo nada)")
   [ "$anterior" = "$de" ] && [ -d "$VERSOES/$de" ] || falhar "a versão anterior $de não está disponível"
   case "$em" in '' | *[!0-9]*) falhar "data da troca inválida em estado/troca" ;; esac
   passou=$(( $(date +%s) - em ))
   # Só até 24 h depois da troca (ADR 0042, item 8): ninguém força uma versão velha depois.
   [ "$passou" -ge 0 ] && [ "$passou" -le "$PRAZO_VOLTAR" ] ||
     falhar "a volta atrás só vale até 24 h depois da troca"
-  trocar_link atual "versoes/$de"
-  rm -f "$BASE/anterior"
+  trocar_link atual "$de"
+  rm -f "$VERSOES/anterior"
   # A troca fica marcada como desfeita: um 2º voltar é recusado.
   printf 'em=\nde=\npara=\nvoltou=%s\n' "$(date +%s)" | gravar_estado troca
   registrar "voltar: $atual -> $de"

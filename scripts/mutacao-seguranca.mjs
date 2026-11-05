@@ -126,6 +126,10 @@ const MUTACOES = [
   { nome: 'executor sem conferir a assinatura de novo', arquivo: 'libexec/atualizador', de: '  tag_confere "$nova" "$lista" || falhar', para: '  true || falhar', testes: ['test/integration/atualizador.test.js'] },
   { nome: 'executor volta depois das 24 h', arquivo: 'libexec/atualizador', de: 'PRAZO_VOLTAR=86400', para: 'PRAZO_VOLTAR=999999999', testes: ['test/integration/atualizador.test.js'] },
   { nome: 'executor herdando o ambiente de quem chamou', arquivo: 'libexec/atualizador', de: 'if [ "${ATUALIZADOR_AMBIENTE:-}" != limpo ]; then', para: 'if false; then', testes: ['test/integration/atualizador.test.js'] },
+  { nome: 'executor troca o link na pasta base', arquivo: 'libexec/atualizador', de: 'mv -fT "$VERSOES/.$1.novo" "$VERSOES/$1"', para: 'ln -sfn "$2" "$BASE/$1"', testes: ['test/integration/atualizador.test.js'] },
+  { nome: 'unidade sem ProtectSystem', arquivo: 'pacote/systemd/server-dashboard-atualizar.service', de: 'ProtectSystem=strict\n', para: '', testes: ['test/unit/unidades-systemd.test.js'] },
+  { nome: 'unidade grava na pasta base', arquivo: 'pacote/systemd/server-dashboard-verificar.service', de: 'ReadWritePaths=/opt/server-dashboard/repo.git ', para: 'ReadWritePaths=/opt/server-dashboard /opt/server-dashboard/repo.git ', testes: ['test/unit/unidades-systemd.test.js'] },
+  { nome: 'unidade com parâmetro de fora', arquivo: 'pacote/systemd/server-dashboard-voltar.service', de: 'libexec/atualizador voltar\n', para: 'libexec/atualizador voltar %i\n', testes: ['test/unit/unidades-systemd.test.js'] },
   { nome: 'exec com shell importado', arquivo: 'server/cli/servico.js', de: "import { spawn, spawnSync } from 'node:child_process';", para: "import { exec, spawn, spawnSync } from 'node:child_process';" },
 ];
 

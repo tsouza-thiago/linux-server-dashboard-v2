@@ -9,7 +9,8 @@
 #
 # Layout esperado (ADR 0042, itens 1 e 2):
 #   <base>/bin/dashboard      este arquivo
-#   <base>/atual              link para versoes/vX.Y.Z (trocado só pelo executor)
+#   <base>/atual              link fixo para versoes/atual, que aponta para vX.Y.Z (trocado só
+#                             pelo executor, ADR 0045)
 #   <base>/node/bin/node      o Node baixado pelo executor (etapa 7 da F9)
 # ============================================================
 set -eu

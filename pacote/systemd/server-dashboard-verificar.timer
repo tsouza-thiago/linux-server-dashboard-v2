@@ -1,0 +1,16 @@
+# Server Dashboard — procura versão nova 1 vez por dia (F9 do #92, ADR 0042 e 0045).
+# No pacote, fica em /usr/lib/systemd/system/. O atraso aleatório espalha os pedidos ao GitHub;
+# Persistent= roda a procura perdida quando a máquina estava desligada.
+[Unit]
+Description=Server Dashboard: procurar versão nova 1 vez por dia
+Documentation=https://github.com/tsouza-thiago/linux-server-dashboard-v2/blob/main/docs/adr/0045-unidades-systemd-do-executor.md
+
+[Timer]
+Unit=server-dashboard-verificar.service
+OnCalendar=daily
+RandomizedDelaySec=6h
+AccuracySec=1h
+Persistent=true
+
+[Install]
+WantedBy=timers.target
