@@ -1,6 +1,7 @@
 // O comando V2 rodando de verdade num Linux (este computador faz o papel do servidor):
 // um `ssh` falso no PATH executa o script recebido com `sh -c`, e o CLI do poller
 // interpreta a saída real do kernel.
+import { pastaTemp } from '../../test-support/limpeza.js';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { execFileSync, spawnSync } from 'node:child_process';
@@ -40,8 +41,8 @@ test('o script passa no sh -n e roda com sh (POSIX) neste Linux, saída completa
   }
 });
 
-test('ponta a ponta: `node server/poller.js --once` com ssh falso executando o comando localmente', { skip: !linux && 'requer Linux' }, () => {
-  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'lsd-e2e-'));
+test('ponta a ponta: `node server/poller.js --once` com ssh falso executando o comando localmente', { skip: !linux && 'requer Linux' }, (t) => {
+  const dir = pastaTemp(t, 'lsd-e2e-');
   const bin = path.join(dir, 'bin');
   const log = path.join(dir, 'chamadas.log');
   fs.mkdirSync(bin);

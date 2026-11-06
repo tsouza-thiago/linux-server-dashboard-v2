@@ -1,4 +1,5 @@
 // `npm run capturar-amostra` com ssh falso: 1 conexão só, grava bruta + anônima, falha limpa.
+import { pastaTemp } from '../../test-support/limpeza.js';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { spawnSync } from 'node:child_process';
@@ -31,8 +32,8 @@ function run(dir, bin) {
   });
 }
 
-test('capturar-amostra faz exatamente 1 conexão SSH, não interativa, e grava bruta + anonimizada (0600)', () => {
-  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'lsd-cap-'));
+test('capturar-amostra faz exatamente 1 conexão SSH, não interativa, e grava bruta + anonimizada (0600)', (t) => {
+  const dir = pastaTemp(t, 'lsd-cap-');
   const { bin, log } = fakeSsh(dir);
   const r = run(dir, bin);
   assert.equal(r.status, 0, r.stderr);
@@ -50,8 +51,8 @@ test('capturar-amostra faz exatamente 1 conexão SSH, não interativa, e grava b
   assert.equal(fs.statSync(anon).mode & 0o777, 0o600);
 });
 
-test('capturar-amostra falha com mensagem clara e sem gravar nada quando o SSH falha', () => {
-  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'lsd-cap-'));
+test('capturar-amostra falha com mensagem clara e sem gravar nada quando o SSH falha', (t) => {
+  const dir = pastaTemp(t, 'lsd-cap-');
   const { bin } = fakeSsh(dir, { exit: 255 });
   const r = run(dir, bin);
   assert.equal(r.status, 1);

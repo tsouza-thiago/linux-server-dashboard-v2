@@ -11,6 +11,11 @@ diante: `PATCH` corrige, `MINOR` acrescenta sem quebrar e `MAJOR` quebra.
 
 ### Alterado
 
+- Testes mais enxutos (#176): `memOut`, `freePort`, `fakeRes`, `espiao`, `setupApp`/`withServer`, `pastaTemp` e
+  o relógio das amostras saem de cópias e vão para `test-support/`; `config`, `csv`, `stores` e `security`
+  juntam seus arquivos divididos; as pastas temporárias sem limpeza passam por `aoFim`; o e2e usa o
+  wrapper `e2e()` e um só Chromium. Nenhum teste saiu. A asserção do `makeRequireAuth` que sempre passava agora
+  conta as chamadas do `next` e falha se o `?token=` na URL voltar a valer.
 - `AGENTS.md` 30% mais curto (#172): as decisões das ADRs 0030 a 0039 e 0042 a 0050 viram regra curta
   com o link da ADR, e o `CLAUDE.md` deixa de repetir o AGENTS e o CONTRIBUTING. Nenhuma regra mudou.
 - Roadmap 2.3.0–2.6.0 fechado (#168): o `docs/ROADMAP.md` diz "concluído". Em seguida (#170), ele
