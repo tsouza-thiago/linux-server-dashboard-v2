@@ -11,8 +11,8 @@ amostra, persistência, API e alertas. Os outros documentos não repetem estes d
 - [TUTORIAL.md](TUTORIAL.md): passo a passo para leigos.
 - [SECURITY.md](SECURITY.md): modelo de ameaças.
 - [CONTRIBUTING.md](CONTRIBUTING.md): o caminho de uma contribuição (issue, PR, checks).
-- [docs/ROADMAP.md](docs/ROADMAP.md): as próximas features, por complexidade, com o planejamento de cada uma em
-  `docs/roadmap/`.
+- [docs/ROADMAP.md](docs/ROADMAP.md): os níveis de complexidade (P, M, G, GG) e as features entregues; o roadmap
+  2.3.0–2.6.0 está concluído (histórico).
 
 O teste `test/unit/docs.test.js` confere esta documentação contra o código.
 
@@ -144,10 +144,10 @@ O teste `test/unit/docs.test.js` confere esta documentação contra o código.
   dispara por 1 min; executor que não sobe tira o código do disco. Detalhes da espera e do motivo na tela: ADRs 0037 e
   0038. `dashboard reconfigurar` sem opção e com o painel no ar só abre o link de uso único com
 `#/visao-geral?reconfigurar=1` (ADR 0039); nos outros casos segue pelo caminho de antes.
-- **Code scanning** (CodeQL padrão do GitHub, a cada push): todo alerta é corrigido ou descartado como falso positivo
-  com a análise em `docs/seguranca/` e, se possível, um teste que falhe na forma errada. Não aplique a sugestão do
-  CodeQL sem conferir o formato real (ex.: o escape do `authorized_keys` segue o `opt_dequote`, não o padrão
-  genérico).
+- **Code scanning** (CodeQL do GitHub, suíte `extended`, a cada push): todo alerta é corrigido ou descartado como
+  falso positivo com a análise em `docs/seguranca/` e, se possível, um teste que falhe na forma errada. Não aplique a
+  sugestão do CodeQL sem conferir o formato real (ex.: o escape do `authorized_keys` segue o `opt_dequote`, não o
+  padrão genérico).
 - **Verificação em camadas** (redundante de propósito):
   1. `test/seguranca/` roda em todo `npm run check`: regras estáticas (`invariantes-estaticas`), matriz de ataque
      gerada das rotas reais (`superficie-ataque`), corpus OWASP (`payloads-owasp`), segredos e OSINT no que vai para o
@@ -304,7 +304,7 @@ npm run capturar-telas          # refaz docs/img/ a partir do painel de teste (-
 npm run migrar-v1               # migra a V1 agora (o painel também migra ao iniciar); com -- --verificar só resume o data/history.json, sem gravar
 npm run soak                    # soak acelerado: 83 h de coletas simuladas e pedidos de 90 dias; confere RAM e vazamento
 npm run empacotar-deb           # .deb reprodutível da tag da versão + dist/SHA256SUMS (--ref <tag|HEAD>, --saida <pasta>)
-npm run painel-teste            # painel de teste com dados semeados (--cenario=normal|lacunas|offline|vazio, --porta=3943, --versao-nova, --exige-reconfigurar, --reconfigurar[=volta|recusa|bloqueio])
+npm run painel-teste            # painel de teste com dados semeados (--cenario=normal|lacunas|offline|vazio, --porta=3943, --versao-nova, --exige-reconfigurar, --resultado=voltou, --reconfigurar[=volta|recusa|sem-assinatura|outra-pasta], --assistente)
 scripts/e2e-instalacao/rodar.sh # instalação, botão Atualizar e pacote .deb (instalar, atualizar, voltar, desinstalar, apt purge) de ponta a ponta em contêineres Debian/Ubuntu, com e sem systemd (E2E_CENARIOS=pacote: só o .deb)
 ```
 

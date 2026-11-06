@@ -13,8 +13,13 @@ diante: `PATCH` corrige, `MINOR` acrescenta sem quebrar e `MAJOR` quebra.
 
 - `AGENTS.md` 30% mais curto (#172): as decisões das ADRs 0030 a 0039 e 0042 a 0050 viram regra curta
   com o link da ADR, e o `CLAUDE.md` deixa de repetir o AGENTS e o CONTRIBUTING. Nenhuma regra mudou.
-- Roadmap 2.3.0–2.6.0 fechado (#168): o `docs/ROADMAP.md` diz "concluído" e cada feature diz em
-  que versão foi entregue (F7 e F8 na 2.5.0, F9 na 2.6.0). Os documentos da F7, da F8 e da F9 também.
+- Roadmap 2.3.0–2.6.0 fechado (#168): o `docs/ROADMAP.md` diz "concluído". Em seguida (#170), ele
+  encolheu para os níveis P/M/G/GG e a tabela feature → versão → ADR; os planejamentos de
+  `docs/roadmap/` saíram (ficam só os avisos da F7 e da F9, que as ADRs 0030 e 0042 citam).
+- Documentação: o AGENTS, o README, o TUTORIAL, o SECURITY e o `test/fixtures/README.md` voltam a
+  bater com o código (suíte `extended` do CodeQL, opções do painel de teste, `semear` do executor,
+  caminhos do pacote `.deb`, lista de `test-support/`). O rodapé do CHANGELOG ganha o link da
+  `2.3.0-rc.1`.
 
 ## [2.6.0] — 2026-11-06
 
@@ -1407,6 +1412,7 @@ histórico a cada minuto.
 [2.4.1]: https://github.com/tsouza-thiago/linux-server-dashboard-v2/compare/v2.4.0...v2.4.1
 [2.4.0]: https://github.com/tsouza-thiago/linux-server-dashboard-v2/compare/v2.3.0...v2.4.0
 [2.3.0]: https://github.com/tsouza-thiago/linux-server-dashboard-v2/compare/v2.2.4...v2.3.0
+[2.3.0-rc.1]: https://github.com/tsouza-thiago/linux-server-dashboard-v2/compare/v2.2.3...v2.3.0-rc.1
 [2.2.4]: https://github.com/tsouza-thiago/linux-server-dashboard-v2/compare/v2.2.3...v2.2.4
 [2.2.3]: https://github.com/tsouza-thiago/linux-server-dashboard-v2/compare/v2.2.2...v2.2.3
 [2.2.2]: https://github.com/tsouza-thiago/linux-server-dashboard-v2/compare/v2.2.1...v2.2.2

@@ -196,8 +196,8 @@ aplicativos como **Server Dashboard**. Pelo terminal, na pasta do projeto:
 A instalação também cria o comando `dashboard`. Com ele, você roda tudo de qualquer pasta e
 sem o `./`, por exemplo `dashboard abrir`. Ele vale no próximo login. Até lá, use o caminho
 completo que a instalação mostrou. Se `~/.local/bin` não estiver no seu PATH, a instalação pergunta
-se pode acrescentar a pasta no arquivo de login, e guarda uma cópia antes. Instalou antes desta
-versão? Rode `./dashboard reconfigurar`: o último passo oferece criar o comando.
+se pode acrescentar a pasta no arquivo de login, e guarda uma cópia antes. Instalou antes da
+2.4.0? Rode `./dashboard reconfigurar`: o último passo oferece criar o comando.
 
 Num terminal novo, a tecla **Tab** completa os comandos e as opções: `dashboard atu` + Tab vira
 `dashboard atualizar`. Em `--chave-ssh`, ela sugere os apelidos do seu `~/.ssh/config` (só desse
@@ -488,7 +488,7 @@ Comece sempre por `./dashboard diagnosticar`: ele aponta o problema e diz como r
 
 ### A porta 3000 já está em uso
 
-- Outro programa usa a porta: mude `PORT=3001` no `.env` e rode `./dashboard iniciar`.
+- Outro programa usa a porta: mude `PORT=3001` no `.env` e rode `./dashboard iniciar`. No pacote `.deb`, o `.env` fica em `~/.config/server-dashboard/.env` e o comando é `dashboard iniciar`.
 
 ### Onde ver o que aconteceu (logs)
 

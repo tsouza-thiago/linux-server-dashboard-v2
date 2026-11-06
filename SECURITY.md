@@ -430,6 +430,8 @@ Análises publicadas:
 - [Alerta 8 do CodeQL](docs/seguranca/2026-10-16-codeql-file-access-to-http.md): dado de
   arquivo num pedido HTTP do cliente dos testes, falso positivo (destino só `127.0.0.1`,
   travado por teste).
+- [Alertas do OpenSSF Scorecard de 19/10/2026](docs/seguranca/2026-10-19-scorecard.md): análise
+  dos alertas sem correção.
 - [Linha de base da 2.0.1](docs/seguranca/2026-10-16-linha-de-base.md): resultado de todas
   as ferramentas na `v2.0.0`, correções feitas e o que o repositório público revela.
 - [Auditoria do CI de 04/11/2026](docs/seguranca/2026-11-04-auditoria-ci.md): tempo de cada

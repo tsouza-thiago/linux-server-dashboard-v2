@@ -177,7 +177,8 @@ inicia mais com o computador) e, na pasta da V1, `./start.sh --background`.
 
 1. Rode `./dashboard diagnosticar`. Ele diz o que aconteceu e como resolver.
 2. Veja a seção [Solução de problemas](TUTORIAL.md#9-solução-de-problemas) do tutorial.
-3. Logs: `data/dashboard.log` e `journalctl --user -u server-dashboard`.
+3. Logs: `data/dashboard.log` (no pacote `.deb`, `~/.local/share/server-dashboard/data/dashboard.log`) e
+   `journalctl --user -u server-dashboard`.
 
 ---
 
