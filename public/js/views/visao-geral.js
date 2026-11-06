@@ -356,7 +356,7 @@ function firstUse(state) {
 
 /**
  * Aviso de script desatualizado no servidor, com o passo a passo (depois de atualizar ou de mudar o
- * .env). Com login, o passo do terminal vira o botão do mesmo diálogo da engrenagem (ADR 0038); sem
+ * .env). Com login, o passo do terminal vira o botão do mesmo diálogo da manutenção (ADR 0038); sem
  * login, a reconfiguração pela tela fica desligada, e o passo continua sendo o comando.
  */
 function configWarning(state) {

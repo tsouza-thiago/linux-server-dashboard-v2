@@ -232,8 +232,8 @@ coleta) e explica cada problema com "O que aconteceu" e "Como resolver".
 
 **Como saber que há versão nova?** O painel procura 1 vez por dia e mostra uma faixa no topo da
 tela. Clique em **Ver novidades** para ler o que mudou. Feche a faixa, se quiser: ela só volta na
-versão seguinte. A engrenagem no topo mostra a versão instalada e a data da última procura, e tem o
-botão **Procurar agora**.
+versão seguinte. O botão de manutenção (a chave inglesa no topo) mostra a versão instalada e a data
+da última procura, e tem o botão **Procurar agora**.
 
 **Como atualizar pelo painel?** Em **Ver novidades**, clique em **Atualizar agora**. A tela mostra
 o que está acontecendo. O painel fica fora do ar por alguns segundos e volta sozinho. No fim, a
@@ -258,8 +258,8 @@ estiver desatualizado:
 
 Sem login no painel, rode `./dashboard reconfigurar` no terminal no lugar do 1º passo.
 
-**Como reconfigurar?** Clique na engrenagem no topo e em **Reconfigurar**, ou rode
-`./dashboard reconfigurar`: com o painel no ar, ele abre o painel já logado, no mesmo diálogo. Clique
+**Como reconfigurar?** Clique no botão de manutenção (a chave inglesa no topo) e em
+**Reconfigurar**, ou rode `./dashboard reconfigurar`: com o painel no ar, ele abre o painel já logado, no mesmo diálogo. Clique
 em **Reconfigurar agora**. A coleta pausa, o assistente abre e, no fim ou ao cancelar, o painel volta
 sozinho. Se o assistente ficar parado por 15 min, o painel volta com a configuração de antes. Sem tela
 gráfica, sem login, com o painel parado ou com qualquer opção (`--terminal`, por exemplo), o comando

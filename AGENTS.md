@@ -826,7 +826,7 @@ linux-server-dashboard-v2/
 │   ├── fonts/              Geist + Geist Mono 1.7.2 (OFL, SHA-256 em vendor/vendor.json)
 │   ├── vendor/             uPlot 1.6.32 (SHA-256 em vendor.json)
 │   └── js/                 main.js, locale-guard.js, core/, charts/, views/ (as 8 telas e a
-│                           manutenção: engrenagem, aviso de versão e novidades)
+│                           manutenção: botão do topo, aviso de versão e novidades)
 ├── test/                   unit/, integration/, seguranca/, e2e/ e fixtures/ (node --test)
 └── test-support/           request.js (HTTP/SSE), sshd.js (sshd real), instalacao-fake.js,
                             rotas.js (rotas lidas do código), fonte.js (código sem comentários),

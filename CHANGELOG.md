@@ -73,6 +73,9 @@ diante: `PATCH` corrige, `MINOR` acrescenta sem quebrar e `MAJOR` quebra.
 
 ### Corrigido
 
+- Ícone do botão de manutenção (#166): o botão do topo mostra uma chave inglesa. O desenho antigo, um
+  círculo com raios, parecia o ícone de brilho e não lembrava manutenção. O assistente e o TUTORIAL
+  passam a citar o botão de manutenção no lugar da "engrenagem".
 - Mutação dos guardas: a rodada que travava ao acaso (#148). A causa estava na limpeza dos testes do
   botão Reconfigurar (`test/integration/reconfigurar.test.js`), não no painel. O `t.after` que apaga
   a pasta temporária vinha antes do que fecha o painel, e o `node:test` roda os `t.after` nessa ordem.
