@@ -47,7 +47,7 @@ const IMG = {
 };
 
 const SEMGREP_REGRAS = ['p/owasp-top-ten', 'p/nodejs', 'p/javascript', 'p/xss', 'p/command-injection', 'p/secrets'];
-const SHELL_SCRIPTS = ['dashboard', 'bin/dashboard', 'libexec/atualizador', 'scripts/node-runtime.sh', 'scripts/askpass.sh', 'scripts/completar.bash', 'scripts/e2e-instalacao/rodar.sh', 'pacote/debian/postinst', 'pacote/debian/prerm', 'pacote/debian/postrm'];
+const SHELL_SCRIPTS = ['dashboard', 'bin/dashboard', 'libexec/atualizador', 'scripts/node-runtime.sh', 'scripts/askpass.sh', 'scripts/completar.bash', 'scripts/e2e-instalacao/rodar.sh', 'scripts/e2e-instalacao/pacote.sh', 'pacote/debian/postinst', 'pacote/debian/prerm', 'pacote/debian/postrm'];
 
 // ---------------------------------------------------------------- utilidades
 

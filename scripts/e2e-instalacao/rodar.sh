@@ -9,12 +9,17 @@
 #       importa (--importar-v1) e depois troca para a chave restrita (reconfigurar)
 #   D · botões Atualizar e Reconfigurar: computador com systemd (systemd-run --user) e sem systemd (segundo
 #       plano), na atualização que dá certo e na que volta atrás
+#   E · pacote .deb: Debian 12 com systemd e Ubuntu 24.04 sem systemd. Instala o .deb gerado
+#       pelo npm run empacotar-deb, instala o painel da pessoa, atualiza (botão e executor),
+#       volta atrás (versão quebrada e executor voltar), dashboard desinstalar e apt purge
 #
 # Os "computadores" não têm Node: o ./dashboard baixa o Node 24 oficial e confere a soma.
 # A release é uma cópia do HEAD com uma tag assinada por uma chave de TESTE (nada é
-# publicado). Precisa de: docker, git, ssh-keygen, node e o playwright-core do npm ci.
+# publicado). Precisa de: docker, git, ssh-keygen, node, dpkg-deb e o playwright-core do npm ci.
+# O E baixa o Node do nodejs.org direto, sem o E2E_PROXY: o executor roda com o ambiente limpo.
 #
 #   scripts/e2e-instalacao/rodar.sh [pasta-de-saida]
+#   E2E_CENARIOS=pacote  só o E (padrão: "clone pacote"; clone = A a D, que andam juntos)
 #   E2E_PROXY=http://… E2E_CA=/caminho/ca.crt  só se a rede exigir proxy com CA própria
 # ============================================================
 set -euo pipefail
@@ -25,6 +30,8 @@ mkdir -p "$OUT/capturas"
 PROXY="${E2E_PROXY:-}"
 CHROMIUM="${CHROMIUM:-$(ls -d /opt/pw-browsers/chromium 2>/dev/null || true)}"
 export GIT_CONFIG_GLOBAL=/dev/null GIT_CONFIG_SYSTEM=/dev/null
+CENARIOS="${E2E_CENARIOS:-clone pacote}"
+quer() { case " $CENARIOS " in *" $1 "*) return 0 ;; *) return 1 ;; esac; }
 PASSOU=()
 FALHOU=()
 
@@ -39,7 +46,7 @@ envs=()
 if [ -n "$PROXY" ]; then envs=(-e "https_proxy=$PROXY" -e "HTTPS_PROXY=$PROXY" -e "NODE_EXTRA_CA_CERTS=/usr/local/share/ca-certificates/proxy.crt"); fi
 
 limpar() {
-  docker rm -f e2e-srv-deb e2e-srv-ubu e2e-srv-v1 e2e-srv-bot e2e-cli-deb e2e-cli-ubu e2e-cli-v1 e2e-cli-bot e2e-cli-sd >/dev/null 2>&1 || true
+  docker rm -f e2e-srv-deb e2e-srv-ubu e2e-srv-v1 e2e-srv-bot e2e-cli-deb e2e-cli-ubu e2e-cli-v1 e2e-cli-bot e2e-cli-sd e2e-srv-pac-deb e2e-srv-pac-ubu e2e-pac-sd e2e-pac-ubu >/dev/null 2>&1 || true
   [ -f "$OUT/gitd.pid" ] && kill "$(cat "$OUT/gitd.pid")" 2>/dev/null || true
 }
 trap limpar EXIT
@@ -85,13 +92,18 @@ sleep 1
 ok "release v2.0.0-beta.2 assinada em git://127.0.0.1:9418/release"
 
 servidor() { docker run -d --init --name "$1" --network host "$2" /usr/sbin/sshd -D -e -p "$3" >/dev/null; }
-cliente() { docker run -d --init --name "$1" --network host "${envs[@]}" "$2" sleep infinity >/dev/null; }
+# cliente <nome> <imagem> [opções do docker run]
+cliente() { local n="$1" i="$2"; shift 2; docker run -d --init --name "$n" --network host "${envs[@]}" "$@" "$i" sleep infinity >/dev/null; }
 # systemd de verdade sem --privileged: nada do computador real fica ao alcance do contêiner. O
-# cgroup dele é privado (--cgroupns), e só ele vira escrita, antes do init.
-cliente_systemd() { docker run -d --name "$1" --network host --cgroupns=private --cap-add SYS_ADMIN --security-opt seccomp=unconfined --security-opt apparmor=unconfined --tmpfs /run --tmpfs /run/lock --tmpfs /tmp -u root --stop-signal SIGRTMIN+3 "${envs[@]}" --entrypoint sh "$2" -c 'mount -o remount,rw /sys/fs/cgroup && exec /sbin/init' >/dev/null; }
+# cgroup dele é privado (--cgroupns), e só ele vira escrita, antes do init. O SYS_PTRACE é o que
+# o root de uma máquina de verdade tem: sem ele, o systemd não monta o ProtectProc=invisible com o
+# PrivateUsers=yes das unidades do pacote (erro 217/USER).
+cliente_systemd() { local n="$1" i="$2"; shift 2; docker run -d --name "$n" --network host --cgroupns=private --cap-add SYS_ADMIN --cap-add SYS_PTRACE --security-opt seccomp=unconfined --security-opt apparmor=unconfined --tmpfs /run --tmpfs /run/lock --tmpfs /tmp -u root --stop-signal SIGRTMIN+3 "${envs[@]}" "$@" --entrypoint sh "$i" -c 'mount -o remount,rw /sys/fs/cgroup && exec /sbin/init' >/dev/null; }
 identidade() { ssh-keyscan -t ed25519 -p "$1" 127.0.0.1 2>/dev/null | ssh-keygen -lf - | awk '{print $2}'; }
 espera_coletas() { timeout 150 bash -c "until [ \"\$(docker exec $1 sh -c 'grep -c \"poll OK\" /home/ana/$2/data/dashboard.log 2>/dev/null || echo 0')\" -ge $3 ]; do sleep 3; done"; }
 
+# A a D usam o mesmo repositório de release, nesta ordem (sem recuo: o bloco é o de sempre).
+if quer clone; then
 # ------------------------------------------------------------------ A · Debian 12
 log "A · Debian 12 limpo → servidor Debian 12 (sem interface)"
 servidor e2e-srv-deb dash-e2e-servidor-debian 2201
@@ -220,6 +232,11 @@ confere "D: systemd-run --user: de volta à versão anterior" versao_instalada e
 confere "D: systemd-run --user: serviço de volta depois da falha" sd_ativo server-dashboard
 confere "D: segundo plano: voltou atrás" botao e2e-cli-bot 3105 v2.0.3 segundo-plano voltou
 confere "D: segundo plano: de volta à versão anterior" versao_instalada e2e-cli-bot 2.0.2
+fi
+
+if quer pacote; then
+. "$HERE/pacote.sh"
+fi
 
 log "Resultado"
 printf '%s passaram, %s falharam (saída em %s)\n' "${#PASSOU[@]}" "${#FALHOU[@]}" "$OUT"
