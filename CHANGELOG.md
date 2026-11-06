@@ -9,6 +9,10 @@ diante: `PATCH` corrige, `MINOR` acrescenta sem quebrar e `MAJOR` quebra.
 
 ## [Não publicado]
 
+## [2.6.1] — 2026-11-06
+
+Versão de limpeza. A Ajuda agora mostra o nome certo do arquivo do sudoers (um por instalação). O `npm run poll` saiu: ele abria um 2º SSH com o painel no ar; use `npm run capturar-amostra` ou `dashboard diagnosticar`. A documentação ficou mais curta e certa. Nada muda na configuração, no formato de `data/` nem no acesso ao servidor.
+
 ### Removido
 
 - Código sem uso (#174): o `npm run poll` e o bloco de linha de comando do `server/poller.js` (com o
@@ -1425,7 +1429,8 @@ Documentados no plano da V2 (seção 2.2, B1–B12), entre eles: alerta SMART fa
 rede zerada com contadores grandes, alerta duplicado a cada coleta e reescrita completa do
 histórico a cada minuto.
 
-[Não publicado]: https://github.com/tsouza-thiago/linux-server-dashboard-v2/compare/v2.6.0...HEAD
+[Não publicado]: https://github.com/tsouza-thiago/linux-server-dashboard-v2/compare/v2.6.1...HEAD
+[2.6.1]: https://github.com/tsouza-thiago/linux-server-dashboard-v2/compare/v2.6.0...v2.6.1
 [2.6.0]: https://github.com/tsouza-thiago/linux-server-dashboard-v2/compare/v2.5.0...v2.6.0
 [2.5.0]: https://github.com/tsouza-thiago/linux-server-dashboard-v2/compare/v2.4.1...v2.5.0
 [2.4.1]: https://github.com/tsouza-thiago/linux-server-dashboard-v2/compare/v2.4.0...v2.4.1
