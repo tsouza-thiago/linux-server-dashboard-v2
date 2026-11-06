@@ -1,6 +1,7 @@
 # F8 — Reconfigurar pela tela
 
 - **Nível:** G · **Versão:** 2.5.0 · **Áreas:** telas, instalação, segurança
+- **Situação:** entregue na 2.5.0 (04/11/2026).
 - **Depende de:** F7 (menu de manutenção no topo, executor fora do serviço, web como
   caminho padrão).
 - **Decidido:** o botão "Reconfigurar" fica no menu de manutenção do topo (engrenagem),

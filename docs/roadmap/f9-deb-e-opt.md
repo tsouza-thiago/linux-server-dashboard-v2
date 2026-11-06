@@ -9,7 +9,7 @@
   - o critério principal do desenho da atualização é a **segurança**.
 - **Decidido em 26/10/2026:** o desenho híbrido (C) está aprovado; o Node é baixado pelo
   executor (item 6); a 1ª versão atende 1 pessoa por máquina (item "Riscos").
-- **Situação:** concluída. Etapas 1 a 12 feitas (ADR 0042 a 0050, 06/11/2026); sai na 2.6.0.
+- **Situação:** entregue na 2.6.0 (06/11/2026). Etapas 1 a 12 feitas (ADR 0042 a 0050).
 ## Objetivo
 
 Instalar com `sudo apt install ./server-dashboard_X.Y.Z_all.deb`, sem `git clone` e sem

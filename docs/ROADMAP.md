@@ -1,12 +1,12 @@
 # Roadmap — versões 2.3.0 a 2.6.0
 
-- **Situação:** em implementação. Entregue: F1 (2.2.3, ADR 0022). As outras seguem em
-  planejamento.
-- **Data:** 26/10/2026.
-- **Issue do roadmap:** #83. Milestones 2.3.0 a 2.6.0.
+- **Situação:** concluído. As 11 features foram entregues entre a 2.2.3 e a 2.6.0. A 2.6.0
+  saiu em 06/11/2026.
+- **Data:** 26/10/2026 (plano) e 06/11/2026 (conclusão).
+- **Issue do roadmap:** #83 (fechada). Milestones 2.3.0 a 2.6.0 (fechados).
 - **Regra:** cada feature tem um documento em [`docs/roadmap/`](roadmap/) com o objetivo, a
   situação de hoje no código, a decisão, as etapas pequenas, os testes e os riscos. A
-  decisão vira ADR só quando a feature for aprovada para implementar.
+  decisão virou ADR quando a feature foi aprovada para implementar.
 
 ## Classificação por complexidade
 
@@ -28,22 +28,22 @@ risco de segurança, os testes novos e o que muda para quem já usa o painel.
 | 4 | Link simbólico: `dashboard` sem `./` e fora da pasta — **entregue na 2.4.0** | P–M | 2.4.0 | — | #87 | [f4-link-simbolico.md](roadmap/f4-link-simbolico.md) |
 | 5 | Autocomplete com Tab (bash) — **entregue na 2.4.0** | M | 2.4.0 | 4 (para valer fora da pasta) | #88 | [f5-autocomplete.md](roadmap/f5-autocomplete.md) |
 | 6 | Skeleton em tudo o que carrega — **entregue na 2.3.0** | M | 2.3.0 | 3 (a entrada do conteúdo) | #89 | [f6-skeleton.md](roadmap/f6-skeleton.md) |
-| 7 | Atualização pelo painel, com aviso e log — **concluída, sai na 2.5.0** | G | 2.5.0 | — | #90 | [f7-atualizacao-pelo-painel.md](roadmap/f7-atualizacao-pelo-painel.md) |
-| 8 | Reconfigurar pelo painel — **concluída, sai na 2.5.0** | G | 2.5.0 | 7 (menu e executor) | #91 | [f8-reconfigurar-pela-tela.md](roadmap/f8-reconfigurar-pela-tela.md) |
-| 9 | Instalação em `/opt` por pacote `.deb` — **concluída, sai na 2.6.0** | GG | 2.6.0 | 4, 5, 7 e 8 | #92 | [f9-deb-e-opt.md](roadmap/f9-deb-e-opt.md) |
+| 7 | Atualização pelo painel, com aviso e log — **entregue na 2.5.0** | G | 2.5.0 | — | #90 | [f7-atualizacao-pelo-painel.md](roadmap/f7-atualizacao-pelo-painel.md) |
+| 8 | Reconfigurar pelo painel — **entregue na 2.5.0** | G | 2.5.0 | 7 (menu e executor) | #91 | [f8-reconfigurar-pela-tela.md](roadmap/f8-reconfigurar-pela-tela.md) |
+| 9 | Instalação em `/opt` por pacote `.deb` — **entregue na 2.6.0** | GG | 2.6.0 | 4, 5, 7 e 8 | #92 | [f9-deb-e-opt.md](roadmap/f9-deb-e-opt.md) |
 | 10 | Hover mais visível em clicáveis, contêineres e gráficos — **entregue na 2.2.4** | M | 2.2.4 | 1 | #100 | [f10-hover-mais-visivel.md](roadmap/f10-hover-mais-visivel.md) |
 | 11 | README e TUTORIAL ilustrados com prints e elementos gráficos — **entregue na 2.4.0** | M | 2.4.0 | 6 (prints da interface final) | #106 | [f11-documentacao-ilustrada.md](roadmap/f11-documentacao-ilustrada.md) |
 
-A F8 é menos arriscada que a F7 (reaproveita o assistente e não acessa a internet), mas
-vem depois dela porque usa o menu e o executor que a F7 cria.
+A F8 era menos arriscada que a F7 (reaproveita o assistente e não acessa a internet), mas
+veio depois dela porque usa o menu e o executor que a F7 criou.
 
 ## Versões (ADR 0015 e 0023)
 
-Cada feature sai num PR próprio. As versões sobem conforme os milestones, e mudança pequena
-sai direto na versão estável, sem pré-versão (ADR 0023, de 30/10/2026). A pré-versão fica para
+Cada feature saiu em PR próprio. As versões subiram conforme os milestones, e mudança pequena
+saiu direto na versão estável, sem pré-versão (ADR 0023, de 30/10/2026). A pré-versão ficou para
 as features de nível G e GG. A F1 saiu na 2.2.3.
 
-| Versão | Tema | Pré-versões |
+| Versão | Tema | Pré-versões (plano) |
 |---|---|---|
 | 2.2.4 | Hover mais visível | nenhuma |
 | 2.3.0 | Interface mais suave | nenhuma: clique, troca de tela e skeleton saem juntos |
@@ -51,15 +51,15 @@ as features de nível G e GG. A F1 saiu na 2.2.3.
 | 2.5.0 | Manutenção pelo painel | atualizar: uma pré-versão por grupo de etapas (detecção, aviso, execução); depois reconfigurar |
 | 2.6.0 | Pacote `.deb` e `/opt` | uma pré-versão por grupo de etapas (modo sistema, executor, pacote) |
 
-Nenhuma destas versões quebra quem instalou por `git clone`: elas são MINOR. Se a F8 exigir
-mudar o formato de `data/` para quem já usa, ela vira MAJOR (3.0.0) e este roadmap muda.
+Nenhuma destas versões quebrou quem instalou por `git clone`: todas saíram como MINOR (ou
+PATCH, na 2.2.3 e na 2.2.4). Nenhuma mudou o formato de `data/`.
 
 ## Regras que valem para todas as features
 
 1. As invariantes I1–I11 do [AGENTS.md](../AGENTS.md) continuam valendo. Nenhuma feature
    abre SSH para o servidor nem grava nada nele.
-2. **Orçamento da página inicial:** 450 KB transferidos; hoje são 293 KB. Sobram ~157 KB
-   para as próximas features. Cada PR de tela mede o tamanho no `test/e2e/telas.test.js`.
+2. **Orçamento da página inicial:** 450 KB transferidos (293 KB no início do roadmap). Cada
+   PR de tela mede o tamanho no `test/e2e/telas.test.js`.
 3. **CSP sem `'unsafe-inline'`:** animação só por CSS em arquivo ou pelo CSSOM. Nunca
    `style="…"` no HTML (ADR 0010).
 4. **Movimento reduzido:** o `base.css` já zera durações com `prefers-reduced-motion`.
@@ -102,14 +102,16 @@ mudar o formato de `data/` para quem já usa, ela vira MAJOR (3.0.0) e este road
 
 ## Perguntas em aberto
 
-As 9 perguntas deste roadmap foram respondidas em 26/10/2026 (tabela acima). Nenhuma
-pergunta em aberto agora. Pergunta nova que surgir entra aqui, com a feature e a proposta.
+As 9 perguntas deste roadmap foram respondidas em 26/10/2026 (tabela acima). O roadmap está
+concluído e não tem pergunta em aberto. O próximo roadmap terá um arquivo próprio.
 
 ## Fluxo de trabalho
 
-1. Cada feature tem uma issue no milestone da versão dela e no quadro do Projects.
+O fluxo que este roadmap seguiu (vale também para o próximo):
+
+1. Cada feature teve uma issue no milestone da versão dela e no quadro do Projects.
 2. Antes de implementar: revisar o documento da feature, responder as perguntas em aberto
    dela e escrever a ADR (status Aceita).
 3. Implementar em PR próprio, com `npm run check`, os testes no navegador e, nas features
-   7 e 8, `npm run seguranca`.
+   7, 8 e 9, `npm run seguranca`.
 4. Ao terminar a feature, marcar a linha da tabela acima como entregue, com a versão.
