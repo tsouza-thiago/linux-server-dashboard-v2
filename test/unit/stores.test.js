@@ -298,20 +298,20 @@ test('OutageLog: abre e fecha quedas, ignora repetição e sobrevive a reinício
   assert.equal(again.list()[0].reason.length, 200);
 });
 
-test('OutageLog.uptime: janela começa no início do monitoramento; queda em andamento conta até agora', () => {
+test('OutageLog.uptime: conta só o tempo medido; queda em andamento conta até agora', () => {
   const now = BASE + 10 * 60 * MIN;
   const log = new OutageLog({ file: path.join(tmp(), 'o.ndjson'), now: () => now });
   log.start(BASE + 60 * MIN, 'a');
   log.end(BASE + 90 * MIN);
   log.start(BASE + 9 * 60 * MIN, 'b');
-  const u = log.uptime({ fromMs: now - 90 * 24 * 60 * MIN, toMs: now, sinceMs: BASE });
-  assert.equal(u.windowMs, 10 * 60 * MIN);
+  const u = log.uptime({ fromMs: now - 90 * 24 * 60 * MIN, toMs: now, monitored: [[BASE, now]] });
+  assert.equal(u.monitoredMs, 10 * 60 * MIN);
   assert.equal(u.offlineMs, 90 * MIN);
   assert.equal(u.uptimePct, 85);
   assert.equal(u.from, new Date(BASE).toISOString());
-  const part = log.uptime({ fromMs: BASE + 75 * MIN, toMs: BASE + 105 * MIN });
+  const part = log.uptime({ fromMs: BASE + 75 * MIN, toMs: BASE + 105 * MIN, monitored: [[BASE, now]] });
   assert.equal(part.offlineMs, 15 * MIN, 'queda cortada nas bordas da janela');
-  assert.equal(log.uptime({ fromMs: now, toMs: now }).uptimePct, null, 'janela vazia');
+  assert.equal(log.uptime({ fromMs: now, toMs: now, monitored: [[BASE, now]] }).uptimePct, null, 'janela vazia');
 });
 
 test('OutageLog: linhas inválidas, eventos fora de ordem e quedas além de 90 dias são limpos', () => {

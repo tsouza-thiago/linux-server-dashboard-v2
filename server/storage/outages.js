@@ -107,31 +107,12 @@ export class OutageLog {
   }
 
   /**
-   * Disponibilidade em [fromMs, toMs].
-   *
-   * Com `monitored` (ADR 0018: intervalos [início, fim) em que o painel estava medindo), a
-   * conta usa só o tempo medido: 100 − fora do ar ÷ medido. Sem tempo medido, é null ("sem
-   * dados"), nunca 100%. Sem `monitored` (forma antiga, ADR 0006), `sinceMs` é o início do
-   * monitoramento e a janela começa ali.
+   * Disponibilidade em [fromMs, toMs] (ADR 0018): `monitored` são os intervalos [início, fim)
+   * em que o painel estava medindo, e a conta usa só esse tempo: 100 − fora do ar ÷ medido.
+   * Sem tempo medido, é null ("sem dados"), nunca 100%.
    */
-  uptime({ fromMs, toMs = this.now(), sinceMs = -Infinity, monitored = null }) {
-    if (Array.isArray(monitored)) return this._uptimeMeasured({ fromMs, toMs, monitored });
-    const start = Math.max(fromMs, sinceMs);
-    const windowMs = Math.max(0, toMs - start);
-    let offlineMs = 0;
-    for (const o of this.list({ fromMs: start, toMs })) {
-      const a = Math.max(Date.parse(o.from), start);
-      const b = Math.min(o.to ? Date.parse(o.to) : this.now(), toMs);
-      if (b > a) offlineMs += b - a;
-    }
-    const uptimePct = windowMs > 0 ? Math.max(0, 100 - (offlineMs / windowMs) * 100) : null;
-    return {
-      from: new Date(Number.isFinite(start) ? start : toMs).toISOString(),
-      to: new Date(toMs).toISOString(),
-      windowMs,
-      offlineMs,
-      uptimePct: uptimePct === null ? null : Math.round(uptimePct * 1000) / 1000,
-    };
+  uptime({ fromMs, toMs = this.now(), monitored = [] }) {
+    return this._uptimeMeasured({ fromMs, toMs, monitored });
   }
 
   /** Disponibilidade só sobre o tempo medido (ADR 0018). */

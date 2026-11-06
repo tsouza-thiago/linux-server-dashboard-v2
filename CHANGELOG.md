@@ -9,6 +9,14 @@ diante: `PATCH` corrige, `MINOR` acrescenta sem quebrar e `MAJOR` quebra.
 
 ## [Não publicado]
 
+### Removido
+
+- Código sem uso (#174): o `npm run poll` e o bloco de linha de comando do `server/poller.js` (com o
+  painel no ar, ele abria um 2º SSH ao mesmo tempo, contra a I1; o `npm run capturar-amostra` e o
+  `dashboard diagnosticar` cobrem); os nomes V1 `diskMounts`/`diskDevs` do `buildCommand`; o ramo
+  de `uptime()` sem `monitored`, anterior à ADR 0018; as classes `.c-s2` e `.c-s3`; o `export` de 8
+  símbolos só internos.
+
 ### Alterado
 
 - Testes mais enxutos (#176): `memOut`, `freePort`, `fakeRes`, `espiao`, `setupApp`/`withServer`, `pastaTemp` e
@@ -16,6 +24,9 @@ diante: `PATCH` corrige, `MINOR` acrescenta sem quebrar e `MAJOR` quebra.
   juntam seus arquivos divididos; as pastas temporárias sem limpeza passam por `aoFim`; o e2e usa o
   wrapper `e2e()` e um só Chromium. Nenhum teste saiu. A asserção do `makeRequireAuth` que sempre passava agora
   conta as chamadas do `next` e falha se o `?token=` na URL voltar a valer.
+- A Ajuda manda criar o sudoers com o nome por instalação (`/etc/sudoers.d/dashboard-<computador>-<id>`,
+  ADR 0020), não com o antigo. A lista `SHELL_SCRIPTS` do `check` e da `seguranca` virou um módulo só
+  (`scripts/shell-scripts.mjs`), e o tema lembrado ficou em `public/js/core/tema.js`.
 - `AGENTS.md` 30% mais curto (#172): as decisões das ADRs 0030 a 0039 e 0042 a 0050 viram regra curta
   com o link da ADR, e o `CLAUDE.md` deixa de repetir o AGENTS e o CONTRIBUTING. Nenhuma regra mudou.
 - Roadmap 2.3.0–2.6.0 fechado (#168): o `docs/ROADMAP.md` diz "concluído". Em seguida (#170), ele

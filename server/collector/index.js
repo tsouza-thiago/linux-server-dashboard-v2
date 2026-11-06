@@ -10,7 +10,7 @@ import { computeRates } from './rates.js';
 // fora do ar falha rápido em vez de travar a coleta (invariante I4).
 export const SSH_OPTS = ['-o', 'BatchMode=yes', '-o', 'ConnectTimeout=10'];
 /** Intervalo mínimo entre dois testes SMART (1 h). */
-export const SMART_INTERVAL_MS = 3600000;
+const SMART_INTERVAL_MS = 3600000;
 // Uma coleta normal tem ~3 KB (2,9 KB medidos no servidor real). Acima de 1 MB a resposta não é a da coleta (servidor
 // comprometido ou quebrado): a conexão é cortada para não encher a memória desta máquina.
 export const MAX_OUTPUT_BYTES = 1024 * 1024;

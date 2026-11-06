@@ -1,8 +1,7 @@
 // Cálculos da tela, sem DOM (testáveis no Node): séries a partir dos baldes, previsão de
 // disco cheio, resumo diário no fuso local (B5), manchete de saúde e linha do tempo.
-import { localDay } from './format.js';
+import { isNum, localDay } from './format.js';
 
-const isNum = (v) => typeof v === 'number' && Number.isFinite(v);
 // Posições dentro de cada métrica do balde: [mínimo, máximo, média].
 const AVG = 2;
 const MIN = 0;

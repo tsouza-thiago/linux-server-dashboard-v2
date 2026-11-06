@@ -51,7 +51,7 @@ export function detectionScript({ password = '' } = {}) {
  * aceitou a senha do SSH), `pede-senha` (entrou por chave e o sudo pede senha: ela vem no
  * passo 5), `requiretty` (o sudo exige terminal), `nao` (sem sudo) e `ausente` (sem o sudo).
  */
-export const SUDO_STATES = ['root', 'nopasswd', 'senha', 'pede-senha', 'requiretty', 'nao', 'ausente'];
+const SUDO_STATES = ['root', 'nopasswd', 'senha', 'pede-senha', 'requiretty', 'nao', 'ausente'];
 /** Estados em que o preparo assistido funciona (com a senha do sudo, quando pede). */
 export const SUDO_OK = ['root', 'nopasswd', 'senha', 'pede-senha'];
 // Grupos que costumam ter sudo (Debian/Ubuntu, Fedora/Arch e macOS-like).

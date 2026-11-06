@@ -56,7 +56,7 @@ export function flatten(s) {
 }
 
 // Início do balde de `step` ms que contém `ms` (alinhado à época, igual em toda máquina).
-const bucketStart = (ms, step) => Math.floor(ms / step) * step;
+export const bucketStart = (ms, step) => Math.floor(ms / step) * step;
 
 // Acumulador de um balde: por métrica, mínimo, máximo, soma e contagem.
 function newAcc(t) { return { t, n: 0, m: new Map() }; }

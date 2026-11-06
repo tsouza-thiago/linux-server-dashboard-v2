@@ -53,7 +53,7 @@ export const CENARIOS = ['normal', 'lacunas', 'offline', 'vazio'];
 // normalizeTargets completa o smartDevs com os discos, como a instalação sem SMART_DEVS faz
 // (configTargets); sem isso a Ajuda diria "nenhum disco em SMART_DEVS" (#57). O hash do
 // coletor não muda: SMART nos mesmos discos do I/O fica fora da conta.
-export const ALVOS = normalizeTargets({ netIf: 'enp0s7', mounts: ['/', '/mnt/sdb1', '/mnt/sdc1', '/mnt/sdc2'], devs: ['sda', 'sdb', 'sdc'], services: ['smbd'] });
+const ALVOS = normalizeTargets({ netIf: 'enp0s7', mounts: ['/', '/mnt/sdb1', '/mnt/sdc1', '/mnt/sdc2'], devs: ['sda', 'sdb', 'sdc'], services: ['smbd'] });
 export const FIXTURE = fs.readFileSync(path.join(ROOT, 'test', 'fixtures', 'coleta-v2', 'debian13-real.txt'), 'utf8');
 
 /**

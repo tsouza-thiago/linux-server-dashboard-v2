@@ -1,6 +1,6 @@
 // Formatação PT-BR. Dado ausente vira "—", nunca zero inventado (I5).
 const DASH = '—';
-const isNum = (v) => typeof v === 'number' && Number.isFinite(v);
+export const isNum = (v) => typeof v === 'number' && Number.isFinite(v);
 
 /** Número no padrão brasileiro ("1.234,5") com `digits` casas. */
 export function num(v, digits = 0) {

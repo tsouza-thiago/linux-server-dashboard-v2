@@ -14,6 +14,7 @@ import { connect } from './core/sse.js';
 import { VIEWS, PERIODS, parseHash, buildHash, veioDoAtualizar, veioDoReconfigurar, veioDoAssistente, viewByKey } from './core/router.js';
 import { html, mount } from './core/html.js';
 import { isOffline, mergeAlerts } from './core/analysis.js';
+import { lerTema, gravarTema } from './core/tema.js';
 import { esperaVisivel } from './core/espera.js';
 import { lembrarFormato } from './core/formato.js';
 import * as f from './core/format.js';
@@ -33,7 +34,6 @@ const MODULES = {
   'visao-geral': visaoGeral, recursos, armazenamento, rede, processos, eventos, relatorios, ajuda,
 };
 const USES_BUCKETS = new Set(['visao-geral', 'recursos', 'armazenamento', 'rede']);
-const THEME_KEY = 'dash_theme';
 // Elemento da página pelo id.
 const $ = (id) => document.getElementById(id);
 
@@ -49,14 +49,14 @@ const store = createStore({
 /** Aplica o tema na página, lembra a escolha e troca o ícone do botão. */
 function applyTheme(theme) {
   document.documentElement.dataset.theme = theme;
-  try { localStorage.setItem(THEME_KEY, theme); } catch { /* armazenamento bloqueado */ }
+  gravarTema(theme);
   const dark = theme === 'dark';
   mount($('themeToggle'), icon(dark ? 'moon' : 'sun', 18));
   $('themeToggle').setAttribute('aria-label', dark ? 'Usar tema claro (T)' : 'Usar tema escuro (T)');
 }
 /** Tema lembrado (escuro se não houver ou se o armazenamento estiver bloqueado). */
 function currentTheme() {
-  try { return localStorage.getItem(THEME_KEY) === 'light' ? 'light' : 'dark'; } catch { return 'dark'; }
+  return lerTema();
 }
 // Tela aberta agora: { view, mod, ctx }.
 let current = null;

@@ -91,7 +91,7 @@ export const dataDe = (root, opcoes) => path.join(pastasDe(root, opcoes).dados, 
 export const backupsDe = (root, opcoes) => path.join(pastasDe(root, opcoes).dados, '.backups');
 
 /** Onde o pacote .deb fica, se o código não estiver no layout dele (ADR 0042, item 1). */
-export const PASTA_DO_PACOTE = '/opt/server-dashboard';
+const PASTA_DO_PACOTE = '/opt/server-dashboard';
 
 /**
  * Os caminhos fixos do pacote para o código em `codigo` (<base>/versoes/vX.Y.Z): o link
