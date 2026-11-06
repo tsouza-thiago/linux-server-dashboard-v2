@@ -22,7 +22,8 @@ diante: `PATCH` corrige, `MINOR` acrescenta sem quebrar e `MAJOR` quebra.
 - A Ajuda manda criar o sudoers com o nome por instalação (`/etc/sudoers.d/dashboard-<computador>-<id>`,
   ADR 0020), não com o antigo. A lista `SHELL_SCRIPTS` do `check` e da `seguranca` virou um módulo só
   (`scripts/shell-scripts.mjs`), e o tema lembrado ficou em `public/js/core/tema.js`.
-
+- `AGENTS.md` 30% mais curto (#172): as decisões das ADRs 0030 a 0039 e 0042 a 0050 viram regra curta
+  com o link da ADR, e o `CLAUDE.md` deixa de repetir o AGENTS e o CONTRIBUTING. Nenhuma regra mudou.
 - Roadmap 2.3.0–2.6.0 fechado (#168): o `docs/ROADMAP.md` diz "concluído". Em seguida (#170), ele
   encolheu para os níveis P/M/G/GG e a tabela feature → versão → ADR; os planejamentos de
   `docs/roadmap/` saíram (ficam só os avisos da F7 e da F9, que as ADRs 0030 e 0042 citam).
