@@ -11,6 +11,8 @@ diante: `PATCH` corrige, `MINOR` acrescenta sem quebrar e `MAJOR` quebra.
 
 ### Alterado
 
+- `AGENTS.md` 30% mais curto (#172): as decisões das ADRs 0030 a 0039 e 0042 a 0050 viram regra curta
+  com o link da ADR, e o `CLAUDE.md` deixa de repetir o AGENTS e o CONTRIBUTING. Nenhuma regra mudou.
 - Roadmap 2.3.0–2.6.0 fechado (#168): o `docs/ROADMAP.md` diz "concluído" e cada feature diz em
   que versão foi entregue (F7 e F8 na 2.5.0, F9 na 2.6.0). Os documentos da F7, da F8 e da F9 também.
 
