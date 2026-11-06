@@ -1,4 +1,5 @@
 // Migração do histórico da V1: sem arquivo, arquivo ilegível, --verificar e backup.
+import { pastaTemp } from '../../test-support/limpeza.js';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
@@ -21,35 +22,35 @@ const v1 = (min, tempC = 40) => ({
   net: { rxBytes: 1, txBytes: 1, rxMbps: 0, txMbps: 0 },
 });
 
-function setup(content) {
-  const dataDir = fs.mkdtempSync(path.join(os.tmpdir(), 'lsd-mig-'));
+function setup(t, content) {
+  const dataDir = pastaTemp(t, 'lsd-mig-');
   const v1File = path.join(dataDir, 'history.json');
   if (content !== undefined) fs.writeFileSync(v1File, typeof content === 'string' ? content : JSON.stringify(content));
   return { dataDir, v1File };
 }
 
-test('migração: sem arquivo da V1 não faz nada', () => {
-  const { dataDir, v1File } = setup();
+test('migração: sem arquivo da V1 não faz nada', (t) => {
+  const { dataDir, v1File } = setup(t);
   assert.equal(migrateV1({ v1File, dataDir }).status, 'ausente');
   assert.deepEqual(fs.readdirSync(dataDir), []);
 });
 
-test('migração: arquivo ilegível é deixado intacto', () => {
+test('migração: arquivo ilegível é deixado intacto', (t) => {
   for (const bad of ['{{{ não é json', JSON.stringify({ outra: 1 })]) {
-    const { dataDir, v1File } = setup(bad);
+    const { dataDir, v1File } = setup(t, bad);
     const r = migrateV1({ v1File, dataDir });
     assert.equal(r.status, 'invalido');
     assert.equal(fs.readFileSync(v1File, 'utf8'), bad, 'original não muda');
     assert.deepEqual(fs.readdirSync(dataDir), ['history.json']);
     assert.match(describe(r, dataDir), /não pôde ser lido[\s\S]*não foi alterado/);
   }
-  const { dataDir } = setup();
+  const { dataDir } = setup(t);
   assert.equal(inspectV1(dataDir).status, 'invalido', 'pasta no lugar do arquivo');
 });
 
-test('migração --verificar: resume sem gravar nada', () => {
+test('migração --verificar: resume sem gravar nada', (t) => {
   const list = [v1(0), v1(1), { host: 'sem ts' }, v1(1), { ts: 'ontem' }];
-  const { dataDir, v1File } = setup({ samples: list });
+  const { dataDir, v1File } = setup(t, { samples: list });
   const r = migrateV1({ v1File, dataDir, dryRun: true });
   assert.equal(r.status, 'verificado');
   assert.equal(r.samples.length, 2, 'duplicado por ts conta 1 vez');
@@ -63,10 +64,10 @@ test('migração --verificar: resume sem gravar nada', () => {
   assert.match(text, /Nada foi gravado/);
 });
 
-test('migração: grava bruto (72 h) + agregados de todo o período e só então faz o backup', async () => {
+test('migração: grava bruto (72 h) + agregados de todo o período e só então faz o backup', async (t) => {
   const minutes = 5 * 24 * 60; // 5 dias de V1 a 1/min
   const list = Array.from({ length: minutes }, (_, i) => v1(i, i === 60 ? 77 : 40));
-  const { dataDir, v1File } = setup(list.slice().reverse());
+  const { dataDir, v1File } = setup(t, list.slice().reverse());
   const r = migrateV1({ v1File, dataDir });
   assert.equal(r.status, 'migrado');
   assert.ok(!fs.existsSync(v1File), 'arquivo da V1 virou backup');
@@ -93,9 +94,9 @@ test('migração: grava bruto (72 h) + agregados de todo o período e só então
   assert.match(describe(r, dataDir), /Backup do arquivo original: history\.v1-migrado\.json/);
 });
 
-test('migração: rodar de novo (queda antes do backup) não duplica nada', () => {
+test('migração: rodar de novo (queda antes do backup) não duplica nada', (t) => {
   const list = Array.from({ length: 30 }, (_, i) => v1(i));
-  const { dataDir, v1File } = setup(list);
+  const { dataDir, v1File } = setup(t, list);
   const copy = fs.readFileSync(v1File, 'utf8');
   migrateV1({ v1File, dataDir });
   const snapshot = () => ['history', 'rollup'].map((d) => listDays(path.join(dataDir, d))
@@ -109,8 +110,8 @@ test('migração: rodar de novo (queda antes do backup) não duplica nada', () =
   assert.ok(fs.existsSync(path.join(dataDir, BACKUP_NAME)));
 });
 
-test('migração: mescla com dados da V2 do mesmo dia', async () => {
-  const { dataDir, v1File } = setup([v1(0), v1(1)]);
+test('migração: mescla com dados da V2 do mesmo dia', async (t) => {
+  const { dataDir, v1File } = setup(t, [v1(0), v1(1)]);
   const h = new History({ dataDir, log: () => {} });
   h.append({ ...v1(2), schemaVersion: 2 });
   await h.flush();
@@ -119,8 +120,8 @@ test('migração: mescla com dados da V2 do mesmo dia', async () => {
   assert.deepEqual(items.map((s) => s.ts), [at(0), at(1), at(2)]);
 });
 
-test('migração: lista vazia da V1 vira só o backup', () => {
-  const { dataDir, v1File } = setup([]);
+test('migração: lista vazia da V1 vira só o backup', (t) => {
+  const { dataDir, v1File } = setup(t, []);
   const r = migrateV1({ v1File, dataDir });
   assert.equal(r.status, 'migrado');
   assert.equal(r.rawDays, 0);

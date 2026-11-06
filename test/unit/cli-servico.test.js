@@ -18,6 +18,7 @@ import { rotateIfNeeded, createLogFile } from '../../server/logfile.js';
 import { main, isConfigured } from '../../server/cli/index.js';
 import { lerComModo } from '../../test-support/arquivos.js';
 import { esperarAte } from '../../test-support/esperar.js';
+import { freePort } from '../../test-support/rede.js';
 
 const noSystemd = () => ({ error: new Error('sem systemctl') });
 
@@ -36,14 +37,6 @@ function memOut() {
   const lines = [];
   const stream = { isTTY: false, write: (s) => { lines.push(s); return true; } };
   return { lines, stream, text: () => lines.join('') };
-}
-
-async function freePort() {
-  const srv = net.createServer();
-  await new Promise((r) => srv.listen(0, '127.0.0.1', r));
-  const { port } = srv.address();
-  await new Promise((r) => srv.close(r));
-  return port;
 }
 
 test('servico: reconhece só o processo que roda o server/index.js desta pasta', async (t) => {

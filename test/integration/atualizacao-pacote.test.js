@@ -4,11 +4,9 @@
 // injetados. Nenhum systemd, polkit ou rede de verdade.
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { EventEmitter } from 'node:events';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import { makeOutput } from '../../server/cli/saida.js';
 import { atualizar } from '../../server/cli/atualizar.js';
 import { UNIDADE_ATUALIZAR, UNIDADE_VOLTAR, iniciarUnidade, lerChaves, procurarNoPacote, registroDesde, versaoDoPacote } from '../../server/atualizacao/pacote.js';
 import { bloqueioDaPasta, bloqueioDaReconfiguracao, procurar } from '../../server/atualizacao/procurar.js';
@@ -18,12 +16,8 @@ import { pastasDaInstalacao } from '../../server/config.js';
 import { serviceNode } from '../../server/setup/local.js';
 import { MARCADOR_RECONFIGURAR } from '../../server/atualizacao/novidades.js';
 import { aoFim } from '../../test-support/limpeza.js';
-
-function memOut() {
-  const partes = [];
-  const out = makeOutput({ stream: { isTTY: false, write: (s) => { partes.push(s); return true; } }, env: {} });
-  return { out, texto: () => partes.join('') };
-}
+import { memOut } from '../../test-support/saida.js';
+import { espiao } from '../../test-support/falsos.js';
 
 const CHANGELOG = `# Changelog\n\n## [2.7.0] — 2026-11-20\n\n- novidade da 2.7.0\n\n## [2.6.0] — 2026-11-10\n\n- a de hoje\n`;
 
@@ -263,18 +257,6 @@ test('pacote: a agenda relê de hora em hora e guarda a hora da procura do execu
 });
 
 // Filho falso do spawn: termina como o teste mandar.
-function espiao(fim) {
-  const chamadas = [];
-  const spawnFn = (cmd, args, opts) => {
-    chamadas.push({ cmd, args, opts });
-    const filho = new EventEmitter();
-    filho.unref = () => {};
-    setImmediate(() => fim(filho));
-    return filho;
-  };
-  return { chamadas, spawnFn };
-}
-
 test('pacote: o painel dispara o lançador do pacote, com as pastas XDG da instalação (I11)', async () => {
   const pastas = pastasDaInstalacao({ ambiente: { SERVER_DASHBOARD_MODO: 'sistema', XDG_DATA_HOME: '/dados/ana' }, home: '/casa/ana', codigo: '/srv/pacote/versoes/v2.6.0' });
   const root = '/srv/pacote/versoes/v2.6.0';

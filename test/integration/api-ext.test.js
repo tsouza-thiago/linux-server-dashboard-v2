@@ -1,39 +1,8 @@
 // Proteções da API: cookie CSRF, rate limit das mutações e erros em JSON sem stack trace.
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { mkdtempSync, rmSync } from 'node:fs';
-import { tmpdir } from 'node:os';
-import path from 'node:path';
-import { createApp } from '../../server/index.js';
-import { listen, close, request } from '../../test-support/request.js';
-
-function setupApp({ collect, token, rateLimitMax } = {}) {
-  const dir = mkdtempSync(path.join(tmpdir(), 'dash-api-ext-'));
-  const handles = createApp({
-    sshHost: 'meu-host',
-    pollInterval: 60000,
-    historyFile: path.join(dir, 'history.json'),
-    alertsFile: path.join(dir, 'alerts.json'),
-    annotationsFile: path.join(dir, 'annotations.json'),
-    dashToken: token,
-    rateLimitMax,
-    collect: collect || (async () => ({ ok: false, error: 'sem runner', ts: new Date().toISOString() })),
-    log: () => {},
-  });
-  const cleanup = () => { try { rmSync(dir, { recursive: true, force: true }); } catch { /* noop */ } };
-  return { ...handles, cleanup };
-}
-
-async function withServer(t, setup) {
-  const app = setup();
-  const { server, port } = await listen(app.app);
-  t.after(async () => {
-    await app.shutdown(); // espera as gravações pendentes antes de apagar a pasta
-    await close(server);
-    app.cleanup();
-  });
-  return { ...app, server, port };
-}
+import { request } from '../../test-support/request.js';
+import { setupApp, withServer } from '../../test-support/app-api.js';
 
 test('API: cookie CSRF emitido no GET (SameSite=Lax, HttpOnly) e não reemitido', async (t) => {
   const s = await withServer(t, () => setupApp());

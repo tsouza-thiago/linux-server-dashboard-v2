@@ -1,22 +1,23 @@
 // Agregados de 5 min: só baldes completos, consulta por intervalo, 90 dias e linhas ruins.
+import { pastaTemp } from '../../test-support/limpeza.js';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
+import { relogio, amostraMin, silent } from '../../test-support/amostras.js';
 import { RollupStore, ROLLUP_STEP_MS } from '../../server/storage/rollup.js';
 import { History } from '../../server/storage/index.js';
 import { listDays, dayOf, readNdjson, writeFileAtomicSync, HOUR_MS, DAY_MS } from '../../server/storage/ndjson.js';
 
-const tmp = () => fs.mkdtempSync(path.join(os.tmpdir(), 'lsd-rollup-'));
+const tmp = (t) => pastaTemp(t, 'lsd-rollup-');
 const MIN = 60000;
 const BASE = Date.UTC(2026, 9, 7, 0, 0);
-const at = (min) => new Date(BASE + min * MIN).toISOString();
-const sample = (min, tempC = 40) => ({ ts: at(min), host: 'srv', tempC, load: [0.1, 0.1, 0.1] });
-const silent = () => {};
+const at = relogio(BASE);
+const sample = amostraMin(at);
 
-test('RollupStore: fecha só baldes completos, 1 linha por balde, e retoma após reiniciar', async () => {
-  const dir = tmp();
+test('RollupStore: fecha só baldes completos, 1 linha por balde, e retoma após reiniciar', async (t) => {
+  const dir = tmp(t);
   const r = new RollupStore({ dir, log: silent });
   const raw = [];
   for (let i = 0; i < 12; i++) { raw.push(sample(i, 40 + i)); r.close(raw, Date.parse(raw.at(-1).ts)); }
@@ -33,8 +34,8 @@ test('RollupStore: fecha só baldes completos, 1 linha por balde, e retoma após
   assert.equal(readNdjson(path.join(dir, `${dayOf(at(0))}.ndjson`)).items.length, 2, 'fechar de novo não duplica');
 });
 
-test('RollupStore: query filtra por intervalo e atravessa dias; apaga além de 90 dias', async () => {
-  const dir = tmp();
+test('RollupStore: query filtra por intervalo e atravessa dias; apaga além de 90 dias', async (t) => {
+  const dir = tmp(t);
   const r = new RollupStore({ dir, retentionDays: 90, log: silent });
   const raw = [];
   for (let d = 0; d < 95; d += 1) for (let i = 0; i < 6; i += 1) raw.push(sample(d * 1440 + i));
@@ -51,8 +52,8 @@ test('RollupStore: query filtra por intervalo e atravessa dias; apaga além de 9
   assert.ok(r.sizeBytes() > 0);
 });
 
-test('RollupStore: linha cortada e lixo são ignorados; writeBucketsSync mescla por t', () => {
-  const dir = tmp();
+test('RollupStore: linha cortada e lixo são ignorados; writeBucketsSync mescla por t', (t) => {
+  const dir = tmp(t);
   const file = path.join(dir, `${dayOf(at(0))}.ndjson`);
   fs.writeFileSync(file, `${JSON.stringify({ t: BASE, n: 1, m: { tempC: [1, 1, 1] } })}\n{"t":1,"n":"x"}\n{"t":`);
   const r = new RollupStore({ dir, log: silent });
@@ -63,8 +64,8 @@ test('RollupStore: linha cortada e lixo são ignorados; writeBucketsSync mescla 
   assert.equal(new RollupStore({ dir: path.join(dir, 'nada'), log: silent }).lastT, -Infinity);
 });
 
-test('History: 1 amostra por minuto gera bruto + agregados; recarrega igual', async () => {
-  const dataDir = tmp();
+test('History: 1 amostra por minuto gera bruto + agregados; recarrega igual', async (t) => {
+  const dataDir = tmp(t);
   const h = new History({ dataDir, log: silent });
   for (let i = 0; i < 30; i++) h.append(sample(i, i === 17 ? 90 : 40));
   await h.flush();
@@ -81,8 +82,8 @@ test('History: 1 amostra por minuto gera bruto + agregados; recarrega igual', as
   assert.equal(h2.samples.length, 30);
 });
 
-test('History: reinício depois de parado fecha os baldes pendentes', async () => {
-  const dataDir = tmp();
+test('History: reinício depois de parado fecha os baldes pendentes', async (t) => {
+  const dataDir = tmp(t);
   const h = new History({ dataDir, log: silent });
   for (let i = 0; i < 8; i++) h.raw.append(sample(i)); // grava só o bruto (simula queda antes do rollup)
   await h.flush();
@@ -91,8 +92,8 @@ test('History: reinício depois de parado fecha os baldes pendentes', async () =
   assert.equal(h2.rollup.lastT, BASE, 'balde 00–05 fechado no boot');
 });
 
-test('History.buckets: dentro da janela bruta usa amostras de 1 min e preserva o pico', () => {
-  const h = new History({ dataDir: tmp(), log: silent });
+test('History.buckets: dentro da janela bruta usa amostras de 1 min e preserva o pico', (t) => {
+  const h = new History({ dataDir: tmp(t), log: silent });
   for (let i = 0; i < 120; i++) h.append(sample(i, i === 61 ? 95 : 40));
   const r = h.buckets({ fromMs: BASE, toMs: Date.parse(at(119)), maxPoints: 60 });
   assert.equal(r.step, 2 * MIN);
@@ -104,8 +105,8 @@ test('History.buckets: dentro da janela bruta usa amostras de 1 min e preserva o
   assert.equal(tiny.buckets.length, 10);
 });
 
-test('History.buckets: antes da janela bruta junta agregados + bruto sem sobrepor', async () => {
-  const dataDir = tmp();
+test('History.buckets: antes da janela bruta junta agregados + bruto sem sobrepor', async (t) => {
+  const dataDir = tmp(t);
   const h = new History({ dataDir, retentionMs: 2 * HOUR_MS, log: silent });
   for (let i = 0; i < 6 * 60; i++) h.append(sample(i, i === 30 ? 99 : 40));
   await h.flush();
@@ -123,8 +124,8 @@ test('History.buckets: antes da janela bruta junta agregados + bruto sem sobrepo
   assert.ok(big.buckets.length <= 10);
 });
 
-test('History.buckets: sem dados devolve lista vazia; maxPoints é limitado', () => {
-  const h = new History({ dataDir: tmp(), log: silent });
+test('History.buckets: sem dados devolve lista vazia; maxPoints é limitado', (t) => {
+  const h = new History({ dataDir: tmp(t), log: silent });
   const r = h.buckets({ fromMs: BASE, toMs: BASE + DAY_MS, maxPoints: 999999 });
   assert.deepEqual(r.buckets, []);
   assert.equal(r.step, ROLLUP_STEP_MS);
@@ -132,8 +133,8 @@ test('History.buckets: sem dados devolve lista vazia; maxPoints é limitado', ()
   assert.equal(h.length, 0);
 });
 
-test('History: pausa maior que a janela bruta não perde o último balde aberto', async () => {
-  const dataDir = tmp();
+test('History: pausa maior que a janela bruta não perde o último balde aberto', async (t) => {
+  const dataDir = tmp(t);
   const h = new History({ dataDir, log: silent });
   for (let i = 0; i < 13; i++) h.append(sample(i)); // balde 10–15 fica aberto com 3 amostras
   await h.flush();
@@ -145,8 +146,8 @@ test('History: pausa maior que a janela bruta não perde o último balde aberto'
   assert.equal(r.buckets.reduce((n, b) => n + b.n, 0), 14, 'as 13 amostras antigas + a nova');
 });
 
-test('History.buckets: amostra recente em balde ainda aberto aparece na visão longa', async () => {
-  const dataDir = tmp();
+test('History.buckets: amostra recente em balde ainda aberto aparece na visão longa', async (t) => {
+  const dataDir = tmp(t);
   const h = new History({ dataDir, log: silent });
   for (let i = 0; i < 13; i++) h.append(sample(i));
   const back = 5 * 24 * 60 + 7; // volta 5 dias depois, fora do alinhamento de 5 min
@@ -163,8 +164,8 @@ test('History.buckets: amostra recente em balde ainda aberto aparece na visão l
 // #78: each lê 1 arquivo diário por vez e entrega cada balde logo que o lê, em vez de montar a
 // lista dos 90 dias. Duplicata (só por edição à mão: o painel grava cada `t` 1 vez) vale a
 // 1ª linha do dia.
-test('#78: RollupStore.each entrega os baldes do período, dia a dia, sem duplicatas', () => {
-  const dir = tmp();
+test('#78: RollupStore.each entrega os baldes do período, dia a dia, sem duplicatas', (t) => {
+  const dir = tmp(t);
   const line = (b) => `${JSON.stringify(b)}\n`;
   const d0 = path.join(dir, `${dayOf(BASE)}.ndjson`);
   const d1 = path.join(dir, `${dayOf(BASE + DAY_MS)}.ndjson`);

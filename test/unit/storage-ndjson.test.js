@@ -1,20 +1,21 @@
 // Histórico bruto em NDJSON: 1 linha por amostra (B7), virada do dia e janela de 72 h.
+import { pastaTemp } from '../../test-support/limpeza.js';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
+import { relogio, silent } from '../../test-support/amostras.js';
 import { RawStore, readNdjson, listDays, dayOf, writeFileAtomicSync, HOUR_MS } from '../../server/storage/ndjson.js';
 
-const tmp = () => fs.mkdtempSync(path.join(os.tmpdir(), 'lsd-raw-'));
+const tmp = (t) => pastaTemp(t, 'lsd-raw-');
 const MIN = 60000;
 const BASE = Date.UTC(2026, 9, 7, 12, 0);
-const at = (min) => new Date(BASE + min * MIN).toISOString();
+const at = relogio(BASE);
 const sample = (min, extra = {}) => ({ ts: at(min), host: 'srv', load: [0.1, 0.1, 0.1], ...extra });
-const silent = () => {};
 
-test('RawStore: grava 1 linha por amostra no arquivo do dia e recarrega', async () => {
-  const dir = tmp();
+test('RawStore: grava 1 linha por amostra no arquivo do dia e recarrega', async (t) => {
+  const dir = tmp(t);
   const s1 = new RawStore({ dir, log: silent });
   s1.append(sample(0));
   s1.append(sample(1));
@@ -28,8 +29,8 @@ test('RawStore: grava 1 linha por amostra no arquivo do dia e recarrega', async 
   assert.equal(s2.getLatest().ts, at(1));
 });
 
-test('B7 — gravar uma amostra só acrescenta a linha dela (não reescreve o histórico)', async () => {
-  const dir = tmp();
+test('B7 — gravar uma amostra só acrescenta a linha dela (não reescreve o histórico)', async (t) => {
+  const dir = tmp(t);
   const store = new RawStore({ dir, limit: 5000, log: silent });
   const big = { topProcs: Array(8).fill({ user: 'root', pid: 1, cpu: 0, mem: 0.3, cmd: '/usr/sbin/smbd --foreground' }) };
   for (let i = 0; i < 2000; i++) store.append(sample(i, big));
@@ -45,8 +46,8 @@ test('B7 — gravar uma amostra só acrescenta a linha dela (não reescreve o hi
   assert.equal(fs.readFileSync(firstFile, 'utf8').slice(0, 2000), head, 'conteúdo antigo intacto');
 });
 
-test('RawStore: vira o dia em outro arquivo; janela de 72 h conta da amostra mais recente', async () => {
-  const dir = tmp();
+test('RawStore: vira o dia em outro arquivo; janela de 72 h conta da amostra mais recente', async (t) => {
+  const dir = tmp(t);
   const store = new RawStore({ dir, retentionMs: 72 * HOUR_MS, log: silent });
   for (let h = 0; h <= 100; h += 1) store.append(sample(h * 60));
   await store.flush();
@@ -58,8 +59,8 @@ test('RawStore: vira o dia em outro arquivo; janela de 72 h conta da amostra mai
   assert.equal(reloaded.samples[0].ts, store.samples[0].ts);
 });
 
-test('RawStore: apaga arquivos de dias que saíram inteiros da janela', async () => {
-  const dir = tmp();
+test('RawStore: apaga arquivos de dias que saíram inteiros da janela', async (t) => {
+  const dir = tmp(t);
   const store = new RawStore({ dir, retentionMs: 24 * HOUR_MS, log: silent });
   for (let d = 0; d < 5; d += 1) store.append(sample(d * 24 * 60));
   await store.flush();
@@ -67,15 +68,15 @@ test('RawStore: apaga arquivos de dias que saíram inteiros da janela', async ()
   assert.deepEqual(days, [dayOf(at(3 * 24 * 60)), dayOf(at(4 * 24 * 60))]);
 });
 
-test('RawStore: limite de amostras em memória (HISTORY_LIMIT) é FIFO', () => {
-  const store = new RawStore({ dir: tmp(), limit: 5, log: silent });
+test('RawStore: limite de amostras em memória (HISTORY_LIMIT) é FIFO', (t) => {
+  const store = new RawStore({ dir: tmp(t), limit: 5, log: silent });
   for (let i = 0; i < 8; i++) store.append(sample(i));
   assert.equal(store.length, 5);
   assert.equal(store.samples[0].ts, at(3));
 });
 
-test('RawStore: linha cortada por queda é ignorada e a próxima gravação começa em linha nova', async () => {
-  const dir = tmp();
+test('RawStore: linha cortada por queda é ignorada e a próxima gravação começa em linha nova', async (t) => {
+  const dir = tmp(t);
   const file = path.join(dir, `${dayOf(at(0))}.ndjson`);
   fs.writeFileSync(file, `${JSON.stringify(sample(0))}\n{"ts":"${at(1)}","ho`);
   const logs = [];
@@ -88,8 +89,8 @@ test('RawStore: linha cortada por queda é ignorada e a próxima gravação come
   assert.deepEqual(again.samples.map((s) => s.ts), [at(0), at(2)]);
 });
 
-test('RawStore: ignora amostras sem ts válido, ordena ao carregar e tolera pasta ausente', async () => {
-  const dir = tmp();
+test('RawStore: ignora amostras sem ts válido, ordena ao carregar e tolera pasta ausente', async (t) => {
+  const dir = tmp(t);
   fs.writeFileSync(path.join(dir, `${dayOf(at(0))}.ndjson`), [sample(5), { host: 'x' }, { ts: 'ontem' }, sample(1)].map((x) => JSON.stringify(x)).join('\n') + '\n');
   fs.writeFileSync(path.join(dir, 'outro.txt'), 'não é dia');
   const store = new RawStore({ dir, log: silent });
@@ -101,8 +102,8 @@ test('RawStore: ignora amostras sem ts válido, ordena ao carregar e tolera past
   assert.equal(none.getLatest(), null);
 });
 
-test('RawStore: getSamples e getRange (com redução que preserva picos)', () => {
-  const store = new RawStore({ dir: tmp(), log: silent });
+test('RawStore: getSamples e getRange (com redução que preserva picos)', (t) => {
+  const store = new RawStore({ dir: tmp(t), log: silent });
   for (let i = 0; i < 50; i++) store.append(sample(i, { tempC: i === 33 ? 90 : 40 }));
   assert.equal(store.getSamples(10).length, 10);
   assert.deepEqual(store.getRange(at(10), at(12)).map((s) => s.ts), [at(10), at(11), at(12)]);
@@ -111,8 +112,8 @@ test('RawStore: getSamples e getRange (com redução que preserva picos)', () =>
   assert.ok(reduced.some((s) => s.tempC === 90));
 });
 
-test('RawStore: falha de gravação é registrada sem derrubar o poll', async () => {
-  const dir = tmp();
+test('RawStore: falha de gravação é registrada sem derrubar o poll', async (t) => {
+  const dir = tmp(t);
   const blocker = path.join(dir, 'arquivo');
   fs.writeFileSync(blocker, 'x');
   const logs = [];
@@ -123,8 +124,8 @@ test('RawStore: falha de gravação é registrada sem derrubar o poll', async ()
   assert.match(logs.join('\n'), /falha ao gravar/);
 });
 
-test('readNdjson e writeFileAtomicSync', () => {
-  const dir = tmp();
+test('readNdjson e writeFileAtomicSync', (t) => {
+  const dir = tmp(t);
   const file = path.join(dir, 'sub', 'x.ndjson');
   writeFileAtomicSync(file, '{"a":1}\n\n{"a":2}\n');
   assert.equal(fs.statSync(file).mode & 0o777, 0o600);
@@ -133,8 +134,8 @@ test('readNdjson e writeFileAtomicSync', () => {
   assert.throws(() => readNdjson(dir), /EISDIR/);
 });
 
-test('RAM (orçamento de desempenho): só a amostra mais recente guarda os processos, em memória e depois de reiniciar; o disco guarda tudo', async () => {
-  const dir = tmp();
+test('RAM (orçamento de desempenho): só a amostra mais recente guarda os processos, em memória e depois de reiniciar; o disco guarda tudo', async (t) => {
+  const dir = tmp(t);
   const procs = { topProcs: [{ user: 'root', pid: 1, cpu: 0, mem: 1, rssKB: 10, cmd: '/sbin/init' }] };
   const store = new RawStore({ dir, log: silent });
   for (let i = 0; i < 3; i++) store.append(sample(i, procs));
@@ -153,8 +154,8 @@ test('RAM (orçamento de desempenho): só a amostra mais recente guarda os proce
   assert.equal(again.getLatest().ts, at(24 * 60));
 });
 
-test('readNdjson: lê em blocos (linha e UTF-8 cortados entre blocos), map, linha inválida e arquivo cortado', () => {
-  const dir = tmp();
+test('readNdjson: lê em blocos (linha e UTF-8 cortados entre blocos), map, linha inválida e arquivo cortado', (t) => {
+  const dir = tmp(t);
   const file = path.join(dir, 'x.ndjson');
   const long = 'ç'.repeat(700_000); // ~1,4 MB: a linha atravessa o bloco de 1 MB no meio de um caractere
   fs.writeFileSync(file, `${JSON.stringify({ a: 1 })}\n{quebrada\n${JSON.stringify({ a: 2, s: long })}\n${JSON.stringify({ a: 3 })}`);

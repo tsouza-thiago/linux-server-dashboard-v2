@@ -1,7 +1,7 @@
 // Ponta a ponta no Chromium: o painel real, com 2 h de dados,
 // abre as 8 telas sem erro de JavaScript nem violação de CSP. Precisa do playwright-core
 // (devDependency) e de um Chromium; sem eles o teste é pulado com aviso.
-import test from 'node:test';
+import test, { after } from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import http from 'node:http';
@@ -19,6 +19,20 @@ try { ({ chromium } = await import('playwright-core')); } catch { /* sem playwri
 // No CI (E2E_OBRIGATORIO=1) o e2e não pode pular calado: sem navegador, a suíte falha.
 const OBRIGATORIO = process.env.E2E_OBRIGATORIO === '1';
 if (OBRIGATORIO && !chromium) throw new Error('E2E_OBRIGATORIO=1, mas o playwright-core não está instalado');
+
+/** Teste de navegador: o nome ganha o prefixo "e2e: " e o teste pula sem o playwright-core. */
+function e2e(nome, fn) {
+  return test(`e2e: ${nome}`, { skip: !chromium && 'playwright-core não instalado (npm install)' }, fn);
+}
+
+// Um só Chromium para o arquivo todo (abrir um por teste custava ~1 s cada); cada teste ganha o seu
+// contexto, com cookies e armazenamento próprios, e o fecha no fim.
+let navegador = null;
+function abrirNavegador() {
+  navegador ??= chromium.launch({ executablePath: process.env.CHROMIUM || undefined });
+  return navegador;
+}
+after(async () => { if (navegador) await navegador.then((b) => b.close(), () => {}); });
 
 // Gráficos mínimos por tela: Visão geral = 3 mini-gráficos + 5 faixas de telemetria;
 // Recursos = CPU, RAM, temperatura + 3 faixas de PSI; Armazenamento = previsão + 1 faixa por disco.
@@ -76,18 +90,19 @@ async function setup(t, extra = {}) {
   const { server, port } = await listen(extra.portaUnica ? { listen: (...a) => http.createServer(extra.portaUnica.handler).listen(...a) } : app.app);
   let browser;
   try {
-    browser = await chromium.launch({ executablePath: process.env.CHROMIUM || undefined });
+    browser = await abrirNavegador();
   } catch (err) {
     await close(server);
     if (OBRIGATORIO) throw err;
     return { skip: `Chromium indisponível: ${err.message.split('\n')[0]}` };
   }
-  const page = await browser.newPage({ viewport: extra.viewport || { width: 1280, height: 900 } });
+  const contexto = await browser.newContext({ viewport: extra.viewport || { width: 1280, height: 900 } });
+  const page = await contexto.newPage();
   const problems = [];
   page.on('console', (m) => { if (m.type() === 'error' || /Content Security Policy/i.test(m.text())) problems.push(m.text()); });
   page.on('pageerror', (e) => problems.push(e.message));
   aoFim(t, async () => {
-    await browser.close();
+    await contexto.close();
     extra.limparAssistentes?.();
     await app.shutdown();
     await close(server);
@@ -96,7 +111,7 @@ async function setup(t, extra = {}) {
   return { app, page, problems, base: `http://localhost:${port}` };
 }
 
-test('e2e: as 8 telas abrem com dados, gráficos e sem erro de JS/CSP', { skip: !chromium && 'playwright-core não instalado (npm install)' }, async (t) => {
+e2e('as 8 telas abrem com dados, gráficos e sem erro de JS/CSP', async (t) => {
   const s = await setup(t);
   if (s.skip) return t.skip(s.skip);
   for (const [id, title, charts] of VIEWS) {
@@ -112,7 +127,7 @@ test('e2e: as 8 telas abrem com dados, gráficos e sem erro de JS/CSP', { skip: 
   assert.deepEqual(s.problems, []);
 });
 
-test('e2e: visão geral mostra a manchete e os dados da última coleta', { skip: !chromium && 'sem playwright-core' }, async (t) => {
+e2e('visão geral mostra a manchete e os dados da última coleta', async (t) => {
   const s = await setup(t);
   if (s.skip) return t.skip(s.skip);
   await s.page.goto(`${s.base}/`, { waitUntil: 'load' });
@@ -125,7 +140,7 @@ test('e2e: visão geral mostra a manchete e os dados da última coleta', { skip:
 
 // Orçamento de desempenho (AGENTS): a página inicial transfere até 450 KB (HTML, CSS, JS, fontes,
 // uPlot e os dados das primeiras chamadas da API; o SSE fica de fora, ele não termina).
-test('e2e: versão nova — aviso, novidades com texto escapado, menu e fechar o aviso', { skip: !chromium && 'sem playwright-core' }, async (t) => {
+e2e('versão nova — aviso, novidades com texto escapado, menu e fechar o aviso', async (t) => {
   const ctx = await setup(t, { procurarVersao: procurarFalso });
   if (ctx.skip) return t.skip(ctx.skip);
   const { app, page, base, problems } = ctx;
@@ -161,7 +176,7 @@ test('e2e: versão nova — aviso, novidades com texto escapado, menu e fechar o
 
 // `dashboard atualizar` (ADR 0032): o link de uso único leva o fragmento até a tela, e a versão que
 // muda a coleta avisa antes de atualizar.
-test('e2e: dashboard atualizar — link de uso único abre o diálogo, com o aviso de reconfigurar', { skip: !chromium && 'sem playwright-core' }, async (t) => {
+e2e('dashboard atualizar — link de uso único abre o diálogo, com o aviso de reconfigurar', async (t) => {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'dash-e2e-link-'));
   aoFim(t, () => fs.rmSync(dir, { recursive: true, force: true }));
   const procurar = async () => { const r = await procurarFalso(); return { ...r, novidades: { ...r.novidades, exigeReconfigurar: true } }; };
@@ -181,7 +196,7 @@ test('e2e: dashboard atualizar — link de uso único abre o diálogo, com o avi
   assert.deepEqual(problems, []);
 });
 
-test('e2e: dashboard atualizar — sem versão nova, o menu fica aberto com a versão instalada', { skip: !chromium && 'sem playwright-core' }, async (t) => {
+e2e('dashboard atualizar — sem versão nova, o menu fica aberto com a versão instalada', async (t) => {
   const ctx = await setup(t);
   if (ctx.skip) return t.skip(ctx.skip);
   const { page, base, problems } = ctx;
@@ -194,7 +209,7 @@ test('e2e: dashboard atualizar — sem versão nova, o menu fica aberto com a ve
 
 // `dashboard reconfigurar` com o painel no ar (ADR 0039): o link de uso único abre o diálogo do
 // Reconfigurar, sem disparar nada. Quem para a coleta é o clique em Reconfigurar agora.
-test('e2e: dashboard reconfigurar — link de uso único abre o diálogo do Reconfigurar, 1 vez', { skip: !chromium && 'sem playwright-core' }, async (t) => {
+e2e('dashboard reconfigurar — link de uso único abre o diálogo do Reconfigurar, 1 vez', async (t) => {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'dash-e2e-reconf-'));
   aoFim(t, () => fs.rmSync(dir, { recursive: true, force: true }));
   const ctx = await setup(t, { dashToken: 'teste', dataDir: dir });
@@ -215,7 +230,7 @@ test('e2e: dashboard reconfigurar — link de uso único abre o diálogo do Reco
   assert.deepEqual(problems, []);
 });
 
-test('e2e: script desatualizado no servidor — a Visão geral mostra o passo a passo', { skip: !chromium && 'sem playwright-core' }, async (t) => {
+e2e('script desatualizado no servidor — a Visão geral mostra o passo a passo', async (t) => {
   const ctx = await setup(t, { sshAccess: 'restrito' });
   if (ctx.skip) return t.skip(ctx.skip);
   const { app, page, base } = ctx;
@@ -228,7 +243,7 @@ test('e2e: script desatualizado no servidor — a Visão geral mostra o passo a 
 });
 
 // Etapa 6 da F8 (ADR 0038): com login, o passo do terminal vira o botão, no mesmo fluxo da manutenção.
-test('e2e: script desatualizado no servidor — com login, a Visão geral traz o botão Reconfigurar agora', { skip: !chromium && 'sem playwright-core' }, async (t) => {
+e2e('script desatualizado no servidor — com login, a Visão geral traz o botão Reconfigurar agora', async (t) => {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'dash-e2e-hash-'));
   aoFim(t, () => fs.rmSync(dir, { recursive: true, force: true }));
   const ctx = await setup(t, { ...reconfiguracaoFalsa(dir), sshAccess: 'restrito', dashToken: 'e2e-teste' });
@@ -250,7 +265,7 @@ test('e2e: script desatualizado no servidor — com login, a Visão geral traz o
 
 // Etapa 6 da F8 (ADR 0038): a versão que muda a coleta termina com o botão, sem recarregar sozinha, e
 // o botão segue o mesmo fluxo da manutenção até o assistente.
-test('e2e: atualizar — versão que exige reconfigurar termina com Reconfigurar agora', { skip: !chromium && 'sem playwright-core' }, async (t) => {
+e2e('atualizar — versão que exige reconfigurar termina com Reconfigurar agora', async (t) => {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'dash-e2e-troca-reconf-'));
   aoFim(t, () => fs.rmSync(dir, { recursive: true, force: true }));
   const portaUnica = portaTrocavel();
@@ -288,7 +303,7 @@ test('e2e: atualizar — versão que exige reconfigurar termina com Reconfigurar
 });
 
 // O botão Atualizar (ADR 0031): o painel "cai" no meio (a leitura falha) e a tela continua sozinha.
-test('e2e: atualizar — botão, log ao vivo, painel fora do ar e recarga', { skip: !chromium && 'sem playwright-core' }, async (t) => {
+e2e('atualizar — botão, log ao vivo, painel fora do ar e recarga', async (t) => {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'dash-e2e-troca-'));
   aoFim(t, () => fs.rmSync(dir, { recursive: true, force: true }));
   let voltar;
@@ -324,7 +339,7 @@ test('e2e: atualizar — botão, log ao vivo, painel fora do ar e recarga', { sk
   assert.deepEqual(filtrados, []);
 });
 
-test('e2e: atualizar — voltou atrás mostra o resultado e não recarrega', { skip: !chromium && 'sem playwright-core' }, async (t) => {
+e2e('atualizar — voltou atrás mostra o resultado e não recarrega', async (t) => {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'dash-e2e-volta-'));
   aoFim(t, () => fs.rmSync(dir, { recursive: true, force: true }));
   const ctx = await setup(t, { procurarVersao: procurarFalso, ...atualizacaoFalsa(dir, { passoMs: 100, resultado: 'voltou' }), dashToken: 'e2e-teste' });
@@ -345,7 +360,7 @@ test('e2e: atualizar — voltou atrás mostra o resultado e não recarrega', { s
 
 // O item Reconfigurar (ADR 0036): o diálogo explica antes, e os bloqueios aparecem nele. Depois do
 // clique, a tela espera o assistente e entra sozinha (etapa 5 da F8); cancelar volta ao painel.
-test('e2e: reconfigurar — menu, explicação, espera, entrada no assistente e cancelar', { skip: !chromium && 'sem playwright-core' }, async (t) => {
+e2e('reconfigurar — menu, explicação, espera, entrada no assistente e cancelar', async (t) => {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'dash-e2e-reconf-'));
   aoFim(t, () => fs.rmSync(dir, { recursive: true, force: true }));
   const portaUnica = portaTrocavel();
@@ -388,7 +403,7 @@ test('e2e: reconfigurar — menu, explicação, espera, entrada no assistente e 
   assert.deepEqual(problems.filter((p) => !/Failed to load resource|ERR_|net::/.test(p)), []);
 });
 
-test('e2e: reconfigurar — o comando recusa depois do 202: a tela mostra o motivo e solta o diálogo', { skip: !chromium && 'sem playwright-core' }, async (t) => {
+e2e('reconfigurar — o comando recusa depois do 202: a tela mostra o motivo e solta o diálogo', async (t) => {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'dash-e2e-reconf-recusa-'));
   aoFim(t, () => fs.rmSync(dir, { recursive: true, force: true }));
   const portaUnica = portaTrocavel();
@@ -409,7 +424,7 @@ test('e2e: reconfigurar — o comando recusa depois do 202: a tela mostra o moti
   assert.deepEqual(problems, []);
 });
 
-test('e2e: reconfigurar — de volta do assistente, a Visão geral diz se a configuração valeu', { skip: !chromium && 'sem playwright-core' }, async (t) => {
+e2e('reconfigurar — de volta do assistente, a Visão geral diz se a configuração valeu', async (t) => {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'dash-e2e-reconf-volta-'));
   aoFim(t, () => fs.rmSync(dir, { recursive: true, force: true }));
   const ctx = await setup(t, { ...reconfiguracaoFalsa(dir), dashToken: 'e2e-teste' });
@@ -432,7 +447,7 @@ test('e2e: reconfigurar — de volta do assistente, a Visão geral diz se a conf
   assert.deepEqual(problems, []);
 });
 
-test('e2e: reconfigurar — bloqueio depois do clique mostra o motivo e o comando', { skip: !chromium && 'sem playwright-core' }, async (t) => {
+e2e('reconfigurar — bloqueio depois do clique mostra o motivo e o comando', async (t) => {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'dash-e2e-reconf-bloq-'));
   aoFim(t, () => fs.rmSync(dir, { recursive: true, force: true }));
   const ctx = await setup(t, { ...reconfiguracaoFalsa(dir, { bloqueio: 'sem-assinatura' }), dashToken: 'e2e-teste' });
@@ -452,7 +467,7 @@ test('e2e: reconfigurar — bloqueio depois do clique mostra o motivo e o comand
   assert.deepEqual(problems.filter((p) => !/Failed to load resource/.test(p)), []);
 });
 
-test('e2e: reconfigurar — executor que não sobe deixa tentar de novo', { skip: !chromium && 'sem playwright-core' }, async (t) => {
+e2e('reconfigurar — executor que não sobe deixa tentar de novo', async (t) => {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'dash-e2e-reconf-503-'));
   aoFim(t, () => fs.rmSync(dir, { recursive: true, force: true }));
   const ctx = await setup(t, { ...reconfiguracaoFalsa(dir), executarReconfiguracao: async () => ({ ok: false }), dashToken: 'e2e-teste' });
@@ -468,7 +483,7 @@ test('e2e: reconfigurar — executor que não sobe deixa tentar de novo', { skip
   assert.ok(await page.isEnabled('[data-manut="reconfigurar-agora"]'));
 });
 
-test('e2e: reconfigurar — sem login, o botão nasce desligado e o comando aparece', { skip: !chromium && 'sem playwright-core' }, async (t) => {
+e2e('reconfigurar — sem login, o botão nasce desligado e o comando aparece', async (t) => {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'dash-e2e-reconf-livre-'));
   aoFim(t, () => fs.rmSync(dir, { recursive: true, force: true }));
   const ctx = await setup(t, { ...reconfiguracaoFalsa(dir), dashToken: '' });
@@ -485,7 +500,7 @@ test('e2e: reconfigurar — sem login, o botão nasce desligado e o comando apar
   assert.deepEqual(problems, []);
 });
 
-test('e2e: a página inicial transfere até 450 KB (orçamento de desempenho)', { skip: !chromium && 'sem playwright-core' }, async (t) => {
+e2e('a página inicial transfere até 450 KB (orçamento de desempenho)', async (t) => {
   const s = await setup(t);
   if (s.skip) return t.skip(s.skip);
   const sizes = [];
@@ -503,7 +518,7 @@ test('e2e: a página inicial transfere até 450 KB (orçamento de desempenho)', 
   assert.deepEqual(s.problems, []);
 });
 
-test('e2e: atalhos de teclado trocam de tela e de tema', { skip: !chromium && 'sem playwright-core' }, async (t) => {
+e2e('atalhos de teclado trocam de tela e de tema', async (t) => {
   const s = await setup(t);
   if (s.skip) return t.skip(s.skip);
   await s.page.goto(`${s.base}/`, { waitUntil: 'load' });
@@ -519,7 +534,7 @@ test('e2e: atalhos de teclado trocam de tela e de tema', { skip: !chromium && 's
 });
 
 // ADR 0022: botão principal sobe com o mouse em cima; com "reduzir movimento", só a cor muda.
-test('e2e: hover — botão solto sobe, grupo não sobe e o movimento reduzido anula o deslocamento', { skip: !chromium && 'sem playwright-core' }, async (t) => {
+e2e('hover — botão solto sobe, grupo não sobe e o movimento reduzido anula o deslocamento', async (t) => {
   const s = await setup(t);
   if (s.skip) return t.skip(s.skip);
   await s.page.goto(`${s.base}/#/eventos?p=6h`, { waitUntil: 'load' });
@@ -546,7 +561,7 @@ test('e2e: hover — botão solto sobe, grupo não sobe e o movimento reduzido a
   assert.deepEqual(s.problems, []);
 });
 
-test('e2e: hover — o gráfico sobe menos que o botão, a faixa não sobe e o mouse continua chegando ao gráfico', { skip: !chromium && 'sem playwright-core' }, async (t) => {
+e2e('hover — o gráfico sobe menos que o botão, a faixa não sobe e o mouse continua chegando ao gráfico', async (t) => {
   const s = await setup(t);
   if (s.skip) return t.skip(s.skip);
   await s.page.goto(`${s.base}/#/recursos`, { waitUntil: 'load' });
@@ -572,7 +587,7 @@ test('e2e: hover — o gráfico sobe menos que o botão, a faixa não sobe e o m
   assert.deepEqual(s.problems, []);
 });
 
-test('e2e: hover — nenhum clicável, contêiner ou gráfico das 8 telas, nos 2 temas, fica sem mudança de estilo', { skip: !chromium && 'sem playwright-core' }, async (t) => {
+e2e('hover — nenhum clicável, contêiner ou gráfico das 8 telas, nos 2 temas, fica sem mudança de estilo', async (t) => {
   const s = await setup(t);
   if (s.skip) return t.skip(s.skip);
   s.app.annotationsStore.add({ text: 'troquei o disco', label: 'manutenção' });
@@ -591,7 +606,7 @@ test('e2e: hover — nenhum clicável, contêiner ou gráfico das 8 telas, nos 2
 });
 
 // ADR 0025: o botão solto encolhe ao ser apertado; grupo, lista e menu só mudam o fundo.
-test('e2e: clique — botão solto encolhe, grupo, lista e desligado não se movem e o movimento reduzido anula o deslocamento', { skip: !chromium && 'sem playwright-core' }, async (t) => {
+e2e('clique — botão solto encolhe, grupo, lista e desligado não se movem e o movimento reduzido anula o deslocamento', async (t) => {
   const s = await setup(t);
   if (s.skip) return t.skip(s.skip);
   s.app.annotationsStore.add({ text: 'troquei o disco' });
@@ -617,7 +632,7 @@ test('e2e: clique — botão solto encolhe, grupo, lista e desligado não se mov
   assert.deepEqual(s.problems, []);
 });
 
-test('e2e: clique — soltar o mouse no canto do botão, depois de ele encolher, ainda conta como clique', { skip: !chromium && 'sem playwright-core' }, async (t) => {
+e2e('clique — soltar o mouse no canto do botão, depois de ele encolher, ainda conta como clique', async (t) => {
   const s = await setup(t);
   if (s.skip) return t.skip(s.skip);
   await s.page.goto(`${s.base}/#/eventos`, { waitUntil: 'load' });
@@ -634,7 +649,7 @@ test('e2e: clique — soltar o mouse no canto do botão, depois de ele encolher,
   assert.equal(await s.page.evaluate(() => window.__cliques), 1);
 });
 
-test('e2e: clique — o botão fica aguardando sem mudar de largura, e o duplo clique faz só 1 pedido', { skip: !chromium && 'sem playwright-core' }, async (t) => {
+e2e('clique — o botão fica aguardando sem mudar de largura, e o duplo clique faz só 1 pedido', async (t) => {
   const s = await setup(t);
   if (s.skip) return t.skip(s.skip);
   const pedidos = { poll: 0, nota: 0 };
@@ -678,7 +693,7 @@ const semEntrada = (page) => page.evaluate(() => {
 const trocouElemento = (page) => page.waitForFunction(() => !document.querySelector('.view')?.dataset.velha);
 const temEntrada = (page) => page.evaluate(() => document.querySelector('.view').classList.contains('view-entra'));
 
-test('e2e: troca de tela — entra com a tela nova; amostra do SSE, período e tema não animam', { skip: !chromium && 'sem playwright-core' }, async (t) => {
+e2e('troca de tela — entra com a tela nova; amostra do SSE, período e tema não animam', async (t) => {
   const s = await setup(t, { collect: async () => ({ ok: true, sample: { ...sample(Date.now(), 120), host: 'servidor-novo' } }) });
   if (s.skip) return t.skip(s.skip);
   await s.page.goto(`${s.base}/`, { waitUntil: 'load' });
@@ -712,7 +727,7 @@ test('e2e: troca de tela — entra com a tela nova; amostra do SSE, período e t
   assert.deepEqual(s.problems, []);
 });
 
-test('e2e: troca de tela — o conteúdo que substitui o esqueleto entra, na tela geral e na Visão geral', { skip: !chromium && 'sem playwright-core' }, async (t) => {
+e2e('troca de tela — o conteúdo que substitui o esqueleto entra, na tela geral e na Visão geral', async (t) => {
   const s = await setup(t);
   if (s.skip) return t.skip(s.skip);
   for (const [hash, conteudo] of [['#/processos', '#pr-rows'], ['#/visao-geral', '#vg-hero .hero']]) {
@@ -730,7 +745,7 @@ test('e2e: troca de tela — o conteúdo que substitui o esqueleto entra, na tel
   }
 });
 
-test('e2e: troca de tela — atalhos em sequência não acumulam, e o gráfico mantém a largura', { skip: !chromium && 'sem playwright-core' }, async (t) => {
+e2e('troca de tela — atalhos em sequência não acumulam, e o gráfico mantém a largura', async (t) => {
   const s = await setup(t);
   if (s.skip) return t.skip(s.skip);
   await s.page.goto(`${s.base}/`, { waitUntil: 'load' });
@@ -780,7 +795,7 @@ test('e2e: troca de tela — atalhos em sequência não acumulam, e o gráfico m
   assert.deepEqual(s.problems, []);
 });
 
-test('e2e: troca de tela — login e diálogo entram igual; o movimento reduzido anula a entrada', { skip: !chromium && 'sem playwright-core' }, async (t) => {
+e2e('troca de tela — login e diálogo entram igual; o movimento reduzido anula a entrada', async (t) => {
   const s = await setup(t, { dashToken: 'e'.repeat(43) });
   if (s.skip) return t.skip(s.skip);
   const dialogo = () => s.page.evaluate(() => {
@@ -833,7 +848,7 @@ async function segura(page, caminho) {
   return { solta, tira: () => page.unroute(filtro) };
 }
 
-test('e2e: esqueleto — nas 8 telas fica no formato final: o conteúdo entra sem pulo', { skip: !chromium && 'sem playwright-core' }, async (t) => {
+e2e('esqueleto — nas 8 telas fica no formato final: o conteúdo entra sem pulo', async (t) => {
   const s = await setup(t, { viewport: LARGA });
   if (s.skip) return t.skip(s.skip);
   for (const [id] of VIEWS) {
@@ -854,7 +869,7 @@ test('e2e: esqueleto — nas 8 telas fica no formato final: o conteúdo entra se
   assert.deepEqual(s.problems, []);
 });
 
-test('e2e: esqueleto (#121) — com vários discos, Visão geral e Armazenamento já sobem na altura final ao recarregar', { skip: !chromium && 'sem playwright-core' }, async (t) => {
+e2e('esqueleto (#121) — com vários discos, Visão geral e Armazenamento já sobem na altura final ao recarregar', async (t) => {
   const s = await setup(t, { viewport: LARGA, amostra: amostraVariosDiscos });
   if (s.skip) return t.skip(s.skip);
   // 1ª carga completa: o navegador lembra quantas pastas e discos há. A partir daí, recarregar
@@ -887,7 +902,7 @@ test('e2e: esqueleto (#121) — com vários discos, Visão geral e Armazenamento
   assert.deepEqual(s.problems, []);
 });
 
-test('e2e: previsão de lotação (#116) — durante a carga dos 30 dias, a tela não diz "~1 dia"', { skip: !chromium && 'sem playwright-core' }, async (t) => {
+e2e('previsão de lotação (#116) — durante a carga dos 30 dias, a tela não diz "~1 dia"', async (t) => {
   const s = await setup(t);
   if (s.skip) return t.skip(s.skip);
   // Segura só os 30 dias da previsão: o período da tela e o resto da carga seguem normais.
@@ -931,7 +946,7 @@ const gravaEsperas = (page) => page.addInitScript(() => {
   requestAnimationFrame(olha);
 });
 
-test('e2e: esqueleto — resposta rápida não mostra esqueleto nem "atualizando"', { skip: !chromium && 'sem playwright-core' }, async (t) => {
+e2e('esqueleto — resposta rápida não mostra esqueleto nem "atualizando"', async (t) => {
   const s = await setup(t);
   if (s.skip) return t.skip(s.skip);
   await gravaEsperas(s.page);
@@ -948,7 +963,7 @@ test('e2e: esqueleto — resposta rápida não mostra esqueleto nem "atualizando
   assert.deepEqual(s.problems, []);
 });
 
-test('e2e: esqueleto — uma vez visível, fica pelo menos o tempo mínimo', { skip: !chromium && 'sem playwright-core' }, async (t) => {
+e2e('esqueleto — uma vez visível, fica pelo menos o tempo mínimo', async (t) => {
   const s = await setup(t);
   if (s.skip) return t.skip(s.skip);
   await gravaEsperas(s.page);
@@ -968,7 +983,7 @@ test('e2e: esqueleto — uma vez visível, fica pelo menos o tempo mínimo', { s
   assert.deepEqual(s.problems, []);
 });
 
-test('e2e: esqueleto — na troca de período o gráfico fica com os dados velhos, esmaecido e com a faixa', { skip: !chromium && 'sem playwright-core' }, async (t) => {
+e2e('esqueleto — na troca de período o gráfico fica com os dados velhos, esmaecido e com a faixa', async (t) => {
   const s = await setup(t);
   if (s.skip) return t.skip(s.skip);
   await s.page.goto(`${s.base}/#/recursos`, { waitUntil: 'load' });
@@ -1001,7 +1016,7 @@ test('e2e: esqueleto — na troca de período o gráfico fica com os dados velho
   assert.deepEqual(s.problems, []);
 });
 
-test('e2e: esqueleto — região que carrega depois guarda o espaço, e sair no meio não quebra', { skip: !chromium && 'sem playwright-core' }, async (t) => {
+e2e('esqueleto — região que carrega depois guarda o espaço, e sair no meio não quebra', async (t) => {
   const s = await setup(t, { viewport: LARGA });
   if (s.skip) return t.skip(s.skip);
   await s.page.goto(`${s.base}/#/processos`, { waitUntil: 'networkidle' });
@@ -1036,7 +1051,7 @@ test('e2e: esqueleto — região que carrega depois guarda o espaço, e sair no 
   assert.deepEqual(s.problems, []);
 });
 
-test('e2e: esqueleto — Relatórios mantém o resumo até o atraso e mostra blocos no período novo', { skip: !chromium && 'sem playwright-core' }, async (t) => {
+e2e('esqueleto — Relatórios mantém o resumo até o atraso e mostra blocos no período novo', async (t) => {
   const s = await setup(t);
   if (s.skip) return t.skip(s.skip);
   await s.page.goto(`${s.base}/#/relatorios`, { waitUntil: 'load' });
@@ -1054,7 +1069,7 @@ test('e2e: esqueleto — Relatórios mantém o resumo até o atraso e mostra blo
   assert.deepEqual(s.problems, []);
 });
 
-test('e2e: esqueleto — com movimento reduzido nada pulsa nem corre', { skip: !chromium && 'sem playwright-core' }, async (t) => {
+e2e('esqueleto — com movimento reduzido nada pulsa nem corre', async (t) => {
   const s = await setup(t);
   if (s.skip) return t.skip(s.skip);
   await s.page.emulateMedia({ reducedMotion: 'reduce' });
@@ -1082,7 +1097,7 @@ test('e2e: esqueleto — com movimento reduzido nada pulsa nem corre', { skip: !
   assert.deepEqual(s.problems, []);
 });
 
-test('e2e: esqueleto — sem a configuração, a Ajuda diz que falhou em vez de pulsar para sempre', { skip: !chromium && 'sem playwright-core' }, async (t) => {
+e2e('esqueleto — sem a configuração, a Ajuda diz que falhou em vez de pulsar para sempre', async (t) => {
   const s = await setup(t);
   if (s.skip) return t.skip(s.skip);
   await s.page.route((url) => url.pathname === '/api/config', (rota) => rota.abort());
@@ -1091,7 +1106,7 @@ test('e2e: esqueleto — sem a configuração, a Ajuda diz que falhou em vez de 
   assert.equal(await s.page.locator('.view .skel').count(), 0);
 });
 
-test('e2e: anotação com HTML malicioso aparece como texto (anti-XSS)', { skip: !chromium && 'sem playwright-core' }, async (t) => {
+e2e('anotação com HTML malicioso aparece como texto (anti-XSS)', async (t) => {
   const s = await setup(t);
   if (s.skip) return t.skip(s.skip);
   s.app.annotationsStore.add({ text: '<img src=x onerror="window.__xss=1">troquei o disco', label: '<b>manutenção</b>' });
@@ -1102,7 +1117,7 @@ test('e2e: anotação com HTML malicioso aparece como texto (anti-XSS)', { skip:
   assert.equal(await s.page.locator('.event-list img').count(), 0);
 });
 
-test('e2e: com DASH_TOKEN a tela pede login e só então mostra os dados', { skip: !chromium && 'sem playwright-core' }, async (t) => {
+e2e('com DASH_TOKEN a tela pede login e só então mostra os dados', async (t) => {
   const token = 'e'.repeat(43);
   const s = await setup(t, { dashToken: token });
   if (s.skip) return t.skip(s.skip);
@@ -1120,7 +1135,7 @@ test('e2e: com DASH_TOKEN a tela pede login e só então mostra os dados', { ski
   assert.deepEqual(s.problems.filter((p) => !/401/.test(p)), [], 'só os 401 esperados antes do login');
 });
 
-test('e2e: celular (390 px) — menu abre, navega e fecha; sem rolagem horizontal', { skip: !chromium && 'sem playwright-core' }, async (t) => {
+e2e('celular (390 px) — menu abre, navega e fecha; sem rolagem horizontal', async (t) => {
   const s = await setup(t, { viewport: { width: 390, height: 844 } });
   if (s.skip) return t.skip(s.skip);
   await s.page.goto(`${s.base}/`, { waitUntil: 'load' });
@@ -1141,7 +1156,7 @@ test('e2e: celular (390 px) — menu abre, navega e fecha; sem rolagem horizonta
   assert.deepEqual(s.problems, []);
 });
 
-test('e2e: tema claro — telas abrem, gráficos recriados com as cores do tema e sem erros', { skip: !chromium && 'sem playwright-core' }, async (t) => {
+e2e('tema claro — telas abrem, gráficos recriados com as cores do tema e sem erros', async (t) => {
   const s = await setup(t);
   if (s.skip) return t.skip(s.skip);
   await s.page.addInitScript(() => localStorage.setItem('dash_theme', 'light'));
@@ -1155,7 +1170,7 @@ test('e2e: tema claro — telas abrem, gráficos recriados com as cores do tema 
   assert.deepEqual(s.problems, []);
 });
 
-test('e2e: servidor inacessível — faixa crítica, manchete e últimos valores em cinza', { skip: !chromium && 'sem playwright-core' }, async (t) => {
+e2e('servidor inacessível — faixa crítica, manchete e últimos valores em cinza', async (t) => {
   const s = await setup(t);
   if (s.skip) return t.skip(s.skip);
   await s.app.runPoll();

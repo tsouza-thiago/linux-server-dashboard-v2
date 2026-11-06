@@ -7,7 +7,6 @@ import { spawn, spawnSync } from 'node:child_process';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import { makeOutput } from '../../server/cli/saida.js';
 import { diagnosticar, latestSample, permissionProblems, explainFailure, sshSettings } from '../../server/cli/diagnosticar.js';
 import { atualizar, afterUpdate, backupData, restoreData } from '../../server/cli/atualizar.js';
 import { instalar } from '../../server/cli/instalar.js';
@@ -21,12 +20,8 @@ import { MARCADOR_RECONFIGURAR } from '../../server/atualizacao/novidades.js';
 import { consumeLoginCode } from '../../server/http/entrar.js';
 import { loadEnvFile } from '../../server/config.js';
 import { esperarAte } from '../../test-support/esperar.js';
+import { memOut } from '../../test-support/saida.js';
 
-function memOut() {
-  const chunks = [];
-  const out = makeOutput({ stream: { isTTY: false, write: (s) => { chunks.push(s); return true; } }, env: {} });
-  return { out, text: () => chunks.join('') };
-}
 const tmp = (t, p) => {
   const d = fs.mkdtempSync(path.join(os.tmpdir(), p));
   t.after(() => fs.rmSync(d, { recursive: true, force: true }));

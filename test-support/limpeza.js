@@ -7,6 +7,10 @@
 // exemplo): o `fs.rmSync` falhava com ENOTEMPTY, o `close(server)` não rodava e o processo do
 // teste ficava preso para sempre, com o servidor escutando.
 
+import fs from 'node:fs';
+import os from 'node:os';
+import path from 'node:path';
+
 const pilhas = new WeakMap();
 
 /**
@@ -29,4 +33,14 @@ export function aoFim(t, fn) {
     });
   }
   pilha.push(fn);
+}
+
+/**
+ * Cria uma pasta temporária e a apaga no fim do teste `t` (pela pilha do `aoFim`, na ordem certa).
+ * Uso: `const dir = pastaTemp(t, 'lsd-raw-');`
+ */
+export function pastaTemp(t, prefixo) {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), prefixo));
+  aoFim(t, () => fs.rmSync(dir, { recursive: true, force: true }));
+  return dir;
 }

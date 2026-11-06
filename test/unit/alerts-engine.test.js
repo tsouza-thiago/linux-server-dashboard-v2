@@ -1,4 +1,5 @@
 // Motor de alertas: debounce do offline, quedas e alertas que ficam como estão sem medida.
+import { pastaTemp } from '../../test-support/limpeza.js';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
@@ -12,7 +13,7 @@ const MIN = 60000;
 const BASE = Date.UTC(2026, 9, 7, 12, 0);
 const T = { diskPct: 90, ramPct: 90, tempC: 60, hysteresis: 5, offlineAfter: 2 };
 
-function setup({ thresholds = T, dir = fs.mkdtempSync(path.join(os.tmpdir(), 'lsd-eng-')) } = {}) {
+function setup(tc, { thresholds = T, dir = pastaTemp(tc, 'lsd-eng-') } = {}) {
   let t = BASE;
   const now = () => t;
   const alerts = new AlertsStore({ file: path.join(dir, 'alerts.json'), now });
@@ -23,8 +24,8 @@ function setup({ thresholds = T, dir = fs.mkdtempSync(path.join(os.tmpdir(), 'ls
 }
 const sample = (ts, over = {}) => ({ ts, host: 'srv', cores: 1, load: [0.1, 0.1, 0.1], ram: { total: 1000, used: 400 }, tempC: 40, disks: [{ mount: '/', pct: 10 }], smart: [], services: { smbd: 'active' }, ...over });
 
-test('motor: 1 falha isolada não alerta nem abre queda (debounce)', () => {
-  const { engine, alerts, outages, tick } = setup();
+test('motor: 1 falha isolada não alerta nem abre queda (debounce)', (t) => {
+  const { engine, alerts, outages, tick } = setup(t);
   engine.onSample(sample(tick()));
   assert.deepEqual(engine.onFailure('timeout'), { offline: false, failures: 1 });
   engine.onSample(sample(tick()));
@@ -33,8 +34,8 @@ test('motor: 1 falha isolada não alerta nem abre queda (debounce)', () => {
   assert.equal(engine.health(sample(tick())).score, 100);
 });
 
-test('motor: 2 falhas seguidas abrem UM alerta e UMA queda desde a 1ª falha; volta resolve e fecha', () => {
-  const { engine, alerts, outages, tick } = setup();
+test('motor: 2 falhas seguidas abrem UM alerta e UMA queda desde a 1ª falha; volta resolve e fecha', (t) => {
+  const { engine, alerts, outages, tick } = setup(t);
   engine.onSample(sample(tick()));
   tick();
   const firstFailure = new Date(BASE + 2 * MIN).toISOString();
@@ -56,8 +57,8 @@ test('motor: 2 falhas seguidas abrem UM alerta e UMA queda desde a 1ª falha; vo
   assert.deepEqual([o.from, o.to, o.reason], [firstFailure, backAt, 'Tempo esgotado']);
 });
 
-test('motor: durante a queda os outros alertas abertos ficam como estão', () => {
-  const { engine, alerts, tick } = setup();
+test('motor: durante a queda os outros alertas abertos ficam como estão', (t) => {
+  const { engine, alerts, tick } = setup(t);
   engine.onSample(sample(tick(), { tempC: 65 }));
   engine.onFailure('x');
   engine.onFailure('x');
@@ -66,8 +67,8 @@ test('motor: durante a queda os outros alertas abertos ficam como estão', () =>
   assert.equal(alerts.active.length, 0);
 });
 
-test('motor: histerese aplicada entre coletas (flapping de disco não abre/fecha a cada poll)', () => {
-  const { engine, alerts, tick } = setup();
+test('motor: histerese aplicada entre coletas (flapping de disco não abre/fecha a cada poll)', (t) => {
+  const { engine, alerts, tick } = setup(t);
   for (const pct of [90, 88, 91, 86, 89, 90, 87]) engine.onSample(sample(tick(), { disks: [{ mount: '/', pct }] }));
   assert.equal(alerts.data.length, 1, 'um único alerta durante toda a oscilação');
   assert.equal(alerts.active[0].message, 'Disco / com 87% usado');
@@ -75,12 +76,12 @@ test('motor: histerese aplicada entre coletas (flapping de disco não abre/fecha
   assert.equal(alerts.active.length, 0);
 });
 
-test('motor: offlineAfter configurável e reinício no meio de uma queda continua offline', async () => {
-  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'lsd-eng-'));
-  const a = setup({ thresholds: { ...T, offlineAfter: 1 }, dir });
+test('motor: offlineAfter configurável e reinício no meio de uma queda continua offline', async (t) => {
+  const dir = pastaTemp(t, 'lsd-eng-');
+  const a = setup(t, { thresholds: { ...T, offlineAfter: 1 }, dir });
   assert.equal(a.engine.onFailure('x').offline, true, '1 falha basta com ALERT_OFFLINE_AFTER=1');
   await Promise.all([a.outages.flush(), a.alerts.flush()]);
-  const b = setup({ dir });
+  const b = setup(t, { dir });
   assert.equal(b.engine.offline, true, 'queda aberta no log');
   assert.equal(b.engine.offlineSince, new Date(BASE).toISOString());
   assert.equal(b.engine.onFailure('y').offline, true, 'segue offline já na 1ª falha após reiniciar');

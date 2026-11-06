@@ -5,11 +5,12 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { createApp } from '../../server/index.js';
+import { relogio } from '../../test-support/amostras.js';
 import { listen, close, request } from '../../test-support/request.js';
 
 const MIN = 60000;
 const BASE = Date.UTC(2026, 9, 7, 0, 0);
-const at = (min) => new Date(BASE + min * MIN).toISOString();
+const at = relogio(BASE);
 const sample = (min, tempC = 40) => ({ ts: at(min), host: 'srv', load: [0.1, 0.1, 0.1], tempC, disks: [], io: [] });
 
 async function start(t, { v1 } = {}) {

@@ -19,6 +19,11 @@ diante: `PATCH` corrige, `MINOR` acrescenta sem quebrar e `MAJOR` quebra.
 
 ### Alterado
 
+- Testes mais enxutos (#176): `memOut`, `freePort`, `fakeRes`, `espiao`, `setupApp`/`withServer`, `pastaTemp` e
+  o relógio das amostras saem de cópias e vão para `test-support/`; `config`, `csv`, `stores` e `security`
+  juntam seus arquivos divididos; as pastas temporárias sem limpeza passam por `aoFim`; o e2e usa o
+  wrapper `e2e()` e um só Chromium. Nenhum teste saiu. A asserção do `makeRequireAuth` que sempre passava agora
+  conta as chamadas do `next` e falha se o `?token=` na URL voltar a valer.
 - A Ajuda manda criar o sudoers com o nome por instalação (`/etc/sudoers.d/dashboard-<computador>-<id>`,
   ADR 0020), não com o antigo. A lista `SHELL_SCRIPTS` do `check` e da `seguranca` virou um módulo só
   (`scripts/shell-scripts.mjs`), e o tema lembrado ficou em `public/js/core/tema.js`.
