@@ -1,4 +1,4 @@
-// Manutenção do painel (ADR 0030): a engrenagem no topo com a versão instalada e "Procurar
+// Manutenção do painel (ADR 0030): o botão de manutenção no topo com a versão instalada e "Procurar
 // agora", o aviso de versão nova, o diálogo com as novidades e o botão Atualizar, com o progresso
 // (ADR 0031), e o item Reconfigurar com o diálogo dele (ADR 0036), a espera do assistente e o motivo
 // quando a reconfiguração não vale (ADR 0035), e o botão "Reconfigurar agora" no fim da versão que muda
@@ -93,7 +93,7 @@ export function iniciarManutencao({ store, toast, pedidoDoTerminal = false, reco
   const menu = $('manutMenu');
   const aviso = $('avisoVersao');
   const dialogo = $('novidadesDialog');
-  mount(botao, icon('gear', 18));
+  mount(botao, icon('ferramenta', 18));
   // Há uma leitura de progresso ligada nesta aba.
   let acompanhando = false;
   // A troca em andamento é de uma versão que muda a coleta: o fim oferece Reconfigurar agora.
@@ -258,7 +258,7 @@ export function iniciarManutencao({ store, toast, pedidoDoTerminal = false, reco
   /**
    * Mostra o resultado. Com a versão nova no ar, recarrega para carregar a interface dela. A versão
    * que muda a coleta não recarrega sozinha: o fim oferece Reconfigurar agora, no mesmo fluxo da
-   * engrenagem, e "Agora não" recarrega (a Visão geral repete o botão enquanto o script estiver velho).
+   * manutenção, e "Agora não" recarrega (a Visão geral repete o botão enquanto o script estiver velho).
    */
   function terminar(r, fase, acoes) {
     acompanhando = false;
@@ -377,7 +377,7 @@ export function iniciarManutencao({ store, toast, pedidoDoTerminal = false, reco
       <button class="btn btn-soft btn-block" type="button" data-manut="reconfigurar">Reconfigurar</button>`);
   }
 
-  /** Aviso no topo e ponto na engrenagem, conforme o estado. */
+  /** Aviso no topo e ponto no botão de manutenção, conforme o estado. */
   function render() {
     const a = store.get().atualizacao;
     botao.classList.toggle('tem-novidade', Boolean(a?.nova));

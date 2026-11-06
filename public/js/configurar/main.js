@@ -174,7 +174,7 @@ function viewGate() {
       <div class="wz-title"><h1 class="wz-h1 sm" tabindex="-1">O assistente não abriu</h1>
       <p class="wz-lead sm">Este assistente foi aberto pelo botão Reconfigurar do painel e só aceita, uma vez, o código que o painel entregou a este navegador.</p></div>
       ${alertBox(st.gateError, true)}
-      <p class="wz-lead sm">Sem uso, o assistente fecha depois de 15 minutos e o painel volta com a configuração de antes. Depois, peça de novo pela engrenagem do painel.</p>
+      <p class="wz-lead sm">Sem uso, o assistente fecha depois de 15 minutos e o painel volta com a configuração de antes. Depois, peça de novo pelo botão de manutenção do painel (a chave inglesa).</p>
     </main>`;
   }
   return html`<main class="wz-card md wz-gate">
