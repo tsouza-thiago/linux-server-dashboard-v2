@@ -122,10 +122,20 @@ export async function importarPasta({ out, root, dir, home = os.homedir(), deps 
   const contagem = { arquivos: 0 };
   const dadosDoClone = path.join(clone, 'data');
   if (fs.existsSync(dadosDoClone)) copiarDados(dadosDoClone, dataDe(root), contagem);
-  const sshConfig = path.join(dataDe(root), 'ssh', 'config');
-  if (fs.existsSync(sshConfig)) {
-    const knownHosts = path.join(dataDe(root), 'ssh', 'known_hosts');
-    fs.writeFileSync(sshConfig, sshConfigDoPacote(fs.readFileSync(sshConfig, 'utf8'), knownHosts), { mode: 0o600 });
+  // Um descritor só para ler e gravar: o arquivo não troca entre a leitura e a escrita (CodeQL
+  // "file system race"), e O_NOFOLLOW recusa um link no lugar dele.
+  let fd = null;
+  try {
+    fd = fs.openSync(path.join(dataDe(root), 'ssh', 'config'), fs.constants.O_RDWR | fs.constants.O_NOFOLLOW, 0o600);
+  } catch { /* o clone não tinha data/ssh/config */ }
+  if (fd !== null) {
+    try {
+      const novo = sshConfigDoPacote(fs.readFileSync(fd, 'utf8'), path.join(dataDe(root), 'ssh', 'known_hosts'));
+      fs.ftruncateSync(fd, 0);
+      fs.writeSync(fd, novo, 0);
+    } finally {
+      fs.closeSync(fd);
+    }
   }
   out.ok('configuração e dados trazidos do clone', `${contagem.arquivos} arquivo${contagem.arquivos === 1 ? '' : 's'} · ${path.dirname(dataDe(root))}`);
 
