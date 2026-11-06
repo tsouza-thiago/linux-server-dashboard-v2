@@ -9,6 +9,9 @@ diante: `PATCH` corrige, `MINOR` acrescenta sem quebrar e `MAJOR` quebra.
 
 ## [Não publicado]
 
+### Alterado
+- Telas: as transições ficaram mais visíveis. A tela nova entra em 280 ms com deslocamento de 12 px, e a troca de período faz um fade de 220 ms no conteúdo novo (ADR 0052, #184).
+
 ## [2.6.2] — 2026-11-06
 
 **Atenção, quem usa o serviço systemd (clone ou pacote):** o botão "Atualizar agora" e a procura de versão nova não funcionavam desde a 2.5.0. Para receber esta correção, atualize UMA VEZ pelo terminal: `./dashboard atualizar --terminal` (clone) ou `dashboard atualizar --terminal` (pacote). Depois, o botão volta a funcionar. Nada muda na configuração, no formato de `data/` nem no acesso ao servidor.

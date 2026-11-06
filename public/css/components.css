@@ -385,7 +385,7 @@ pre.code {
 #ar-fc-skel:not(:empty) + .chart { display: none; }
 
 /* Troca de período (ADR 0027): os dados velhos esmaecem e uma faixa fina corre no topo. */
-.atualizando .chart > .uplot { opacity: 0.5; transition: opacity var(--t-fast); }
+.atualizando .chart > .uplot { opacity: 0.35; transition: opacity var(--t-troca) var(--ease-enter); }
 .atualizando .panel > .chart::before, .atualizando .strips::before {
   content: ""; position: absolute; top: 0; left: 0; z-index: 1; width: 100%; height: 2px; background: var(--accent);
   transform-origin: left; animation: atualizando 1s ease-in-out infinite alternate;
@@ -433,8 +433,11 @@ pre.code {
 /* Entrada (F3, ADR 0026): tela nova, login e diálogo. Sem `both`: ao terminar, nada guarda um
    `transform`, que prenderia dentro da tela o que usa `position: fixed`. */
 @keyframes entra { from { opacity: 0; transform: translateY(var(--enter-y)); } }
+/* Troca de período (ADR 0052): só o fade do conteúdo novo, sem deslocamento. */
+@keyframes troca { from { opacity: 0; } }
 @media (prefers-reduced-motion: no-preference) {
-  .view-entra, .login > *, dialog[open] { animation: entra var(--t-enter) var(--ease-out); }
+  .view-entra, .login > *, dialog[open] { animation: entra var(--t-enter) var(--ease-enter); }
+  .view-troca { animation: troca var(--t-troca) var(--ease-enter); }
 }
 
 /* ---------------- Login ---------------- */
