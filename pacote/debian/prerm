@@ -1,19 +1,23 @@
 #!/bin/sh
 # ============================================================
-# Server Dashboard — prerm do pacote .deb (F9 do #92, ADR 0049)
+# Server Dashboard — prerm do pacote .deb (F9 do #92, ADR 0049 e 0050)
 #
-# Ao remover o pacote, desliga o timer da procura diária, para ele não ficar apontando para
-# uma unidade que vai sumir. Na troca por uma versão nova do pacote, nada muda. A limpeza de
-# /opt/server-dashboard, do usuário e do grupo é do apt purge (etapa 10 da F9).
+# Ao remover o pacote, para o timer da procura diária e as unidades do executor que estiverem
+# rodando, para nenhuma ficar apontando para um arquivo que vai sumir. O executor limpa a pasta
+# temporária dele ao parar. Na troca por uma versão nova do pacote, nada muda. A limpeza de
+# /opt/server-dashboard, do usuário e dos grupos é do postrm, no apt purge.
 # ============================================================
 set -e
 
 TIMER=server-dashboard-verificar.timer
+UNIDADES="server-dashboard-verificar.service server-dashboard-atualizar.service server-dashboard-voltar.service"
 
 case "$1" in
   remove | deconfigure)
     if [ -d /run/systemd/system ]; then
       systemctl stop "$TIMER" > /dev/null 2>&1 || true
+      # shellcheck disable=SC2086 # a lista é fixa, um nome por palavra
+      systemctl stop $UNIDADES > /dev/null 2>&1 || true
     fi
     systemctl disable "$TIMER" > /dev/null 2>&1 || true
     ;;

@@ -1,6 +1,6 @@
 # shellcheck shell=bash
 # Autocomplete do comando dashboard no bash (F5, ADR 0029): comandos, opções de cada comando e
-# os valores de --importar-v1, --chave-ssh e --modo. Arquivo estático: chamar a CLI custaria
+# os valores de --importar-v1, --importar-pasta, --chave-ssh e --modo. Arquivo estático: chamar a CLI custaria
 # dezenas de ms a cada Tab. test/unit/autocomplete.test.js confere as listas contra o código.
 
 # Comandos, sem os apelidos (help, -h, versão). As opções internas --pos-atualizacao, --registro e --pela-tela ficam de fora.
@@ -10,7 +10,7 @@ _DASHBOARD_COMANDOS='instalar abrir iniciar parar status diagnosticar reconfigur
 _dashboard_opcoes() {
   case "$1" in
     instalar | reconfigurar)
-      echo '--ajuda --chave-ssh --disco --editar-profile --forcar --identidade --importar-v1
+      echo '--ajuda --chave-ssh --disco --editar-profile --forcar --identidade --importar-pasta --importar-v1
         --ja-preparado --memoria --modo --pastas --porta --pre --rede --sem-assinatura
         --sem-atalho --sem-inicio-automatico --sem-interface --sem-link --sem-origem
         --senha-stdin --servicos --servidor --smart --temperatura --terminal --usuario'
@@ -47,7 +47,7 @@ _dashboard() {
     return 0
   fi
   case "${COMP_WORDS[COMP_CWORD - 1]}" in
-    --importar-v1)
+    --importar-v1 | --importar-pasta)
       # Fora do Tab de verdade (nos testes), o compopt falha; o erro não importa.
       compopt -o filenames 2>/dev/null
       mapfile -t COMPREPLY < <(compgen -d -- "$cur")

@@ -10,7 +10,7 @@
 - **Decidido em 26/10/2026:** o desenho híbrido (C) está aprovado; o Node é baixado pelo
   executor (item 6); a 1ª versão atende 1 pessoa por máquina (item "Riscos").
 - **Situação:** em implementação. Etapas 1 a 8 feitas (ADR 0042 a 0048, 05/11/2026).
-
+- **Situação:** em implementação. Etapas 1 a 10 feitas (ADR 0042 a 0050, 06/11/2026).
 ## Objetivo
 
 Instalar com `sudo apt install ./server-dashboard_X.Y.Z_all.deb`, sem `git clone` e sem
@@ -138,7 +138,7 @@ O código em `/opt` pertence ao root. A pergunta é: quem grava a versão nova l
 7. **Feita (ADR 0047).** Node baixado pelo executor, com a soma SHA-256 conferida.
 8. **Feita (ADR 0048).** F7 no modo sistema: o painel usa o executor no lugar do `git checkout`.
 9. **Feita (ADR 0049).** `npm run empacotar-deb` reprodutível, `SHA256SUMS` assinado e conferência no CI.
-10. `--importar-pasta`, `desinstalar` e `apt purge`.
+10. **Feita (ADR 0050).** `--importar-pasta`, `desinstalar` e `apt purge`.
 11. `scripts/e2e-instalacao/`: instalar o `.deb`, atualizar, voltar, desinstalar, em
     Debian e Ubuntu.
 12. README, TUTORIAL, AGENTS, SECURITY e o passo novo de "Publicar uma versão".

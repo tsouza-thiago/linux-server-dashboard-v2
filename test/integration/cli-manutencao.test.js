@@ -12,6 +12,7 @@ import { diagnosticar, latestSample, permissionProblems, explainFailure, sshSett
 import { atualizar, afterUpdate, backupData, restoreData } from '../../server/cli/atualizar.js';
 import { instalar } from '../../server/cli/instalar.js';
 import { importarV1, detectV1, v1Settings, v1Pid, stopV1 } from '../../server/cli/importar-v1.js';
+import { importarPasta, detectarClone, envDoClone, sshConfigDoPacote } from '../../server/cli/importar-pasta.js';
 import { desinstalar } from '../../server/cli/desinstalar.js';
 import { LINHA_PATH, editarArquivoDeLogin, unitText } from '../../server/setup/local.js';
 import { unitPath } from '../../server/cli/servico.js';
@@ -689,6 +690,115 @@ test('V1 → V2: para só o processo da V1 daquela pasta e o serviço dela', asy
   assert.ok(calls.includes('stop linux-server-dashboard.service') && calls.includes('disable linux-server-dashboard.service'));
   fs.writeFileSync(path.join(v1, 'data', 'dashboard.pid'), String(process.pid));
   assert.equal(v1Pid(v1), null, 'outro processo no PID: não é a V1');
+});
+
+// ---------------- clone → pacote .deb (ADR 0050) ----------------
+
+function cloneInstalado(t) {
+  const clone = tmp(t, 'dash-clone-');
+  for (const d of ['server', path.join('data', 'ssh'), path.join('data', 'history')]) fs.mkdirSync(path.join(clone, d), { recursive: true, mode: 0o700 });
+  fs.writeFileSync(path.join(clone, 'package.json'), JSON.stringify({ name: 'linux-server-dashboard', version: '2.5.0' }));
+  fs.writeFileSync(path.join(clone, 'server', 'index.js'), '');
+  fs.writeFileSync(path.join(clone, 'dashboard'), '#!/bin/sh\n', { mode: 0o755 });
+  fs.writeFileSync(path.join(clone, '.env'), [
+    'SSH_HOST=servidor', `SSH_CONFIG=${path.join(clone, 'data', 'ssh', 'config')}`, 'SSH_ACESSO=restrito', 'PORT=3000',
+    'HISTORY_FILE=/etc/passwd', `LOG_FILE="${path.join(clone, 'data', 'outro.log')}"`, `DASH_TOKEN=${'b'.repeat(32)}`, '',
+  ].join('\n'), { mode: 0o600 });
+  fs.writeFileSync(path.join(clone, 'data', 'ssh', 'config'), [
+    'Host servidor', '  HostName 192.0.2.10', '  IdentityFile "/caminho/da/chave"',
+    `  UserKnownHostsFile "${path.join(clone, 'data', 'ssh', 'known_hosts')}"`, '  StrictHostKeyChecking yes', '',
+  ].join('\n'), { mode: 0o600 });
+  fs.writeFileSync(path.join(clone, 'data', 'ssh', 'known_hosts'), '192.0.2.10 ssh-ed25519 AAAA\n', { mode: 0o600 });
+  // Um arquivo aberto demais no clone: a cópia sai 0600 mesmo assim.
+  fs.writeFileSync(path.join(clone, 'data', 'history', '2026-11-06.ndjson'), '{"ts":"2026-11-06T00:00:00.000Z"}\n', { mode: 0o644 });
+  fs.writeFileSync(path.join(clone, 'data', 'alerts.json'), '[]', { mode: 0o600 });
+  for (const f of ['dashboard.pid', 'entrar.json', 'reconfigurar.json']) fs.writeFileSync(path.join(clone, 'data', f), 'x', { mode: 0o600 });
+  // Um link para fora do clone nunca é seguido.
+  const fora = path.join(tmp(t, 'dash-fora-'), 'segredo');
+  fs.writeFileSync(fora, 'segredo');
+  fs.symlinkSync(fora, path.join(clone, 'data', 'link-para-fora'));
+  return clone;
+}
+
+const depsDoPacote = (extra = {}) => ({
+  stopPanel: async () => ({ ok: true, wasRunning: true }), hasSystemdUser: () => false,
+  startPanel: async () => ({ ok: true }), installShortcut: () => {}, waitForPort: async () => true, env: {}, ...extra,
+});
+
+test('clone → pacote: para o clone, traz o .env e o data/ (0600/0700) e acerta os caminhos; o clone fica intacto', async (t) => {
+  const clone = cloneInstalado(t);
+  const envAntes = fs.readFileSync(path.join(clone, '.env'), 'utf8');
+  const root = tmp(t, 'dash-pacote-');
+  const home = tmp(t, 'dash-pacote-home-');
+  fs.mkdirSync(path.join(home, '.local', 'bin'), { recursive: true });
+  fs.symlinkSync(path.join(clone, 'dashboard'), path.join(home, '.local', 'bin', 'dashboard'));
+  const parou = [];
+  const o = memOut();
+  const code = await importarPasta({ out: o.out, root, dir: clone, home, deps: depsDoPacote({ stopPanel: async (a) => { parou.push(a.root); return { ok: true, wasRunning: true }; } }) });
+  assert.equal(code, 0, o.text());
+  assert.deepEqual(parou, [clone], 'o painel do clone para antes da cópia');
+
+  const env = loadEnvFile(path.join(root, '.env'));
+  assert.deepEqual([env.SSH_HOST, env.SSH_CONFIG, env.SSH_ACESSO, env.PORT, env.DASH_TOKEN, env.HISTORY_FILE, env.LOG_FILE],
+    ['servidor', 'data/ssh/config', 'restrito', '3000', 'b'.repeat(32), undefined, 'data/outro.log']);
+  assert.equal(fs.statSync(path.join(root, '.env')).mode & 0o777, 0o600);
+  assert.match(fs.readFileSync(path.join(root, 'data', 'ssh', 'config'), 'utf8'), new RegExp(`UserKnownHostsFile "${path.join(root, 'data', 'ssh', 'known_hosts')}"`));
+  assert.match(fs.readFileSync(path.join(root, 'data', 'ssh', 'config'), 'utf8'), /IdentityFile "\/caminho\/da\/chave"/, 'a chave continua a mesma');
+  for (const f of ['ssh/known_hosts', 'history/2026-11-06.ndjson', 'alerts.json']) {
+    assert.equal(fs.statSync(path.join(root, 'data', f)).mode & 0o777, 0o600, f);
+  }
+  for (const d of ['data', 'data/ssh', 'data/history']) assert.equal(fs.statSync(path.join(root, d)).mode & 0o777, 0o700, d);
+  for (const f of ['dashboard.pid', 'entrar.json', 'reconfigurar.json', 'link-para-fora']) {
+    assert.equal(fs.existsSync(path.join(root, 'data', f)), false, `${f} não vem`);
+  }
+  assert.equal(fs.existsSync(path.join(home, '.local', 'bin', 'dashboard')), false, 'o comando pessoal do clone sai');
+  assert.equal(fs.readFileSync(path.join(clone, '.env'), 'utf8'), envAntes, 'o clone não muda');
+  assert.equal(fs.statSync(path.join(clone, 'data', 'history', '2026-11-06.ndjson')).mode & 0o777, 0o644);
+  assert.match(o.text(), /✓ clone encontrado \(2\.5\.0\)/);
+  assert.match(o.text(), /✓ painel do clone parado/);
+  assert.match(o.text(), /✓ configuração e dados trazidos do clone \(4 arquivos/);
+  assert.match(o.text(), /não foi alterada: ela é a cópia de segurança/);
+
+  // De novo: a configuração já existe e nada é sobrescrito.
+  const de = memOut();
+  assert.equal(await importarPasta({ out: de.out, root, dir: clone, home, deps: depsDoPacote() }), 1);
+  assert.match(de.text(), /o painel do pacote já tem configuração nesta conta/);
+  assert.match(de.text(), /desinstalar --apagar-historico/);
+});
+
+test('clone → pacote: recusa o que não é um clone instalado, sem parar nada', async (t) => {
+  const clone = cloneInstalado(t);
+  const root = tmp(t, 'dash-pacote-');
+  const home = tmp(t, 'dash-pacote-home-');
+  const parou = [];
+  const deps = depsDoPacote({ stopPanel: async (a) => { parou.push(a); return { ok: true }; } });
+  assert.deepEqual(detectarClone(clone), { ok: true, versao: '2.5.0' });
+  assert.deepEqual(detectarClone(v1Folder(t)), { ok: false, motivo: 'nao-e-clone' }, 'a V1 vai pelo --importar-v1');
+  fs.rmSync(path.join(clone, '.env'));
+  assert.deepEqual(detectarClone(clone), { ok: false, motivo: 'sem-env' });
+  const o = memOut();
+  assert.equal(await importarPasta({ out: o.out, root, dir: clone, home, deps }), 1);
+  assert.match(o.text(), /esse clone ainda não foi instalado/);
+  assert.equal(await importarPasta({ out: memOut().out, root, dir: root, home, deps }), 1);
+  assert.deepEqual(parou, []);
+  assert.equal(fs.existsSync(path.join(root, '.env')), false);
+});
+
+test('clone → pacote: só os caminhos mudam no .env e no data/ssh/config', () => {
+  const texto = ['# comentário', 'SSH_CONFIG="/c/data/ssh/config"', 'HISTORY_FILE=data/history.json', 'LOG_FILE=/c/dataX/log', 'PORT=3000'].join('\n');
+  assert.equal(envDoClone(texto, '/c'), ['# comentário', 'SSH_CONFIG=data/ssh/config', 'HISTORY_FILE=data/history.json', 'PORT=3000'].join('\n'));
+  assert.equal(sshConfigDoPacote('Host s\n  UserKnownHostsFile "/c/k"\n  User dashmon\n', '/p/k'), 'Host s\n  UserKnownHostsFile "/p/k"\n  User dashmon\n');
+  assert.throws(() => sshConfigDoPacote('x', '/p/"k'), /caminho não suportado/);
+});
+
+test('instalar --importar-pasta só vale no pacote: no clone, recusa antes de criar algo', async (t) => {
+  const root = tmp(t, 'dash-clone-raiz-');
+  for (const reconfigurar of [false, true]) {
+    const o = memOut();
+    assert.equal(await instalar({ out: o.out, root, args: ['--importar-pasta', '/tmp/x'], home: root, reconfigurar }), 2);
+    assert.match(o.text(), /--importar-pasta só vale no instalar do pacote \.deb/);
+  }
+  assert.deepEqual(fs.readdirSync(root), []);
 });
 
 // ---------------- desinstalar ----------------

@@ -333,6 +333,7 @@ navegador. O backend só coleta, persiste e serve. O limite de 1 SSH por minuto 
 ```bash
 ./dashboard instalar            # assistente no navegador (--terminal: TUI; --sem-interface: sem perguntas)
 ./dashboard instalar --importar-v1 <pasta>   # upgrade V1 → V2 (para a V1, traz .env e data/)
+dashboard instalar --importar-pasta <clone>  # só no pacote .deb: para o painel do clone e traz o .env e o data/ dele para as pastas pessoais
 ./dashboard instalar --sem-assinatura        # só para desenvolvimento: pasta sem tag assinada (cópia, ramo)
 ./dashboard instalar --sem-link              # não cria o comando dashboard (~/.local/bin/dashboard) nem o autocomplete, nos 3 modos
 ./dashboard instalar --sem-interface --editar-profile  # põe ~/.local/bin no PATH pelo arquivo de login e, sem o bash-completion, carrega o autocomplete pelo ~/.bashrc, com cópia antes
@@ -344,9 +345,9 @@ navegador. O backend só coleta, persiste e serve. O limite de 1 SSH por minuto 
 ./dashboard reconfigurar        # com o painel no ar, abre o painel logado no diálogo do Reconfigurar; sem tela, sem login, painel parado ou qualquer opção, reabre o assistente daqui (--terminal: TUI)
 ./dashboard atualizar           # abre o painel logado, no diálogo da versão nova; sem tela, sem login ou com o painel parado, segue no terminal; só na pasta da instalação (com .env e dona do serviço)
 ./dashboard atualizar --terminal  # tudo no terminal: tag assinada mais nova, backup de data/, volta atrás se falhar
-./dashboard desinstalar         # remove daqui e oferece limpar a parte deste computador no servidor
+./dashboard desinstalar         # remove daqui e oferece limpar a parte deste computador no servidor; no pacote, só a configuração e os dados da pessoa
 ./dashboard versao              # versão instalada
-bin/dashboard <comando>         # lançador do pacote .deb (/usr/bin/dashboard): os mesmos comandos no modo sistema; desinstalar e --importar-v1 ainda recusam
+bin/dashboard <comando>         # lançador do pacote .deb (/usr/bin/dashboard): os mesmos comandos no modo sistema
 libexec/atualizador verificar|atualizar|voltar|semear  # executor do pacote (usuário _server-dashboard, nunca root): versão nova, troca, volta atrás e 1ª instalação
 npm start                       # o painel em primeiro plano (node --max-semi-space-size=2 --optimize-for-size server/index.js)
 npm run poll                    # 1 coleta, sem o servidor web (node server/poller.js --once)
@@ -414,8 +415,19 @@ ambiente, e roda o código do link `atual` com o Node de `<base>/node/bin/node` 
 do sistema. A CLI acha o `.env` e o `data/` por `pastasDe(root)` (`envDe`, `dataDe`, `backupsDe`): a
 pasta do código que roda segue o modo; qualquer outra é um clone. No pacote, a instalação não cria o
 link nem o autocomplete pessoais (vêm do pacote), e o serviço de usuário roda pelo link `atual` com
-o sinal e as pastas XDG no `Environment=`. `desinstalar` e `instalar --importar-v1` recusam com o
-motivo até a etapa 10.
+o sinal e as pastas XDG no `Environment=`.
+
+Do clone para o pacote e desinstalar (ADR 0050): `dashboard instalar --importar-pasta <clone>` só vale
+no pacote (no clone e no `reconfigurar`, recusa com código 2). Ele confere o clone (`package.json` 2.x,
+`server/index.js` e `.env`), recusa se a conta já tem `.env` ou histórico do pacote, para o painel do
+clone e copia o `.env` e o `data/` para as pastas XDG (0600/0700, sem seguir link, sem o PID nem os
+códigos de uso único). `SSH_CONFIG`, `HISTORY_FILE` e `LOG_FILE` absolutos no `data/` do clone viram
+relativos, e no `data/ssh/config` só o `UserKnownHostsFile` troca. A chave e o ID ficam. Tira o link e
+o autocomplete pessoais só se forem do clone e liga o serviço do pacote; o clone não muda. O
+`--importar-v1` grava no `data/` da pessoa. No pacote, o `desinstalar` limpa o servidor e apaga só o
+`.env`, `data/ssh`, sessões, códigos e a chave do painel (com `--apagar-historico`, também `data/`,
+`.backups/` e `.atualizacao/`), e as pastas pessoais vazias; nunca o comando, o autocomplete, os blocos
+do login nem `/opt`. Nenhum comando recusa no pacote.
 
 No pacote, a troca de versão usa o executor (ADR 0048): o painel lê `<base>/estado/disponivel` e o
 `novidades.md` de hora em hora, sem git e sem rede. O `dashboard atualizar` (pelo terminal ou pelo
@@ -475,7 +487,11 @@ da tag), as unidades, a regra do polkit, o `sysusers.d`, o autocomplete e os lin
 atualizador semear` (extrai a semente só se não houver versão `atual` e baixa o Node só se faltar;
 falha só avisa), liga o timer só na 1ª instalação e põe no grupo `server-dashboard` a conta que
 instalou (`SUDO_USER` ou `PKEXEC_UID`, UID 1000 ou mais), só com o grupo vazio, com o aviso de entrar
-de novo na sessão. O `prerm` desliga o timer na remoção. O mantenedor assina o `dist/SHA256SUMS` com
+de novo na sessão. O `prerm` desliga o timer na remoção e para as 3 unidades do executor. No `apt
+purge`, o `postrm` apaga `repo.git`, `versoes`, `estado` e `node` (`rm -rf --one-file-system`, nomes
+fixos) e a base vazia, e remove o usuário `_server-dashboard` e os grupos `_server-dashboard` e
+`server-dashboard` só se forem de sistema (abaixo de 1000; falha só avisa). Nunca toca nas pastas
+pessoais: cada pessoa roda `dashboard desinstalar` antes. O mantenedor assina o `dist/SHA256SUMS` com
 `ssh-keygen -Y sign -n server-dashboard` (a chave nova tem `namespaces="git,server-dashboard"` no
 `docs/allowed_signers`).
 
@@ -778,7 +794,7 @@ linux-server-dashboard-v2/
 │   ├── poller.js           fachada do coletor + alertas (CLI --once)
 │   ├── csv.js · stores.js · logfile.js · version.js · node-flags.js (opções do Node do painel)
 │   ├── cli/                subcomandos do ./dashboard (index, servico, instalar, diagnosticar,
-│   │                       atualizar, desinstalar, importar-v1, saida)
+│   │                       atualizar, desinstalar, importar-v1, importar-pasta, saida)
 │   ├── setup/              instalação: acesso, deteccao, preparo, remoto, local, assinatura,
 │   │                       instalacao, web (assistente), tui, sem-interface, pela-tela
 │   ├── http/               router, static, session, sse, entrar (link de uso único)

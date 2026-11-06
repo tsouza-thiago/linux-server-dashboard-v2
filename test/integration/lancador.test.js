@@ -77,17 +77,64 @@ test('lançador: liga o modo sistema e lê o .env da pasta XDG da pessoa', (t) =
   assert.equal(r.status, 3);
 });
 
-test('lançador: desinstalar recusa no pacote; atualizar sem instalação para antes de tudo', (t) => {
+test('lançador: atualizar sem instalação para antes de tudo', (t) => {
   const p = montarPacote(t);
-  let r = rodar(p, ['desinstalar']);
-  assert.equal(r.status, 1);
-  assert.match(r.stdout, /o desinstalar ainda não funciona no pacote/);
-  assert.match(r.stdout, /você instalou o painel pelo pacote \.deb/);
   // O atualizar funciona no pacote (etapa 8, ADR 0048), mas só com o .env da pessoa.
-  r = rodar(p, ['atualizar', '--terminal']);
+  const r = rodar(p, ['atualizar', '--terminal']);
   assert.equal(r.status, 1);
   assert.match(r.stdout, /esta pasta não é uma instalação do painel/);
   assert.deepEqual(fs.readdirSync(p.home), [], 'nenhuma pasta criada');
+});
+
+test('lançador: desinstalar no pacote apaga só a configuração e os dados da pessoa (ADR 0050)', (t) => {
+  const p = montarPacote(t);
+  const config = path.join(p.home, '.config', 'server-dashboard');
+  const dados = path.join(p.home, '.local', 'share', 'server-dashboard');
+  const data = path.join(dados, 'data');
+  for (const dir of [config, path.join(data, 'ssh'), path.join(data, 'history'), path.join(dados, '.backups'), path.join(p.home, '.ssh'), path.join(p.home, '.local', 'bin')]) {
+    fs.mkdirSync(dir, { recursive: true, mode: 0o700 });
+  }
+  const chave = path.join(p.home, '.ssh', 'dashboard-servidor-3f9a12c4');
+  fs.writeFileSync(path.join(config, '.env'), 'PORT=3999\n', { mode: 0o600 });
+  fs.writeFileSync(path.join(data, 'ssh', 'config'), `Host servidor\n  IdentityFile "${chave}"\n`, { mode: 0o600 });
+  fs.writeFileSync(chave, 'chave falsa\n', { mode: 0o600 });
+  fs.writeFileSync(`${chave}.pub`, 'ssh-ed25519 AAAA dashboard@teste\n');
+  fs.writeFileSync(path.join(data, 'sessions.json'), '[]', { mode: 0o600 });
+  fs.writeFileSync(path.join(data, 'history', '2026-11-06.ndjson'), '{}\n', { mode: 0o600 });
+  // O comando pessoal de um clone: no pacote, o desinstalar não mexe nele.
+  const outroClone = path.join(p.dir, 'clone');
+  fs.mkdirSync(outroClone);
+  fs.writeFileSync(path.join(outroClone, 'dashboard'), '#!/bin/sh\n', { mode: 0o755 });
+  fs.symlinkSync(path.join(outroClone, 'dashboard'), path.join(p.home, '.local', 'bin', 'dashboard'));
+  const antes = fs.readdirSync(ROOT).sort();
+
+  let r = rodar(p, ['desinstalar', '--sim']);
+  assert.equal(r.status, 0, r.stdout + r.stderr);
+  assert.equal(fs.existsSync(config), false, 'a pasta da configuração vazia sai');
+  for (const f of [path.join(data, 'ssh'), path.join(data, 'sessions.json'), chave, `${chave}.pub`]) assert.equal(fs.existsSync(f), false, f);
+  assert.ok(fs.existsSync(path.join(data, 'history', '2026-11-06.ndjson')), 'o histórico fica sem --apagar-historico');
+  assert.ok(fs.lstatSync(path.join(p.home, '.local', 'bin', 'dashboard')).isSymbolicLink(), 'o comando do clone fica');
+  assert.match(r.stdout, /O código do painel fica em \/opt\/server-dashboard/);
+  assert.match(r.stdout, /sudo apt purge server-dashboard/);
+  assert.doesNotMatch(r.stdout, /rm -rf/);
+
+  r = rodar(p, ['desinstalar', '--sim', '--apagar-historico']);
+  assert.equal(r.status, 0, r.stdout + r.stderr);
+  assert.equal(fs.existsSync(dados), false, 'sem o histórico, a pasta de dados vazia sai');
+  assert.deepEqual(fs.readdirSync(path.join(p.home, '.local')).sort(), ['bin', 'share'], 'só as pastas do painel saem');
+  assert.deepEqual(fs.readdirSync(ROOT).sort(), antes, 'nada muda na pasta do código');
+});
+
+test('lançador: --importar-pasta e --importar-v1 passam no pacote e conferem a pasta antes de tudo', (t) => {
+  const p = montarPacote(t);
+  const r = rodar(p, ['instalar', '--importar-pasta', p.dir]);
+  assert.equal(r.status, 1, r.stdout + r.stderr);
+  assert.match(r.stdout, /essa pasta não é um clone do painel/);
+  assert.equal(fs.existsSync(path.join(p.home, '.config', 'server-dashboard', '.env')), false);
+  // O --importar-v1 também funciona no pacote: confere a pasta da V1.
+  const v1 = rodar(p, ['instalar', '--importar-v1', p.dir]);
+  assert.equal(v1.status, 1, v1.stdout + v1.stderr);
+  assert.match(v1.stdout, /essa pasta não é uma instalação da V1/);
 });
 
 test('lançador: a instalação cria as pastas pessoais (0700) e usa a porta do .env de lá', async (t) => {

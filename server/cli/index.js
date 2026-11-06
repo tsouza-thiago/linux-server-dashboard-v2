@@ -20,6 +20,7 @@ const HELP = `Uso: ./dashboard <comando>
                     --terminal       os mesmos passos no terminal (máquina sem tela)
                     --sem-interface  sem perguntas, por opções (veja --sem-interface --ajuda)
                     --importar-v1 <pasta>  traz configuração e histórico da V1 (e para a V1)
+                    --importar-pasta <clone>  só no pacote .deb: traz o .env e o data/ de um clone
                     --pre            aceita pré-versão (rc); sem ela, fica na estável
                     --sem-link       não cria o comando dashboard (~/.local/bin/dashboard) nem o autocomplete
   abrir           abre o painel no navegador, já logado
@@ -36,7 +37,8 @@ const HELP = `Uso: ./dashboard <comando>
                   parado, segue no terminal); backup e volta atrás se falhar
                     --terminal       faz tudo no terminal, sem abrir o navegador
                     --pre            aceita pré-versão (rc) mesmo estando na estável
-  desinstalar     remove serviço, atalho, comando e arquivos locais (e ajuda a limpar o servidor)
+  desinstalar     remove serviço, atalho, comando e arquivos locais (e ajuda a limpar o servidor);
+                  no pacote .deb, só os dados da pessoa (o código sai com apt purge)
   versao          mostra a versão
   ajuda           esta ajuda
 `;
@@ -121,26 +123,6 @@ const COMMANDS = {
   },
 };
 
-/**
- * O que ainda não funciona na instalação pelo pacote .deb (modo sistema, ADR 0043). Estes
- * caminhos apagam arquivos com as regras do clone; no pacote, o código é do executor e fica em
- * /opt. Cada um recusa com o motivo, até a etapa 10 da F9, que os traz. O atualizar e o
- * reconfigurar pela tela já funcionam no pacote (etapa 8, ADR 0048).
- */
-const RECUSA_NO_PACOTE = [
-  [(nome) => nome === 'desinstalar', 'o desinstalar ainda não funciona no pacote',
-    'nada foi apagado. Os seus dados continuam nas pastas pessoais do painel.'],
-  [(nome, args) => nome === 'instalar' && args.includes('--importar-v1'), 'importar a V1 ainda não funciona no pacote',
-    'instale a V2 pelo git clone para importar a V1.'],
-];
-
-/** Motivo da recusa do comando no modo sistema (null = pode seguir). */
-export function recusaNoPacote(nome, args, modo = pastasDe(ROOT).modo) {
-  if (modo !== 'sistema') return null;
-  const regra = RECUSA_NO_PACOTE.find(([vale]) => vale(nome, args));
-  return regra ? { texto: regra[1], oQueFazer: regra[2] } : null;
-}
-
 /** Nomes dos subcomandos (a documentação é conferida contra esta lista). */
 export const COMMAND_NAMES = Object.freeze(Object.keys(COMMANDS));
 
@@ -158,12 +140,6 @@ export async function main(argv = process.argv.slice(2), { root = ROOT, home = o
     out.fail(`comando desconhecido: ${name}`);
     out.line(help(out));
     return 2;
-  }
-  const recusa = recusaNoPacote(alias[name] ?? name, args, pastasDe(root).modo);
-  if (recusa) {
-    out.fail(recusa.texto);
-    out.explain('você instalou o painel pelo pacote .deb.', recusa.oQueFazer);
-    return 1;
   }
   return cmd({ out, root, home, args });
 }
