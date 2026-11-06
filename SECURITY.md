@@ -312,8 +312,11 @@ Inclua: o passo a passo para reproduzir, o impacto estimado e a versão afetada
   fica fora do git, e o log traz só as linhas do `atualizar`, que não imprime segredos. O
   `dashboard atualizar` só abre a tela (ADR 0032): o fragmento `#...?atualizar=1` abre o diálogo, e
   quem troca é o clique. Pré-versão pela tela exige `--pre` no terminal, que grava uma liberação com
-  prazo em `.atualizacao/`; a tela não tem como pedir.
-- **Verificado por:** `test/integration/atualizacao.test.js`, `test/unit/atualizacao-registro.test.js`,
+  prazo em `.atualizacao/`; a tela não tem como pedir. O serviço systemd escreve só em `data/` e em
+  `.atualizacao/painel/` (ADR 0051): o `pre.json`, a trava, o estado e o log são do executor, e um painel
+  comprometido não os cria. O "Procurar agora" guarda as tags num espelho bare em `painel/`, sem escrever
+  no `.git`; o executor nunca usa o espelho e confere a assinatura no `.git` real.
+- **Verificado por:** `test/seguranca/registro-e-espelho.test.js`, `test/integration/atualizacao.test.js`, `test/unit/atualizacao-registro.test.js`,
   `test/integration/cli-manutencao.test.js`, `test/integration/atualizacao-ponta-a-ponta.test.js`, a regra I11 de `test/seguranca/invariantes-estaticas.test.js`
   e `scripts/mutacao-seguranca.mjs` (versão da tela, sem sessão, rotas fora da sessão, 2 trocas juntas,
   pasta aberta, executor filho do painel, pré-versão liberada sem prazo).

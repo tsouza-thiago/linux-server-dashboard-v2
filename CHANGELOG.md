@@ -9,6 +9,16 @@ diante: `PATCH` corrige, `MINOR` acrescenta sem quebrar e `MAJOR` quebra.
 
 ## [Não publicado]
 
+### Corrigido
+
+- O botão "Atualizar agora" e o "Procurar agora" funcionam no serviço systemd de usuário (#181). A
+  unidade só liberava a escrita em `data/`: o botão falhava com `ENOENT` em `.atualizacao/` e a procura
+  dizia sempre "sem acesso". Agora o serviço escreve só em `data/` e em `.atualizacao/painel/`; a procura
+  guarda as tags num espelho bare dessa pasta, sem tocar no `.git`; o executor segue conferindo a
+  assinatura no `.git` real ([ADR 0051](docs/adr/0051-servico-escreve-so-em-painel-e-procura-por-espelho.md)).
+  Se a pasta não aceitar escrita, a rota responde 503 com o motivo e a tela o mostra. **Quem está na
+  2.5.0 ou na 2.6.x faz a 1ª troca pelo terminal** (`./dashboard atualizar --terminal`), que refaz a unidade.
+
 ## [2.6.1] — 2026-11-06
 
 Versão de limpeza. A Ajuda agora mostra o nome certo do arquivo do sudoers (um por instalação). O `npm run poll` saiu: ele abria um 2º SSH com o painel no ar; use `npm run capturar-amostra` ou `dashboard diagnosticar`. A documentação ficou mais curta e certa. Nada muda na configuração, no formato de `data/` nem no acesso ao servidor.

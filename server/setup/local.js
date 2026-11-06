@@ -9,6 +9,7 @@ import path from 'node:path';
 import { caminhosDoPacote, envDe, loadEnvFile, pastasDe, prepararPastas } from '../config.js';
 import { KEY_COMMENT, NAME_PREFIX, installId, knownHostsName, machineLabel, sshConfigText, validHost, validPort } from './acesso.js';
 import { UNIT_NAME, unitPath, systemctlUser, hasSystemdUser } from '../cli/servico.js';
+import { garantirPasta, pastaDoPainelEm } from '../atualizacao/registro.js';
 import { PANEL_NODE_FLAGS } from '../node-flags.js';
 import { comandoDashboard, primeiroNoPath } from '../cli/saida.js';
 
@@ -212,12 +213,15 @@ export function unitText({ root, nodeBin, hardening = true, pastas = pastasDe(ro
     'RestartSec=10',
     'UMask=0077',
     ...(hardening ? [
-      '# Hardening: sem novos privilégios e só data/ com escrita',
+      '# Hardening: sem novos privilégios e só data/ e .atualizacao/painel/ com escrita (ADR 0051)',
       'NoNewPrivileges=yes',
       'PrivateTmp=yes',
       'ProtectSystem=strict',
       'ProtectHome=read-only',
       `ReadWritePaths=${unitQuote(path.join(pastas.dados, 'data'))}`,
+      // Só o painel/ do registro: o pre.json, a trava, o estado e o log são do executor e ficam
+      // fora. O `-` não derruba o serviço se a pasta faltar; o botão responde 503 com o motivo.
+      `ReadWritePaths=${unitQuote(`-${pastaDoPainelEm(pastas.dados)}`)}`,
       'ProtectKernelTunables=yes',
       'ProtectControlGroups=yes',
       'RestrictSUIDSGID=yes',
@@ -239,6 +243,8 @@ export function unitText({ root, nodeBin, hardening = true, pastas = pastasDe(ro
 export async function installService({ root, home = os.homedir(), nodeBin = serviceNode(root), enable = true, run, waitMs = 4000 } = {}) {
   const file = unitPath(home);
   fs.mkdirSync(path.dirname(file), { recursive: true, mode: 0o700 });
+  // A pasta que o painel escreve precisa existir antes do serviço subir (ADR 0051).
+  garantirPasta(root);
   const apply = (hardening) => {
     writeAtomic(file, unitText({ root, nodeBin, hardening }), 0o600);
     systemctlUser(['daemon-reload'], { run });

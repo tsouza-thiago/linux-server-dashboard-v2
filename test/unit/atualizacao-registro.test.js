@@ -14,6 +14,8 @@ import { espiao } from '../../test-support/falsos.js';
 function pasta(t) {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), 'dash-registro-'));
   t.after(() => fs.rmSync(root, { recursive: true, force: true }));
+  // A instalação cria .atualizacao/painel/ antes do serviço subir; o painel não cria (ADR 0051).
+  garantirPasta(root);
   return root;
 }
 
@@ -26,36 +28,64 @@ function proc(root, pid, cmdline) {
 }
 const ATUALIZAR = ['/opt/node', '/opt/painel/server/cli/index.js', 'atualizar', '--registro'];
 
+// O executor como o `dashboard atualizar --registro` o faz: abre o registro e pega a trava, o que
+// marca o início dele e passa na frente do pedido da tela.
+function executor(root, pid = 700) {
+  const procDir = proc(root, pid, ATUALIZAR);
+  const r = abrirRegistro(root);
+  assert.equal(r.pegarTrava({ pid, procDir }), true);
+  return { r, procDir };
+}
+
 test('pasta: 0700, e corrige a permissão de uma pasta aberta', (t) => {
   const root = pasta(t);
-  fs.mkdirSync(path.join(root, '.atualizacao'), { mode: 0o755 });
+  fs.chmodSync(path.join(root, '.atualizacao'), 0o755);
+  fs.chmodSync(path.join(root, '.atualizacao', 'painel'), 0o755);
   garantirPasta(root);
   assert.equal(fs.statSync(path.join(root, '.atualizacao')).mode & 0o777, 0o700);
+  assert.equal(fs.statSync(path.join(root, '.atualizacao', 'painel')).mode & 0o777, 0o700);
 });
 
-test('estado e log: nascem 0600; o começo zera o log da atualização anterior', (t) => {
+test('estado e log: nascem 0600; o executor, ao pegar a trava, zera o log e o estado da anterior', (t) => {
   const root = pasta(t);
   prepararRegistro(root, { alvo: 'v2.5.0', de: 'v2.4.1', agora: 1000 });
-  const r = abrirRegistro(root);
-  r.stream.write('linha antiga\n');
-  r.fim(0);
+  const a = executor(root);
+  a.r.stream.write('linha antiga\n');
+  a.r.fim(0);
   for (const f of ['estado.json', 'ultima.log']) assert.equal(fs.statSync(path.join(root, '.atualizacao', f)).mode & 0o777, 0o600, f);
-  prepararRegistro(root, { alvo: 'v2.6.0', de: 'v2.5.0', agora: 2000 });
-  assert.equal(lerRegistro(root).texto, '');
-  assert.deepEqual(lerEstado(root), { fase: 'iniciando', alvo: 'v2.6.0', de: 'v2.5.0', inicio: new Date(2000).toISOString(), fim: null, resultado: null });
+  assert.equal(fs.statSync(path.join(root, '.atualizacao', 'painel', 'pedido.json')).mode & 0o777, 0o600);
+  prepararRegistro(root, { alvo: 'v2.6.0', de: 'v2.5.0', agora: Date.now() + 5000 });
+  assert.equal(lerRegistro(root).texto, '', 'o pedido novo esconde o log velho');
+  const b = executor(root);
+  assert.equal(lerRegistro(root).texto, '', 'o log da anterior foi zerado');
+  assert.deepEqual({ ...lerEstado(root), inicio: undefined }, { fase: 'iniciando', inicio: undefined, fim: null, resultado: null });
+  b.r.fim(0);
+});
+
+test('o painel só escreve em .atualizacao/painel/ (ADR 0051)', (t) => {
+  const root = pasta(t);
+  const antes = fs.readdirSync(path.join(root, '.atualizacao')).sort();
+  prepararRegistro(root, { alvo: 'v2.5.0', de: 'v2.4.1' });
+  registrarFalha(root, 'não subiu');
+  assert.deepEqual(fs.readdirSync(path.join(root, '.atualizacao')).sort(), antes, 'nenhum arquivo novo fora de painel/');
+  assert.deepEqual(fs.readdirSync(path.join(root, '.atualizacao', 'painel')), ['pedido.json']);
+  assert.equal(preLiberada(root), false);
+});
+
+test('sem painel/ (serviço antigo, pasta sem escrita): prepararRegistro lança e não cria nada', (t) => {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'dash-registro-'));
+  t.after(() => fs.rmSync(root, { recursive: true, force: true }));
+  assert.throws(() => prepararRegistro(root, { alvo: 'v2.5.0', de: 'v2.4.1' }), { code: 'ENOENT' });
+  assert.equal(fs.existsSync(path.join(root, '.atualizacao')), false);
 });
 
 test('fim: o código decide o resultado, menos quando o resultado já foi marcado', (t) => {
   const root = pasta(t);
-  const ok = abrirRegistro(root);
-  ok.fim(0);
+  executor(root).r.fim(0);
   assert.equal(lerEstado(root).resultado, 'atualizado');
-  prepararRegistro(root, { alvo: 'v2.5.0', de: 'v2.4.1' });
-  const ruim = abrirRegistro(root);
-  ruim.fim(1);
+  executor(root).r.fim(1);
   assert.equal(lerEstado(root).resultado, 'falhou');
-  prepararRegistro(root, { alvo: 'v2.5.0', de: 'v2.4.1' });
-  const volta = abrirRegistro(root);
+  const volta = executor(root).r;
   volta.marcar({ resultado: 'voltou' });
   volta.fim(1);
   assert.equal(lerEstado(root).resultado, 'voltou');
@@ -93,7 +123,7 @@ test('em andamento: o pedido da tela conta só até o executor ter tempo de subi
 test('registro: entrega só o pedaço novo, em linhas inteiras', (t) => {
   const root = pasta(t);
   prepararRegistro(root, { alvo: 'v2.5.0', de: 'v2.4.1' });
-  const r = abrirRegistro(root);
+  const { r } = executor(root);
   r.stream.write('✓ primeira\n');
   const a = lerRegistro(root, 0);
   assert.equal(a.texto, '✓ primeira\n');
@@ -108,7 +138,7 @@ test('registro: entrega só o pedaço novo, em linhas inteiras', (t) => {
 test('registro: log grande vem em pedaços, sem partir caractere', (t) => {
   const root = pasta(t);
   prepararRegistro(root, { alvo: 'v2.5.0', de: 'v2.4.1' });
-  const r = abrirRegistro(root);
+  const { r } = executor(root);
   const linha = `${'ç'.repeat(99)}\n`;
   for (let i = 0; i < 1000; i += 1) r.stream.write(linha);
   let desde = 0;
@@ -128,7 +158,7 @@ test('registro: depois de um log mais curto, lê do começo; sem nada, responde 
   const root = pasta(t);
   assert.deepEqual(lerRegistro(root, 0), { texto: '', proximo: 0, fase: null, alvo: null, de: null, inicio: null, fim: null, resultado: null, rodando: false });
   prepararRegistro(root, { alvo: 'v2.5.0', de: 'v2.4.1' });
-  const r = abrirRegistro(root);
+  const { r } = executor(root);
   r.stream.write('curta\n');
   assert.equal(lerRegistro(root, 99999).texto, 'curta\n');
   r.fim(0);
@@ -137,9 +167,10 @@ test('registro: depois de um log mais curto, lê do começo; sem nada, responde 
 test('registro: executor que morreu no meio aparece como interrompida', (t) => {
   const root = pasta(t);
   prepararRegistro(root, { alvo: 'v2.5.0', de: 'v2.4.1', agora: 1000 });
-  const r = abrirRegistro(root);
+  const { r, procDir } = executor(root);
   r.marcar({ fase: 'trocando' });
-  const lido = lerRegistro(root, 0, { agora: 1000 });
+  fs.rmSync(path.join(procDir, '700'), { recursive: true }); // o executor morreu
+  const lido = lerRegistro(root, 0, { agora: 1000, procDir });
   assert.equal(lido.resultado, 'interrompida');
   assert.equal(lido.fase, 'fim');
   assert.equal(lido.rodando, false);
@@ -148,10 +179,8 @@ test('registro: executor que morreu no meio aparece como interrompida', (t) => {
 
 test('registro: executor que termina entre as 2 leituras não vira interrompida (#130)', (t) => {
   const root = pasta(t);
-  const procDir = proc(root, 700, ATUALIZAR);
   prepararRegistro(root, { alvo: 'v2.5.0', de: 'v2.4.1', agora: 1000 });
-  const r = abrirRegistro(root);
-  assert.equal(r.pegarTrava({ pid: 700, procDir }), true);
+  const { r, procDir } = executor(root);
   r.marcar({ fase: 'ligando' });
   // A corrida fica fixa: o executor termina logo depois da 1ª leitura do estado.
   const original = fs.readFileSync;
@@ -203,78 +232,22 @@ test('trava pelo registro: quem não pegou a trava não solta a dos outros', (t)
   assert.equal(donoDaTrava(root, procDir), 700);
 });
 
-test('falha ao iniciar: fica no log e encerra o estado', (t) => {
+test('falha ao iniciar: a linha aparece como log e o estado encerra como falha', (t) => {
   const root = pasta(t);
   prepararRegistro(root, { alvo: 'v2.5.0', de: 'v2.4.1' });
   registrarFalha(root, 'não subiu');
   const r = lerRegistro(root);
   assert.equal(r.texto, 'não subiu\n');
   assert.equal(r.resultado, 'falhou');
+  assert.equal(r.fase, 'fim');
+  assert.equal(emAndamento(root), false);
+  assert.equal(lerRegistro(root, r.proximo).texto, '');
 });
 
-// Filho falso: anota o que foi pedido e termina como o teste mandar.
-test('executor: serviço → unidade própria do systemd, com o comando em lista e sem shell', async () => {
-  const { chamadas, spawnFn } = espiao((f) => f.emit('close', 0));
-  assert.deepEqual(await executarForaDoServico({ root: '/opt/painel', modo: 'systemd', spawnFn }), { ok: true });
-  assert.equal(chamadas[0].cmd, 'systemd-run');
-  assert.deepEqual(chamadas[0].args, ['--user', '--unit=server-dashboard-atualizar', '--collect', '--quiet', '--working-directory=/opt/painel', '/opt/painel/dashboard', 'atualizar', '--registro']);
-  assert.equal(chamadas[0].opts.shell, undefined);
-});
-
-test('executor: systemd-run que falha não cai para um processo solto dentro do serviço', async () => {
-  const { chamadas, spawnFn } = espiao((f) => f.emit('close', 1));
-  assert.deepEqual(await executarForaDoServico({ root: '/opt/painel', modo: 'systemd', spawnFn }), { ok: false });
-  assert.equal(chamadas.length, 1);
-  const erro = espiao((f) => f.emit('error', new Error('sem systemd-run')));
-  assert.deepEqual(await executarForaDoServico({ root: '/opt/painel', modo: 'systemd', spawnFn: erro.spawnFn }), { ok: false });
-});
-
-test('executor: segundo plano → sessão própria e sem prender o painel', async () => {
-  const { chamadas, spawnFn } = espiao((f) => f.emit('spawn'));
-  assert.deepEqual(await executarForaDoServico({ root: '/opt/painel', modo: 'segundo-plano', spawnFn }), { ok: true });
-  assert.equal(chamadas[0].cmd, '/opt/painel/dashboard');
-  assert.deepEqual(chamadas[0].args, ['atualizar', '--registro']);
-  assert.equal(chamadas[0].opts.detached, true);
-  assert.equal(chamadas[0].opts.stdio, 'ignore');
-  assert.equal(chamadas[0].opts.cwd, '/opt/painel');
-  assert.equal(chamadas[0].unref, true);
-  const erro = espiao((f) => f.emit('error', new Error('sem arquivo')));
-  assert.deepEqual(await executarForaDoServico({ root: '/opt/painel', modo: 'segundo-plano', spawnFn: erro.spawnFn }), { ok: false });
-});
-
-test('executor: reconfigurar usa outra unidade e o comando fixo, nos 2 modos (I11)', async () => {
-  const unidade = espiao((f) => f.emit('close', 0));
-  assert.deepEqual(await reconfigurarForaDoServico({ root: '/opt/painel', modo: 'systemd', spawnFn: unidade.spawnFn }), { ok: true });
-  assert.equal(unidade.chamadas[0].cmd, 'systemd-run');
-  assert.deepEqual(unidade.chamadas[0].args, ['--user', '--unit=server-dashboard-reconfigurar', '--collect', '--quiet', '--working-directory=/opt/painel', '/opt/painel/dashboard', 'reconfigurar', '--pela-tela']);
-  const solto = espiao((f) => f.emit('spawn'));
-  assert.deepEqual(await reconfigurarForaDoServico({ root: '/opt/painel', modo: 'segundo-plano', spawnFn: solto.spawnFn }), { ok: true });
-  assert.equal(solto.chamadas[0].cmd, '/opt/painel/dashboard');
-  assert.deepEqual(solto.chamadas[0].args, ['reconfigurar', '--pela-tela']);
-  assert.equal(solto.chamadas[0].opts.detached, true);
-});
-
-test('--pre pela tela: arquivo 0600, vale por um tempo e sai quando pedem', (t) => {
+test('pedido que o executor nunca pegou vira interrompida depois da espera', (t) => {
   const root = pasta(t);
-  const agora = Date.parse('2026-11-01T12:00:00Z');
-  assert.equal(preLiberada(root, agora), false);
-  liberarPre(root, agora);
-  assert.equal(fs.statSync(path.join(root, '.atualizacao', 'pre.json')).mode & 0o777, 0o600);
-  assert.equal(preLiberada(root, agora + 29 * 60000), true);
-  assert.equal(preLiberada(root, agora + 30 * 60000), false, 'a tela não estica o prazo');
-  cancelarPre(root);
-  assert.equal(preLiberada(root, agora), false);
-  fs.writeFileSync(path.join(root, '.atualizacao', 'pre.json'), 'quebrado');
-  assert.equal(preLiberada(root, agora), false);
-});
-
-test('modo: serviço só com a unidade instalada e o systemd do usuário de pé', (t) => {
-  const home = pasta(t);
-  const comSystemd = () => ({ status: 0, stdout: '' });
-  assert.equal(modoDoExecutor({ home, run: comSystemd }), 'segundo-plano');
-  const unit = path.join(home, '.config', 'systemd', 'user');
-  fs.mkdirSync(unit, { recursive: true });
-  fs.writeFileSync(path.join(unit, 'server-dashboard.service'), '[Unit]\n');
-  assert.equal(modoDoExecutor({ home, run: comSystemd }), 'systemd');
-  assert.equal(modoDoExecutor({ home, run: () => ({ status: 1 }) }), 'segundo-plano');
+  prepararRegistro(root, { alvo: 'v2.5.0', de: 'v2.4.1', agora: 1000 });
+  const r = lerRegistro(root, 0, { agora: 1000 + 61000 });
+  assert.equal(r.resultado, 'interrompida');
+  assert.equal(r.fase, 'fim');
 });

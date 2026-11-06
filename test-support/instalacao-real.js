@@ -3,6 +3,7 @@
 // ./dashboard de verdade. O HOME é temporário e o ambiente não leva nada do systemd do usuário:
 // o serviço real desta máquina nunca é tocado (#118). Nada sai da máquina: o `origin` é uma pasta,
 // e o servidor monitorado é um nome .invalid, que nunca resolve.
+import { garantirPasta } from '../server/atualizacao/registro.js';
 import assert from 'node:assert/strict';
 import { spawn, spawnSync } from 'node:child_process';
 import fs from 'node:fs';
@@ -74,6 +75,8 @@ export async function instalacaoReal(t, { versao = '2.90.0' } = {}) {
   spawnSync('git', ['clone', '-q', origem, pasta], { env: { ...process.env, ...ENV_GIT } });
   git(pasta, 'checkout', '-q', '--detach', `v${versao}`);
   fs.writeFileSync(path.join(pasta, '.env'), `SSH_HOST=servidor-de-teste.invalid\nPORT=${porta}\nDASH_TOKEN=${TOKEN}\nPOLL_INTERVAL=3600000\n`, { mode: 0o600 });
+  // A instalação de verdade cria .atualizacao/painel/ ao ligar o serviço (ADR 0051).
+  garantirPasta(pasta);
 
   // Só o necessário: sem XDG_RUNTIME_DIR nem barramento, o `systemctl --user` não acha o systemd daqui.
   const ambiente = { PATH: [bin, path.dirname(process.execPath), process.env.PATH].join(':'), HOME: home, LANG: 'C.UTF-8', ...ENV_GIT };

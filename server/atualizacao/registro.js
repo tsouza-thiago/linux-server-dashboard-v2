@@ -1,8 +1,14 @@
-// Registro da troca de versão (ADR 0031): log, estado e trava em .atualizacao/, fora de data/,
+// Registro da troca de versão (ADR 0031 e 0051): log, estado e trava em .atualizacao/, fora de data/,
 // porque a volta atrás apaga data/ e perderia o log. Quem escreve é o `dashboard atualizar
-// --registro`; o painel só prepara o início e lê. A pasta sobrevive à queda do painel, e é por
-// isso que a tela de progresso consegue continuar depois da troca de versão. No pacote .deb (modo
-// sistema), a pasta do código em /opt é só leitura: .atualizacao/ fica na pasta de dados da pessoa.
+// --registro` (o executor, fora do serviço); o painel só lê. A pasta sobrevive à queda do painel, e é
+// por isso que a tela de progresso consegue continuar depois da troca de versão. No pacote .deb
+// (modo sistema), a pasta do código em /opt é só leitura: .atualizacao/ fica na pasta de dados da
+// pessoa.
+//
+// Quem grava o quê (ADR 0051): o serviço roda isolado e só escreve em data/ e em
+// .atualizacao/painel/. Os arquivos em que o executor confia (ultima.log, estado.json, trava.pid,
+// pre.json) ficam FORA do painel/: um painel comprometido não cria o pre.json nem a trava. O pedido
+// da tela (pedido.json) e a falha ao disparar ficam em painel/; o executor só os lê, para mostrar.
 import fs from 'node:fs';
 import path from 'node:path';
 import { pastasDe } from '../config.js';
@@ -19,16 +25,56 @@ const GRACA_MS = 60000;
 // Quanto vale o `dashboard atualizar --pre` pelo painel: o tempo de olhar o diálogo e clicar.
 const PRE_MS = 30 * 60000;
 
+// O pedido da tela: o painel o grava em painel/ (a única pasta do registro que ele escreve).
+const SUBPASTA_PAINEL = 'painel';
+const PEDIDO = 'pedido.json';
+
 /** A pasta .atualizacao/ da instalação de `root`: a do projeto no clone, a XDG no pacote. */
 const pastaDoRegistro = (root) => path.join(pastasDe(root).dados, PASTA);
 const arquivo = (root, nome) => path.join(pastaDoRegistro(root), nome);
 
-/** Cria a pasta (0700) ou corrige a permissão dela. */
+/** A única pasta do registro com escrita do painel, dado o `dados` de `pastasDe` (ADR 0051). */
+export const pastaDoPainelEm = (dados) => path.join(dados, PASTA, SUBPASTA_PAINEL);
+export const pastaDoPainel = (root) => pastaDoPainelEm(pastasDe(root).dados);
+
+/** Cria .atualizacao/ e painel/ (0700) ou corrige a permissão. Quem chama é o executor ou a instalação. */
 export function garantirPasta(root) {
   const dir = pastaDoRegistro(root);
   fs.mkdirSync(path.dirname(dir), { recursive: true, mode: 0o700 });
   fs.mkdirSync(dir, { recursive: true, mode: 0o700 });
   fs.chmodSync(dir, 0o700);
+  const painel = pastaDoPainel(root);
+  fs.mkdirSync(painel, { recursive: true, mode: 0o700 });
+  fs.chmodSync(painel, 0o700);
+}
+
+// Lê um JSON de objeto; {} sem arquivo ou inválido.
+function lerObjeto(file) {
+  try {
+    const salvo = JSON.parse(fs.readFileSync(file, 'utf8'));
+    return salvo && typeof salvo === 'object' && !Array.isArray(salvo) ? salvo : {};
+  } catch {
+    return {};
+  }
+}
+
+/** O pedido da tela; {} sem pedido. Quem escreve é o painel: serve só para mostrar. */
+const lerPedido = (root) => lerObjeto(path.join(pastaDoPainel(root), PEDIDO));
+
+// Troca atômica dentro de painel/ (o painel não escreve em mais nada).
+function gravarPedido(root, pedido) {
+  const file = path.join(pastaDoPainel(root), PEDIDO);
+  fs.writeFileSync(`${file}.tmp`, JSON.stringify(pedido), { mode: 0o600 });
+  fs.renameSync(`${file}.tmp`, file);
+}
+
+// O pedido ainda não foi pego pelo executor? O executor, ao pegar a trava, grava um `inicio` novo no
+// estado.json; enquanto o do estado for mais velho que o do pedido, vale o pedido.
+function pedidoPendente(root) {
+  const p = lerPedido(root);
+  if (!p.inicio) return null;
+  const doExecutor = Date.parse(lerEstado(root).inicio);
+  return Number.isNaN(doExecutor) || Date.parse(p.inicio) > doExecutor ? p : null;
 }
 
 /** O estado gravado; {} sem arquivo ou com arquivo inválido. */
@@ -54,19 +100,17 @@ function marcarEstado(root, mudanca) {
 }
 
 /**
- * Começo pedido pela tela: zera o log e grava a fase `iniciando`. É síncrono de propósito:
- * 2 pedidos seguidos não passam juntos pela conferência de `emAndamento`.
+ * Começo pedido pela tela: grava o pedido (fase `iniciando`) em painel/. É síncrono de propósito:
+ * 2 pedidos seguidos não passam juntos pela conferência de `emAndamento`. Não toca no log nem no
+ * estado do executor. Lança se painel/ não aceitar escrita (a rota responde 503 com o motivo).
  */
 export function prepararRegistro(root, { alvo, de, agora = Date.now() }) {
-  garantirPasta(root);
-  fs.writeFileSync(arquivo(root, LOG), '', { mode: 0o600 });
-  gravarEstado(root, { fase: 'iniciando', alvo, de, inicio: new Date(agora).toISOString(), fim: null, resultado: null });
+  gravarPedido(root, { alvo, de, inicio: new Date(agora).toISOString(), falha: null });
 }
 
-/** Acrescenta uma linha ao log e encerra o estado como falha (o executor nem subiu). */
+/** Marca o pedido como falho (o executor nem subiu); a tela mostra a linha como se fosse o log. */
 export function registrarFalha(root, linha, agora = Date.now()) {
-  fs.appendFileSync(arquivo(root, LOG), `${linha}\n`, { mode: 0o600 });
-  marcarEstado(root, { fase: 'fim', fim: new Date(agora).toISOString(), resultado: 'falhou' });
+  gravarPedido(root, { ...lerPedido(root), falha: { linha, fim: new Date(agora).toISOString() } });
 }
 
 // O PID é mesmo um `dashboard atualizar`? Um PID reaproveitado pelo sistema não segura a trava.
@@ -112,8 +156,8 @@ export function soltarTrava(root) {
 /** Há uma troca de versão em andamento, ou pedida agora há pouco? */
 export function emAndamento(root, { agora = Date.now(), procDir = '/proc' } = {}) {
   if (donoDaTrava(root, procDir)) return true;
-  const e = lerEstado(root);
-  return e.fase === 'iniciando' && agora - Date.parse(e.inicio) < GRACA_MS;
+  const p = pedidoPendente(root);
+  return Boolean(p) && !p.falha && agora - Date.parse(p.inicio) < GRACA_MS;
 }
 
 /**
@@ -162,7 +206,13 @@ export function lerRegistro(root, desde = 0, opcoes = {}) {
   // A trava vem antes do estado (#130): o executor grava `fim` e só então solta. Trava solta aqui
   // garante que o estado lido depois já é o final.
   const rodando = emAndamento(root, opcoes);
-  const e = lerEstado(root);
+  const pedido = pedidoPendente(root);
+  // Pedido que o executor ainda não pegou: a tela vê o início, a falha ao disparar ou a espera vencida.
+  if (pedido) return registroDoPedido(pedido, desde, rodando, opcoes.agora ?? Date.now());
+  const e = { ...lerEstado(root) };
+  const p = lerPedido(root);
+  // O executor só sabe o alvo depois do fetch: até lá, o da tela.
+  if (!e.alvo && p.alvo) { e.alvo = p.alvo; e.de = e.de ?? p.de; }
   // Sem trava e sem `fim`: o executor morreu no meio (ex.: desligaram o computador).
   const interrompida = Boolean(e.fase) && e.fase !== 'fim' && !rodando;
   return {
@@ -173,6 +223,25 @@ export function lerRegistro(root, desde = 0, opcoes = {}) {
     inicio: e.inicio ?? null,
     fim: e.fim ?? null,
     resultado: interrompida ? 'interrompida' : e.resultado ?? null,
+    rodando,
+  };
+}
+
+// O que a tela de progresso vê quando só existe o pedido (o executor não pegou a trava).
+function registroDoPedido(p, desde, rodando, agora) {
+  const texto = p.falha ? `${p.falha.linha}\n` : '';
+  const tamanho = Buffer.byteLength(texto);
+  const venceu = !p.falha && !rodando && agora - Date.parse(p.inicio) >= GRACA_MS;
+  const fim = Boolean(p.falha) || venceu;
+  return {
+    texto: desde < tamanho ? texto : '',
+    proximo: tamanho,
+    fase: fim ? 'fim' : 'iniciando',
+    alvo: p.alvo ?? null,
+    de: p.de ?? null,
+    inicio: p.inicio,
+    fim: p.falha ? p.falha.fim : null,
+    resultado: p.falha ? 'falhou' : venceu ? 'interrompida' : null,
     rodando,
   };
 }
@@ -192,6 +261,12 @@ export function abrirRegistro(root, { agora = Date.now } = {}) {
     /** Pega a trava em nome do registro: quem solta é o `fim`. */
     pegarTrava(opcoes) {
       comTrava = pegarTrava(root, opcoes);
+      // Dono da trava: a troca é esta. Zera o log e o estado da anterior e marca o início, que
+      // passa na frente do pedido da tela (o painel não escreve em nada disto, ADR 0051).
+      if (comTrava) {
+        fs.ftruncateSync(fd, 0);
+        gravarEstado(root, { fase: 'iniciando', inicio: new Date(agora()).toISOString(), fim: null, resultado: null });
+      }
       return comTrava;
     },
     /**

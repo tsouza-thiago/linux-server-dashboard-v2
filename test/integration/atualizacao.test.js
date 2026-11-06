@@ -8,7 +8,7 @@ import os from 'node:os';
 import path from 'node:path';
 import { createApp } from '../../server/index.js';
 import { procurar } from '../../server/atualizacao/procurar.js';
-import { abrirRegistro, cancelarPre, liberarPre, pegarTrava } from '../../server/atualizacao/registro.js';
+import { abrirRegistro, cancelarPre, garantirPasta, liberarPre, pastaDoPainel, pegarTrava } from '../../server/atualizacao/registro.js';
 import { newestSignedTag } from '../../server/setup/assinatura.js';
 import { listen, close, request, readSSE } from '../../test-support/request.js';
 import { aoFim } from '../../test-support/limpeza.js';
@@ -106,6 +106,8 @@ function clone(t) {
   spawnSync('git', ['clone', '-q', origem, pasta], { env });
   git(pasta, 'checkout', '-q', '--detach', 'v2.4.0');
   fs.writeFileSync(path.join(pasta, '.env'), 'PORT=3000\n');
+  // A instalação cria .atualizacao/painel/ antes do serviço subir (ADR 0051).
+  garantirPasta(pasta);
   const home = path.join(base, 'home');
   return { origem, pasta, home, git, versao, assina };
 }
@@ -121,6 +123,9 @@ test('procura: acha a tag assinada nova, traz as novidades e não troca de vers�
   assert.match(r.novidades.secoes[0].texto, /Item novo <b>\./);
   assert.equal(r.bloqueio, null);
   git(pasta, 'describe', '--exact-match', '--tags', 'v2.4.0');
+  // O serviço não escreve no .git (#181, ADR 0051): a tag nova só existe no espelho.
+  assert.equal(spawnSync('git', ['-C', pasta, 'tag', '--list', 'v2.5.0'], { encoding: 'utf8' }).stdout.trim(), '');
+  assert.match(spawnSync('git', ['-C', path.join(pastaDoPainel(pasta), 'espelho.git'), 'tag', '--list', 'v2.5.0'], { encoding: 'utf8' }).stdout, /v2\.5\.0/);
   assert.equal(JSON.parse(fs.readFileSync(path.join(pasta, 'package.json'), 'utf8')).version, '2.4.0', 'a pasta continua na versão instalada');
 });
 
@@ -150,7 +155,9 @@ test('procura: pré-versão só para quem já está numa', { skip: !hasTools }, 
   versao('2.5.0-rc.1', 'pré');
   assina('v2.5.0-rc.1');
   assert.equal(procurar(pasta, { home }).nova, null);
-  assert.equal(newestSignedTag(pasta, { current: 'v2.4.0', includePre: true }), 'v2.5.0-rc.1');
+  // As tags chegam ao espelho do painel, não ao clone (ADR 0051).
+  const espelho = path.join(pastaDoPainel(pasta), 'espelho.git');
+  assert.equal(newestSignedTag(espelho, { current: 'v2.4.0', includePre: true, signersFile: path.join(pasta, 'docs', 'allowed_signers') }), 'v2.5.0-rc.1');
 });
 
 test('procura: o --pre do terminal libera a pré-versão, e só enquanto vale', { skip: !hasTools }, (t) => {
@@ -203,6 +210,7 @@ async function comBotao(t, extra = {}) {
   const executarAtualizacao = extra.executarAtualizacao ?? (async () => { chamadas.push('executou'); return { ok: true }; });
   const pastaAtualizacao = extra.pastaAtualizacao ?? fs.mkdtempSync(path.join(os.tmpdir(), 'dash-atu-botao-'));
   aoFim(t, () => fs.rmSync(pastaAtualizacao, { recursive: true, force: true }));
+  if (!extra.semPainel) garantirPasta(pastaAtualizacao);
   const p = await painel(t, { procurarVersao: async () => NOVA, modoAtualizacao: 'systemd', ...extra, pastaAtualizacao, executarAtualizacao });
   await p.app.atualizacao.verificar();
   return { ...p, chamadas, pastaAtualizacao };
@@ -297,6 +305,10 @@ test('registro: `desde` inválido vira 0; o log só sai com sessão e sem o toke
   const { port, bearer, pastaAtualizacao } = await comBotao(t);
   await pedir(port, bearer, { versao: 'v9.9.9' });
   const r = abrirRegistro(pastaAtualizacao);
+  const procDir = path.join(pastaAtualizacao, 'proc');
+  fs.mkdirSync(path.join(procDir, '700'), { recursive: true });
+  fs.writeFileSync(path.join(procDir, '700', 'cmdline'), 'node\0/p/server/cli/index.js\0atualizar\0');
+  r.pegarTrava({ pid: 700, procDir });
   r.stream.write('✓ linha um\n');
   r.fim(0);
   for (const q of ['', '?desde=abc', '?desde=-5', '?desde=999999999999999999999']) {
@@ -308,4 +320,16 @@ test('registro: `desde` inválido vira 0; o log só sai com sessão e sem o toke
   assert.equal(fim.json.resultado, 'atualizado');
   assert.equal(fim.json.alvo, 'v9.9.9');
   assert.ok(!JSON.stringify(fim.json).includes(TOKEN));
+});
+
+// #181: o serviço isolado não escrevia em .atualizacao/. Sem a pasta do painel, a rota dava 500 sem
+// texto e a tela ficava parada; agora é 503 com o motivo, e o executor nem é chamado.
+test('iniciar: sem escrita em .atualizacao/painel/, 503 com o motivo e o botão volta (#181)', async (t) => {
+  const { port, bearer, chamadas } = await comBotao(t, { semPainel: true });
+  const r = await pedir(port, bearer, { versao: 'v9.9.9' });
+  assert.equal(r.status, 503);
+  assert.equal(r.json.motivo, 'sem-escrita');
+  assert.match(r.json.error, /\.atualizacao\/painel\//);
+  assert.deepEqual(chamadas, []);
+  assert.equal((await request(port, { path: '/api/atualizacao', headers: bearer })).json.bloqueio, null);
 });
