@@ -21,7 +21,7 @@ import { parseFlags } from './instalar.js';
 import { backupsDe, caminhosDoPacote, dataDe, envDe, pastasDe } from '../config.js';
 
 /** Pergunta no terminal (com a senha escondida quando `secret`). */
-export function ask(question, { secret = false, input = process.stdin, output = process.stdout } = {}) {
+function ask(question, { secret = false, input = process.stdin, output = process.stdout } = {}) {
   return new Promise((resolve) => {
     const rl = readline.createInterface({ input, output, terminal: Boolean(input.isTTY) });
     // Senha: no terminal, cada caractere aparece como "•" (a pergunta continua visível).

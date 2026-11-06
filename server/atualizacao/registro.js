@@ -20,7 +20,7 @@ const GRACA_MS = 60000;
 const PRE_MS = 30 * 60000;
 
 /** A pasta .atualizacao/ da instalação de `root`: a do projeto no clone, a XDG no pacote. */
-export const pastaDoRegistro = (root) => path.join(pastasDe(root).dados, PASTA);
+const pastaDoRegistro = (root) => path.join(pastasDe(root).dados, PASTA);
 const arquivo = (root, nome) => path.join(pastaDoRegistro(root), nome);
 
 /** Cria a pasta (0700) ou corrige a permissão dela. */
@@ -49,7 +49,7 @@ function gravarEstado(root, estado) {
 }
 
 /** Junta `mudanca` ao estado gravado. */
-export function marcarEstado(root, mudanca) {
+function marcarEstado(root, mudanca) {
   gravarEstado(root, { ...lerEstado(root), ...mudanca });
 }
 
