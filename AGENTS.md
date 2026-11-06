@@ -301,15 +301,29 @@ O teste `test/unit/docs.test.js` confere esta documentação contra o código.
    git push origin vX.Y.Z
    ```
 
-3. Release no GitHub **escolhendo a tag que já existe** (`gh release create vX.Y.Z
-   --verify-tag`), com as notas do CHANGELOG e as issues fechadas. A interface do GitHub
-   cria tags leves, sem assinatura, que o instalador ignora. Depois, feche o milestone.
+3. Pacote `.deb` da tag (ADR 0049), na mesma máquina: gere, assine o `SHA256SUMS` com a mesma
+   chave, no namespace `server-dashboard`, e confira a assinatura:
+
+   ```bash
+   npm run empacotar-deb -- --ref vX.Y.Z
+   ssh-keygen -Y sign -f ~/.ssh/thiago-assinatura-releases-linux-server-dashboard-v2_ed25519 -n server-dashboard dist/SHA256SUMS
+   ssh-keygen -Y verify -f docs/allowed_signers -I tsouza-thiago -n server-dashboard -s dist/SHA256SUMS.sig < dist/SHA256SUMS
+   ```
+
+4. Release no GitHub **escolhendo a tag que já existe** (`gh release create vX.Y.Z
+   --verify-tag`), com as notas do CHANGELOG e as issues fechadas, e com os 3 arquivos de `dist/`
+   anexados: `server-dashboard_X.Y.Z_all.deb`, `SHA256SUMS` e `SHA256SUMS.sig`. A interface do GitHub
+   cria tags leves, sem assinatura, que o instalador ignora. Ao publicar, o
+   `.github/workflows/pacote.yml` gera o `.deb` da tag de novo e confere os 3 arquivos: confira que
+   ele ficou verde. Depois, feche o milestone.
 
 Trocar a chave exige um commit em `docs/allowed_signers` **antes** da tag nova: quem já tem
 o painel instalado só aceita a versão nova se a chave dela estiver na lista da versão
 instalada. Sem a chave antiga (troca da 2.1.1, #64), quem está numa versão anterior precisa
 de um passo manual uma vez, descrito nas notas da versão: conferir a impressão digital da
-chave nova no `verify-tag` e fazer o checkout da tag.
+chave nova no `verify-tag` e fazer o checkout da tag. A chave nova também precisa de
+`namespaces="git,server-dashboard"` e entra na linha do README e do TUTORIAL que confere o
+`SHA256SUMS` do pacote.
 
 ## Arquitetura
 
@@ -403,9 +417,9 @@ log).
 Mudar alvos (pastas, discos, serviços) à mão quebra a chave restrita: o script no
 `authorized_keys` deixa de bater (`hashMismatch`). Use `./dashboard reconfigurar`.
 
-**Modo sistema** (ADR 0042, F9; em implementação): o lançador do pacote `.deb` define
+**Modo sistema** (ADR 0042, F9): o lançador do pacote `.deb` define
 `SERVER_DASHBOARD_MODO=sistema` no ambiente (só o valor exato vale, e nunca pelo `.env`). Nesse modo,
-o `.env` fica em `~/.config/server-dashboard/` e o `data/` em `~/.local/share/server-dashboard/`
+o `.env` fica em `~/.config/server-dashboard/` e o `data/` dentro de `~/.local/share/server-dashboard/`
 (seguem `XDG_CONFIG_HOME` e `XDG_DATA_HOME`; valor relativo é ignorado), com 0700/0600. Os caminhos
 de dados ficam presos no `data/` dessa pasta, nunca no código em `/opt`. Sem a variável, tudo segue
 na pasta do projeto, como sempre (modo clone).
