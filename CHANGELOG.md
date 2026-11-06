@@ -9,6 +9,10 @@ diante: `PATCH` corrige, `MINOR` acrescenta sem quebrar e `MAJOR` quebra.
 
 ## [Não publicado]
 
+## [2.6.3] — 2026-11-06
+
+A troca de tela e a troca de período ficaram mais fáceis de ver, ainda suaves. Nada muda na configuração, no formato de `data/` nem no acesso ao servidor.
+
 ### Alterado
 - Telas: as transições ficaram mais visíveis. A tela nova entra em 280 ms com deslocamento de 12 px, e a troca de período faz um fade de 220 ms no conteúdo novo (ADR 0052, #184).
 
@@ -1446,7 +1450,8 @@ Documentados no plano da V2 (seção 2.2, B1–B12), entre eles: alerta SMART fa
 rede zerada com contadores grandes, alerta duplicado a cada coleta e reescrita completa do
 histórico a cada minuto.
 
-[Não publicado]: https://github.com/tsouza-thiago/linux-server-dashboard-v2/compare/v2.6.2...HEAD
+[Não publicado]: https://github.com/tsouza-thiago/linux-server-dashboard-v2/compare/v2.6.3...HEAD
+[2.6.3]: https://github.com/tsouza-thiago/linux-server-dashboard-v2/compare/v2.6.2...v2.6.3
 [2.6.2]: https://github.com/tsouza-thiago/linux-server-dashboard-v2/compare/v2.6.1...v2.6.2
 [2.6.1]: https://github.com/tsouza-thiago/linux-server-dashboard-v2/compare/v2.6.0...v2.6.1
 [2.6.0]: https://github.com/tsouza-thiago/linux-server-dashboard-v2/compare/v2.5.0...v2.6.0
