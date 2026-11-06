@@ -1,6 +1,7 @@
 # F7 — Atualização pelo painel, com aviso e log
 
 - **Nível:** G · **Versão:** 2.5.0 · **Áreas:** telas, instalação, segurança
+- **Situação:** entregue na 2.5.0 (04/11/2026).
 - **Vale para:** instalação por `git clone` (ADR 0012). O modo `.deb` usa a mesma tela com
   outro executor (F9).
 - **Decidido:** procurar versão nova 1 vez por dia, sempre ligado; qualquer sessão logada

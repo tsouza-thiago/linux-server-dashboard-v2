@@ -9,6 +9,11 @@ diante: `PATCH` corrige, `MINOR` acrescenta sem quebrar e `MAJOR` quebra.
 
 ## [Não publicado]
 
+### Alterado
+
+- Roadmap 2.3.0–2.6.0 fechado (#168): o `docs/ROADMAP.md` diz "concluído" e cada feature diz em
+  que versão foi entregue (F7 e F8 na 2.5.0, F9 na 2.6.0). Os documentos da F7, da F8 e da F9 também.
+
 ## [2.6.0] — 2026-11-06
 
 Versão com o pacote `.deb` (Debian, Ubuntu, Mint). O código fica em `/opt/server-dashboard`, e o
