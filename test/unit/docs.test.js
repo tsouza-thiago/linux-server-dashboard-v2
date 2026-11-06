@@ -287,7 +287,8 @@ test('docs: nome do serviço systemd e arquivo do sudoers são os do código', (
   const legado = read('server/setup/preparo.js').match(/const SUDOERS = '([^']+)'/)[1];
   const sudoers = new Set([legado, `${legado}-<computador>-<id>`]);
   for (const file of [...MAIN_DOCS, 'public/js/views/ajuda.js']) {
-    const text = read(file);
+    // O ajuda.js escreve os sinais < e > como entidade HTML dentro do template.
+    const text = read(file).replaceAll('&lt;', '<').replaceAll('&gt;', '>');
     for (const [, name] of text.matchAll(/(?:systemctl --user [a-z-]+(?: --now)?|journalctl --user -u) ([a-z][a-z0-9-]*)/g)) {
       assert.ok(units.has(name), `${file}: serviço ${name}`);
     }

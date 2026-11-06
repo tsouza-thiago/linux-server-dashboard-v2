@@ -2,9 +2,9 @@
 // métodos da TUI (server/setup/instalacao.js). Toda interpolação passa pelo `html` com
 // escape; nada de style="" (CSP).
 import { html, raw, mount } from '../core/html.js';
+import { lerTema, gravarTema } from '../core/tema.js';
 
 // Mesma chave de tema do painel: a escolha vale para os dois.
-const THEME_KEY = 'dash_theme';
 const $ = (id) => document.getElementById(id);
 // Onde cada passo é desenhado.
 const root = $('wz-main');
@@ -900,15 +900,13 @@ root.addEventListener('input', (e) => {
 // ---------------- Tema e início ----------------
 function applyTheme(theme) {
   document.documentElement.dataset.theme = theme;
-  try { localStorage.setItem(THEME_KEY, theme); } catch { /* bloqueado */ }
+  gravarTema(theme);
   const dark = theme === 'dark';
   mount($('wzTheme'), icon(dark ? 'moon' : 'sun', 18, 2));
   $('wzTheme').setAttribute('aria-label', dark ? 'Usar tema claro' : 'Usar tema escuro');
 }
 // Tema lembrado (escuro por padrão).
-let theme = 'dark';
-try { theme = localStorage.getItem(THEME_KEY) === 'light' ? 'light' : 'dark'; } catch { /* bloqueado */ }
-applyTheme(theme);
+applyTheme(lerTema());
 $('wzTheme').addEventListener('click', () => applyTheme(document.documentElement.dataset.theme === 'dark' ? 'light' : 'dark'));
 $('wzCancelar').addEventListener('click', () => {
   st.cancel = 'confirmar';

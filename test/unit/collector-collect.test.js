@@ -109,8 +109,8 @@ test('fachada collect usa os alvos do .env e aceita runner da V1', async () => {
   assert.ok(Array.isArray(res.alerts));
 });
 
-test('fachada buildCommand aceita os nomes de override da V1', () => {
-  const cmd = buildCommand({ netIf: 'enp0s7', diskMounts: ['/', '/mnt/x'], diskDevs: ['sda'], services: ['smbd'] });
+test('fachada buildCommand aceita override de alvos', () => {
+  const cmd = buildCommand({ netIf: 'enp0s7', mounts: ['/', '/mnt/x'], devs: ['sda'], services: ['smbd'] });
   assert.ok(cmd.includes(' / /mnt/x 2>/dev/null'));
   assert.ok(cmd.includes('$3=="sda"'));
   assert.ok(cmd.includes('for s in smbd;'));

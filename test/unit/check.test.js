@@ -54,7 +54,7 @@ function projetoComSuiteGrande() {
   for (const pasta of ['bin', 'libexec', 'server', 'public/js', 'scripts/e2e-instalacao', 'pacote/debian', 'test']) {
     fs.mkdirSync(path.join(dir, pasta), { recursive: true });
   }
-  fs.copyFileSync(path.join(ROOT, 'scripts', 'check.mjs'), path.join(dir, 'scripts', 'check.mjs'));
+  for (const f of ['check.mjs', 'shell-scripts.mjs']) fs.copyFileSync(path.join(ROOT, 'scripts', f), path.join(dir, 'scripts', f));
   // O passo do bash -n confere estes 11 scripts: vazios, passam.
   for (const sh of ['dashboard', 'bin/dashboard', 'libexec/atualizador', 'scripts/node-runtime.sh', 'scripts/askpass.sh', 'scripts/completar.bash', 'scripts/e2e-instalacao/rodar.sh',
     'scripts/e2e-instalacao/pacote.sh', 'pacote/debian/postinst', 'pacote/debian/prerm', 'pacote/debian/postrm']) {

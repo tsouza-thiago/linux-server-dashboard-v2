@@ -138,8 +138,9 @@ test('sincronia: opção que recebe valor não sugere outra opção no lugar del
   }
 });
 
-test('sincronia: scripts/check.mjs e scripts/seguranca.mjs conferem o arquivo', () => {
-  for (const f of ['scripts/check.mjs', 'scripts/seguranca.mjs']) assert.match(fonte(f), /SHELL_SCRIPTS = \[.*'scripts\/completar\.bash'/);
+test('sincronia: a lista única SHELL_SCRIPTS confere o arquivo, e o check e a segurança a importam', () => {
+  assert.match(fonte('scripts/shell-scripts.mjs'), /SHELL_SCRIPTS = \[.*'scripts\/completar\.bash'/);
+  for (const f of ['scripts/check.mjs', 'scripts/seguranca.mjs']) assert.match(fonte(f), /import \{ SHELL_SCRIPTS \} from '\.\/shell-scripts\.mjs'/);
 });
 
 // ---------------- instalação ----------------

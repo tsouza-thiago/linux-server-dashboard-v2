@@ -243,8 +243,6 @@ body.login-open { overflow: hidden; }
 .swatch { display: inline-block; width: 10px; height: 10px; border-radius: 3px; flex: 0 0 10px; background: var(--s1); }
 .swatch.line { width: 14px; height: 3px; border-radius: 2px; flex-basis: 14px; }
 .c-s1 { --c: var(--s1); }
-.c-s2 { --c: var(--s2); }
-.c-s3 { --c: var(--s3); }
 .c-s4 { --c: var(--s4); }
 .swatch[class*="c-s"] { background: var(--c); }
 

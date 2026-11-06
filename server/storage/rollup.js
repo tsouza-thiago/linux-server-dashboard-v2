@@ -5,7 +5,7 @@
 import fs from 'node:fs';
 import fsp from 'node:fs/promises';
 import path from 'node:path';
-import { aggregate } from './buckets.js';
+import { aggregate, bucketStart as bucketStartDe } from './buckets.js';
 import { forEachNdjson, readNdjson, listDays, dayOf, DAY_MS } from './ndjson.js';
 import { mergeSpans, clipSpans } from './coverage.js';
 
@@ -13,7 +13,7 @@ import { mergeSpans, clipSpans } from './coverage.js';
 export const ROLLUP_STEP_MS = 5 * 60000;
 
 // Início do balde de 5 min que contém `ms`; e se um balde lido do disco tem a forma certa.
-const bucketStart = (ms) => Math.floor(ms / ROLLUP_STEP_MS) * ROLLUP_STEP_MS;
+const bucketStart = (ms) => bucketStartDe(ms, ROLLUP_STEP_MS);
 const validBucket = (b) => b && Number.isFinite(b.t) && Number.isFinite(b.n) && b.m && typeof b.m === 'object';
 
 /** Os agregados de 5 min em data/rollup/ (gravação só por acréscimo, em fila). */

@@ -7,7 +7,7 @@ import { execFileSync, spawnSync } from 'node:child_process';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import { fileURLToPath } from 'node:url';
+import { fileURLToPath, pathToFileURL } from 'node:url';
 import { buildScript, normalizeTargets } from '../../server/collector/builder.js';
 import { parseOutput } from '../../server/collector/parser.js';
 import { collect, runSSH, MAX_OUTPUT_BYTES } from '../../server/collector/index.js';
@@ -40,7 +40,7 @@ test('o script passa no sh -n e roda com sh (POSIX) neste Linux, saída completa
   }
 });
 
-test('ponta a ponta: `node server/poller.js --once` com ssh falso executando o comando localmente', { skip: !linux && 'requer Linux' }, () => {
+test('ponta a ponta: a coleta do poller com ssh falso executando o comando localmente', { skip: !linux && 'requer Linux' }, () => {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'lsd-e2e-'));
   const bin = path.join(dir, 'bin');
   const log = path.join(dir, 'chamadas.log');
@@ -52,7 +52,7 @@ test('ponta a ponta: `node server/poller.js --once` com ssh falso executando o c
     'for last; do :; done',
     'exec sh -c "$last"',
   ].join('\n'), { mode: 0o755 });
-  const r = spawnSync(process.execPath, [path.join(ROOT, 'server', 'poller.js'), '--once'], {
+  const r = spawnSync(process.execPath, ['--input-type=module', '-e', `import { collect } from ${JSON.stringify(pathToFileURL(path.join(ROOT, 'server', 'poller.js')).href)}; console.log(JSON.stringify(await collect({ host: 'servidor-local', prev: null })));`], {
     encoding: 'utf8',
     env: { ...process.env, PATH: `${bin}:${process.env.PATH}`, SSH_HOST: 'servidor-local', DISK_MOUNTS: '/', NET_IF: 'lo', DISK_DEVS: '', SERVICES: '' },
   });

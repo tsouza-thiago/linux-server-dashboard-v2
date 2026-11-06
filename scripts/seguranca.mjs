@@ -32,6 +32,7 @@ import http from 'node:http';
 import os from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { SHELL_SCRIPTS } from './shell-scripts.mjs';
 
 const ROOT = path.join(path.dirname(fileURLToPath(import.meta.url)), '..');
 const OUT = path.join(ROOT, '.seguranca');
@@ -47,7 +48,6 @@ const IMG = {
 };
 
 const SEMGREP_REGRAS = ['p/owasp-top-ten', 'p/nodejs', 'p/javascript', 'p/xss', 'p/command-injection', 'p/secrets'];
-const SHELL_SCRIPTS = ['dashboard', 'bin/dashboard', 'libexec/atualizador', 'scripts/node-runtime.sh', 'scripts/askpass.sh', 'scripts/completar.bash', 'scripts/e2e-instalacao/rodar.sh', 'scripts/e2e-instalacao/pacote.sh', 'pacote/debian/postinst', 'pacote/debian/prerm', 'pacote/debian/postrm'];
 
 // ---------------------------------------------------------------- utilidades
 

@@ -94,7 +94,7 @@ function access(state) {
       ${!devs.length ? html`<div class="kv"><span class="ink-2">SMART</span><span class="ink-3">nenhum disco em SMART_DEVS</span></div>` : ''}
     </div>
     ${line ? html`<div class="field">
-      <span class="note">O <span class="mono">./dashboard reconfigurar</span> grava esta linha sozinho. À mão: cole no servidor com <span class="mono">sudo visudo -f /etc/sudoers.d/dashboard</span> (troque <span class="mono">dashmon</span> pelo usuário SSH, se for outro, e o caminho pelo de <span class="mono">command -v smartctl</span>):</span>
+      <span class="note">O <span class="mono">./dashboard reconfigurar</span> grava esta linha sozinho. À mão: cole no servidor com <span class="mono">sudo visudo -f /etc/sudoers.d/dashboard-&lt;computador&gt;-&lt;id&gt;</span> (o nome que o reconfigurar usa; troque <span class="mono">dashmon</span> pelo usuário SSH, se for outro, e o caminho pelo de <span class="mono">command -v smartctl</span>):</span>
       <pre class="code" id="aj-sudo">${line}</pre>
       <button class="btn btn-soft btn-sm align-start" type="button" id="aj-copy">${icon('copy', 14)} Copiar linha</button>
     </div>` : ''}

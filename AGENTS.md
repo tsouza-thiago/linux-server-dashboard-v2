@@ -364,7 +364,6 @@ dashboard instalar --importar-pasta <clone>  # só no pacote .deb: para o painel
 bin/dashboard <comando>         # lançador do pacote .deb (/usr/bin/dashboard): os mesmos comandos no modo sistema
 libexec/atualizador verificar|atualizar|voltar|semear  # executor do pacote (usuário _server-dashboard, nunca root): versão nova, troca, volta atrás e 1ª instalação
 npm start                       # o painel em primeiro plano (node --max-semi-space-size=2 --optimize-for-size server/index.js)
-npm run poll                    # 1 coleta, sem o servidor web (node server/poller.js --once)
 npm test                        # suíte de testes (node --test)
 npm run check                   # verificação completa, obrigatória antes de cada commit
 npm run test:unit               # só testes unitários (test/unit)
@@ -805,7 +804,7 @@ linux-server-dashboard-v2/
 │   ├── index.js            rotas, loop de coleta, export
 │   ├── config.js           parser único do .env, faixas, sanitizeToken/sanitizeHost
 │   ├── security.js         Host check, CSRF, cabeçalhos, token timing-safe, rate limit
-│   ├── poller.js           fachada do coletor + alertas (CLI --once)
+│   ├── poller.js           fachada do coletor + alertas
 │   ├── csv.js · stores.js · logfile.js · version.js · node-flags.js (opções do Node do painel)
 │   ├── cli/                subcomandos do ./dashboard (index, servico, instalar, diagnosticar,
 │   │                       atualizar, desinstalar, importar-v1, importar-pasta, saida)
