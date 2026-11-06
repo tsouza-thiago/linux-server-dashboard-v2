@@ -347,6 +347,44 @@ Inclua: o passo a passo para reproduzir, o impacto estimado e a versão afetada
   vencido, curto, em texto puro ou na query, dado da tela no comando, cancelar sem sessão ou fora da
   tela, 1 h parado, log inteiro na tela).
 
+### 24. Pacote `.deb` em `/opt` (ADR 0042 a 0050)
+- **Ameaça:** no pacote, o código fica numa pasta do sistema, e trocar a versão exige um privilégio
+  que a conta da pessoa não tem. Um executor com root, uma regra do polkit larga ou uma unidade sem
+  isolamento daria root a qualquer programa dessa conta. Um `.deb` trocado no caminho, um Node
+  adulterado ou a volta forçada para uma versão velha com falha conhecida trocariam o código
+  publicado.
+- **Mitigação:**
+  - Depois do `apt install`, nada roda como root. O executor (`libexec/atualizador`, `sh` POSIX) roda
+    como `_server-dashboard`, usuário de sistema sem login e fora do grupo `server-dashboard`, com o
+    ambiente limpo (`env -i`). Ele é o único que grava em `/opt`, e só em `repo.git`, `versoes`,
+    `estado` e `node`; o resto da pasta é do root.
+  - O polkit libera sem senha só o verbo `start`, só nas unidades `server-dashboard-atualizar.service`
+    e `server-dashboard-voltar.service`, e só para o grupo. Outra unidade, outro verbo ou outra ação
+    pedem a senha do administrador. As unidades não recebem parâmetro: o `atualizar` instala só a
+    versão que o `verificar` achou e confere de novo a assinatura (chaves da versão instalada, nome
+    gravado na tag igual ao da ref). O `voltar` só troca para a versão `anterior` e só até 24 h depois
+    da troca.
+  - As unidades rodam isoladas: `NoNewPrivileges`, `ProtectSystem=strict`, `ProtectHome`,
+    `PrivateDevices`, `CapabilityBoundingSet=` vazio e `SystemCallFilter=@system-service`. Só o
+    `verificar` (`git fetch`) e o `atualizar` (Node) têm rede.
+  - O Node da versão nova tem a soma SHA-256 fixada no `scripts/node-runtime.sh` da tag assinada. O
+    executor lê esse arquivo como texto, nunca o executa, e baixa só por `https`. Soma errada ou
+    download cortado: nada muda.
+  - O `.deb` é reprodutível: a mesma tag dá os mesmos bytes. O `SHA256SUMS` é assinado pela chave das
+    tags no namespace `server-dashboard`, e uma assinatura de tag não vale como assinatura do pacote. A
+    pessoa confere antes de instalar (README); o CI gera o pacote 2 vezes a cada PR e confere o `.deb`
+    de cada Release.
+  - Os dados da pessoa ficam nas pastas XDG dela (0700/0600); `estado/` não tem segredo. O `apt purge`
+    apaga só nomes fixos em `/opt` e nunca as pastas pessoais. O grupo recebe só 1 conta por
+    computador.
+- **Verificado por:** `test/integration/atualizador.test.js`, `test/unit/unidades-systemd.test.js`
+  (cada diretiva e a nota do `systemd-analyze security`), `test/unit/polkit-e-grupo.test.js` (a regra
+  contra cada unidade, verbo e grupo), `test/integration/atualizacao-pacote.test.js`,
+  `test/integration/lancador.test.js`, `test/unit/modo-sistema-cli.test.js`,
+  `test/integration/empacotar-deb.test.js`, `test/unit/pacote-debian.test.js`,
+  `scripts/e2e-instalacao/pacote.sh` (Debian e Ubuntu, com e sem systemd) e
+  `scripts/mutacao-seguranca.mjs`.
+
 ---
 
 ## OWASP Top 10:2025

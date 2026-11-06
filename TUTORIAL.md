@@ -72,6 +72,7 @@ Só são necessários 3 itens:
 > [!NOTE]
 > Não precisa instalar o Node.js nem configurar chave SSH: o `./dashboard` baixa o Node 24
 > oficial para dentro da pasta (conferido) e o assistente cria uma chave só para o painel.
+> Vai instalar pelo pacote `.deb`? Pule o item 1: o `apt` instala o que falta.
 
 ---
 
@@ -142,6 +143,41 @@ endereço e o **código de uso único** que aparecem no terminal.
 > [!TIP]
 > **Máquina sem tela?** `./dashboard instalar --terminal` faz os mesmos 6 passos no
 > terminal (setas, espaço e Enter).
+
+### Pelo pacote `.deb`
+
+No Debian, no Ubuntu e no Mint, você também pode instalar por um pacote `.deb`. O código fica em
+`/opt/server-dashboard`, só para leitura, e o comando é `dashboard`, sem o `./`, de qualquer pasta.
+A sua configuração fica em `~/.config/server-dashboard/` e o histórico em
+`~/.local/share/server-dashboard/`. Escolha um caminho só: o clone ou o pacote.
+
+1. Abra o [Release mais novo](https://github.com/tsouza-thiago/linux-server-dashboard-v2/releases/latest)
+   e baixe 3 arquivos para a mesma pasta: `server-dashboard_X.Y.Z_all.deb` (`X.Y.Z` é a versão),
+   `SHA256SUMS` e `SHA256SUMS.sig`.
+2. Nessa pasta, confira se os arquivos são os publicados. A chave abaixo é a mesma das versões
+   assinadas, em `docs/allowed_signers`:
+   ```bash
+   echo 'tsouza-thiago ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIDnYsXcStBkPcaNMFPpswKiIautYac3UeWKKOqfTcpKA' > chave-do-painel
+   ssh-keygen -Y verify -f chave-do-painel -I tsouza-thiago -n server-dashboard -s SHA256SUMS.sig < SHA256SUMS && sha256sum -c SHA256SUMS
+   ```
+   O resultado certo tem `Good "server-dashboard" signature` e `server-dashboard_X.Y.Z_all.deb: OK`.
+   Qualquer outro resultado: **não instale**.
+3. Instale (pede a sua senha do computador):
+   ```bash
+   sudo apt install ./server-dashboard_X.Y.Z_all.deb
+   ```
+4. O pacote põe a sua conta no grupo `server-dashboard`. Ele permite trocar a versão pela tela.
+   **Saia da sessão e entre de novo**: o grupo só vale depois disso.
+5. Rode `dashboard instalar`. O assistente é o mesmo dos 6 passos acima.
+
+**Já usa o painel pelo clone?** No passo 5, rode `dashboard instalar --importar-pasta <pasta do clone>`
+no lugar do `dashboard instalar`. Ele para o painel do clone e traz a configuração e o histórico. O
+acesso ao servidor continua o mesmo, sem refazer nada lá. A pasta do clone não muda: guarde-a como
+cópia de segurança ou apague-a depois.
+
+> [!IMPORTANT]
+> O pacote atende **1 pessoa por computador**. Só a 1ª conta entra no grupo `server-dashboard`; se o
+> grupo já tiver outra conta, a instalação avisa e não põe a sua.
 
 ---
 
@@ -232,6 +268,20 @@ abre o assistente dali, como antes.
 **Rode na pasta da instalação.** O `atualizar` só vale na pasta onde o painel foi instalado.
 Numa cópia sem `.env`, ou com o serviço em outra pasta, ele para sem alterar nada e mostra a pasta
 certa. Para o serviço mudar de pasta de propósito, rode `./dashboard reconfigurar` na pasta nova.
+
+**Instalou pelo pacote `.deb`?** Os comandos são os mesmos, sem o `./`. A troca de versão também é
+pelo botão **Atualizar agora** ou pelo `dashboard atualizar`. Quem procura a versão nova é o próprio
+pacote, 1 vez por dia, e a tela mostra em até 1 hora. O painel copia os seus dados, o pacote instala a
+versão conferida e, se ela não ligar, volta para a anterior com os seus dados. O `--pre` não vale no
+pacote. Se a troca não acontecer, confira se você está no grupo `server-dashboard` (rode `id`) e se
+saiu e entrou de novo na sessão depois de instalar.
+
+**Desinstalar o pacote** tem uma ordem:
+
+1. Rode `dashboard desinstalar`. Ele oferece limpar a parte deste computador no servidor, apaga a sua
+   configuração e pergunta se apaga também o histórico.
+2. Depois, rode `sudo apt purge server-dashboard`. Ele tira o código de `/opt` e o usuário e os grupos
+   do pacote, mas não toca nas pastas pessoais.
 
 **Mais de um computador com o painel?** Pode. Cada computador tem a sua chave e a sua
 linha no servidor, e uma instalação não apaga a outra. Cada painel faz a sua coleta: com 2
@@ -446,6 +496,9 @@ Comece sempre por `./dashboard diagnosticar`: ele aponta o problema e diz como r
 tail -f data/dashboard.log                  # o painel
 journalctl --user -u server-dashboard       # o serviço que inicia com o computador
 ```
+
+No pacote `.deb`, o log fica em `~/.local/share/server-dashboard/data/dashboard.log`, e o registro das
+trocas de versão do pacote em `/opt/server-dashboard/estado/registro.log`.
 
 Cada coleta registra uma linha: `poll OK (123ms) — amostras: 45` ou `poll FALHOU (2x seguidas): <motivo>`.
 

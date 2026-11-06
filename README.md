@@ -110,11 +110,29 @@ Tab vira `dashboard atualizar`, e as opções completam do mesmo jeito. Para pul
 `--sem-link`. Já tinha o painel instalado? Rode `./dashboard reconfigurar`: o assistente oferece
 criar o comando.
 
+### Ou pelo pacote `.deb` (Debian, Ubuntu, Mint)
+
+O código fica em `/opt/server-dashboard`, e o painel troca de versão pela tela, sem `apt`. Baixe do
+[Release mais novo](https://github.com/tsouza-thiago/linux-server-dashboard-v2/releases/latest) o
+`.deb`, o `SHA256SUMS` e o `SHA256SUMS.sig`. Na pasta deles, confira a assinatura (a chave é a das
+tags, em `docs/allowed_signers`) e instale (troque `X.Y.Z` pela versão):
+
+```bash
+echo 'tsouza-thiago ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIDnYsXcStBkPcaNMFPpswKiIautYac3UeWKKOqfTcpKA' > chave-do-painel
+ssh-keygen -Y verify -f chave-do-painel -I tsouza-thiago -n server-dashboard -s SHA256SUMS.sig < SHA256SUMS && sha256sum -c SHA256SUMS
+sudo apt install ./server-dashboard_X.Y.Z_all.deb
+```
+
+Saia da sessão e entre de novo (o pacote põe a sua conta no grupo `server-dashboard`, que libera a
+troca de versão pela tela) e rode `dashboard instalar`. Vem do clone? Rode
+`dashboard instalar --importar-pasta <pasta do clone>`. O pacote atende 1 pessoa por computador.
+Detalhes, remoção e a ordem certa: [TUTORIAL, seção 3](TUTORIAL.md#pelo-pacote-deb).
+
 ---
 
 ## <picture><source media="(prefers-color-scheme: dark)" srcset="docs/img/icones/comandos-escuro.svg"><img src="docs/img/icones/comandos-claro.svg" alt="" width="24" height="24"></picture> Comandos
 
-Na pasta do projeto:
+Na pasta do projeto (no pacote, `dashboard` sem o `./`, de qualquer pasta):
 
 | Comando | O que faz |
 |---|---|
@@ -128,10 +146,10 @@ Na pasta do projeto:
 | `./dashboard versao` | Mostra a versão |
 
 Quando sai uma versão nova, o painel avisa no topo da tela, com as novidades. Para isso ele roda
-`git fetch` das tags 1 vez por dia: é a única conexão dele além do SSH da coleta. Para trocar de
-versão, clique em **Atualizar agora** nas novidades. O `./dashboard atualizar` abre esse mesmo diálogo,
-e o `./dashboard atualizar --terminal` faz tudo no terminal. Os 2 caminhos fazem backup e voltam atrás
-se a versão nova falhar.
+`git fetch` das tags 1 vez por dia (no pacote, quem procura é o executor do pacote): é a única
+conexão dele além do SSH da coleta. Para trocar de versão, clique em **Atualizar agora** nas
+novidades. O `./dashboard atualizar` abre esse mesmo diálogo, e o `./dashboard atualizar --terminal`
+faz tudo no terminal. Os 2 caminhos fazem backup e voltam atrás se a versão nova falhar.
 
 Depois de instalado, o painel inicia com o computador (serviço systemd **de usuário**) e
 aparece no menu como **Server Dashboard**.

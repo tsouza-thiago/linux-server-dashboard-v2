@@ -9,8 +9,7 @@
   - o critério principal do desenho da atualização é a **segurança**.
 - **Decidido em 26/10/2026:** o desenho híbrido (C) está aprovado; o Node é baixado pelo
   executor (item 6); a 1ª versão atende 1 pessoa por máquina (item "Riscos").
-- **Situação:** em implementação. Etapas 1 a 8 feitas (ADR 0042 a 0048, 05/11/2026).
-- **Situação:** em implementação. Etapas 1 a 10 feitas (ADR 0042 a 0050, 06/11/2026).
+- **Situação:** concluída. Etapas 1 a 12 feitas (ADR 0042 a 0050, 06/11/2026); sai na 2.6.0.
 ## Objetivo
 
 Instalar com `sudo apt install ./server-dashboard_X.Y.Z_all.deb`, sem `git clone` e sem
@@ -141,14 +140,14 @@ O código em `/opt` pertence ao root. A pergunta é: quem grava a versão nova l
 10. **Feita (ADR 0050).** `--importar-pasta`, `desinstalar` e `apt purge`.
 11. **Feita.** `scripts/e2e-instalacao/` (cenário E do `rodar.sh`): instalar o `.deb`, atualizar,
     voltar, desinstalar e `apt purge`, em Debian e Ubuntu.
-12. README, TUTORIAL, AGENTS, SECURITY e o passo novo de "Publicar uma versão".
+12. **Feita.** README, TUTORIAL, AGENTS, SECURITY e o passo novo de "Publicar uma versão".
 
 ## Riscos
 
 - **Grupo novo só vale no próximo login:** o `systemd --user` só enxerga o grupo depois
   de sair e entrar. A instalação avisa.
 - **Várias pessoas na mesma máquina:** fora da 1ª versão (decidido). Ela atende 1 pessoa
-  por máquina: a instalação recusa uma 2ª pessoa com um aviso claro, e o README documenta
+  por máquina: a instalação não põe uma 2ª pessoa no grupo e avisa, e o README documenta
   o limite. Atender várias pessoas (uma porta e um painel por pessoa) fica para depois.
 - **Clone e `.deb` na mesma máquina:** o `~/.local/bin/dashboard` (F4) vem antes do
   `/usr/bin/dashboard` no PATH. O `diagnosticar` avisa qual roda.

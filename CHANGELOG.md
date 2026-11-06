@@ -63,6 +63,13 @@ diante: `PATCH` corrige, `MINOR` acrescenta sem quebrar e `MAJOR` quebra.
   unidade) e pelo executor, volta atrás sozinho de uma versão que não liga, roda o
   `dashboard desinstalar` e o `apt purge`. As versões de teste são assinadas por uma chave de teste e
   chegam ao executor por um `git bundle`, sem rede. `E2E_CENARIOS=pacote` roda só esse cenário.
+- Documentação do pacote `.deb` (#92, F9, etapa 12 de 12): o README e o TUTORIAL ensinam a baixar o
+  `.deb` do Release, conferir o `SHA256SUMS` assinado, instalar, sair e entrar de novo na sessão (grupo
+  `server-dashboard`), trocar de versão pela tela, vir do clone com `--importar-pasta` e desinstalar na
+  ordem certa (`dashboard desinstalar`, depois `sudo apt purge server-dashboard`). O pacote atende 1
+  pessoa por computador. O SECURITY ganha a ameaça 24 (executor sem root, polkit só para atualizar e
+  voltar, unidades isoladas, Node com SHA-256 fixado, `.deb` reprodutível e assinado), e o AGENTS, o
+  passo de gerar, assinar e anexar o `.deb` ao Release. A F9 está concluída.
 
 ### Corrigido
 
