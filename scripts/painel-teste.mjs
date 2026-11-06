@@ -9,6 +9,7 @@
 //   npm run painel-teste -- --versao-nova             # com aviso de versão nova (falsa) e troca simulada
 //   npm run painel-teste -- --versao-nova --resultado=voltou  # a troca simulada volta atrás
 //   npm run painel-teste -- --versao-nova --exige-reconfigurar  # versão que muda a coleta, com o aviso
+//   npm run painel-teste -- --versao-nova --sem-escrita  # serviço sem escrita em .atualizacao/painel/: o botão mostra o 503 (#181)
 //   npm run painel-teste -- --reconfigurar            # Reconfigurar com login: o painel dá lugar ao assistente falso
 //   npm run painel-teste -- --reconfigurar=volta      # o mesmo, mas o painel novo "não sobe" no fim
 //   npm run painel-teste -- --reconfigurar=recusa     # o comando recusa depois do 202, e o painel fica
@@ -42,7 +43,7 @@ import { OutageLog } from '../server/storage/outages.js';
 import { createWizardApp } from '../server/setup/web.js';
 import { LOG_PELA_TELA, retirarCodigoPelaTela } from '../server/setup/pela-tela.js';
 import { VERSION } from '../server/version.js';
-import { abrirRegistro, lerEstado, pegarTrava, soltarTrava } from '../server/atualizacao/registro.js';
+import { abrirRegistro, garantirPasta, lerRegistro } from '../server/atualizacao/registro.js';
 import { makeInstalacao, detectionWithSudo } from '../test-support/instalacao-fake.js';
 
 const ROOT = path.join(path.dirname(fileURLToPath(import.meta.url)), '..');
@@ -155,15 +156,20 @@ export function criarPainel(dir, cenario, coletar, extra = {}) {
  * máquina e nenhum arquivo do painel muda. `reiniciar` derruba o servidor no meio, como a troca.
  */
 export function atualizacaoFalsa(dir, { resultado = 'atualizado', passoMs = 700, reiniciar = async () => {} } = {}) {
+  // A instalação cria .atualizacao/painel/ ao ligar o serviço; o painel não cria (ADR 0051).
+  garantirPasta(dir);
   const procDir = path.join(dir, 'proc');
   fs.mkdirSync(path.join(procDir, '4242'), { recursive: true });
   fs.writeFileSync(path.join(procDir, '4242', 'cmdline'), 'node\0/painel/server/cli/index.js\0atualizar\0--registro\0');
   const espera = () => new Promise((r) => { setTimeout(r, passoMs); });
   const executar = async () => {
+    // O pedido da tela vem do painel (painel/pedido.json); o executor falso o lê antes de pegar a
+    // trava, que zera o estado e passa na frente do pedido (ADR 0051).
+    const { de, alvo } = lerRegistro(dir);
     const registro = abrirRegistro(dir);
-    pegarTrava(dir, { pid: 4242, procDir });
+    registro.pegarTrava({ pid: 4242, procDir });
+    registro.marcar({ alvo, de });
     const escrever = (linha) => registro.stream.write(`${linha}\n`);
-    const { de } = lerEstado(dir);
     (async () => {
       registro.marcar({ fase: 'procurando' });
       escrever('Server Dashboard · atualizar');
@@ -184,7 +190,6 @@ export function atualizacaoFalsa(dir, { resultado = 'atualizado', passoMs = 700,
         escrever(`✓ atualizado de ${de} para v9.9.9`);
       }
       registro.fim(resultado === 'voltou' ? 1 : 0);
-      soltarTrava(dir);
     })();
     return { ok: true };
   };
@@ -310,6 +315,8 @@ async function main() {
     return;
   }
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'dash-painel-teste-'));
+  // A instalação cria .atualizacao/painel/; `--sem-escrita` simula o serviço sem essa pasta (#181).
+  if (!process.argv.includes('--sem-escrita')) garantirPasta(dir);
   const reconfigurar = process.argv.includes('--exige-reconfigurar');
   // Outro hash na resposta do "servidor": é o que a coleta vê depois de uma versão que muda o script.
   const { coletar } = await semear(dir, cenario, reconfigurar ? { coletor: coletorFalso((now) => saidaFalsa(now).replace(/(===VER===\n\d+ )\w+/, '$1000000000000')) } : {});

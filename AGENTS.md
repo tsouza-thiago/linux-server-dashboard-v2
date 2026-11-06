@@ -126,6 +126,9 @@ O teste `test/unit/docs.test.js` confere esta documentação contra o código.
   versão do pedido com a detectada e dispara o comando fixo `dashboard atualizar --registro` fora do serviço
   (`systemd-run --user` ou `spawn` com `detached`), sem shell e sem dado da tela. Exige sessão e a pasta da instalação
   (#118). Log, estado e trava com PID ficam em `.atualizacao/`, fora de `data/`, porque a volta atrás apaga `data/`.
+  O serviço escreve só em `data/` e em `.atualizacao/painel/` (`pedido.json` e `espelho.git`, ADR 0051); o resto
+  da `.atualizacao/` é do executor. A procura de versão faz o fetch no espelho bare, nunca no `.git`, e o executor
+  nunca usa o espelho (regra estática). Sem escrita em `painel/`, a rota responde 503 com `motivo: sem-escrita`.
   `dashboard atualizar` só abre o link de uso único com `#/visao-geral?atualizar=1`; quem troca é o clique. Sem tela,
   sem login ou com o painel parado, segue no terminal (`--terminal` força). O `--pre` pela tela é o arquivo
   `.atualizacao/pre.json` (30 min).
@@ -303,7 +306,7 @@ npm run capturar-telas          # refaz docs/img/ a partir do painel de teste (-
 npm run migrar-v1               # migra a V1 agora (o painel também migra ao iniciar); com -- --verificar só resume o data/history.json, sem gravar
 npm run soak                    # soak acelerado: 83 h de coletas simuladas e pedidos de 90 dias; confere RAM e vazamento
 npm run empacotar-deb           # .deb reprodutível da tag da versão + dist/SHA256SUMS (--ref <tag|HEAD>, --saida <pasta>)
-npm run painel-teste            # painel de teste com dados semeados (--cenario=normal|lacunas|offline|vazio, --porta=3943, --versao-nova, --exige-reconfigurar, --resultado=voltou, --reconfigurar[=volta|recusa|sem-assinatura|outra-pasta], --assistente)
+npm run painel-teste            # painel de teste com dados semeados (--cenario=normal|lacunas|offline|vazio, --porta=3943, --versao-nova, --sem-escrita, --exige-reconfigurar, --resultado=voltou, --reconfigurar[=volta|recusa|sem-assinatura|outra-pasta], --assistente)
 scripts/e2e-instalacao/rodar.sh # instalação, botão Atualizar e pacote .deb (instalar, atualizar, voltar, desinstalar, apt purge) de ponta a ponta em contêineres Debian/Ubuntu, com e sem systemd (E2E_CENARIOS=pacote: só o .deb)
 ```
 
@@ -479,7 +482,7 @@ e `data/` ficam nas pastas XDG (veja [Configuração](#configuração)).
 | `data/ssh/`, `data/dashboard.log` | `config` e `known_hosts` próprios do painel (0700); log (gira em 5 MB para `dashboard.log.1`) |
 | `data/dashboard.pid`, `data/dashboard-erros.log` | Modo segundo plano (sem systemd): PID e erros de inicialização |
 | `.runtime/node/`, `.backups/` | Node 24 baixado pelo `./dashboard`, se o do sistema faltar; cópias de `data/` feitas pelo `atualizar` (as 3 mais novas, 0700) |
-| `.atualizacao/` | `ultima.log`, `estado.json`, `trava.pid` e `pre.json` (liberação do `--pre`, ADR 0032) da atualização pelo painel (0700, fora do git). Fica fora de `data/` porque a volta atrás apaga `data/` (ADR 0031). No pacote, fica na pasta de dados XDG (ADR 0048) |
+| `.atualizacao/` | `ultima.log`, `estado.json`, `trava.pid` e `pre.json` (liberação do `--pre`, ADR 0032) da atualização pelo painel, escritos pelo executor; `painel/` (`pedido.json`, `espelho.git`) é a única subpasta com escrita do serviço (ADR 0051) (0700, fora do git). Fica fora de `data/` porque a volta atrás apaga `data/` (ADR 0031). No pacote, fica na pasta de dados XDG (ADR 0048) |
 
 No navegador, o `localStorage` guarda só conveniências: o tema, a versão nova dispensada e as contagens de pastas,
 discos, SMART e serviços para o esqueleto (`dash_formato`, ADR 0033), sem nomes.

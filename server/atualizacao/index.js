@@ -144,12 +144,19 @@ export class Atualizacao {
       this.onChange(this.estado());
       return { status: 409, corpo: { error: 'não dá para atualizar agora', bloqueio: agoraNaPasta } };
     }
-    prepararRegistro(this.root, { alvo: nova, de: instalada, agora: this.agora() });
+    // O painel só escreve em .atualizacao/painel/ (ADR 0051). Se nem ali der, a causa vai para a tela:
+    // antes, o erro virava 500 sem texto e o botão ficava parado (#181).
+    try {
+      prepararRegistro(this.root, { alvo: nova, de: instalada, agora: this.agora() });
+    } catch (err) {
+      this.log(`[atualização] sem escrita em .atualizacao/painel/ (${err.code ?? 'erro'})`);
+      return { status: 503, corpo: { error: 'não consegui preparar a atualização: a pasta .atualizacao/painel/ não aceita escrita. Rode ./dashboard atualizar no terminal para refazer o serviço.', motivo: 'sem-escrita' } };
+    }
     this.onChange(this.estado());
     let iniciou;
     try { iniciou = await this.executar(); } catch { iniciou = { ok: false }; }
     if (!iniciou?.ok) {
-      registrarFalha(this.root, 'não consegui iniciar a atualização', this.agora());
+      try { registrarFalha(this.root, 'não consegui iniciar a atualização', this.agora()); } catch { /* sem escrita: a resposta 503 já diz */ }
       this.log('[atualização] não consegui iniciar a troca de versão');
       this.onChange(this.estado());
       return { status: 503, corpo: { error: 'não consegui iniciar a atualização' } };

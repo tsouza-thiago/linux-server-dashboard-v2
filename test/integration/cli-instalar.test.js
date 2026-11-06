@@ -8,7 +8,7 @@ import os from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { verifyVendor, parseFlags, preflight, runWizard, instalar } from '../../server/cli/instalar.js';
-import { prepararRegistro } from '../../server/atualizacao/registro.js';
+import { garantirPasta, prepararRegistro } from '../../server/atualizacao/registro.js';
 import { criarCodigoPelaTela } from '../../server/setup/pela-tela.js';
 import { request } from '../../test-support/request.js';
 import { makeInstalacao } from '../../test-support/instalacao-fake.js';
@@ -342,7 +342,7 @@ test('--pela-tela: sem código válido, o painel nem para', async (t) => {
 });
 
 test('--pela-tela: com uma atualização em andamento, o painel nem para e o código fica', async (t) => {
-  const p = await pelaTela(t, { antes: (port, root) => prepararRegistro(root, { alvo: 'v2.90.0', de: 'v2.89.0' }) });
+  const p = await pelaTela(t, { antes: (port, root) => { garantirPasta(root); prepararRegistro(root, { alvo: 'v2.90.0', de: 'v2.89.0' }); } });
   assert.equal(await p.rodando, 1);
   assert.deepEqual(p.painel, []);
   assert.match(p.log(), /há uma atualização em andamento/);
