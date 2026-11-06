@@ -9,6 +9,16 @@ diante: `PATCH` corrige, `MINOR` acrescenta sem quebrar e `MAJOR` quebra.
 
 ## [Não publicado]
 
+## [2.6.0] — 2026-11-06
+
+Versão com o pacote `.deb` (Debian, Ubuntu, Mint). O código fica em `/opt/server-dashboard`, e o
+painel troca de versão pela tela, sem `apt`. Depois da instalação, nada roda como root: um usuário de
+sistema sem login baixa e grava a versão nova, e a conta no grupo `server-dashboard` só pede a troca.
+O `.deb` sai sempre igual da mesma tag, e o Release traz o `SHA256SUMS` assinado para conferir (veja o
+README). Quem usa o clone não precisa mudar nada: atualize com `./dashboard atualizar` ou pelo botão
+**Atualizar agora**. Para passar do clone para o pacote, use `dashboard instalar --importar-pasta
+<clone>`. Nada muda na configuração, no formato de `data/` nem no acesso do painel ao servidor.
+
 ### Adicionado
 
 - ADR 0042 (#92, F9, etapa 1 de 12): o modo sistema, com o pacote `.deb` em `/opt`. Depois da
@@ -1381,7 +1391,8 @@ Documentados no plano da V2 (seção 2.2, B1–B12), entre eles: alerta SMART fa
 rede zerada com contadores grandes, alerta duplicado a cada coleta e reescrita completa do
 histórico a cada minuto.
 
-[Não publicado]: https://github.com/tsouza-thiago/linux-server-dashboard-v2/compare/v2.5.0...HEAD
+[Não publicado]: https://github.com/tsouza-thiago/linux-server-dashboard-v2/compare/v2.6.0...HEAD
+[2.6.0]: https://github.com/tsouza-thiago/linux-server-dashboard-v2/compare/v2.5.0...v2.6.0
 [2.5.0]: https://github.com/tsouza-thiago/linux-server-dashboard-v2/compare/v2.4.1...v2.5.0
 [2.4.1]: https://github.com/tsouza-thiago/linux-server-dashboard-v2/compare/v2.4.0...v2.4.1
 [2.4.0]: https://github.com/tsouza-thiago/linux-server-dashboard-v2/compare/v2.3.0...v2.4.0
