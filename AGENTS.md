@@ -12,8 +12,8 @@ documentos não repetem estes detalhes:
 - [TUTORIAL.md](TUTORIAL.md): passo a passo para leigos.
 - [SECURITY.md](SECURITY.md): modelo de ameaças.
 - [CONTRIBUTING.md](CONTRIBUTING.md): o caminho de uma contribuição (issue, PR, checks).
-- [docs/ROADMAP.md](docs/ROADMAP.md): as próximas features, por complexidade, com o
-  planejamento de cada uma em `docs/roadmap/`.
+- [docs/ROADMAP.md](docs/ROADMAP.md): os níveis de complexidade (P, M, G, GG) e as features
+  entregues; o roadmap 2.3.0–2.6.0 está concluído (histórico).
 
 O teste `test/unit/docs.test.js` confere esta documentação contra o código.
 
@@ -185,7 +185,7 @@ O teste `test/unit/docs.test.js` confere esta documentação contra o código.
   do item Reconfigurar 1 vez. Não para o painel nem cria código: isso é do clique. Sem tela, sem login,
   com o painel parado, sem navegador, com a pasta que a rota recusaria (`outra-pasta`, `sem-assinatura`)
   ou com qualquer opção (a tela não leva opção ao comando fixo, I11), segue pelo caminho de antes.
-- **Code scanning** (CodeQL padrão do GitHub, a cada push): todo alerta é corrigido ou
+- **Code scanning** (CodeQL do GitHub, suíte `extended`, a cada push): todo alerta é corrigido ou
   descartado como falso positivo com a análise em `docs/seguranca/` e, se possível, um
   teste que falhe na forma errada. Não aplique a sugestão do CodeQL sem conferir o formato
   real (ex.: o escape do `authorized_keys` segue o `opt_dequote`, não o padrão genérico).
@@ -378,7 +378,7 @@ npm run migrar-v1 -- --verificar  # resume o data/history.json da V1 sem gravar 
 npm run migrar-v1               # migra a V1 agora (o painel também migra sozinho ao iniciar)
 npm run soak                    # soak acelerado: 83 h de coletas simuladas e pedidos de 90 dias; confere RAM e vazamento
 npm run empacotar-deb           # .deb reprodutível da tag da versão + dist/SHA256SUMS (--ref <tag|HEAD>, --saida <pasta>)
-npm run painel-teste            # painel de teste com dados semeados (--cenario=normal|lacunas|offline|vazio, --porta=3943, --versao-nova, --exige-reconfigurar, --reconfigurar[=volta|recusa|bloqueio])
+npm run painel-teste            # painel de teste com dados semeados (--cenario=normal|lacunas|offline|vazio, --porta=3943, --versao-nova, --exige-reconfigurar, --resultado=voltou, --reconfigurar[=volta|recusa|sem-assinatura|outra-pasta], --assistente)
 scripts/e2e-instalacao/rodar.sh # instalação, botão Atualizar e pacote .deb (instalar, atualizar, voltar, desinstalar, apt purge) de ponta a ponta em contêineres Debian/Ubuntu, com e sem systemd (E2E_CENARIOS=pacote: só o .deb)
 ```
 
@@ -441,7 +441,7 @@ o autocomplete pessoais só se forem do clone e liga o serviço do pacote; o clo
 `--importar-v1` grava no `data/` da pessoa. No pacote, o `desinstalar` limpa o servidor e apaga só o
 `.env`, `data/ssh`, sessões, códigos e a chave do painel (com `--apagar-historico`, também `data/`,
 `.backups/` e `.atualizacao/`), e as pastas pessoais vazias; nunca o comando, o autocomplete, os blocos
-do login nem `/opt`. Nenhum comando recusa no pacote.
+do login nem `/opt`. No pacote, só a opção `--pre` é recusada.
 
 No pacote, a troca de versão usa o executor (ADR 0048): o painel lê `<base>/estado/disponivel` e o
 `novidades.md` de hora em hora, sem git e sem rede. O `dashboard atualizar` (pelo terminal ou pelo
@@ -780,7 +780,7 @@ linux-server-dashboard-v2/
 ├── AGENTS.md · README.md · TUTORIAL.md · SECURITY.md · CONTRIBUTING.md · CHANGELOG.md · LICENSE (MIT)
 ├── dashboard               comando único: garante o Node 24 (scripts/node-runtime.sh) e chama server/cli/
 ├── bin/dashboard           lançador do pacote .deb (modo sistema, ADR 0043): Node do pacote ou do sistema, código do link atual
-├── libexec/atualizador     executor do pacote .deb (ADR 0044): verificar, atualizar e voltar, como _server-dashboard
+├── libexec/atualizador     executor do pacote .deb (ADR 0044): verificar, atualizar, voltar e semear, como _server-dashboard
 ├── pacote/systemd/         unidades do executor e o timer diário (ADR 0045), isoladas
 ├── pacote/polkit/          regra do polkit: o grupo só inicia atualizar e voltar (ADR 0046)
 ├── pacote/sysusers/        grupo server-dashboard e usuário _server-dashboard (ADR 0046)
@@ -794,7 +794,7 @@ linux-server-dashboard-v2/
 │                           CODEOWNERS (ADR 0016)
 ├── docs/                   adr/, seguranca/ (análises e excecoes.json), allowed_signers,
 │                           testes-no-navegador.md (roteiro da bateria, ADR 0019),
-│                           ROADMAP.md e roadmap/ (planejamento de cada feature),
+│                           ROADMAP.md (níveis e features entregues) e roadmap/ (avisos de f7 e f9),
 │                           img/ (prints e SVG do README e do TUTORIAL)
 ├── scripts/                check.mjs, seguranca.mjs, mutacao-seguranca.mjs, soak-acelerado.mjs,
 │                           capturar-amostra.mjs, painel-teste.mjs, capturar-telas.mjs,
@@ -833,6 +833,9 @@ linux-server-dashboard-v2/
                             hover.js (resposta ao mouse no navegador), instalacao-real.js
                             (o comando real em pasta temporária, com tags assinadas),
                             limpeza.js (aoFim: limpeza do fim do teste, do último para o 1º, #148)
+                            arquivos.js (modo e conteúdo de um arquivo no mesmo descritor),
+                            esperar.js (espera por condição, sem tempo fixo),
+                            servidor-simulado.js (servidor falso para o preparo e a remoção)
 ```
 
 ## Solução de problemas (para quem desenvolve)
