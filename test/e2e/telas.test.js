@@ -227,7 +227,7 @@ test('e2e: script desatualizado no servidor — a Visão geral mostra o passo a 
   assert.equal(await page.$('[data-reconfigurar]'), null, 'sem login, só o comando do terminal');
 });
 
-// Etapa 6 da F8 (ADR 0038): com login, o passo do terminal vira o botão, no mesmo fluxo da engrenagem.
+// Etapa 6 da F8 (ADR 0038): com login, o passo do terminal vira o botão, no mesmo fluxo da manutenção.
 test('e2e: script desatualizado no servidor — com login, a Visão geral traz o botão Reconfigurar agora', { skip: !chromium && 'sem playwright-core' }, async (t) => {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'dash-e2e-hash-'));
   aoFim(t, () => fs.rmSync(dir, { recursive: true, force: true }));
@@ -249,7 +249,7 @@ test('e2e: script desatualizado no servidor — com login, a Visão geral traz o
 });
 
 // Etapa 6 da F8 (ADR 0038): a versão que muda a coleta termina com o botão, sem recarregar sozinha, e
-// o botão segue o mesmo fluxo da engrenagem até o assistente.
+// o botão segue o mesmo fluxo da manutenção até o assistente.
 test('e2e: atualizar — versão que exige reconfigurar termina com Reconfigurar agora', { skip: !chromium && 'sem playwright-core' }, async (t) => {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'dash-e2e-troca-reconf-'));
   aoFim(t, () => fs.rmSync(dir, { recursive: true, force: true }));

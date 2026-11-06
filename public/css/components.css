@@ -306,7 +306,7 @@ pre.code {
 .toast .btn-link { margin-left: auto; }
 @keyframes toast-in { from { opacity: 0; transform: translateY(8px); } }
 
-/* ---------------- Manutenção: engrenagem, aviso de versão e novidades (ADR 0030) ---------------- */
+/* ---------------- Manutenção: botão (chave inglesa), aviso de versão e novidades (ADR 0030) ---------------- */
 .manut { position: relative; }
 .manut .icon-btn.tem-novidade { position: relative; }
 .manut .icon-btn.tem-novidade::after {

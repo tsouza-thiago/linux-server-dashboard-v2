@@ -56,8 +56,8 @@ export function createWizardApp({ inst, code, codeHash = null, onFinish = () => 
   const pelaTela = Boolean(onCancel);
   const TEXTO = pelaTela
     ? {
-      vencido: 'Este código não vale mais. O painel volta sozinho depois de 15 minutos sem uso; depois, peça de novo pela engrenagem.',
-      incorreto: 'Código incorreto. O painel volta sozinho depois de 15 minutos sem uso; depois, peça de novo pela engrenagem.',
+      vencido: 'Este código não vale mais. O painel volta sozinho depois de 15 minutos sem uso; depois, peça de novo pelo botão de manutenção.',
+      incorreto: 'Código incorreto. O painel volta sozinho depois de 15 minutos sem uso; depois, peça de novo pelo botão de manutenção.',
       semSessao: 'Este assistente só abre pelo botão Reconfigurar do painel.',
       inesperado: 'Algo deu errado aqui. Tente de novo; se continuar, cancele: o painel volta com a configuração de antes.',
       concluir: 'Não consegui concluir. Tente de novo; se continuar, cancele: o painel volta com a configuração de antes.',

@@ -142,7 +142,7 @@ Com `npm run painel-teste -- --reconfigurar` (token `teste`), nos 2 temas. O pai
 sobe comando nenhum: a rota é a de verdade, e um assistente falso toma a porta, como o
 `--pela-tela` faria.
 
-- A engrenagem tem o item **Reconfigurar**. O diálogo explica a pausa da coleta e a volta do painel.
+- O botão de manutenção (a chave inglesa do topo) tem o item **Reconfigurar**. O diálogo explica a pausa da coleta e a volta do painel.
 - **Fechar** não dispara nada. **Reconfigurar agora** mostra a espera, sem link, e o Esc não fecha.
 - Em poucos segundos, a página entra sozinha no assistente, sem pedir código e sem o código no endereço.
 - O assistente tem **Cancelar**: "Continuar" volta ao passo; "Cancelar e voltar ao painel"

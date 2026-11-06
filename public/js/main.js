@@ -171,11 +171,11 @@ const act = {
     if (current) refreshView();
   },
   go(view, period = store.get().period) { location.hash = buildHash({ view, period }); },
-  // O diálogo do item Reconfigurar da engrenagem, aberto por outra tela (ADR 0038).
+  // O diálogo do item Reconfigurar da manutenção, aberto por outra tela (ADR 0038).
   reconfigurar() { manutencao?.abrirReconfigurar(); },
   toast,
 };
-// A manutenção (engrenagem), ligada depois do login.
+// A manutenção (botão do topo), ligada depois do login.
 let manutencao = null;
 
 // ---------------- Navegação ----------------
