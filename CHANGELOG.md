@@ -19,6 +19,9 @@ diante: `PATCH` corrige, `MINOR` acrescenta sem quebrar e `MAJOR` quebra.
 
 ### Alterado
 
+- Documentação para quem usa (#178): o README manda para o TUTORIAL os 6 passos, a tabela das telas, os
+  comandos menos usados e o "Vindo da V1"; a ameaça 24 e os "Princípios" do SECURITY viram resumo com link
+  para o AGENTS e as ADRs. Nenhuma regra mudou.
 - Testes mais enxutos (#176): `memOut`, `freePort`, `fakeRes`, `espiao`, `setupApp`/`withServer`, `pastaTemp` e
   o relógio das amostras saem de cópias e vão para `test-support/`; `config`, `csv`, `stores` e `security`
   juntam seus arquivos divididos; as pastas temporárias sem limpeza passam por `aoFim`; o e2e usa o
