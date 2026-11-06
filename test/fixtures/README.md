@@ -13,6 +13,7 @@ fixtures que vieram do servidor real.
 | `coleta-v2/debian13-real.txt` | coleta real anonimizada (07/10/2026), modo `smart`, ~2 min após boot; discos com valores sintéticos | V2 (`server/collector/`) |
 | `coleta-v2/debian13-derivada-v1.txt` | derivada de uma coleta V1 anonimizada, convertida à mão para o formato V2 (sem PSI); discos com valores sintéticos | V2 |
 | `coleta-v2/casos-limite.txt` | sintética: contador colado, sem permissão, vários sensores, mount ausente | V2 |
+| `instalacao/deteccao-debian12.txt` | saída sintética do script de detecção da instalação (Debian 12, IPs de documentação) | detecção (`server/setup/`) |
 
 Fatos de formato confirmados pela amostra real (Debian 13, kernel 6.12):
 
