@@ -441,8 +441,7 @@ o autocomplete pessoais só se forem do clone e liga o serviço do pacote; o clo
 `--importar-v1` grava no `data/` da pessoa. No pacote, o `desinstalar` limpa o servidor e apaga só o
 `.env`, `data/ssh`, sessões, códigos e a chave do painel (com `--apagar-historico`, também `data/`,
 `.backups/` e `.atualizacao/`), e as pastas pessoais vazias; nunca o comando, o autocomplete, os blocos
-do login nem `/opt`. Só o `--importar-pasta` (no clone e no
-`reconfigurar`) e o `--pre` recusam no pacote.
+do login nem `/opt`. No pacote, só a opção `--pre` é recusada.
 
 No pacote, a troca de versão usa o executor (ADR 0048): o painel lê `<base>/estado/disponivel` e o
 `novidades.md` de hora em hora, sem git e sem rede. O `dashboard atualizar` (pelo terminal ou pelo

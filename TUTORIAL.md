@@ -488,7 +488,7 @@ Comece sempre por `./dashboard diagnosticar`: ele aponta o problema e diz como r
 
 ### A porta 3000 já está em uso
 
-- Outro programa usa a porta: mude `PORT=3001` no `.env` (no pacote `.deb`, `~/.config/server-dashboard/.env`) e rode `./dashboard iniciar`.
+- Outro programa usa a porta: mude `PORT=3001` no `.env` e rode `./dashboard iniciar`. No pacote `.deb`, o `.env` fica em `~/.config/server-dashboard/.env` e o comando é `dashboard iniciar`.
 
 ### Onde ver o que aconteceu (logs)
 
