@@ -46,7 +46,7 @@ Inclua: o passo a passo para reproduzir, o impacto estimado e a versão afetada
   `-`, e `runSSH()` repete a checagem. O script de coleta (`server/collector/builder.js`)
   só recebe valores já filtrados. Na instalação, cada entrada passa por
   `server/setup/acesso.js` antes de virar arquivo ou comando.
-- **Verificado por:** `test/unit/config.test.js`, `test/unit/security-fixes.test.js`,
+- **Verificado por:** `test/unit/config.test.js`, `test/unit/security.test.js`,
   `test/unit/collector-builder.test.js` e `test/unit/setup-nucleo.test.js`.
 
 ### 2. Chave do painel vazada (ADR 0008)
@@ -165,7 +165,7 @@ Inclua: o passo a passo para reproduzir, o impacto estimado e a versão afetada
      recebem 403 (`csrfCheck`).
   2. Mutações com `Origin` também precisam do cookie `dash_csrf` (SameSite=Lax, HttpOnly),
      emitido nos GETs. Um site de outra origem não consegue forjar esse cookie.
-- **Verificado por:** `test/unit/security-ext.test.js`,
+- **Verificado por:** `test/unit/security.test.js`,
   `test/integration/http-seguranca.test.js`, `test/integration/api-ext.test.js` e
   `test/seguranca/superficie-ataque.test.js` (toda mutação de toda rota).
 
@@ -202,7 +202,7 @@ Inclua: o passo a passo para reproduzir, o impacto estimado e a versão afetada
   serviço de usuário roda isolado (`NoNewPrivileges`, `ProtectSystem=strict`, só grava em
   `data/`); se não permitir, a instalação avisa e segue sem o isolamento. O
   `./dashboard diagnosticar` aponta arquivo aberto demais e o `chmod` exato.
-- **Verificado por:** `test/unit/security-fixes.test.js`, `test/unit/config.test.js`,
+- **Verificado por:** `test/unit/security.test.js`, `test/unit/config.test.js`,
   `test/unit/setup-nucleo.test.js`, `test/integration/cli-manutencao.test.js` e
   `test/seguranca/invariantes-estaticas.test.js` (toda escrita do painel com 0600).
 
@@ -233,7 +233,7 @@ Inclua: o passo a passo para reproduzir, o impacto estimado e a versão afetada
 - **Mitigação:** `server/csv.js` põe `'` antes desses valores e coloca entre aspas a célula
   com vírgula, aspas ou quebra de linha (`csvEscape`). O nome do arquivo exportado também
   é saneado.
-- **Verificado por:** `test/unit/csv.test.js`, `test/unit/csv-ext.test.js` e
+- **Verificado por:** `test/unit/csv.test.js` e
   `test/seguranca/payloads-owasp.test.js`.
 
 ### 16. Detalhes internos em mensagens de erro

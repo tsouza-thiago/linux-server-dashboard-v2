@@ -6,18 +6,12 @@ import { EventEmitter } from 'node:events';
 import { Readable } from 'node:stream';
 import { runTui, Screen } from '../../server/setup/tui.js';
 import { runHeadless, HEADLESS_HELP } from '../../server/setup/sem-interface.js';
-import { makeOutput } from '../../server/cli/saida.js';
 import { makeInstalacao, detectionWithSudo } from '../../test-support/instalacao-fake.js';
 import { esperarAte } from '../../test-support/esperar.js';
 import { loadEnvFile } from '../../server/config.js';
 import fs from 'node:fs';
 import path from 'node:path';
-
-function memOut() {
-  const chunks = [];
-  const out = makeOutput({ stream: { isTTY: false, write: (s) => { chunks.push(s); return true; } }, env: {} });
-  return { out, text: () => chunks.join('') };
-}
+import { memOut } from '../../test-support/saida.js';
 
 /** Terminal falso: as teclas entram em fila, na ordem em que a pessoa apertaria. */
 function terminal() {

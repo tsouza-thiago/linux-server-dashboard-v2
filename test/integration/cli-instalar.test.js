@@ -8,20 +8,15 @@ import os from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { verifyVendor, parseFlags, preflight, runWizard, instalar } from '../../server/cli/instalar.js';
-import { makeOutput } from '../../server/cli/saida.js';
 import { prepararRegistro } from '../../server/atualizacao/registro.js';
 import { criarCodigoPelaTela } from '../../server/setup/pela-tela.js';
 import { request } from '../../test-support/request.js';
 import { makeInstalacao } from '../../test-support/instalacao-fake.js';
 import { esperarAte } from '../../test-support/esperar.js';
+import { memOut } from '../../test-support/saida.js';
+import { freePort } from '../../test-support/rede.js';
 
 const ROOT = path.join(path.dirname(fileURLToPath(import.meta.url)), '..', '..');
-
-function memOut() {
-  const chunks = [];
-  const out = makeOutput({ stream: { isTTY: false, write: (s) => { chunks.push(s); return true; } }, env: {} });
-  return { out, text: () => chunks.join('') };
-}
 
 function copyVendor(t) {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), 'dash-pre-'));
@@ -29,14 +24,6 @@ function copyVendor(t) {
   fs.cpSync(path.join(ROOT, 'public', 'vendor'), path.join(root, 'public', 'vendor'), { recursive: true });
   fs.cpSync(path.join(ROOT, 'public', 'fonts'), path.join(root, 'public', 'fonts'), { recursive: true });
   return root;
-}
-
-async function freePort() {
-  const srv = net.createServer();
-  await new Promise((r) => srv.listen(0, '127.0.0.1', r));
-  const { port } = srv.address();
-  await new Promise((r) => srv.close(r));
-  return port;
 }
 
 test('instalar: uPlot e fontes conferidos pelo SHA-256 do vendor.json', (t) => {

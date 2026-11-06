@@ -2,7 +2,6 @@
 // serviço. As rotas ficam em test/integration/atualizacao.test.js.
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { EventEmitter } from 'node:events';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
@@ -10,6 +9,7 @@ import {
   abrirRegistro, cancelarPre, donoDaTrava, emAndamento, garantirPasta, lerEstado, lerRegistro, liberarPre, pegarTrava, preLiberada, prepararRegistro, registrarFalha, soltarTrava,
 } from '../../server/atualizacao/registro.js';
 import { executarForaDoServico, modoDoExecutor, reconfigurarForaDoServico } from '../../server/atualizacao/executor.js';
+import { espiao } from '../../test-support/falsos.js';
 
 function pasta(t) {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), 'dash-registro-'));
@@ -213,18 +213,6 @@ test('falha ao iniciar: fica no log e encerra o estado', (t) => {
 });
 
 // Filho falso: anota o que foi pedido e termina como o teste mandar.
-function espiao(fim) {
-  const chamadas = [];
-  const spawnFn = (cmd, args, opts) => {
-    chamadas.push({ cmd, args, opts });
-    const filho = new EventEmitter();
-    filho.unref = () => { chamadas.at(-1).unref = true; };
-    setImmediate(() => fim(filho));
-    return filho;
-  };
-  return { chamadas, spawnFn };
-}
-
 test('executor: serviço → unidade própria do systemd, com o comando em lista e sem shell', async () => {
   const { chamadas, spawnFn } = espiao((f) => f.emit('close', 0));
   assert.deepEqual(await executarForaDoServico({ root: '/opt/painel', modo: 'systemd', spawnFn }), { ok: true });

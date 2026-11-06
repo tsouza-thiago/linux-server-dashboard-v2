@@ -1,23 +1,24 @@
 // Tempo medido (ADR 0018, #24): faixas de 5 min com amostra + quedas. A disponibilidade não
 // conta o tempo em que nenhum painel estava coletando.
+import { pastaTemp } from '../../test-support/limpeza.js';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { mergeSpans, clipSpans, spansMs, spansToIso } from '../../server/storage/coverage.js';
+import { relogio, amostraMin, silent } from '../../test-support/amostras.js';
 import { RollupStore, ROLLUP_STEP_MS } from '../../server/storage/rollup.js';
 import { History } from '../../server/storage/index.js';
 import { OutageLog } from '../../server/storage/outages.js';
 import { dayOf } from '../../server/storage/ndjson.js';
 
-const tmp = () => fs.mkdtempSync(path.join(os.tmpdir(), 'lsd-cobertura-'));
+const tmp = (t) => pastaTemp(t, 'lsd-cobertura-');
 const MIN = 60000;
 const STEP = ROLLUP_STEP_MS;
 const BASE = Date.UTC(2026, 9, 7, 0, 0);
-const at = (min) => new Date(BASE + min * MIN).toISOString();
-const sample = (min) => ({ ts: at(min), host: 'srv', tempC: 40, load: [0.1, 0.1, 0.1] });
-const silent = () => {};
+const at = relogio(BASE);
+const sample = amostraMin(at);
 
 test('cobertura: junta intervalos que se tocam, corta na janela e soma', () => {
   const spans = mergeSpans([[30, 40], [0, 10], [10, 20], [5, 8], [50, 50], [NaN, 3]]);
@@ -30,8 +31,8 @@ test('cobertura: junta intervalos que se tocam, corta na janela e soma', () => {
   assert.deepEqual(entrada, [[0, 10], [5, 20]], 'não altera a lista recebida');
 });
 
-test('History.monitored: 2 períodos de coleta separados por uma lacuna de 2 dias', async () => {
-  const dir = tmp();
+test('History.monitored: 2 períodos de coleta separados por uma lacuna de 2 dias', async (t) => {
+  const dir = tmp(t);
   const h = new History({ dataDir: dir, log: silent });
   // 30 min de coleta, 2 dias sem painel, mais 30 min.
   const gap = 2 * 1440;
@@ -51,8 +52,8 @@ test('History.monitored: 2 períodos de coleta separados por uma lacuna de 2 dia
   assert.deepEqual(again.monitored(BASE - 3 * 1440 * MIN, toMs), spans);
 });
 
-test('RollupStore.coverage: lê só t e n do disco, ignora balde vazio e acompanha o que fecha', async () => {
-  const dir = tmp();
+test('RollupStore.coverage: lê só t e n do disco, ignora balde vazio e acompanha o que fecha', async (t) => {
+  const dir = tmp(t);
   fs.mkdirSync(dir, { recursive: true });
   const file = path.join(dir, `${dayOf(BASE)}.ndjson`);
   fs.writeFileSync(file, [
@@ -71,9 +72,9 @@ test('RollupStore.coverage: lê só t e n do disco, ignora balde vazio e acompan
   assert.deepEqual(r.coverage(), [[BASE, BASE + 2 * STEP], [BASE + 4 * STEP, BASE + 6 * STEP]], 'baldes 20–30 entram ao fechar');
 });
 
-test('OutageLog.uptime com tempo medido: a lacuna não conta, e sem medida é null', () => {
+test('OutageLog.uptime com tempo medido: a lacuna não conta, e sem medida é null', (t) => {
   const now = BASE + 10 * 1440 * MIN;
-  const log = new OutageLog({ file: path.join(tmp(), 'o.ndjson'), now: () => now });
+  const log = new OutageLog({ file: path.join(tmp(t), 'o.ndjson'), now: () => now });
   log.start(BASE + 10 * MIN, 'caiu');
   log.end(BASE + 25 * MIN);
   // 1 h medida no dia 0 (com a queda de 15 min dentro) e nada nos 9 dias seguintes.
