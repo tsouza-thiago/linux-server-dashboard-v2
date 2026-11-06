@@ -242,7 +242,7 @@ antes, e a tela avisa. O botão fica desligado quando o painel não tem login ou
 alterados na pasta; nesse caso, a tela diz o motivo e mostra o comando
 `./dashboard atualizar --terminal`.
 
-Do 2.5.0 ao 2.6.1, no serviço systemd, o botão não funcionava. Quem está nessas versões atualiza uma vez
+Da 2.5.0 à 2.6.1, no serviço systemd, o botão não funcionava. Quem está nessas versões atualiza uma vez
 pelo terminal (`./dashboard atualizar --terminal`; no pacote, `dashboard atualizar --terminal`). Depois, o botão volta.
 
 **E pelo terminal?** O `./dashboard atualizar` abre o painel já logado, com o diálogo da versão nova.
