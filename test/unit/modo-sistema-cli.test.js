@@ -1,5 +1,5 @@
 // Modo sistema nos subcomandos (F9, etapa 3, ADR 0043): de qual pasta saem o .env e o data/,
-// os caminhos do pacote, os comandos que recusam no pacote e a unidade systemd e o atalho do
+// os caminhos do pacote e a unidade systemd e o atalho do
 // pacote. O modo clone continua igual: toda pasta que não é a do código que roda é um clone.
 import test from 'node:test';
 import assert from 'node:assert/strict';
@@ -7,7 +7,6 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { ROOT, backupsDe, caminhosDoPacote, dataDe, envDe, pastasDaInstalacao, pastasDe } from '../../server/config.js';
-import { recusaNoPacote } from '../../server/cli/index.js';
 import { desktopEntryText, ensureDataDirs, unitText } from '../../server/setup/local.js';
 
 // Pastas do modo sistema de uma pessoa fictícia, como o lançador as escolhe.
@@ -41,23 +40,6 @@ test('caminhosDoPacote: o link atual e o lançador saem do layout versoes/; fora
   assert.deepEqual(caminhosDoPacote('/home/ana/painel'), {
     base: '/opt/server-dashboard', atual: '/opt/server-dashboard/atual', lancador: '/opt/server-dashboard/bin/dashboard',
   });
-});
-
-test('recusaNoPacote: no modo clone, nenhum comando é recusado', () => {
-  for (const [nome, args] of [['atualizar', []], ['desinstalar', []], ['reconfigurar', ['--pela-tela']], ['instalar', ['--importar-v1', '/x']]]) {
-    assert.equal(recusaNoPacote(nome, args, 'clone'), null, nome);
-  }
-});
-
-test('recusaNoPacote: no pacote, recusa desinstalar e importar a V1', () => {
-  for (const [nome, args] of [['desinstalar', []], ['desinstalar', ['--apagar-historico']], ['instalar', ['--importar-v1', '/x']]]) {
-    const r = recusaNoPacote(nome, args, 'sistema');
-    assert.ok(r?.texto && r?.oQueFazer, `${nome} ${args.join(' ')}`);
-  }
-  // O resto segue: atualizar e reconfigurar pela tela (etapa 8, ADR 0048), instalação, status…
-  for (const [nome, args] of [['atualizar', []], ['atualizar', ['--terminal']], ['atualizar', ['--registro']], ['reconfigurar', ['--pela-tela']], ['instalar', []], ['instalar', ['--terminal']], ['reconfigurar', []], ['status', []], ['abrir', []], ['diagnosticar', []], ['versao', []]]) {
-    assert.equal(recusaNoPacote(nome, args, 'sistema'), null, nome);
-  }
 });
 
 test('unitText: no pacote, roda pelo link atual, com o sinal e as pastas XDG no ambiente', () => {

@@ -4,7 +4,7 @@
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import { clampInt, loadEnvFile, sanitizeToken, isPlaceholderHost, sanitizeHost } from '../config.js';
+import { clampInt, dataDe, loadEnvFile, sanitizeToken, isPlaceholderHost, sanitizeHost } from '../config.js';
 import { ensureDataDirs, updateEnv, installService, installShortcut } from '../setup/local.js';
 import { hasSystemdUser, systemctlUser, startPanel, waitForPort, panelPort, UNIT_NAME } from './servico.js';
 import { BACKUP_NAME } from '../storage/migrate-v1.js';
@@ -107,11 +107,13 @@ export async function importarV1({ out, root, dir, home = os.homedir(), deps = {
   // Copia só o que ainda não existe na V2 (nunca sobrescreve dados dela); o histórico da V1
   // não volta se ele já foi migrado antes (o backup existe).
   const copied = [];
+  // No pacote .deb, o data/ da V2 fica na pasta pessoal (dataDe, ADR 0050).
+  const data = dataDe(root);
   for (const f of DATA_FILES) {
     const src = path.join(v1, 'data', f);
-    const dst = path.join(root, 'data', f);
+    const dst = path.join(data, f);
     if (!fs.existsSync(src)) continue;
-    if (fs.existsSync(dst) || (f === 'history.json' && fs.existsSync(path.join(root, 'data', BACKUP_NAME)))) continue;
+    if (fs.existsSync(dst) || (f === 'history.json' && fs.existsSync(path.join(data, BACKUP_NAME)))) continue;
     fs.copyFileSync(src, dst);
     fs.chmodSync(dst, 0o600);
     copied.push(f);

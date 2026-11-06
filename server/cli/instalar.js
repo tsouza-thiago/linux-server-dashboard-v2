@@ -54,7 +54,7 @@ export function parseFlags(args) {
     if (!a.startsWith('--')) { flags._.push(a); continue; }
     const [k, v] = a.slice(2).split('=');
     if (v !== undefined) flags[k] = v;
-    else if (args[i + 1] && !args[i + 1].startsWith('--') && ['servidor', 'usuario', 'porta', 'pastas', 'smart', 'rede', 'servicos', 'identidade', 'importar-v1', 'disco', 'memoria', 'temperatura', 'modo', 'chave-ssh'].includes(k)) { flags[k] = args[i + 1]; i += 1; } else flags[k] = true;
+    else if (args[i + 1] && !args[i + 1].startsWith('--') && ['servidor', 'usuario', 'porta', 'pastas', 'smart', 'rede', 'servicos', 'identidade', 'importar-v1', 'importar-pasta', 'disco', 'memoria', 'temperatura', 'modo', 'chave-ssh'].includes(k)) { flags[k] = args[i + 1]; i += 1; } else flags[k] = true;
   }
   return flags;
 }
@@ -367,7 +367,7 @@ async function abrirNoPainel({ out, root, home, deps }) {
 
 /**
  * `./dashboard instalar` e `./dashboard reconfigurar`: preflight, depois o caminho escolhido
- * (--importar-v1, --terminal, --sem-interface ou o assistente no navegador).
+ * (--importar-pasta, --importar-v1, --terminal, --sem-interface ou o assistente no navegador).
  */
 export async function instalar({ out, root, args, home, reconfigurar = false, deps = {} }) {
   const flags = parseFlags(args);
@@ -381,6 +381,11 @@ export async function instalar({ out, root, args, home, reconfigurar = false, de
   out.title(reconfigurar ? 'Server Dashboard · reconfigurar' : 'Server Dashboard · instalação');
   // Qualquer opção segue pelo caminho de hoje: a tela não leva opção ao comando fixo do executor (I11).
   if (reconfigurar && args.length === 0 && await abrirNoPainel({ out, root, home, deps })) return 0;
+  // Do clone para o pacote (ADR 0050): só no instalar do pacote. No clone, não há para onde importar.
+  if (flags['importar-pasta'] && (reconfigurar || pastasDe(root).modo !== 'sistema')) {
+    out.fail('--importar-pasta só vale no instalar do pacote .deb', 'ela traz a configuração de um clone para o pacote');
+    return 2;
+  }
   // Roda o ./dashboard de novo com os mesmos argumentos (depois de trocar de versão).
   const reexec = deps.reexec ?? (() => {
     const env = { ...process.env, ...(process.env.DASHBOARD_NODE_ORIGEM === 'baixado' ? { DASHBOARD_NODE_BAIXADO: '1' } : {}) };
@@ -390,6 +395,11 @@ export async function instalar({ out, root, args, home, reconfigurar = false, de
   const pre = preflight({ out, root, flags, reexec });
   if (typeof pre === 'number') return pre;
   if (!pre) return 1;
+
+  if (flags['importar-pasta']) {
+    const { importarPasta } = await import('./importar-pasta.js');
+    return importarPasta({ out, root, dir: flags['importar-pasta'], home });
+  }
 
   if (flags['importar-v1']) {
     const { importarV1 } = await import('./importar-v1.js');

@@ -50,6 +50,13 @@ diante: `PATCH` corrige, `MINOR` acrescenta sem quebrar e `MAJOR` quebra.
   assinado. Na 1ª instalação, o pacote cria o usuário de sistema, instala a versão que traz dentro,
   baixa o Node com a soma conferida, liga a procura diária de versão nova e põe no grupo
   `server-dashboard` a conta que instalou (vale depois de sair e entrar de novo na sessão).
+- Do clone para o pacote e desinstalar (#92, F9, etapa 10 de 12, ADR 0050):
+  `dashboard instalar --importar-pasta <clone>` para o painel do clone e traz o `.env` e o `data/` dele
+  para as pastas pessoais do pacote, sem refazer o acesso ao servidor. O clone fica como cópia de
+  segurança. No pacote, `dashboard desinstalar` limpa o servidor e apaga só a configuração e os dados
+  da pessoa, e o `--importar-v1` também funciona. O `apt purge` tira de `/opt/server-dashboard` as
+  versões, o Node e o estado do executor, e também o usuário e os grupos de sistema, sem tocar nas
+  pastas pessoais. Ao remover o pacote, as unidades do executor que estiverem rodando param.
 
 ### Corrigido
 

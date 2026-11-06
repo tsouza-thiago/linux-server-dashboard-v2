@@ -153,6 +153,12 @@ const MUTACOES = [
   { nome: 'troca no pacote sem conferir o link atual', arquivo: 'server/cli/atualizar.js', de: 'if (!alvo || alvo === current) {', para: 'if (!alvo) {', testes: ['test/integration/atualizacao-pacote.test.js'] },
   { nome: 'troca no pacote sem pedir o voltar', arquivo: 'server/cli/atualizar.js', de: 'const volta = executor(UNIDADE_VOLTAR);', para: 'const volta = { ok: true, erro: null };', testes: ['test/integration/atualizacao-pacote.test.js'] },
   { nome: 'pacote aceita o --pre', arquivo: 'server/cli/atualizar.js', de: 'if (pacote && flags.pre && !registro) {', para: 'if (false) {', testes: ['test/integration/atualizacao-pacote.test.js'] },
+  // Desinstalar e importar no pacote (F9 etapa 10, ADR 0050): apt purge e clone → pacote.
+  { nome: 'postrm apaga na remoção sem purge', arquivo: 'pacote/debian/postrm', de: 'if [ "$1" = purge ]; then', para: 'if true; then', testes: ['test/unit/pacote-debian.test.js'] },
+  { nome: 'postrm apaga conta de pessoa', arquivo: 'pacote/debian/postrm', de: '[ "$1" -lt 1000 ]', para: 'true', testes: ['test/unit/pacote-debian.test.js'] },
+  { nome: 'importar do clone deixa arquivo aberto', arquivo: 'server/cli/importar-pasta.js', de: '      fs.chmodSync(destino, 0o600);\n', para: '', testes: ['test/integration/cli-manutencao.test.js'] },
+  { nome: 'importar do clone segue link', arquivo: 'server/cli/importar-pasta.js', de: 'else if (item.isFile() && ', para: 'else if (!item.isDirectory() && ', testes: ['test/integration/cli-manutencao.test.js'] },
+  { nome: 'importar do clone por cima da instalação', arquivo: 'server/cli/importar-pasta.js', de: 'if (pacoteJaInstalado(root)) {', para: 'if (false) {', testes: ['test/integration/cli-manutencao.test.js'] },
   { nome: 'exec com shell importado', arquivo: 'server/cli/servico.js', de: "import { spawn, spawnSync } from 'node:child_process';", para: "import { exec, spawn, spawnSync } from 'node:child_process';" },
 ];
 

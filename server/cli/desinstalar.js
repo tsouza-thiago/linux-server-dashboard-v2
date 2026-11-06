@@ -3,7 +3,9 @@
 // sudo dela; o usuário dashmon sai só se nenhum outro computador o usar, ADR 0020) — com
 // os comandos exibidos antes e a senha usada uma vez, como no assistente. Servidor que só
 // aceita chave (ADR 0021): --chave-ssh <apelido> entra pela chave do apelido, no ssh-agent, e
-// a senha pedida passa a ser só a do sudo.
+// a senha pedida passa a ser só a do sudo. No pacote .deb (modo sistema, ADR 0050), apaga só a
+// configuração e os dados da pessoa, nas pastas pessoais; o código em /opt é de todas as contas
+// da máquina e sai com o apt purge.
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
@@ -16,6 +18,7 @@ import { validUser, installId, validPublicKey, NAME_PREFIX, PANEL_USER } from '.
 import { stopPanel } from './servico.js';
 import { keyFileFromConfig } from './diagnosticar.js';
 import { parseFlags } from './instalar.js';
+import { backupsDe, caminhosDoPacote, dataDe, envDe, pastasDe } from '../config.js';
 
 /** Pergunta no terminal (com a senha escondida quando `secret`). */
 export function ask(question, { secret = false, input = process.stdin, output = process.stdout } = {}) {
@@ -107,7 +110,10 @@ export async function desinstalar({ out, root, args = [], home = os.homedir(), d
   // 1. Servidor primeiro: depois que a chave e o known_hosts saem, não dá mais para conferir a
   // identidade nem saber qual linha é desta instalação.
   const server = currentServer(root);
-  const knownHosts = path.join(root, 'data', 'ssh', 'known_hosts');
+  const pastas = pastasDe(root);
+  const sistema = pastas.modo === 'sistema';
+  const data = dataDe(root);
+  const knownHosts = path.join(data, 'ssh', 'known_hosts');
   const key = keyFileFromConfig(root);
   const publicKey = publicKeyOf(key);
   if (server && fs.existsSync(knownHosts) && !publicKey) {
@@ -135,13 +141,14 @@ export async function desinstalar({ out, root, args = [], home = os.homedir(), d
   out.ok('painel parado');
   if ((deps.removeService ?? removeService)({ home })) out.ok('serviço de usuário removido');
   if (removeShortcut({ home })) out.ok('atalho do menu removido');
-  const link = removerLinkDoPath({ root, home });
-  if (link.removido) out.ok('comando dashboard removido', '~/.local/bin/dashboard');
-  const auto = removerAutocomplete({ root, home, env: deps.env ?? process.env });
-  if (auto.removido) out.ok('autocomplete removido', auto.nome);
+  // No pacote, o comando e o autocomplete são do pacote (/usr/bin, /usr/share): nada pessoal a tirar.
+  const link = sistema ? null : removerLinkDoPath({ root, home });
+  if (link?.removido) out.ok('comando dashboard removido', '~/.local/bin/dashboard');
+  const auto = sistema ? null : removerAutocomplete({ root, home, env: deps.env ?? process.env });
+  if (auto?.removido) out.ok('autocomplete removido', auto.nome);
   // Os blocos são da máquina: a outra pasta que tem o link ainda precisa dele.
-  if (link.estado === 'outra-pasta') out.line(out.c.dim(`O comando dashboard continua: ele vale para ${link.alvo}.`));
-  else {
+  if (link?.estado === 'outra-pasta') out.line(out.c.dim(`O comando dashboard continua: ele vale para ${link.alvo}.`));
+  else if (link) {
     const bloco = removerBlocoDoLogin({ home });
     for (const f of bloco.removidos) out.ok(`${f === '.bashrc' ? 'autocomplete' : 'PATH'} retirado do ~/${f}`, 'só o bloco do painel');
     for (const f of bloco.falhas) out.warn(`não consegui editar o ~/${f}`, 'apague à mão o bloco server-dashboard');
@@ -152,20 +159,30 @@ export async function desinstalar({ out, root, args = [], home = os.homedir(), d
     fs.rmSync(`${key}.pub`, { force: true });
     out.ok('chave do painel apagada', key.replace(home, '~'));
   }
-  for (const f of ['.env', path.join('data', 'ssh'), path.join('data', 'sessions.json'), path.join('data', 'entrar.json'), path.join('data', 'reconfigurar.json'), path.join('data', 'reconfigurar.log'), '.runtime']) {
-    fs.rmSync(path.join(root, f), { recursive: true, force: true });
-  }
-  out.ok('configuração local apagada', '.env, data/ssh, sessões e o Node baixado');
+  // O .env e o data/ vêm de envDe/dataDe: a pasta do projeto no clone, as pastas pessoais no pacote.
+  const locais = [envDe(root), ...['ssh', 'sessions.json', 'entrar.json', 'reconfigurar.json', 'reconfigurar.log'].map((f) => path.join(data, f))];
+  if (!sistema) locais.push(path.join(root, '.runtime'));
+  for (const f of locais) fs.rmSync(f, { recursive: true, force: true });
+  out.ok('configuração local apagada', sistema ? '.env, data/ssh e sessões' : '.env, data/ssh, sessões e o Node baixado');
   const dropHistory = flags['apagar-historico'] || (interactive && !flags.sim && yes(await askFn('Apagar também o histórico (data/)? [s/N] ')));
   if (dropHistory) {
-    fs.rmSync(path.join(root, 'data'), { recursive: true, force: true });
-    fs.rmSync(path.join(root, '.backups'), { recursive: true, force: true });
-    fs.rmSync(path.join(root, '.atualizacao'), { recursive: true, force: true });
+    fs.rmSync(data, { recursive: true, force: true });
+    fs.rmSync(backupsDe(root), { recursive: true, force: true });
+    fs.rmSync(path.join(pastas.dados, '.atualizacao'), { recursive: true, force: true });
     out.ok('histórico apagado');
   } else {
-    out.ok('histórico mantido em data/', 'apague a pasta quando quiser');
+    out.ok('histórico mantido em data/', sistema ? data : 'apague a pasta quando quiser');
   }
   out.line();
-  out.line(`Pronto. A pasta do projeto pode ser apagada: rm -rf "${root}"`);
+  if (sistema) {
+    // Pastas pessoais vazias saem; com o histórico, a de dados fica. rmdir nunca apaga conteúdo.
+    for (const dir of [pastas.config, pastas.dados]) {
+      try { fs.rmdirSync(dir); } catch { /* não vazia ou já removida */ }
+    }
+    out.line(`Pronto. O código do painel fica em ${caminhosDoPacote(root).base}, para as outras contas desta máquina.`);
+    out.line(out.c.dim('Para tirá-lo do computador: sudo apt purge server-dashboard'));
+  } else {
+    out.line(`Pronto. A pasta do projeto pode ser apagada: rm -rf "${root}"`);
+  }
   return 0;
 }

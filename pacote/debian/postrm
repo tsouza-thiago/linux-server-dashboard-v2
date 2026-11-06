@@ -1,11 +1,24 @@
 #!/bin/sh
 # ============================================================
-# Server Dashboard — postrm do pacote .deb (F9 do #92, ADR 0049)
+# Server Dashboard — postrm do pacote .deb (F9 do #92, ADR 0049 e 0050)
 #
-# Depois de o dpkg tirar as unidades do disco, o systemd relê a lista. O apt purge (limpar
-# /opt/server-dashboard, o usuário e o grupo) é da etapa 10 da F9.
+# Depois de o dpkg tirar as unidades do disco, o systemd relê a lista. No apt purge, tira também
+# o que o pacote criou fora da lista do dpkg (ADR 0042, item 12):
+#   1. as pastas do executor em /opt/server-dashboard (repo.git, versoes, estado e node);
+#   2. o usuário de sistema _server-dashboard e os grupos _server-dashboard e server-dashboard.
+# Nunca toca nas pastas pessoais (~/.config e ~/.local/share): elas são de cada pessoa, que as
+# limpa com "dashboard desinstalar" antes de remover o pacote.
 # ============================================================
 set -e
+
+BASE=/opt/server-dashboard
+DONO=_server-dashboard
+GRUPO=server-dashboard
+
+# Conta de sistema (abaixo de 1000)? Uma conta de pessoa com o mesmo nome nunca é apagada.
+de_sistema() {
+  [ -n "$1" ] && [ "$1" -ge 0 ] 2> /dev/null && [ "$1" -lt 1000 ]
+}
 
 case "$1" in
   remove | purge)
@@ -14,5 +27,26 @@ case "$1" in
     fi
     ;;
 esac
+
+if [ "$1" = purge ]; then
+  # 1. Os nomes são fixos e a base é do root: o executor não troca uma pasta por um link aqui.
+  # O rm não segue links de dentro delas, e --one-file-system não desce em outra montagem.
+  for pasta in repo.git versoes estado node; do
+    rm -rf --one-file-system "${BASE:?}/$pasta"
+  done
+  rmdir "$BASE" 2> /dev/null || true
+
+  # 2. Usuário e grupos, só se forem de sistema. O grupo server-dashboard sai com as pessoas que
+  # estavam nele (a regra do polkit já saiu com o pacote).
+  if de_sistema "$(getent passwd "$DONO" | cut -d: -f3)"; then
+    userdel "$DONO" || echo "AVISO: não consegui remover o usuário $DONO; remova com: sudo userdel $DONO" >&2
+  fi
+  for grupo in "$DONO" "$GRUPO"; do
+    if de_sistema "$(getent group "$grupo" | cut -d: -f3)"; then
+      groupdel "$grupo" || echo "AVISO: não consegui remover o grupo $grupo; remova com: sudo groupdel $grupo" >&2
+    fi
+  done
+  echo "Os dados de cada pessoa ficam nas pastas pessoais (~/.config/server-dashboard e ~/.local/share/server-dashboard)."
+fi
 
 exit 0

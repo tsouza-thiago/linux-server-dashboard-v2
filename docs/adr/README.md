@@ -54,3 +54,4 @@ Uma ADR aceita não é editada; se a decisão mudar, uma nova ADR a substitui.
 | [0047](0047-rede-do-atualizar-para-o-node.md) | Node baixado pelo executor e rede do `atualizar` | Aceita |
 | [0048](0048-painel-usa-o-executor-do-pacote.md) | O painel usa o executor do pacote para trocar de versão | Aceita |
 | [0049](0049-pacote-deb-reprodutivel-e-primeira-instalacao.md) | Pacote `.deb` reprodutível, 1ª instalação e `SHA256SUMS` assinado | Aceita |
+| [0050](0050-importar-desinstalar-e-purge-no-pacote.md) | Importar um clone, desinstalar e `apt purge` no pacote `.deb` | Aceita |
