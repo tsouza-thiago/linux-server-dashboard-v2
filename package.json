@@ -6,7 +6,6 @@
   "main": "server/index.js",
   "scripts": {
     "start": "node --max-semi-space-size=2 --optimize-for-size server/index.js",
-    "poll": "node server/poller.js --once",
     "test": "node --test",
     "test:unit": "node --test \"test/unit/**/*.test.js\"",
     "test:integration": "node --test \"test/integration/**/*.test.js\"",

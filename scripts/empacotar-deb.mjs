@@ -46,7 +46,7 @@ function rodar(cmd, args, { buffer = false, env = AMBIENTE } = {}) {
 }
 
 /** Versão do Debian a partir da do npm: a pré-versão usa ~, que ordena antes da final. */
-export function versaoDebian(v) {
+function versaoDebian(v) {
   if (!/^\d+\.\d+\.\d+(-(alpha|beta|rc)\.\d+)?$/.test(v)) throw new Error(`versão inválida no package.json: ${v}`);
   return v.replace('-', '~');
 }

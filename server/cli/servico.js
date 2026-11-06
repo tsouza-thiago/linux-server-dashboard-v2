@@ -20,7 +20,7 @@ export const UNIT_NAME = 'server-dashboard.service';
 export const unitPath = (home = os.homedir()) => path.join(home, '.config', 'systemd', 'user', UNIT_NAME);
 
 /** Pasta do serviço instalado (WorkingDirectory da unidade, sem o escape %%); null sem unidade. */
-export function serviceRoot(home = os.homedir()) {
+function serviceRoot(home = os.homedir()) {
   try {
     const m = fs.readFileSync(unitPath(home), 'utf8').match(/^WorkingDirectory=(.+)$/m);
     return m ? m[1].replace(/%%/g, '%') : null;
