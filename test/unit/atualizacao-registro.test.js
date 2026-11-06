@@ -251,3 +251,70 @@ test('pedido que o executor nunca pegou vira interrompida depois da espera', (t)
   assert.equal(r.resultado, 'interrompida');
   assert.equal(r.fase, 'fim');
 });
+
+// Filho falso: anota o que foi pedido e termina como o teste mandar.
+test('executor: serviço → unidade própria do systemd, com o comando em lista e sem shell', async () => {
+  const { chamadas, spawnFn } = espiao((f) => f.emit('close', 0));
+  assert.deepEqual(await executarForaDoServico({ root: '/opt/painel', modo: 'systemd', spawnFn }), { ok: true });
+  assert.equal(chamadas[0].cmd, 'systemd-run');
+  assert.deepEqual(chamadas[0].args, ['--user', '--unit=server-dashboard-atualizar', '--collect', '--quiet', '--working-directory=/opt/painel', '/opt/painel/dashboard', 'atualizar', '--registro']);
+  assert.equal(chamadas[0].opts.shell, undefined);
+});
+
+test('executor: systemd-run que falha não cai para um processo solto dentro do serviço', async () => {
+  const { chamadas, spawnFn } = espiao((f) => f.emit('close', 1));
+  assert.deepEqual(await executarForaDoServico({ root: '/opt/painel', modo: 'systemd', spawnFn }), { ok: false });
+  assert.equal(chamadas.length, 1);
+  const erro = espiao((f) => f.emit('error', new Error('sem systemd-run')));
+  assert.deepEqual(await executarForaDoServico({ root: '/opt/painel', modo: 'systemd', spawnFn: erro.spawnFn }), { ok: false });
+});
+
+test('executor: segundo plano → sessão própria e sem prender o painel', async () => {
+  const { chamadas, spawnFn } = espiao((f) => f.emit('spawn'));
+  assert.deepEqual(await executarForaDoServico({ root: '/opt/painel', modo: 'segundo-plano', spawnFn }), { ok: true });
+  assert.equal(chamadas[0].cmd, '/opt/painel/dashboard');
+  assert.deepEqual(chamadas[0].args, ['atualizar', '--registro']);
+  assert.equal(chamadas[0].opts.detached, true);
+  assert.equal(chamadas[0].opts.stdio, 'ignore');
+  assert.equal(chamadas[0].opts.cwd, '/opt/painel');
+  assert.equal(chamadas[0].unref, true);
+  const erro = espiao((f) => f.emit('error', new Error('sem arquivo')));
+  assert.deepEqual(await executarForaDoServico({ root: '/opt/painel', modo: 'segundo-plano', spawnFn: erro.spawnFn }), { ok: false });
+});
+
+test('executor: reconfigurar usa outra unidade e o comando fixo, nos 2 modos (I11)', async () => {
+  const unidade = espiao((f) => f.emit('close', 0));
+  assert.deepEqual(await reconfigurarForaDoServico({ root: '/opt/painel', modo: 'systemd', spawnFn: unidade.spawnFn }), { ok: true });
+  assert.equal(unidade.chamadas[0].cmd, 'systemd-run');
+  assert.deepEqual(unidade.chamadas[0].args, ['--user', '--unit=server-dashboard-reconfigurar', '--collect', '--quiet', '--working-directory=/opt/painel', '/opt/painel/dashboard', 'reconfigurar', '--pela-tela']);
+  const solto = espiao((f) => f.emit('spawn'));
+  assert.deepEqual(await reconfigurarForaDoServico({ root: '/opt/painel', modo: 'segundo-plano', spawnFn: solto.spawnFn }), { ok: true });
+  assert.equal(solto.chamadas[0].cmd, '/opt/painel/dashboard');
+  assert.deepEqual(solto.chamadas[0].args, ['reconfigurar', '--pela-tela']);
+  assert.equal(solto.chamadas[0].opts.detached, true);
+});
+
+test('--pre pela tela: arquivo 0600, vale por um tempo e sai quando pedem', (t) => {
+  const root = pasta(t);
+  const agora = Date.parse('2026-11-01T12:00:00Z');
+  assert.equal(preLiberada(root, agora), false);
+  liberarPre(root, agora);
+  assert.equal(fs.statSync(path.join(root, '.atualizacao', 'pre.json')).mode & 0o777, 0o600);
+  assert.equal(preLiberada(root, agora + 29 * 60000), true);
+  assert.equal(preLiberada(root, agora + 30 * 60000), false, 'a tela não estica o prazo');
+  cancelarPre(root);
+  assert.equal(preLiberada(root, agora), false);
+  fs.writeFileSync(path.join(root, '.atualizacao', 'pre.json'), 'quebrado');
+  assert.equal(preLiberada(root, agora), false);
+});
+
+test('modo: serviço só com a unidade instalada e o systemd do usuário de pé', (t) => {
+  const home = pasta(t);
+  const comSystemd = () => ({ status: 0, stdout: '' });
+  assert.equal(modoDoExecutor({ home, run: comSystemd }), 'segundo-plano');
+  const unit = path.join(home, '.config', 'systemd', 'user');
+  fs.mkdirSync(unit, { recursive: true });
+  fs.writeFileSync(path.join(unit, 'server-dashboard.service'), '[Unit]\n');
+  assert.equal(modoDoExecutor({ home, run: comSystemd }), 'systemd');
+  assert.equal(modoDoExecutor({ home, run: () => ({ status: 1 }) }), 'segundo-plano');
+});

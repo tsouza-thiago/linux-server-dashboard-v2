@@ -129,6 +129,8 @@ Com `npm run painel-teste -- --versao-nova` (token `teste`), nos 2 temas:
 - O Esc não fecha o progresso. Recarregar a página no meio volta para o progresso.
 - Com `--resultado=voltou`, a tela diz que voltou para a versão anterior e não recarrega.
 - Com outro bloqueio, o botão fica desligado e o comando do terminal aparece.
+- Com `--versao-nova --sem-escrita` (serviço sem a pasta `.atualizacao/painel/`, #181), o clique em **Atualizar agora**
+  mostra o aviso "não consegui preparar a atualização…", o diálogo reabre e o botão continua ligado.
 - Com `--exige-reconfigurar`, o aviso do topo e as novidades dizem que a versão exige reconfigurar, e
   a Visão geral mostra o aviso de configuração desatualizada. Com login, ele tem o passo a passo de 3
   itens e o botão **Reconfigurar agora**. Sem login (`npm run painel-teste -- --exige-reconfigurar`,

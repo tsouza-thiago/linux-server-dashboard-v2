@@ -306,7 +306,7 @@ npm run capturar-telas          # refaz docs/img/ a partir do painel de teste (-
 npm run migrar-v1               # migra a V1 agora (o painel também migra ao iniciar); com -- --verificar só resume o data/history.json, sem gravar
 npm run soak                    # soak acelerado: 83 h de coletas simuladas e pedidos de 90 dias; confere RAM e vazamento
 npm run empacotar-deb           # .deb reprodutível da tag da versão + dist/SHA256SUMS (--ref <tag|HEAD>, --saida <pasta>)
-npm run painel-teste            # painel de teste com dados semeados (--cenario=normal|lacunas|offline|vazio, --porta=3943, --versao-nova, --exige-reconfigurar, --resultado=voltou, --reconfigurar[=volta|recusa|sem-assinatura|outra-pasta], --assistente)
+npm run painel-teste            # painel de teste com dados semeados (--cenario=normal|lacunas|offline|vazio, --porta=3943, --versao-nova, --sem-escrita, --exige-reconfigurar, --resultado=voltou, --reconfigurar[=volta|recusa|sem-assinatura|outra-pasta], --assistente)
 scripts/e2e-instalacao/rodar.sh # instalação, botão Atualizar e pacote .deb (instalar, atualizar, voltar, desinstalar, apt purge) de ponta a ponta em contêineres Debian/Ubuntu, com e sem systemd (E2E_CENARIOS=pacote: só o .deb)
 ```
 

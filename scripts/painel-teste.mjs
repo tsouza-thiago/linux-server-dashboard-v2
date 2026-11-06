@@ -9,6 +9,7 @@
 //   npm run painel-teste -- --versao-nova             # com aviso de versão nova (falsa) e troca simulada
 //   npm run painel-teste -- --versao-nova --resultado=voltou  # a troca simulada volta atrás
 //   npm run painel-teste -- --versao-nova --exige-reconfigurar  # versão que muda a coleta, com o aviso
+//   npm run painel-teste -- --versao-nova --sem-escrita  # serviço sem escrita em .atualizacao/painel/: o botão mostra o 503 (#181)
 //   npm run painel-teste -- --reconfigurar            # Reconfigurar com login: o painel dá lugar ao assistente falso
 //   npm run painel-teste -- --reconfigurar=volta      # o mesmo, mas o painel novo "não sobe" no fim
 //   npm run painel-teste -- --reconfigurar=recusa     # o comando recusa depois do 202, e o painel fica
@@ -42,7 +43,7 @@ import { OutageLog } from '../server/storage/outages.js';
 import { createWizardApp } from '../server/setup/web.js';
 import { LOG_PELA_TELA, retirarCodigoPelaTela } from '../server/setup/pela-tela.js';
 import { VERSION } from '../server/version.js';
-import { abrirRegistro, lerEstado, pegarTrava, soltarTrava } from '../server/atualizacao/registro.js';
+import { abrirRegistro, garantirPasta, lerEstado, pegarTrava, soltarTrava } from '../server/atualizacao/registro.js';
 import { makeInstalacao, detectionWithSudo } from '../test-support/instalacao-fake.js';
 
 const ROOT = path.join(path.dirname(fileURLToPath(import.meta.url)), '..');
@@ -310,6 +311,8 @@ async function main() {
     return;
   }
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'dash-painel-teste-'));
+  // A instalação cria .atualizacao/painel/; `--sem-escrita` simula o serviço sem essa pasta (#181).
+  if (!process.argv.includes('--sem-escrita')) garantirPasta(dir);
   const reconfigurar = process.argv.includes('--exige-reconfigurar');
   // Outro hash na resposta do "servidor": é o que a coleta vê depois de uma versão que muda o script.
   const { coletar } = await semear(dir, cenario, reconfigurar ? { coletor: coletorFalso((now) => saidaFalsa(now).replace(/(===VER===\n\d+ )\w+/, '$1000000000000')) } : {});
