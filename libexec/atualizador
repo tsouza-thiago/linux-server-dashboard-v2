@@ -9,6 +9,8 @@
 #   atualizador verificar   busca as tags, acha a assinada mais nova e grava em estado/
 #   atualizador atualizar   instala só a versão que o verificar gravou (sem parâmetro)
 #   atualizador voltar      troca atual por anterior, só até 24 h depois da troca
+#   atualizador semear      1ª instalação: extrai a semente do pacote e baixa o Node dela
+#                           (só o postinst do .deb chama, como _server-dashboard; ADR 0049)
 #
 # Layout (ADR 0042, itens 1 e 2), tudo a partir da pasta deste arquivo:
 #   <base>/libexec/atualizador   este arquivo
@@ -21,6 +23,7 @@
 #   <base>/node/node-vN-linux-A/ o Node baixado da versão (soma SHA-256 fixada na tag)
 #   <base>/node/bin              link para node-vN-linux-A/bin (o lançador usa node/bin/node)
 #   <base>/share/allowed_signers chaves de partida, se a versão atual não trouxer as dela
+#   <base>/share/semente.tar     a versão do pacote (git archive da tag), para a 1ª instalação
 # ============================================================
 set -eu
 
@@ -226,9 +229,9 @@ preparar_node() {
 
   # A marca .soma só é gravada depois da conferência: com ela igual, o Node já está certo.
   if [ -x "$NODE/$nome/bin/node" ] && [ "$(cat "$NODE/$nome/.soma" 2> /dev/null || true)" = "$soma" ]; then
-    registrar "atualizar: Node $versao_node já presente, sem baixar"
+    registrar "$OPERACAO: Node $versao_node já presente, sem baixar"
   else
-    registrar "atualizar: baixando o Node $versao_node ($arq)"
+    registrar "$OPERACAO: baixando o Node $versao_node ($arq)"
     rm -rf "$NODE"/.baixando.*
     TMP_NODE=$(mktemp -d "$NODE/.baixando.XXXXXX") || falhar "não deu para criar a pasta temporária em node/"
     baixar "$dist/v$versao_node/$nome.tar.gz" "$TMP_NODE/node.tar.gz" ||
@@ -370,6 +373,41 @@ voltar() {
   registrar "voltar: $atual -> $de"
 }
 
+# 1ª instalação (ADR 0049): o pacote traz a versão dele em share/semente.tar, o mesmo git archive
+# que o atualizar extrai de uma tag. Ela só entra quando ainda não há versão atual: depois, quem troca
+# a versão é o atualizar, com a assinatura conferida. Sem o Node da versão atual, ele é baixado como
+# no atualizar (soma SHA-256 da versão). Rodar de novo (reinstalar o pacote) só completa o que faltou.
+semear() {
+  semente="$BASE/share/semente.tar"
+  if [ -L "$VERSOES/atual" ]; then
+    atual=$(versao_atual)
+    registrar "semear: a versão $atual já está instalada; a semente fica de fora"
+  else
+    [ -f "$semente" ] || falhar "pacote incompleto: falta a share/semente.tar"
+    # A versão vem do package.json da semente, no formato fixo do npm, e passa pelo padrão das tags.
+    v=$(tar -xOf "$semente" package.json 2> /dev/null | sed -n 's/^  "version": "\([^"]*\)",\{0,1\}$/v\1/p' | head -n 1)
+    printf '%s\n' "$v" | grep -Eq "$PADRAO_TAG" || falhar "a semente não traz uma versão válida: $v"
+    tmp="$VERSOES/$v.tmp"
+    rm -rf "$tmp"
+    mkdir "$tmp"
+    TMP_VERSAO=$tmp
+    tar -x -f "$semente" -C "$tmp" --no-same-owner 2>> "$ESTADO/registro.log" ||
+      falhar "a extração da semente $v falhou"
+    [ -f "$tmp/server/cli/index.js" ] || falhar "a semente $v veio incompleta"
+    rm -rf "${VERSOES:?}/$v"
+    mv "$tmp" "$VERSOES/$v"
+    TMP_VERSAO=
+    trocar_link atual "$v"
+    atual=$v
+    registrar "semear: versão $v instalada a partir do pacote"
+  fi
+  if [ -x "$NODE/bin/node" ]; then
+    registrar "semear: o Node já está em node/bin"
+  else
+    preparar_node "$VERSOES/$atual" "$atual"
+  fi
+}
+
 # ------------------------------------------------------------ entrada
 
 if [ "$(id -u)" = 0 ]; then
@@ -377,17 +415,18 @@ if [ "$(id -u)" = 0 ]; then
   exit 1
 fi
 if [ "$#" -ne 1 ]; then
-  echo "uso: atualizador verificar|atualizar|voltar" >&2
+  echo "uso: atualizador verificar|atualizar|voltar|semear" >&2
   exit 2
 fi
 [ -d "$ESTADO" ] && [ -d "$VERSOES" ] || { echo "ERRO: pacote incompleto em $BASE" >&2; exit 1; }
 case "$1" in
-  verificar | atualizar | voltar)
+  verificar | atualizar | voltar | semear)
+    OPERACAO=$1
     travar
     "$1"
     ;;
   *)
-    echo "uso: atualizador verificar|atualizar|voltar" >&2
+    echo "uso: atualizador verificar|atualizar|voltar|semear" >&2
     exit 2
     ;;
 esac

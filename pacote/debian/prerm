@@ -1,0 +1,22 @@
+#!/bin/sh
+# ============================================================
+# Server Dashboard — prerm do pacote .deb (F9 do #92, ADR 0049)
+#
+# Ao remover o pacote, desliga o timer da procura diária, para ele não ficar apontando para
+# uma unidade que vai sumir. Na troca por uma versão nova do pacote, nada muda. A limpeza de
+# /opt/server-dashboard, do usuário e do grupo é do apt purge (etapa 10 da F9).
+# ============================================================
+set -e
+
+TIMER=server-dashboard-verificar.timer
+
+case "$1" in
+  remove | deconfigure)
+    if [ -d /run/systemd/system ]; then
+      systemctl stop "$TIMER" > /dev/null 2>&1 || true
+    fi
+    systemctl disable "$TIMER" > /dev/null 2>&1 || true
+    ;;
+esac
+
+exit 0

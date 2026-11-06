@@ -35,6 +35,9 @@ id_ed25519*
 # Log e estado da atualização pelo painel (cita caminhos da máquina; ADR 0031)
 .atualizacao/
 
+# Pacote .deb e SHA256SUMS do npm run empacotar-deb (vão para o Release, nunca para o git)
+dist/
+
 # Relatórios brutos do npm run seguranca (podem citar trechos do código e do histórico)
 .seguranca/
 

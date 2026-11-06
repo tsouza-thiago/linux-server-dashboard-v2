@@ -44,6 +44,12 @@ diante: `PATCH` corrige, `MINOR` acrescenta sem quebrar e `MAJOR` quebra.
   dados, pedem a troca ao executor, ligam a versão nova e, se ela não responder, voltam para a anterior
   com os dados da cópia. O registro do executor aparece junto na tela de progresso. O Reconfigurar
   pela tela também passa a funcionar no pacote. O `--pre` fica de fora no pacote.
+- Pacote `.deb` (#92, F9, etapa 9 de 12, ADR 0049): `npm run empacotar-deb` gera o
+  `server-dashboard_<versão>_all.deb` e o `SHA256SUMS` de uma tag. A mesma tag dá os mesmos bytes em
+  qualquer máquina, e o CI confere isso a cada PR e o `.deb` de cada Release contra o `SHA256SUMS`
+  assinado. Na 1ª instalação, o pacote cria o usuário de sistema, instala a versão que traz dentro,
+  baixa o Node com a soma conferida, liga a procura diária de versão nova e põe no grupo
+  `server-dashboard` a conta que instalou (vale depois de sair e entrar de novo na sessão).
 
 ### Corrigido
 

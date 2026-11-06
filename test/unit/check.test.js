@@ -51,12 +51,13 @@ test('check: o log da falha fica numa pasta que o git ignora', () => {
 // segredos passam, e a suíte tem 1 teste que escreve muito e falha.
 function projetoComSuiteGrande() {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'check-pipe-'));
-  for (const pasta of ['bin', 'libexec', 'server', 'public/js', 'scripts/e2e-instalacao', 'test']) {
+  for (const pasta of ['bin', 'libexec', 'server', 'public/js', 'scripts/e2e-instalacao', 'pacote/debian', 'test']) {
     fs.mkdirSync(path.join(dir, pasta), { recursive: true });
   }
   fs.copyFileSync(path.join(ROOT, 'scripts', 'check.mjs'), path.join(dir, 'scripts', 'check.mjs'));
-  // O passo do bash -n confere estes 7 scripts: vazios, passam.
-  for (const sh of ['dashboard', 'bin/dashboard', 'libexec/atualizador', 'scripts/node-runtime.sh', 'scripts/askpass.sh', 'scripts/completar.bash', 'scripts/e2e-instalacao/rodar.sh']) {
+  // O passo do bash -n confere estes 10 scripts: vazios, passam.
+  for (const sh of ['dashboard', 'bin/dashboard', 'libexec/atualizador', 'scripts/node-runtime.sh', 'scripts/askpass.sh', 'scripts/completar.bash', 'scripts/e2e-instalacao/rodar.sh',
+    'pacote/debian/postinst', 'pacote/debian/prerm', 'pacote/debian/postrm']) {
     fs.writeFileSync(path.join(dir, sh), '');
   }
   // 300 KB no stdout do teste: bem mais que os 64 KiB que o pipe guarda.

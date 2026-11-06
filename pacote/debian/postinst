@@ -1,0 +1,85 @@
+#!/bin/sh
+# ============================================================
+# Server Dashboard — postinst do pacote .deb (F9 do #92, ADR 0042 e 0049)
+#
+# Roda como root, pelo dpkg, depois de os arquivos do pacote entrarem no disco. Faz só o que
+# o código em /opt precisa para rodar; nada daqui lê dados da pessoa nem do servidor:
+#   1. cria o grupo server-dashboard e o usuário _server-dashboard (systemd-sysusers, ADR 0046);
+#   2. cria as pastas do executor, do _server-dashboard (ADR 0045 e 0047);
+#   3. 1ª instalação: o executor, como _server-dashboard, extrai a semente e baixa o Node;
+#   4. liga o timer da procura diária de versão nova;
+#   5. põe no grupo a pessoa que instalou (1 pessoa por máquina) e avisa do novo login.
+# Uma falha nos passos 3 e 5 só avisa: o pacote fica configurado e o aviso diz o que fazer.
+# ============================================================
+set -e
+
+BASE=/opt/server-dashboard
+DONO=_server-dashboard
+GRUPO=server-dashboard
+TIMER=server-dashboard-verificar.timer
+
+case "$1" in
+  configure) ;;
+  *) exit 0 ;;
+esac
+
+# 1. Usuário e grupo pelo arquivo do sysusers.d do pacote (só cria o que falta).
+systemd-sysusers server-dashboard.conf
+
+# 2. Pastas do executor. A base é do root (só leitura para o executor); estas 4 são dele,
+# legíveis por todos (o painel da pessoa lê versoes, estado e node).
+for pasta in repo.git versoes estado node; do
+  install -d -o "$DONO" -g "$DONO" -m 0755 "$BASE/$pasta"
+done
+
+# 3. Versão e Node da 1ª instalação. O executor recusa o root: roda como o dono das pastas,
+# a partir de / (a pasta atual do root pode ser fechada para ele).
+if ! (cd / && runuser -u "$DONO" -- "$BASE/libexec/atualizador" semear); then
+  echo "AVISO: a instalação da versão ou do Node não terminou (veja $BASE/estado/registro.log)." >&2
+  echo "Confira a internet e rode: sudo apt install --reinstall server-dashboard" >&2
+fi
+
+# 4. Timer: ligado só na 1ª instalação (quem o desligou depois continua com ele desligado).
+if [ -z "${2:-}" ]; then
+  systemctl enable "$TIMER" > /dev/null 2>&1 || true
+fi
+if [ -d /run/systemd/system ]; then
+  systemctl daemon-reload || true
+  if systemctl is-enabled --quiet "$TIMER" 2> /dev/null; then
+    systemctl start "$TIMER" || true
+  fi
+fi
+
+# 5. A pessoa que instalou: sudo (SUDO_USER) ou a loja de programas (PKEXEC_UID). Só conta uma
+# conta de pessoa (UID 1000 ou mais, fora o nobody) com nome no formato do Debian.
+pessoa=
+if [ -n "${SUDO_USER:-}" ]; then
+  pessoa=$SUDO_USER
+elif [ -n "${PKEXEC_UID:-}" ]; then
+  pessoa=$(getent passwd "$PKEXEC_UID" | cut -d: -f1)
+fi
+if [ -n "$pessoa" ]; then
+  uid=$(id -u "$pessoa" 2> /dev/null || echo 0)
+  if ! printf '%s\n' "$pessoa" | grep -Eq '^[a-z_][a-z0-9_-]*$' || [ "$uid" -lt 1000 ] || [ "$uid" -eq 65534 ]; then
+    pessoa=
+  fi
+fi
+membros=$(getent group "$GRUPO" | cut -d: -f4)
+if [ -z "$pessoa" ]; then
+  if [ -z "$membros" ]; then
+    echo "Para atualizar o painel pela tela, ponha a sua conta no grupo $GRUPO:"
+    echo "  sudo usermod -a -G $GRUPO <sua-conta>"
+    echo "Depois, saia da sessão e entre de novo."
+  fi
+elif printf ',%s,' "$membros" | grep -q ",$pessoa,"; then
+  : # já está no grupo (reinstalação ou versão nova do pacote)
+elif [ -z "$membros" ]; then
+  usermod -a -G "$GRUPO" "$pessoa"
+  echo "A conta $pessoa entrou no grupo $GRUPO: ela pode atualizar o painel pela tela."
+  echo "Isso só vale depois de sair da sessão e entrar de novo."
+else
+  echo "AVISO: o grupo $GRUPO já tem a conta $membros. Esta versão atende 1 pessoa por máquina;" >&2
+  echo "a conta $pessoa não foi posta no grupo." >&2
+fi
+
+exit 0

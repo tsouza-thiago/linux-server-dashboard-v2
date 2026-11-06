@@ -1,6 +1,7 @@
 # Verificação contínua (ADR 0014): a cada push no main e a cada PR, roda tudo o que é
 # obrigatório antes de um commit, mais o que precisa de navegador e de Docker:
-#   npm run check      sintaxe, .env/data/ fora do git, testes (com test/seguranca/), npm audit
+#   npm run check      sintaxe, .env/data/ fora do git, testes (com test/seguranca/), npm audit,
+#                      e o pacote .deb gerado 2 vezes com os mesmos bytes (ADR 0049)
 #   npm run test:e2e   as 8 telas e o assistente no Chromium (sem navegador, FALHA: E2E_OBRIGATORIO)
 #   npm run seguranca  Semgrep, Gitleaks (todo o histórico), ShellCheck, OSV-Scanner, OWASP ZAP
 #                      e a mutação dos guardas de segurança
@@ -54,6 +55,15 @@ jobs:
       - name: npm run check
         run: npm run check
         timeout-minutes: 3
+
+      # O .deb sai igual de novo (ADR 0049): 2 gerações com umask e fuso diferentes dão os mesmos
+      # bytes. A conferência contra o .deb publicado fica no pacote.yml, a cada Release.
+      - name: Pacote .deb reprodutível
+        timeout-minutes: 3
+        run: |
+          npm run empacotar-deb -- --ref HEAD --saida "$RUNNER_TEMP/a"
+          (umask 077; TZ=America/Sao_Paulo npm run empacotar-deb -- --ref HEAD --saida "$RUNNER_TEMP/b")
+          cmp "$RUNNER_TEMP/a/SHA256SUMS" "$RUNNER_TEMP/b/SHA256SUMS"
 
   e2e:
     name: npm run test:e2e

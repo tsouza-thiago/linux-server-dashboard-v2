@@ -1,0 +1,18 @@
+#!/bin/sh
+# ============================================================
+# Server Dashboard — postrm do pacote .deb (F9 do #92, ADR 0049)
+#
+# Depois de o dpkg tirar as unidades do disco, o systemd relê a lista. O apt purge (limpar
+# /opt/server-dashboard, o usuário e o grupo) é da etapa 10 da F9.
+# ============================================================
+set -e
+
+case "$1" in
+  remove | purge)
+    if [ -d /run/systemd/system ]; then
+      systemctl daemon-reload > /dev/null 2>&1 || true
+    fi
+    ;;
+esac
+
+exit 0

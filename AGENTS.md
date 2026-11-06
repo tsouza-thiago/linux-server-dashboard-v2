@@ -213,7 +213,8 @@ O teste `test/unit/docs.test.js` confere esta documentação contra o código.
      navegador, falha em vez de pular) e `npm run seguranca`, em 4 jobs ao mesmo tempo (a
      mutação num job só dela). O job `verificacao` (o check obrigatório) só passa com os 4
      verdes, e toda etapa tem
-     `timeout-minutes`. Decisões e tempos: `docs/seguranca/2026-11-04-auditoria-ci.md`.
+     `timeout-minutes`. O job `check` também gera o pacote `.deb` 2 vezes e compara (ADR 0049); o
+     `.github/workflows/pacote.yml` confere o `.deb` de cada Release contra o `SHA256SUMS` assinado. Decisões e tempos: `docs/seguranca/2026-11-04-auditoria-ci.md`.
      Actions presas por SHA, permissão só de leitura, sem segredos.
   4. Ferramentas gratuitas do GitHub (ADR 0016): Dependency Review em todo PR
      (`.github/workflows/dependencias.yml`: reprova vulnerabilidade moderada ou pior e
@@ -346,7 +347,7 @@ navegador. O backend só coleta, persiste e serve. O limite de 1 SSH por minuto 
 ./dashboard desinstalar         # remove daqui e oferece limpar a parte deste computador no servidor
 ./dashboard versao              # versão instalada
 bin/dashboard <comando>         # lançador do pacote .deb (/usr/bin/dashboard): os mesmos comandos no modo sistema; desinstalar e --importar-v1 ainda recusam
-libexec/atualizador verificar|atualizar|voltar  # executor do pacote (usuário _server-dashboard, nunca root): versão nova, troca e volta atrás
+libexec/atualizador verificar|atualizar|voltar|semear  # executor do pacote (usuário _server-dashboard, nunca root): versão nova, troca, volta atrás e 1ª instalação
 npm start                       # o painel em primeiro plano (node --max-semi-space-size=2 --optimize-for-size server/index.js)
 npm run poll                    # 1 coleta, sem o servidor web (node server/poller.js --once)
 npm test                        # suíte de testes (node --test)
@@ -361,6 +362,7 @@ npm run capturar-telas          # refaz docs/img/ a partir do painel de teste (-
 npm run migrar-v1 -- --verificar  # resume o data/history.json da V1 sem gravar nada
 npm run migrar-v1               # migra a V1 agora (o painel também migra sozinho ao iniciar)
 npm run soak                    # soak acelerado: 83 h de coletas simuladas e pedidos de 90 dias; confere RAM e vazamento
+npm run empacotar-deb           # .deb reprodutível da tag da versão + dist/SHA256SUMS (--ref <tag|HEAD>, --saida <pasta>)
 npm run painel-teste            # painel de teste com dados semeados (--cenario=normal|lacunas|offline|vazio, --porta=3943, --versao-nova, --exige-reconfigurar, --reconfigurar[=volta|recusa|bloqueio])
 scripts/e2e-instalacao/rodar.sh # instalação e botão Atualizar de ponta a ponta em contêineres Debian/Ubuntu, com e sem systemd
 ```
@@ -462,6 +464,20 @@ do polkit (senha do administrador). O `pacote/sysusers/server-dashboard.conf` (n
 `/usr/lib/sysusers.d/`) cria esse grupo, vazio, e o usuário `_server-dashboard`, sem login e fora do
 grupo. `test/unit/polkit-e-grupo.test.js` avalia a regra num `vm` contra cada combinação e aplica o
 `sysusers.d` numa raiz falsa.
+
+O pacote (ADR 0049) sai do `npm run empacotar-deb` (`scripts/empacotar-deb.mjs`): tudo vem da ref no
+git (padrão: a tag `v<versão do package.json>`), com a data do commit como `SOURCE_DATE_EPOCH`, dono
+root, permissões fixas e `dpkg-deb -Zxz --threads-max=1`. A mesma ref dá os mesmos bytes em qualquer
+máquina. Ele leva o lançador, o executor, as chaves de partida, a `share/semente.tar` (o `git archive`
+da tag), as unidades, a regra do polkit, o `sysusers.d`, o autocomplete e os links `<base>/atual` e
+`/usr/bin/dashboard`. O `postinst` (`pacote/debian/`) roda o `systemd-sysusers`, cria `repo.git`,
+`versoes`, `estado` e `node` do `_server-dashboard` (0755), roda `runuser -u _server-dashboard --
+atualizador semear` (extrai a semente só se não houver versão `atual` e baixa o Node só se faltar;
+falha só avisa), liga o timer só na 1ª instalação e põe no grupo `server-dashboard` a conta que
+instalou (`SUDO_USER` ou `PKEXEC_UID`, UID 1000 ou mais), só com o grupo vazio, com o aviso de entrar
+de novo na sessão. O `prerm` desliga o timer na remoção. O mantenedor assina o `dist/SHA256SUMS` com
+`ssh-keygen -Y sign -n server-dashboard` (a chave nova tem `namespaces="git,server-dashboard"` no
+`docs/allowed_signers`).
 
 ## Comando SSH de coleta
 
@@ -738,10 +754,12 @@ linux-server-dashboard-v2/
 ├── pacote/systemd/         unidades do executor e o timer diário (ADR 0045), isoladas
 ├── pacote/polkit/          regra do polkit: o grupo só inicia atualizar e voltar (ADR 0046)
 ├── pacote/sysusers/        grupo server-dashboard e usuário _server-dashboard (ADR 0046)
+├── pacote/debian/          control (modelo), postinst, prerm e postrm do .deb (ADR 0049)
 ├── package.json            sem dependências de runtime; devDependency: playwright-core (e2e)
 ├── .env.example            modelo do .env (sem valores reais)
-├── .github/                workflows/: seguranca.yml (CI, ADR 0014), dependencias.yml e
-│                           scorecard.yml; dependabot.yml (ADR 0016);
+├── .github/                workflows/: seguranca.yml (CI, ADR 0014), dependencias.yml,
+│                           scorecard.yml e pacote.yml (.deb do Release, ADR 0049);
+│                           dependabot.yml (ADR 0016);
 │                           ISSUE_TEMPLATE/ (bug, funcionalidade, tarefa), template de PR e
 │                           CODEOWNERS (ADR 0016)
 ├── docs/                   adr/, seguranca/ (análises e excecoes.json), allowed_signers,
@@ -752,7 +770,7 @@ linux-server-dashboard-v2/
 │                           capturar-amostra.mjs, painel-teste.mjs, capturar-telas.mjs,
 │                           desenhar-graficos.mjs, node-runtime.sh, askpass.sh,
 │                           completar.bash (autocomplete do bash),
-│                           e2e-instalacao/
+│                           empacotar-deb.mjs (o .deb, ADR 0049), e2e-instalacao/
 ├── server/
 │   ├── index.js            rotas, loop de coleta, export
 │   ├── config.js           parser único do .env, faixas, sanitizeToken/sanitizeHost

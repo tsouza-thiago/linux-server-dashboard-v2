@@ -1,0 +1,16 @@
+Package: server-dashboard
+Version: @VERSAO@
+Architecture: all
+Maintainer: Thiago Souza <tsouza-thiago@users.noreply.github.com>
+Installed-Size: @TAMANHO@
+Depends: systemd, polkitd | policykit-1, git, openssh-client, curl | wget, ca-certificates
+Recommends: bash-completion
+Section: admin
+Priority: optional
+Homepage: https://github.com/tsouza-thiago/linux-server-dashboard-v2
+Description: painel de monitoramento de um servidor Linux da rede local
+ Mostra no navegador a saúde de um servidor Linux da rede local. A coleta usa
+ 1 comando SSH por minuto, somente leitura, e toda a carga fica nesta máquina.
+ .
+ O código fica em /opt/server-dashboard. Só o usuário de sistema
+ _server-dashboard troca a versão, e só para uma tag assinada pelo mantenedor.

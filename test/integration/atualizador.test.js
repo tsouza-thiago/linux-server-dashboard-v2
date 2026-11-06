@@ -27,7 +27,7 @@ function montar(t) {
   aoFim(t, () => fs.rmSync(dir, { recursive: true, force: true }));
   const base = path.join(dir, 'base');
   const origem = path.join(dir, 'origem');
-  for (const d of ['libexec', 'versoes', 'estado', 'node']) fs.mkdirSync(path.join(base, d), { recursive: true });
+  for (const d of ['libexec', 'share', 'versoes', 'estado', 'node']) fs.mkdirSync(path.join(base, d), { recursive: true });
   fs.copyFileSync(EXECUTOR, path.join(base, 'libexec', 'atualizador'));
   fs.chmodSync(path.join(base, 'libexec', 'atualizador'), 0o755);
 
@@ -86,6 +86,8 @@ function montar(t) {
     const cli = path.join(origem, 'server', 'cli', 'index.js');
     if (semCodigo) fs.rmSync(cli, { force: true });
     else fs.writeFileSync(cli, `// versão ${v}\n`);
+    // O package.json no formato do npm: o semear lê a versão dele (ADR 0049).
+    fs.writeFileSync(path.join(origem, 'package.json'), `${JSON.stringify({ name: 'linux-server-dashboard', version: v }, null, 2)}\n`);
     fs.writeFileSync(path.join(origem, 'CHANGELOG.md'), `# Changelog\n\n## [${v}] — 2026-11-05\n\n- Novidade da ${v}.\n`);
     git(origem, 'add', '-A');
     git(origem, 'commit', '-q', '-m', v);
@@ -102,6 +104,12 @@ function montar(t) {
   fs.mkdirSync(path.join(base, 'versoes', 'v2.90.0'));
   const arq = spawnSync('sh', ['-c', `git -C "${origem}" archive v2.90.0 | tar -x -C "${path.join(base, 'versoes', 'v2.90.0')}"`]);
   assert.equal(arq.status, 0);
+  // A semente do pacote (ADR 0049): o mesmo git archive da tag.
+  const semear = (tag) => {
+    const r = spawnSync('sh', ['-c', `git -C "${origem}" archive ${tag} > "${path.join(base, 'share', 'semente.tar')}"`]);
+    assert.equal(r.status, 0);
+  };
+  semear('v2.90.0');
   // O link que o executor troca fica em versoes/; o da base é fixo, do pacote (ADR 0045).
   fs.symlinkSync('v2.90.0', path.join(base, 'versoes', 'atual'));
   fs.symlinkSync('versoes/atual', path.join(base, 'atual'));
@@ -134,7 +142,7 @@ function montar(t) {
     bin: (() => { try { return fs.readlinkSync(path.join(base, 'node', 'bin')); } catch { return null; } })(),
     pastas: fs.readdirSync(path.join(base, 'node')).filter((n) => n !== 'bin').sort(),
   });
-  return { dir, base, origem, git, publicar, rodar, estado, link, versoes, node, pacoteNode };
+  return { dir, base, origem, git, publicar, rodar, estado, link, versoes, node, pacoteNode, semear };
 }
 
 test('atualizador: verificar acha a assinada mais nova e grava em estado/', (t) => {
@@ -398,4 +406,62 @@ test('atualizar não baixa de novo o Node já presente e guarda só o atual e o 
   p.rodar('verificar');
   assert.match(p.rodar('atualizar').texto, /não deu para baixar o Node 24\.99\.2/);
   assert.equal(p.link('atual'), 'v2.94.0');
+});
+
+// 1ª instalação do pacote (ADR 0049): sem versão atual, como logo depois do dpkg.
+function semVersao(p) {
+  fs.rmSync(path.join(p.base, 'versoes', 'atual'));
+  fs.rmSync(path.join(p.base, 'versoes', 'v2.90.0'), { recursive: true });
+}
+
+test('semear instala a semente na 1ª instalação, baixa o Node e, de novo, só completa', (t) => {
+  const p = montar(t);
+  semVersao(p);
+  const r = p.rodar('semear');
+  assert.equal(r.codigo, 0, r.texto);
+  assert.equal(p.link('atual'), 'v2.90.0');
+  assert.deepEqual(p.versoes(), ['v2.90.0']);
+  assert.ok(fs.existsSync(path.join(p.base, 'atual', 'server', 'cli', 'index.js')));
+  assert.equal(p.node().bin, `node-v24.99.0-linux-${ARQ}/bin`);
+  assert.match(r.texto, /semear: baixando o Node 24\.99\.0/);
+  // De novo (reinstalar o pacote): nada muda e nada é baixado.
+  fs.rmSync(p.pacoteNode('24.99.0'));
+  const r2 = p.rodar('semear');
+  assert.equal(r2.codigo, 0, r2.texto);
+  assert.match(r2.texto, /a versão v2\.90\.0 já está instalada/);
+  assert.match(r2.texto, /o Node já está em node\/bin/);
+});
+
+test('semear nunca troca a versão já instalada, mesmo com a semente mais nova', (t) => {
+  const p = montar(t);
+  p.publicar('2.91.0');
+  p.semear('v2.91.0');
+  const r = p.rodar('semear');
+  assert.equal(r.codigo, 0, r.texto);
+  assert.equal(p.link('atual'), 'v2.90.0');
+  assert.deepEqual(p.versoes(), ['v2.90.0']);
+});
+
+test('semear recusa semente sem versão no formato das tags e sem o código', (t) => {
+  const p = montar(t);
+  semVersao(p);
+  // Versão fora do padrão das tags (falta o PATCH).
+  const pasta = path.join(p.dir, 'semente-ruim');
+  fs.mkdirSync(path.join(pasta, 'server', 'cli'), { recursive: true });
+  fs.writeFileSync(path.join(pasta, 'server', 'cli', 'index.js'), '// ruim\n');
+  fs.writeFileSync(path.join(pasta, 'package.json'), '{\n  "version": "2.90"\n}\n');
+  const semente = path.join(p.base, 'share', 'semente.tar');
+  // Os nomes sem ./ na frente, como no git archive.
+  assert.equal(spawnSync('tar', ['-cf', semente, '-C', pasta, 'package.json', 'server']).status, 0);
+  const r = p.rodar('semear');
+  assert.notEqual(r.codigo, 0);
+  assert.match(r.texto, /a semente não traz uma versão válida/);
+  // Versão boa, mas sem o código do painel.
+  fs.writeFileSync(path.join(pasta, 'package.json'), '{\n  "version": "2.90.1"\n}\n');
+  fs.rmSync(path.join(pasta, 'server'), { recursive: true });
+  assert.equal(spawnSync('tar', ['-cf', semente, '-C', pasta, 'package.json']).status, 0);
+  assert.match(p.rodar('semear').texto, /a semente v2\.90\.1 veio incompleta/);
+  // Nada ficou instalado nem pela metade.
+  assert.equal(p.link('atual'), null);
+  assert.deepEqual(fs.readdirSync(path.join(p.base, 'versoes')), []);
 });
