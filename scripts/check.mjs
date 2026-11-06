@@ -11,7 +11,7 @@ import { fileURLToPath } from 'node:url';
 
 const ROOT = path.join(path.dirname(fileURLToPath(import.meta.url)), '..');
 // Raiz do projeto e os scripts shell conferidos com `bash -n`.
-const SHELL_SCRIPTS = ['dashboard', 'bin/dashboard', 'libexec/atualizador', 'scripts/node-runtime.sh', 'scripts/askpass.sh', 'scripts/completar.bash', 'scripts/e2e-instalacao/rodar.sh', 'pacote/debian/postinst', 'pacote/debian/prerm', 'pacote/debian/postrm'];
+const SHELL_SCRIPTS = ['dashboard', 'bin/dashboard', 'libexec/atualizador', 'scripts/node-runtime.sh', 'scripts/askpass.sh', 'scripts/completar.bash', 'scripts/e2e-instalacao/rodar.sh', 'scripts/e2e-instalacao/pacote.sh', 'pacote/debian/postinst', 'pacote/debian/prerm', 'pacote/debian/postrm'];
 // Saída completa da última suíte vermelha. Uma falha rara (teste instável) só pode ser
 // investigada se a saída inteira sobreviver ao terminal e ao relatório resumido.
 export const LOG_FALHA = path.join('.check', 'ultima-falha.log');

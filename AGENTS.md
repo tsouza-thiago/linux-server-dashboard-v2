@@ -365,7 +365,7 @@ npm run migrar-v1               # migra a V1 agora (o painel também migra sozin
 npm run soak                    # soak acelerado: 83 h de coletas simuladas e pedidos de 90 dias; confere RAM e vazamento
 npm run empacotar-deb           # .deb reprodutível da tag da versão + dist/SHA256SUMS (--ref <tag|HEAD>, --saida <pasta>)
 npm run painel-teste            # painel de teste com dados semeados (--cenario=normal|lacunas|offline|vazio, --porta=3943, --versao-nova, --exige-reconfigurar, --reconfigurar[=volta|recusa|bloqueio])
-scripts/e2e-instalacao/rodar.sh # instalação e botão Atualizar de ponta a ponta em contêineres Debian/Ubuntu, com e sem systemd
+scripts/e2e-instalacao/rodar.sh # instalação, botão Atualizar e pacote .deb (instalar, atualizar, voltar, desinstalar, apt purge) de ponta a ponta em contêineres Debian/Ubuntu, com e sem systemd (E2E_CENARIOS=pacote: só o .deb)
 ```
 
 Opções do modo sem perguntas: `./dashboard instalar --sem-interface --ajuda`. Servidor que só

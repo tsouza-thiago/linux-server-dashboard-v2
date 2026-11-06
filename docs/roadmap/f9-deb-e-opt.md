@@ -139,8 +139,8 @@ O código em `/opt` pertence ao root. A pergunta é: quem grava a versão nova l
 8. **Feita (ADR 0048).** F7 no modo sistema: o painel usa o executor no lugar do `git checkout`.
 9. **Feita (ADR 0049).** `npm run empacotar-deb` reprodutível, `SHA256SUMS` assinado e conferência no CI.
 10. **Feita (ADR 0050).** `--importar-pasta`, `desinstalar` e `apt purge`.
-11. `scripts/e2e-instalacao/`: instalar o `.deb`, atualizar, voltar, desinstalar, em
-    Debian e Ubuntu.
+11. **Feita.** `scripts/e2e-instalacao/` (cenário E do `rodar.sh`): instalar o `.deb`, atualizar,
+    voltar, desinstalar e `apt purge`, em Debian e Ubuntu.
 12. README, TUTORIAL, AGENTS, SECURITY e o passo novo de "Publicar uma versão".
 
 ## Riscos

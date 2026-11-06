@@ -57,6 +57,12 @@ diante: `PATCH` corrige, `MINOR` acrescenta sem quebrar e `MAJOR` quebra.
   da pessoa, e o `--importar-v1` também funciona. O `apt purge` tira de `/opt/server-dashboard` as
   versões, o Node e o estado do executor, e também o usuário e os grupos de sistema, sem tocar nas
   pastas pessoais. Ao remover o pacote, as unidades do executor que estiverem rodando param.
+- Pacote `.deb` de ponta a ponta (#92, F9, etapa 11 de 12): o `scripts/e2e-instalacao/rodar.sh` ganha
+  o cenário E, em contêineres Debian 12 com systemd e Ubuntu 24.04 sem systemd. Ele instala o `.deb`
+  gerado pelo `npm run empacotar-deb`, instala o painel da pessoa, troca a versão pelo botão (polkit e
+  unidade) e pelo executor, volta atrás sozinho de uma versão que não liga, roda o
+  `dashboard desinstalar` e o `apt purge`. As versões de teste são assinadas por uma chave de teste e
+  chegam ao executor por um `git bundle`, sem rede. `E2E_CENARIOS=pacote` roda só esse cenário.
 
 ### Corrigido
 
