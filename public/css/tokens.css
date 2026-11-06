@@ -93,10 +93,12 @@
   --t-fast: 150ms;
   --t-base: 200ms;
   --t-press: 80ms; /* clique: desce rápido e volta em --t-fast */
-  --t-enter: 180ms; /* entrada de tela, login e diálogo */
-  --enter-y: 4px;
+  --t-enter: 280ms; /* entrada de tela, login e diálogo (ADR 0052) */
+  --t-troca: 220ms; /* troca de período: o conteúdo novo aparece em fade */
+  --enter-y: 12px;
   --press: scale(0.97);
   --ease-out: cubic-bezier(0.22, 1, 0.36, 1);
+  --ease-enter: cubic-bezier(0.2, 0.8, 0.2, 1);
   --lift: -2px;
   --lift-soft: -1px; /* gráficos: um pouco menos que os botões */
   /* Fundo de hover: a mesma conta nos 2 temas, sobre o --accent de cada um. */

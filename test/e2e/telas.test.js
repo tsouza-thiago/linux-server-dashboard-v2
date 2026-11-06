@@ -703,7 +703,7 @@ e2e('troca de tela — entra com a tela nova; amostra do SSE, período e tema n�
   await s.page.keyboard.press('8');
   await s.page.waitForSelector('.view-ajuda');
   assert.ok(await temEntrada(s.page), 'o atalho trocou a tela');
-  assert.deepEqual(await s.page.evaluate(entrada(), '.view'), { nome: 'entra', duracao: 0.18 });
+  assert.deepEqual(await s.page.evaluate(entrada(), '.view'), { nome: 'entra', duracao: 0.28 });
 
   await semEntrada(s.page);
   await s.app.runPoll();
@@ -719,6 +719,7 @@ e2e('troca de tela — entra com a tela nova; amostra do SSE, período e tema n�
   await s.page.evaluate(() => { location.hash = '#/recursos?p=7d'; });
   await trocouElemento(s.page);
   assert.equal(await temEntrada(s.page), false, 'trocar o período não anima');
+  assert.deepEqual(await s.page.evaluate(entrada(), '.view'), { nome: 'troca', duracao: 0.22 }, 'o período faz só o fade');
 
   await semEntrada(s.page);
   await s.page.keyboard.press('t');
@@ -809,8 +810,8 @@ e2e('troca de tela — login e diálogo entram igual; o movimento reduzido anula
   });
   await s.page.goto(`${s.base}/`, { waitUntil: 'load' });
   await s.page.waitForSelector('#login:not([hidden])');
-  assert.deepEqual(await s.page.evaluate(entrada(), '.login-card'), { nome: 'entra', duracao: 0.18 });
-  assert.deepEqual(await dialogo(), { nome: 'entra', duracao: 0.18 });
+  assert.deepEqual(await s.page.evaluate(entrada(), '.login-card'), { nome: 'entra', duracao: 0.28 });
+  assert.deepEqual(await dialogo(), { nome: 'entra', duracao: 0.28 });
 
   await s.page.emulateMedia({ reducedMotion: 'reduce' });
   for (const atual of [await s.page.evaluate(entrada(), '.login-card'), await dialogo()]) {
@@ -1000,13 +1001,13 @@ e2e('esqueleto — na troca de período o gráfico fica com os dados velhos, esm
     const faixa = getComputedStyle(painel, '::before');
     const faixas = getComputedStyle(document.querySelector('.view .strips'), '::before');
     return {
-      opacidade: Number(getComputedStyle(painel.querySelector('.uplot')).opacity), faixa: faixa.animationName, altura: faixa.height,
+      opacidade: Math.round(Number(getComputedStyle(painel.querySelector(".uplot")).opacity) * 100) / 100, faixa: faixa.animationName, altura: faixa.height,
       faixas: faixas.animationName, esqueleto: document.querySelector('.view .skel') !== null, ocupada: document.getElementById('view').hasAttribute('aria-busy'),
       aviso: document.querySelector('.view > .visually-hidden')?.textContent,
     };
   });
   await s.page.waitForTimeout(200);
-  assert.deepEqual(await estado(), { opacidade: 0.5, faixa: 'atualizando', altura: '2px', faixas: 'atualizando', esqueleto: false, ocupada: true, aviso: 'carregando' });
+  assert.deepEqual(await estado(), { opacidade: 0.35, faixa: 'atualizando', altura: '2px', faixas: 'atualizando', esqueleto: false, ocupada: true, aviso: 'carregando' });
   assert.equal(await canvas.evaluate((c) => c.isConnected), true, 'o mesmo gráfico continua na tela');
   baldes.solta();
   await s.page.waitForFunction(() => !document.querySelector('.view.atualizando, #view[aria-busy]'));

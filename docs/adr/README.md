@@ -56,3 +56,4 @@ Uma ADR aceita não é editada; se a decisão mudar, uma nova ADR a substitui.
 | [0049](0049-pacote-deb-reprodutivel-e-primeira-instalacao.md) | Pacote `.deb` reprodutível, 1ª instalação e `SHA256SUMS` assinado | Aceita |
 | [0050](0050-importar-desinstalar-e-purge-no-pacote.md) | Importar um clone, desinstalar e `apt purge` no pacote `.deb` | Aceita |
 | [0051](0051-servico-escreve-so-em-painel-e-procura-por-espelho.md) | O serviço escreve só em `data/` e `.atualizacao/painel/`; a procura usa um espelho | Aceita |
+| [0052](0052-transicoes-mais-visiveis.md) | Transições mais visíveis | Aceita |

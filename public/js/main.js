@@ -334,14 +334,14 @@ function marcarAtualizando() {
  * só vale quando a tela é outra ou com `entra`: tema, período e amostra nova passam por aqui com
  * a mesma tela, e animar piscaria a cada minuto (ADR 0026).
  */
-function renderView({ entra = false } = {}) {
+function renderView({ entra = false, troca = false } = {}) {
   const { view } = store.get();
   const animar = entra || current?.view !== view;
   const vinhaDoEsqueleto = Boolean(current?.ctx.pending);
   destroyCurrent();
   const mod = MODULES[view];
   const el = document.createElement('div');
-  el.className = `view view-${view}${animar ? ' view-entra' : ''}`;
+  el.className = `view view-${view}${animar ? ' view-entra' : troca ? ' view-troca' : ''}`;
   $('view').replaceChildren(el);
   const ctx = { el, charts: new Map(), local: {}, api, act, semAtraso: vinhaDoEsqueleto, get state() { return store.get(); } };
   current = { view, mod, ctx };
@@ -427,7 +427,7 @@ async function navigate() {
   esperandoBaldes = false;
   $('view').focus({ preventScroll: true });
   window.scrollTo(0, 0);
-  if (telaPronta()) entregar({ entra: current?.ctx.pending });
+  if (telaPronta()) entregar({ entra: current?.ctx.pending, troca: changed && !trocouTela });
 }
 
 // ---------------- Ao vivo (SSE) ----------------
