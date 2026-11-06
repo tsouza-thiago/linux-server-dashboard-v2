@@ -353,30 +353,15 @@ Inclua: o passo a passo para reproduzir, o impacto estimado e a versão afetada
   isolamento daria root a qualquer programa dessa conta. Um `.deb` trocado no caminho, um Node
   adulterado ou a volta forçada para uma versão velha com falha conhecida trocariam o código
   publicado.
-- **Mitigação:**
-  - Depois do `apt install`, nada roda como root. O executor (`libexec/atualizador`, `sh` POSIX) roda
-    como `_server-dashboard`, usuário de sistema sem login e fora do grupo `server-dashboard`, com o
-    ambiente limpo (`env -i`). Ele é o único que grava em `/opt`, e só em `repo.git`, `versoes`,
-    `estado` e `node`; o resto da pasta é do root.
-  - O polkit libera sem senha só o verbo `start`, só nas unidades `server-dashboard-atualizar.service`
-    e `server-dashboard-voltar.service`, e só para o grupo. Outra unidade, outro verbo ou outra ação
-    pedem a senha do administrador. As unidades não recebem parâmetro: o `atualizar` instala só a
-    versão que o `verificar` achou e confere de novo a assinatura (chaves da versão instalada, nome
-    gravado na tag igual ao da ref). O `voltar` só troca para a versão `anterior` e só até 24 h depois
-    da troca.
-  - As unidades rodam isoladas: `NoNewPrivileges`, `ProtectSystem=strict`, `ProtectHome`,
-    `PrivateDevices`, `CapabilityBoundingSet=` vazio e `SystemCallFilter=@system-service`. Só o
-    `verificar` (`git fetch`) e o `atualizar` (Node) têm rede.
-  - O Node da versão nova tem a soma SHA-256 fixada no `scripts/node-runtime.sh` da tag assinada. O
-    executor lê esse arquivo como texto, nunca o executa, e baixa só por `https`. Soma errada ou
-    download cortado: nada muda.
-  - O `.deb` é reprodutível: a mesma tag dá os mesmos bytes. O `SHA256SUMS` é assinado pela chave das
-    tags no namespace `server-dashboard`, e uma assinatura de tag não vale como assinatura do pacote. A
-    pessoa confere antes de instalar (README); o CI gera o pacote 2 vezes a cada PR e confere o `.deb`
-    de cada Release.
-  - Os dados da pessoa ficam nas pastas XDG dela (0700/0600); `estado/` não tem segredo. O `apt purge`
-    apaga só nomes fixos em `/opt` e nunca as pastas pessoais. O grupo recebe só 1 conta por
-    computador.
+- **Mitigação:** depois do `apt install`, nada roda como root. O executor roda como
+  `_server-dashboard` (sem login, ambiente limpo) e só ele grava em `/opt`. O polkit libera sem senha só
+  `start` nas 2 unidades fixas, só para o grupo `server-dashboard`; as unidades rodam isoladas e só 2
+  têm rede. O `atualizar` instala só a versão assinada que o `verificar` achou, com o Node fixado por
+  SHA-256 na tag; o `voltar` vale 1 vez, até 24 h. O `.deb` é reprodutível e o `SHA256SUMS` é assinado
+  no namespace `server-dashboard`: a pessoa o confere antes de instalar (README) e o CI gera o pacote 2
+  vezes. O `apt purge` nunca toca nas pastas pessoais. Cada regra e cada diretiva estão no
+  [AGENTS.md](AGENTS.md#configuração) e nas ADRs [0042](docs/adr/0042-modo-sistema-deb-e-executor-em-opt.md)
+  a [0050](docs/adr/0050-importar-desinstalar-e-purge-no-pacote.md).
 - **Verificado por:** `test/integration/atualizador.test.js`, `test/unit/unidades-systemd.test.js`
   (cada diretiva e a nota do `systemd-analyze security`), `test/unit/polkit-e-grupo.test.js` (a regra
   contra cada unidade, verbo e grupo), `test/integration/atualizacao-pacote.test.js`,
@@ -442,15 +427,10 @@ Análises publicadas:
 
 ## Princípios
 
-- **Servidor somente leitura**, sem agente: o servidor só lê `/proc` e `/sys` e roda `df`,
-  `ps`, `systemctl is-active` e `smartctl -H`. Nada é instalado nele.
-- **1 comando SSH por minuto**, com chave Ed25519 restrita à coleta. `BatchMode=yes` e
-  `ConnectTimeout=10`.
-- **A senha do servidor serve só na instalação** e nunca é guardada.
-- **Painel só em `127.0.0.1`**, com Host check, CSRF, rate limit, CSP e escape de HTML.
-- **Sem segredos no repositório:** `.env` e `data/` estão no `.gitignore`.
-- **Sem CDN:** uPlot e as fontes Geist vêm no pacote, conferidos por SHA-256
-  (`public/vendor/vendor.json`), coerente com a CSP `'self'`.
+Servidor só leitura e sem agente, 1 comando SSH por minuto com chave restrita à coleta, senha do
+administrador só na instalação, painel só em `127.0.0.1`, sem segredos no repositório e sem CDN. A
+lista completa, com a garantia de cada uma, está nas
+[Regras do AGENTS.md](AGENTS.md#regras-obrigatórias) e nas invariantes I1 a I11.
 
 ---
 

@@ -19,6 +19,9 @@ diante: `PATCH` corrige, `MINOR` acrescenta sem quebrar e `MAJOR` quebra.
 
 ### Alterado
 
+- Documentação para quem usa (#178): o README manda para o TUTORIAL os 6 passos, a tabela das telas, os
+  comandos menos usados e o "Vindo da V1"; a ameaça 24 e os "Princípios" do SECURITY viram resumo com link
+  para o AGENTS e as ADRs. Nenhuma regra mudou.
 - A Ajuda manda criar o sudoers com o nome por instalação (`/etc/sudoers.d/dashboard-<computador>-<id>`,
   ADR 0020), não com o antigo. A lista `SHELL_SCRIPTS` do `check` e da `seguranca` virou um módulo só
   (`scripts/shell-scripts.mjs`), e o tema lembrado ficou em `public/js/core/tema.js`.

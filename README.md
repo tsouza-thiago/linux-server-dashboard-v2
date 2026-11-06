@@ -40,16 +40,10 @@ Detalhes e modelo de ameaças: [SECURITY.md](SECURITY.md).
 
 ## <picture><source media="(prefers-color-scheme: dark)" srcset="docs/img/icones/telas-escuro.svg"><img src="docs/img/icones/telas-claro.svg" alt="" width="24" height="24"></picture> O que ele mostra
 
-| Tela | O que mostra |
-|---|---|
-| **Visão geral** | Saúde de 0 a 100 com o motivo, disponibilidade, indicadores e telemetria |
-| **Recursos** | Processador, carga, memória, swap, temperatura e pressão do sistema (PSI) |
-| **Armazenamento** | Espaço por pasta, **previsão de quando enche**, atividade e saúde (SMART) dos discos |
-| **Rede** | Download, upload, picos, erros e volume por dia |
-| **Processos & serviços** | Serviços com histórico de quedas e processos que mais usam memória |
-| **Eventos** | Alertas, quedas e anotações numa linha do tempo, com disponibilidade de 90 dias |
-| **Relatórios** | Resumo de 7, 30 ou 90 dias, exportação CSV/JSON e impressão |
-| **Ajuda** | O que fazer em cada alerta, atalhos e a configuração ativa |
+São 8 telas: **Visão geral** (saúde de 0 a 100 com o motivo), **Recursos**, **Armazenamento**
+(com a **previsão de quando enche** e o SMART), **Rede**, **Processos & serviços**, **Eventos**
+(alertas, quedas e anotações), **Relatórios** (CSV/JSON e impressão) e **Ajuda**. O que cada uma
+mostra está no [TUTORIAL, seção 6](TUTORIAL.md#6-como-usar-o-dashboard).
 
 Histórico: 72 horas detalhadas (1 ponto por minuto) e 90 dias resumidos (a cada 5 min).
 Tema escuro e claro.
@@ -70,11 +64,8 @@ Todas as imagens saem de um painel de teste, com dados inventados.
 
 ## <picture><source media="(prefers-color-scheme: dark)" srcset="docs/img/icones/requisitos-escuro.svg"><img src="docs/img/icones/requisitos-claro.svg" alt="" width="24" height="24"></picture> Requisitos
 
-- **Este computador:** Linux (Debian, Ubuntu, Mint ou Fedora; ADR 0013) com `git`:
-  ```bash
-  sudo apt install git     # Debian, Ubuntu, Mint
-  sudo dnf install git     # Fedora
-  ```
+- **Este computador:** Linux (Debian, Ubuntu, Mint ou Fedora; ADR 0013) com `git`
+  (`sudo apt install git` ou `sudo dnf install git`).
 - **O servidor:** Linux ligado e na rede, com `sshd` ativo e um usuário que possa usar
   `sudo` (só na instalação). Servidor que só aceita chave SSH também serve: o assistente
   entra pelo apelido do seu `~/.ssh/config`, com a chave no ssh-agent.
@@ -91,18 +82,10 @@ git clone https://github.com/tsouza-thiago/linux-server-dashboard-v2.git && cd l
 ```
 
 O `./dashboard instalar` confere a versão assinada, o Node e a porta, e abre o
-**assistente no navegador** com um código de uso único. São 6 passos:
-
-1. **Boas-vindas:** o que será feito e o que nunca é feito.
-2. **Servidor:** como você entra (senha ou chave SSH), endereço e usuário administrador.
-3. **Conectar:** você confere a identidade do servidor **antes** de digitar a senha.
-4. **O que monitorar:** pastas, discos, rede, serviços e limites, já marcados como recomendado.
-5. **Preparar o servidor:** *assistido* (mostra os comandos exatos e roda depois do seu
-   "Confirmar") ou *à mão* (você cola os blocos e clica em Testar).
-6. **Pronto:** primeira leitura real; o painel abre já logado.
-
-Sem tela? `./dashboard instalar --terminal` faz os mesmos passos no terminal. Para
-automatizar: `./dashboard instalar --sem-interface --ajuda`.
+**assistente no navegador** com um código de uso único. São 6 passos, do servidor ao primeiro
+painel; cada um está no [TUTORIAL, seção 3](TUTORIAL.md#3-instalação-assistente-no-navegador).
+Sem tela: `./dashboard instalar --terminal`. Para automatizar:
+`./dashboard instalar --sem-interface --ajuda`.
 
 A instalação também cria o comando `dashboard`, que roda de qualquer pasta e sem o `./`. Ele é um
 link em `~/.local/bin` e não pede sudo. Ela liga também o autocomplete do bash: `dashboard atu` +
@@ -140,10 +123,9 @@ Na pasta do projeto (no pacote, `dashboard` sem o `./`, de qualquer pasta):
 | `./dashboard status` | Mostra se o painel está rodando |
 | `./dashboard iniciar` / `./dashboard parar` | Liga ou desliga o painel (o servidor não é afetado) |
 | `./dashboard diagnosticar` | Testa tudo e explica cada problema |
-| `./dashboard reconfigurar` | Outro servidor, disco novo, outro serviço. Com o painel no ar, abre o painel já logado, no diálogo do Reconfigurar. Com `--terminal`, sem tela ou com o painel parado, abre o assistente dali |
-| `./dashboard atualizar` | Abre o painel já logado, no diálogo da versão nova. Com `--terminal`, sem tela ou com o painel parado, faz tudo no terminal |
-| `./dashboard desinstalar` | Remove o painel e o comando deste computador e oferece limpar a parte dele no servidor |
-| `./dashboard versao` | Mostra a versão |
+
+`reconfigurar`, `atualizar`, `desinstalar` e `versao` estão no
+[TUTORIAL, seções 4 e 5](TUTORIAL.md#4-abrir-iniciar-e-parar).
 
 Quando sai uma versão nova, o painel avisa no topo da tela, com as novidades. Para isso ele roda
 `git fetch` das tags 1 vez por dia (no pacote, quem procura é o executor do pacote): é a única
@@ -158,18 +140,9 @@ aparece no menu como **Server Dashboard**.
 
 ## <picture><source media="(prefers-color-scheme: dark)" srcset="docs/img/icones/v1-escuro.svg"><img src="docs/img/icones/v1-claro.svg" alt="" width="24" height="24"></picture> Vindo da V1
 
-Clone a V2 numa pasta nova e rode:
-
-```bash
-./dashboard instalar --importar-v1 ~/linux-server-dashboard
-```
-
-Isto para a V1, traz a configuração e o histórico e liga a V2 com o mesmo acesso SSH da V1.
-A pasta da V1 **não é alterada**. Depois, rode `./dashboard reconfigurar` para trocar o
-acesso completo da V1 pela chave restrita à coleta.
-
-Para voltar à V1: na pasta da V2, `systemctl --user disable --now server-dashboard` (não
-inicia mais com o computador) e, na pasta da V1, `./start.sh --background`.
+Clone a V2 numa pasta nova e rode `./dashboard instalar --importar-v1 <pasta da V1>`. A V1 é
+parada, a configuração e o histórico vêm junto, e a pasta dela **não é alterada**. Os passos
+e a volta à V1 estão no [TUTORIAL, seção 5](TUTORIAL.md#5-atualizar-reconfigurar-e-desinstalar).
 
 ---
 
