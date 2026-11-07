@@ -1457,7 +1457,8 @@ Documentados no plano da V2 (seção 2.2, B1–B12), entre eles: alerta SMART fa
 rede zerada com contadores grandes, alerta duplicado a cada coleta e reescrita completa do
 histórico a cada minuto.
 
-[Não publicado]: https://github.com/tsouza-thiago/linux-server-dashboard-v2/compare/v2.6.3...HEAD
+[Não publicado]: https://github.com/tsouza-thiago/linux-server-dashboard-v2/compare/v2.6.4...HEAD
+[2.6.4]: https://github.com/tsouza-thiago/linux-server-dashboard-v2/compare/v2.6.3...v2.6.4
 [2.6.3]: https://github.com/tsouza-thiago/linux-server-dashboard-v2/compare/v2.6.2...v2.6.3
 [2.6.2]: https://github.com/tsouza-thiago/linux-server-dashboard-v2/compare/v2.6.1...v2.6.2
 [2.6.1]: https://github.com/tsouza-thiago/linux-server-dashboard-v2/compare/v2.6.0...v2.6.1
