@@ -435,7 +435,11 @@ pre.code {
 @keyframes entra { from { opacity: 0; transform: translateY(var(--enter-y)); } }
 /* Troca de período (ADR 0052): só o fade do conteúdo novo, sem deslocamento. */
 @keyframes troca { from { opacity: 0; } }
+/* Saída (ADR 0053): a tela velha esmaece e sobe um pouco enquanto os dados chegam. `forwards`
+   a mantém invisível até a nova ocupar o lugar. */
+@keyframes sai { to { opacity: 0; transform: translateY(calc(var(--enter-y) / -2)); } }
 @media (prefers-reduced-motion: no-preference) {
+  .view-sai { animation: sai var(--t-sai) var(--ease-sai) forwards; }
   .view-entra, .login > *, dialog[open] { animation: entra var(--t-enter) var(--ease-enter); }
   .view-troca { animation: troca var(--t-troca) var(--ease-enter); }
 }
