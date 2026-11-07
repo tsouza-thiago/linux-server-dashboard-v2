@@ -334,9 +334,11 @@ function marcarAtualizando() {
  * só vale quando a tela é outra ou com `entra`: tema, período e amostra nova passam por aqui com
  * a mesma tela, e animar piscaria a cada minuto (ADR 0026).
  */
-function renderView({ entra = false, troca = false } = {}) {
+function renderView({ troca = false } = {}) {
   const { view } = store.get();
-  const animar = entra || current?.view !== view;
+  // A entrada roda 1 vez por troca de tela: no esqueleto. O conteúdo que o substitui já é da mesma
+  // tela e não anima de novo (ADR 0053).
+  const animar = current?.view !== view;
   const vinhaDoEsqueleto = Boolean(current?.ctx.pending);
   destroyCurrent();
   const mod = MODULES[view];
@@ -361,8 +363,8 @@ function renderView({ entra = false, troca = false } = {}) {
 /** Atualiza a tela atual com os dados novos (update, ou monta de novo se não houver). */
 function refreshView() {
   if (!telaPronta()) return; // o esqueleto (ou o "atualizando") fica até os dados chegarem
-  // O esqueleto dá lugar ao conteúdo: é a chegada da tela.
-  if (!current || current.ctx.pending) return entregar({ entra: true });
+  // O esqueleto dá lugar ao conteúdo, sem nova entrada (ADR 0053).
+  if (!current || current.ctx.pending) return entregar({});
   if (espera) return; // o "atualizando" cumpre o tempo mínimo: a entrega já vem
   renderHead();
   if (current.mod.update) current.mod.update(current.ctx);
@@ -419,15 +421,21 @@ async function navigate() {
   const buscar = USES_BUCKETS.has(view) && (changed || !store.get().buckets.length);
   esperandoBaldes = buscar;
   $('view').toggleAttribute('aria-busy', !telaPronta());
+  // A tela velha sai na hora e a nova entra depois: a saída roda durante a espera que já existe.
   // A tela velha fica até o atraso: resposta rápida troca direto, sem esqueleto no meio.
-  if (trocouTela && !telaPronta()) espera = esperaVisivel(() => renderView());
+  if (trocouTela && !telaPronta()) {
+    // Sem `view-entra`: se a entrada da tela velha ainda roda, a saída tem de ganhar dela.
+    current?.ctx.el.classList.remove('view-entra', 'view-troca');
+    current?.ctx.el.classList.add('view-sai');
+    espera = esperaVisivel(() => renderView());
+  }
   else if (buscar) espera = esperaVisivel(marcarAtualizando);
   if (buscar) await loadBuckets();
   if (vez !== navegacao) return; // atalhos em sequência: só a última tecla desenha e anima
   esperandoBaldes = false;
   $('view').focus({ preventScroll: true });
   window.scrollTo(0, 0);
-  if (telaPronta()) entregar({ entra: current?.ctx.pending, troca: changed && !trocouTela });
+  if (telaPronta()) entregar({ troca: changed && !trocouTela });
 }
 
 // ---------------- Ao vivo (SSE) ----------------

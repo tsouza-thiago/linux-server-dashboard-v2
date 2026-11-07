@@ -56,7 +56,7 @@ Em todas as telas, nos cenários `normal` e `lacunas`:
   soltar na borda ainda conta como clique. Botões em grupo, os da lista de eventos e o menu só
   escurecem o fundo. Botão desligado não responde. Com "reduzir movimento", nada se move.
 - **Troca de tela (ADR 0026), nos 2 temas:** menu, atalhos 1–8 e link com `#/tela` trocam de tela
-  com uma entrada curta (esmaecer e 12 px, 280 ms), sem corte seco. O login entra igual. Com 1–8 apertados
+  com uma entrada curta (esmaecer e 16 px, 300 ms), sem corte seco; a tela velha sai antes, em 140 ms, e a entrada roda 1 vez (ADR 0053). O login entra igual. Com 1–8 apertados
   em sequência rápida, fica só a última tela e a animação não acumula. A tela não pisca com uma
   amostra nova nem ao trocar o tema; ao trocar o período, só o conteúdo novo faz um fade de 220 ms (ADR 0052). Depois da entrada, o gráfico continua com a
   largura certa, e o cursor e o zoom acompanham o mouse.

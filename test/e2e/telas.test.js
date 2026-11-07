@@ -703,7 +703,7 @@ e2e('troca de tela — entra com a tela nova; amostra do SSE, período e tema n�
   await s.page.keyboard.press('8');
   await s.page.waitForSelector('.view-ajuda');
   assert.ok(await temEntrada(s.page), 'o atalho trocou a tela');
-  assert.deepEqual(await s.page.evaluate(entrada(), '.view'), { nome: 'entra', duracao: 0.28 });
+  assert.deepEqual(await s.page.evaluate(entrada(), '.view'), { nome: 'entra', duracao: 0.3 });
 
   await semEntrada(s.page);
   await s.app.runPoll();
@@ -728,7 +728,7 @@ e2e('troca de tela — entra com a tela nova; amostra do SSE, período e tema n�
   assert.deepEqual(s.problems, []);
 });
 
-e2e('troca de tela — o conteúdo que substitui o esqueleto entra, na tela geral e na Visão geral', async (t) => {
+e2e('troca de tela — o conteúdo que substitui o esqueleto não anima de novo, na tela geral e na Visão geral', async (t) => {
   const s = await setup(t);
   if (s.skip) return t.skip(s.skip);
   for (const [hash, conteudo] of [['#/processos', '#pr-rows'], ['#/visao-geral', '#vg-hero .hero']]) {
@@ -741,9 +741,63 @@ e2e('troca de tela — o conteúdo que substitui o esqueleto entra, na tela gera
     await semEntrada(s.page);
     solta();
     await s.page.waitForSelector(conteudo);
-    assert.ok(await temEntrada(s.page), `${hash}: o esqueleto deu lugar ao conteúdo`);
+    assert.equal(await temEntrada(s.page), false, `${hash}: o esqueleto deu lugar ao conteúdo sem nova entrada`);
     await s.page.unroute('**/api/status');
   }
+});
+
+// ADR 0053: a troca de tela se vê. Amostra a opacidade da `.view` a cada quadro, com os dados atrasados.
+e2e('troca de tela — a velha sai na hora, a curva espalha a entrada e ela roda 1 vez', async (t) => {
+  const s = await setup(t);
+  if (s.skip) return t.skip(s.skip);
+  await s.page.goto(`${s.base}/`, { waitUntil: 'load' });
+  await s.page.waitForSelector('.hero');
+  await s.page.evaluate(() => Promise.all(document.querySelector('.view').getAnimations().map((a) => a.finished)));
+  const baldes = (url) => url.pathname === '/api/history';
+  await s.page.route(baldes, async (rota) => { await new Promise((r) => { setTimeout(r, 900); }); await rota.continue(); });
+  await s.page.evaluate(() => {
+    window.__amostras = [];
+    let n = 0;
+    const quadro = () => {
+      const el = document.querySelector('.view');
+      if (el) {
+        el.dataset.id ||= String(++n);
+        window.__amostras.push({ t: performance.now(), id: el.dataset.id, op: Number(getComputedStyle(el).opacity), cls: el.className });
+      }
+      requestAnimationFrame(quadro);
+    };
+    quadro();
+  });
+  const t0 = await s.page.evaluate(() => performance.now());
+  await s.page.keyboard.press('2');
+  await s.page.waitForSelector('.view-recursos .uplot');
+  await s.page.waitForTimeout(500);
+  const am = (await s.page.evaluate(() => window.__amostras)).filter((a) => a.t >= t0);
+  const idVelha = am[0].id;
+
+  // (a) saída: a velha chega perto de 0 antes de a nova existir, e sem esperar os dados (900 ms)
+  const velha = am.filter((a) => a.id === idVelha);
+  assert.ok(velha.some((a) => a.cls.includes('view-sai')), 'a tela velha recebeu a saída');
+  assert.ok(Math.min(...velha.map((a) => a.op)) < 0.1, 'a tela velha esmaeceu quase por inteiro');
+  const fimSaida = velha.find((a) => a.op < 0.1);
+  assert.ok(fimSaida.t - t0 < 400, `a saída começou na hora (${Math.round(fimSaida.t - t0)} ms)`);
+
+  // (b) curva: a nova está abaixo de 0,5 aos ~25% da duração (300 ms)
+  const novas = am.filter((a) => a.id !== idVelha);
+  const idEntrada = novas[0].id;
+  const entrada = novas.filter((a) => a.id === idEntrada);
+  const ini = entrada[0].t;
+  const aos25 = entrada.find((a) => a.t - ini >= 75);
+  assert.ok(aos25.op < 0.5, `aos 25% a opacidade é ${aos25.op}`);
+  assert.ok(entrada.at(-1).op > 0.99 || entrada.some((a) => a.op > 0.99), 'a entrada termina inteira');
+
+  // (c) a entrada roda 1 vez: depois de inteira, a opacidade não cai, mesmo com o conteúdo chegando
+  const cheia = novas.findIndex((a) => a.op > 0.99);
+  assert.ok(cheia >= 0);
+  assert.ok(novas.slice(cheia).every((a) => a.op > 0.99), 'a entrada não recomeça quando os dados chegam');
+  assert.equal(new Set(novas.filter((a) => a.cls.includes('view-entra')).map((a) => a.id)).size, 1, 'só 1 tela ganhou view-entra');
+  await s.page.unroute(baldes);
+  assert.deepEqual(s.problems, []);
 });
 
 e2e('troca de tela — atalhos em sequência não acumulam, e o gráfico mantém a largura', async (t) => {
@@ -810,8 +864,8 @@ e2e('troca de tela — login e diálogo entram igual; o movimento reduzido anula
   });
   await s.page.goto(`${s.base}/`, { waitUntil: 'load' });
   await s.page.waitForSelector('#login:not([hidden])');
-  assert.deepEqual(await s.page.evaluate(entrada(), '.login-card'), { nome: 'entra', duracao: 0.28 });
-  assert.deepEqual(await dialogo(), { nome: 'entra', duracao: 0.28 });
+  assert.deepEqual(await s.page.evaluate(entrada(), '.login-card'), { nome: 'entra', duracao: 0.3 });
+  assert.deepEqual(await dialogo(), { nome: 'entra', duracao: 0.3 });
 
   await s.page.emulateMedia({ reducedMotion: 'reduce' });
   for (const atual of [await s.page.evaluate(entrada(), '.login-card'), await dialogo()]) {
