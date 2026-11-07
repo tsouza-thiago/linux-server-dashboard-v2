@@ -9,6 +9,10 @@ diante: `PATCH` corrige, `MINOR` acrescenta sem quebrar e `MAJOR` quebra.
 
 ## [Não publicado]
 
+## [2.6.4] — 2026-11-07
+
+A troca de tela pelo menu lateral agora se vê: a tela velha sai, a nova entra com suavidade e a entrada acontece uma vez só. Nada muda na configuração, no formato de `data/` nem no acesso ao servidor.
+
 ### Corrigido
 - Telas: a troca de tela pelo menu lateral ficou perceptível. A tela velha sai na hora (140 ms) enquanto os dados chegam, a nova entra em 300 ms com 16 px e uma curva que espalha a mudança, e a entrada roda 1 vez, sem recomeçar quando o conteúdo substitui o esqueleto (ADR 0053, #187).
 
