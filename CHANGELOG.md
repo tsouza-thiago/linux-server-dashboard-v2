@@ -9,6 +9,10 @@ diante: `PATCH` corrige, `MINOR` acrescenta sem quebrar e `MAJOR` quebra.
 
 ## [Não publicado]
 
+## [2.6.4] — 2026-11-07
+
+A troca de tela pelo menu lateral agora se vê: a tela velha sai, a nova entra com suavidade e a entrada acontece uma vez só. Nada muda na configuração, no formato de `data/` nem no acesso ao servidor.
+
 ### Corrigido
 - Telas: a troca de tela pelo menu lateral ficou perceptível. A tela velha sai na hora (140 ms) enquanto os dados chegam, a nova entra em 300 ms com 16 px e uma curva que espalha a mudança, e a entrada roda 1 vez, sem recomeçar quando o conteúdo substitui o esqueleto (ADR 0053, #187).
 
@@ -1453,7 +1457,8 @@ Documentados no plano da V2 (seção 2.2, B1–B12), entre eles: alerta SMART fa
 rede zerada com contadores grandes, alerta duplicado a cada coleta e reescrita completa do
 histórico a cada minuto.
 
-[Não publicado]: https://github.com/tsouza-thiago/linux-server-dashboard-v2/compare/v2.6.3...HEAD
+[Não publicado]: https://github.com/tsouza-thiago/linux-server-dashboard-v2/compare/v2.6.4...HEAD
+[2.6.4]: https://github.com/tsouza-thiago/linux-server-dashboard-v2/compare/v2.6.3...v2.6.4
 [2.6.3]: https://github.com/tsouza-thiago/linux-server-dashboard-v2/compare/v2.6.2...v2.6.3
 [2.6.2]: https://github.com/tsouza-thiago/linux-server-dashboard-v2/compare/v2.6.1...v2.6.2
 [2.6.1]: https://github.com/tsouza-thiago/linux-server-dashboard-v2/compare/v2.6.0...v2.6.1
