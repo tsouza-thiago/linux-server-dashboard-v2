@@ -111,9 +111,9 @@ test('CWE-497: fixture do servidor real já passou pela anonimização completa'
   }
 });
 
-test('CWE-497: a amostra do AGENTS não traz processo nem versão do kernel reais', () => {
-  const agents = ler('AGENTS.md');
-  const inicio = agents.indexOf('```json\n', agents.indexOf('## Formato da amostra')) + '```json\n'.length;
+test('CWE-497: a amostra da referência não traz processo nem versão do kernel reais', () => {
+  const agents = ler('docs/referencia/amostra.md');
+  const inicio = agents.indexOf('```json\n', agents.indexOf('# Formato da amostra')) + '```json\n'.length;
   const amostra = JSON.parse(agents.slice(inicio, agents.indexOf('\n```', inicio)));
   assert.equal(amostra.os.kernel, anonymizeKernel(amostra.os.kernel), 'kernel só com major.minor');
   for (const p of amostra.topProcs) {

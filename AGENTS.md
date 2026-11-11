@@ -4,8 +4,9 @@ Painel de monitoramento, em tempo real, de um servidor Linux da rede local. Toda
 servidor só responde **1 comando SSH por minuto**. Este requisito é obrigatório: o hardware do servidor é muito
 limitado.
 
-Este arquivo é a **referência técnica única** do projeto: regras, arquitetura, configuração, coleta, formato da
-amostra, persistência, API e alertas. Os outros documentos não repetem estes detalhes:
+Este arquivo traz o que vale em toda sessão: regras, desenvolvimento, arquitetura e comandos. Com a
+[referência sob demanda](#referência-sob-demanda) (`docs/referencia/`), ele é a **referência técnica única** do
+projeto. Os outros documentos não repetem estes detalhes:
 
 - [README.md](README.md): visão geral, instalação e comandos.
 - [TUTORIAL.md](TUTORIAL.md): passo a passo para leigos.
@@ -15,6 +16,21 @@ amostra, persistência, API e alertas. Os outros documentos não repetem estes d
   2.3.0–2.6.0 está concluído (histórico).
 
 O teste `test/unit/docs.test.js` confere esta documentação contra o código.
+
+## Referência sob demanda
+
+Leia só o arquivo que a tarefa pede. Mudou o código de um destes temas? Atualize o arquivo dele.
+
+| Preciso de… | Arquivo |
+|---|---|
+| Variáveis do `.env` (padrões e faixas), modo sistema e pacote `.deb` | [docs/referencia/configuracao.md](docs/referencia/configuracao.md) |
+| Script de coleta, modos `basico`/`smart`, comando forçado, SMART e temperatura | [docs/referencia/coleta.md](docs/referencia/coleta.md) |
+| Campos da amostra (`schemaVersion: 2`) | [docs/referencia/amostra.md](docs/referencia/amostra.md) |
+| Arquivos de `data/`, `.atualizacao/` e o que fica fora da pasta do projeto | [docs/referencia/persistencia.md](docs/referencia/persistencia.md) |
+| Rotas HTTP, SSE e o assistente | [docs/referencia/api.md](docs/referencia/api.md) |
+| Alertas, histerese, disponibilidade e saúde 0–100 | [docs/referencia/alertas.md](docs/referencia/alertas.md) |
+| Limites de tempo, tamanho e RAM, e como medir | [docs/referencia/desempenho.md](docs/referencia/desempenho.md) |
+| Por onde começar a investigar um problema | [docs/referencia/solucao-de-problemas.md](docs/referencia/solucao-de-problemas.md) |
 
 ## Regras (obrigatórias)
 
@@ -51,7 +67,7 @@ O teste `test/unit/docs.test.js` confere esta documentação contra o código.
 ### Regras de segurança (security by design)
 
 - **Configuração centralizada** em `server/config.js`: parser único do `.env` (com override de `process.env`),
-  validação de faixas (tabela [Configuração](#configuração)) e caminhos de dados forçados para dentro de `data/`
+  validação de faixas (tabela [Configuração](docs/referencia/configuracao.md)) e caminhos de dados forçados para dentro de `data/`
   (`clampPathToData`).
 - **Anti-injeção**: `NET_IF`, `DISK_MOUNTS`, `DISK_DEVS`, `SMART_DEVS` e `SERVICES` passam por `sanitizeToken()`
   (whitelist `[A-Za-z0-9_./:-]`, recusa token iniciado com `-`) **antes** de entrar no script de coleta
@@ -187,7 +203,7 @@ O teste `test/unit/docs.test.js` confere esta documentação contra o código.
   completa fica em `.check/ultima-falha.log`.
 - **Mudou código de segurança, removeu código ou terminou uma etapa?** Rode também `npm run seguranca` (precisa de
   Docker; sem ele, as ferramentas externas são puladas e a mutação roda assim mesmo).
-- **Documentação junto com o código:** mudou comando, opção, variável, rota ou arquivo? Atualize este arquivo (e o
+- **Documentação junto com o código:** mudou comando, opção, variável, rota ou arquivo? Atualize este arquivo ou o de `docs/referencia/` (e o
   README/TUTORIAL, se a pessoa usuária vê a mudança). `test/unit/docs.test.js` falha se a documentação divergir do
   código.
 - **Commits:** Conventional Commits em PT-BR (`feat(escopo):`, `fix:`, `test:`, `docs:`, `refactor:`, `style:`,
@@ -219,7 +235,7 @@ O teste `test/unit/docs.test.js` confere esta documentação contra o código.
   Chrome, num painel de teste (`npm run painel-teste`). A bateria completa segue
   [docs/testes-no-navegador.md](docs/testes-no-navegador.md) e roda antes de cada versão publicada. O PR registra o
   resultado; cada falha nova vira uma issue de bug.
-- **Orçamento de desempenho:** veja [Orçamento de desempenho](#orçamento-de-desempenho). Mudou coleta, histórico ou
+- **Orçamento de desempenho:** veja [Orçamento de desempenho](docs/referencia/desempenho.md). Mudou coleta, histórico ou
   frontend? Rode `npm run soak` e `npm run test:e2e`.
 - **Node.js 24** é a versão mínima (ADR 0002). **Navegadores:** Chrome/Edge, Firefox e Safari, nas 2 últimas versões
   (ES modules, `<dialog>` e CSS moderno, sem polyfill). **Exemplos** usam só IPs de documentação (`192.0.2.x`, RFC
@@ -313,285 +329,3 @@ scripts/e2e-instalacao/rodar.sh # instalação, botão Atualizar e pacote .deb (
 Opções do modo sem perguntas: `./dashboard instalar --sem-interface --ajuda`. Servidor que só aceita chave:
 `--chave-ssh <apelido>` no lugar de `--servidor`/`--usuario`/`--porta` (também no
 `./dashboard desinstalar --limpar-servidor`).
-
-## Configuração
-
-O assistente grava o `.env` (0600). A coluna **Padrão** é o valor que o código usa quando a variável falta ou está
-vazia. Valor fora da faixa volta ao padrão (os limiares avisam no log).
-
-| Variável | Padrão | Faixa | Descrição |
-|---|---|---|---|
-| `SSH_HOST` | `seu-host` | alias ou `usuario@host` | Servidor. O assistente grava `servidor`, o alias do `data/ssh/config` |
-| `SSH_CONFIG` | *(vazio)* | dentro de `data/` | Configuração SSH própria (`ssh -F`). Vazio = usa o `~/.ssh/config` (V1). O assistente grava `data/ssh/config` |
-| `SSH_ACESSO` | `direto` | `restrito` ou `direto` | `restrito`: a chave só roda a coleta e o painel envia só o modo. `direto`: o painel envia o script inteiro (V1). O assistente grava `restrito` |
-| `POLL_INTERVAL` | `60000` | `10000`–`3600000` | Intervalo entre coletas, em ms |
-| `PORT` | `3000` | `1`–`65535` | Porta do painel (só em 127.0.0.1) |
-| `HISTORY_LIMIT` | `4320` | `100`–`100000` | Amostras brutas em memória (4320 = 72 h a 1 por minuto) |
-| `HISTORY_FILE` | `data/history.json` | dentro de `data/` | Histórico da V1 a migrar (1 vez, com backup). A pasta dele também é a de `history/` e `rollup/`; mantenha em `data/` |
-| `LOG_FILE` | `data/dashboard.log` | dentro de `data/` | Log do painel (gira em 5 MB para `dashboard.log.1`) |
-| `NET_IF` | *(vazio)* | 1 interface | Interface de rede. Vazio = sem a seção de rede |
-| `DISK_MOUNTS` | `/` | pontos de montagem | Pastas acompanhadas, separadas por espaço |
-| `DISK_DEVS` | *(vazio)* | discos | Discos com leitura e gravação (I/O), ex.: `sda sdb` |
-| `SMART_DEVS` | *(= DISK_DEVS)* | discos | Discos com teste SMART (1 vez por hora). Ausente = os de `DISK_DEVS`; presente e vazio = nenhum |
-| `SERVICES` | *(vazio)* | serviços systemd | Serviços acompanhados, separados por espaço |
-| `DASH_TOKEN` | *(vazio)* | texto sem espaço | Token de acesso. A instalação gera um; vazio = sem login |
-| `ALERT_DISK_PCT` | `90` | `50`–`99` | Alerta de disco (% usado) |
-| `ALERT_RAM_PCT` | `90` | `50`–`99` | Alerta de RAM (% usada) |
-| `ALERT_TEMP_C` | `60` | `30`–`110` | Alerta de temperatura da CPU (°C) |
-| `ALERT_HYSTERESIS` | `5` | `0`–`20` | Quanto o valor precisa cair abaixo do limiar para o alerta limpar |
-| `ALERT_OFFLINE_AFTER` | `2` | `1`–`10` | Coletas seguidas com falha antes de "servidor inacessível" |
-
-Mudar alvos (pastas, discos, serviços) à mão quebra a chave restrita: o script no `authorized_keys` deixa de bater
-(`hashMismatch`). Use `./dashboard reconfigurar`.
-
-**Modo sistema e pacote `.deb`** (ADRs [0042](docs/adr/0042-modo-sistema-deb-e-executor-em-opt.md) a
-[0050](docs/adr/0050-importar-desinstalar-e-purge-no-pacote.md), F9). Só as regras de trabalho; o resto está nas ADRs:
-
-- **Modo sistema** (0042, 0043): o lançador `bin/dashboard` define `SERVER_DASHBOARD_MODO=sistema` (só o valor exato
-  vale, nunca pelo `.env`). O `.env` fica em `~/.config/server-dashboard/` e o `data/` em
-  `~/.local/share/server-dashboard/` (seguem `XDG_CONFIG_HOME` e `XDG_DATA_HOME`; valor relativo é ignorado), com
-  0700/0600. Os caminhos de dados ficam presos nesse `data/`, nunca no código em `/opt`. Sem a variável, é o modo
-  clone. A CLI acha as pastas por `pastasDe(root)` (`envDe`, `dataDe`, `backupsDe`). O lançador acha a pasta pelo
-  caminho real, nunca pelo ambiente, e usa o Node de `<base>/node/bin/node` ou o Node 24 do sistema. No pacote, a
-  instalação não cria o link nem o autocomplete pessoais.
-- **Executor** (`libexec/atualizador`, 0044, 0045, 0047): o único que grava o código em `/opt`, como
-  `_server-dashboard` (nunca root), com `env -i`. Só instala a versão que o `verificar` aceitou: tag assinada pelas
-  chaves da versão `atual`, com o nome da tag igual ao da ref; `atualizar` não recebe parâmetro; `voltar` vale 1 vez,
-  até 24 h depois. O Node novo vem antes: versão e SHA-256 saem do `scripts/node-runtime.sh` da versão nova, lido como
-  texto e nunca executado; só `https`. As unidades (`pacote/systemd/`) são de uso único, com o subcomando fixo no
-  `ExecStart=` e isoladas; só `verificar` e `atualizar` têm rede. `test/unit/unidades-systemd.test.js` exige cada
-  diretiva e a nota do `systemd-analyze security`.
-- **Polkit e grupos** (0046): a regra libera sem senha só `manage-units` com `start` em
-  `server-dashboard-atualizar.service` e `server-dashboard-voltar.service`, para o grupo `server-dashboard` (criado
-  vazio pelo `sysusers.d`, como o usuário `_server-dashboard`, sem login e fora do grupo).
-  `test/unit/polkit-e-grupo.test.js` confere cada combinação.
-- **Painel no pacote** (0048): lê `<base>/estado/disponivel` e o `novidades.md` de hora em hora, sem git nem rede.
-  `dashboard atualizar` para o painel, copia o `data/`, pede
-  `systemctl --no-ask-password start server-dashboard-atualizar.service` (nome fixo) e, se o painel novo não
-  responder, pede `server-dashboard-voltar.service` e devolve os dados. `--pre` é recusado.
-- **Pacote** (0049): `npm run empacotar-deb`; a mesma ref dá os mesmos bytes. O `apt purge` nunca toca nas pastas
-  pessoais. O mantenedor assina o `dist/SHA256SUMS` (`ssh-keygen -Y sign -n server-dashboard`).
-- **Do clone para o pacote** (0050): `dashboard instalar --importar-pasta <clone>` só vale no pacote (no clone e no
-  `reconfigurar`, sai com código 2); recusa se a conta já tem `.env` ou histórico. O `desinstalar` do pacote nunca
-  apaga o comando, o autocomplete, os blocos do login nem `/opt`.
-
-## Comando SSH de coleta
-
-O script é montado por `server/collector/builder.js`. É um único script POSIX `sh`, somente leitura. Exemplo com
-`NET_IF=enpXsY`, `DISK_MOUNTS=/ /mnt/disco1`, `DISK_DEVS=sda sdb` e `SERVICES=smbd nmbd`, no modo `smart`:
-
-```sh
-LC_ALL=C; export LC_ALL; M="${SSH_ORIGINAL_COMMAND:-smart}"; case "$M" in smart) ;; *) M=basico;; esac;
-echo '===VER==='; echo '2 6443f6bd222e'; echo "$M";
-echo '===HOST==='; cat /proc/sys/kernel/hostname;
-echo '===OS==='; uname -r; grep -E '^(PRETTY_NAME|NAME)=' /etc/os-release 2>/dev/null;
-echo '===CPU==='; getconf _NPROCESSORS_ONLN 2>/dev/null;
-echo '===UPTIME==='; cat /proc/uptime;
-echo '===LOAD==='; cat /proc/loadavg;
-echo '===STAT==='; head -1 /proc/stat;
-echo '===MEM==='; grep -E '^(MemTotal|MemFree|MemAvailable|Buffers|Cached|SReclaimable|SwapTotal|SwapFree|Dirty|Writeback):' /proc/meminfo;
-echo '===DF==='; df -B1 --output=source,target,size,used,avail,pcent,ipcent / /mnt/disco1 2>/dev/null;
-echo '===NET==='; awk -F: -v i='enpXsY' '{n=$1; gsub(/[ \t]/,"",n)} n==i' /proc/net/dev;
-echo '===IO==='; awk '$3=="sda"||$3=="sdb"' /proc/diskstats;
-echo '===PSI==='; for f in cpu memory io; do printf '%s ' "$f"; grep -h . /proc/pressure/$f 2>/dev/null | tr '\n' ' '; echo; done;
-echo '===TEMP==='; for z in /sys/class/thermal/thermal_zone*; do [ -r "$z/temp" ] && printf '%s %s\n' "$(cat "$z/type" 2>/dev/null)" "$(cat "$z/temp" 2>/dev/null)"; done 2>/dev/null; true;
-echo '===SMART==='; case "$M" in smart) for d in sda sdb; do
-  if [ "$(id -u)" = 0 ]; then r=$(smartctl -H "/dev/$d" 2>&1); else r=$(sudo -n smartctl -H "/dev/$d" 2>&1); fi;
-  case "$r" in *"result: PASSED"*|*"Health Status: OK"*) s=PASSED;; *"result: FAILED"*|*"Health Status: FAIL"*) s=FAILED;;
-  *"smartctl: not found"*|*"smartctl: command not found"*) s=SEM_SMARTCTL;;
-  *"sudo:"*|*ermission*|*"Operation not permitted"*) s=SEM_PERMISSAO;; *) s=DESCONHECIDO;; esac;
-  printf '%s %s\n' "$d" "$s"; done;; *) echo pulado;; esac;
-echo '===SERVICES==='; for s in smbd nmbd; do printf '%s %s\n' "$s" "$(systemctl is-active "$s" 2>/dev/null)"; done;
-echo '===PS==='; ps -eo user:32,pid,pcpu,pmem,rss,etimes,args --sort=-rss 2>/dev/null | head -9;
-echo '===FIM==='
-```
-
-- `LC_ALL=C` no início. As métricas vêm de `/proc` e `/sys`, imunes ao idioma.
-- `ssh -o BatchMode=yes -o ConnectTimeout=10`: falha rápido se o servidor estiver fora.
-- `NET`, `IO`, `SMART` e `SERVICES` só entram quando configurados. `===FIM===` marca a saída completa
-  (`collector.complete`).
-- `===VER===` traz a versão do coletor e um hash de 12 hex dos alvos. Hash diferente do esperado indica
-  `authorized_keys` desatualizado (`hashMismatch`).
-- **Modo** `basico` ou `smart`. O SMART roda **1 vez por hora**; nas outras coletas a seção imprime `pulado` e o
-  último resultado é reaproveitado.
-- **Comando forçado** (ADR 0008): o script vai para o `authorized_keys` do `dashmon` e o painel envia só a palavra do
-  modo, que chega em `$SSH_ORIGINAL_COMMAND`, passa só pelo `case` da 1ª linha e nunca é executada nem ecoada. A 1ª
-  linha abaixo vai para o `authorized_keys`, ao lado das dos outros computadores (ADR 0020); a 2ª, para
-  `/etc/sudoers.d/dashboard-<computador>-<id>`. A regra única até a 2.1.0 (`/etc/sudoers.d/dashboard`) sai quando
-  nenhuma linha sem ID sobrar.
-
-  ```
-  restrict,from="192.0.2.20",command="<script acima>" ssh-ed25519 AAAA… dashboard@notebook-a:3f9a12c4
-  dashmon ALL=(root) NOPASSWD: /usr/sbin/smartctl -H /dev/sda, /usr/sbin/smartctl -H /dev/sdb
-  ```
-
-- SMART: root roda `smartctl -H` direto; outro usuário usa `sudo -n` (nunca pede senha). Estados: `PASSED`, `FAILED`,
-  `SEM_PERMISSAO`, `SEM_SMARTCTL`, `DESCONHECIDO`.
-- Temperatura: todas as `thermal_zone*`. Prioridade: `x86_pkg_temp` > `coretemp` > `k10temp` >
-  `cpu-thermal`/`cpu_thermal`/`soc_thermal` > `acpitz` > maior valor.
-- Falhas do SSH viram mensagens claras (`describeError()`).
-
-## Formato da amostra
-
-`schemaVersion: 2`, gerada por `server/collector/parser.js`. Dado ausente é `null`, nunca zero inventado. Taxas
-(`cpu`, `rxMbps`, `readMBps`, `utilPct`…) são `null` na 1ª coleta, depois de um reboot ou com contador que voltou.
-`rxDeltaBytes`/`txDeltaBytes` são os bytes trafegados desde a coleta anterior, exatos pelos contadores (o volume por
-dia sai deles); são `null` nos mesmos casos e também com mais de 2 h entre as coletas. Exemplo (listas e colunas
-encurtadas; a lista completa está em `server/collector/parser.js`):
-
-```json
-{
-  "schemaVersion": 2, "ts": "2026-10-07T13:51:00.000Z",
-  "collector": { "version": 2, "hash": "73cebb436c7c", "mode": "smart", "complete": true, "expectedVersion": 2, "durationMs": 1290, "outputBytes": 2949 },
-  "host": "servidor-exemplo", "os": { "kernel": "6.12.0+deb13-amd64", "name": "Debian GNU/Linux 13 (trixie)" },
-  "cores": 1, "uptimeSec": 12937.03, "bootAt": "2026-10-07T10:15:22.970Z", "load": [0.08, 0.02, 0.01],
-  "cpuTicks": { "user": 102345, "idle": 1234567, "total": 1392845 },
-  "cpu": { "pct": 3.2, "user": 2.1, "system": 0.9, "iowait": 0.2, "steal": 0 },
-  "ram": { "total": 840, "used": 406, "free": 120, "cache": 479, "avail": 434, "swapTotal": 885, "swapUsed": 24, "dirty": 0, "writeback": 0 },
-  "disks": [ { "mount": "/", "source": "/dev/sda2", "dev": "sda", "size": "100G", "used": "1.5G", "avail": "94G", "pct": 2,
-               "sizeBytes": 107374182400, "usedBytes": 1610612736, "availBytes": 100394860544, "inodesPct": 3 } ],
-  "missingMounts": [],
-  "net": { "iface": "enp0s7", "rxBytes": 1752505, "rxErrors": 0, "rxDrops": 0, "txBytes": 771648, "txErrors": 0, "txDrops": 0,
-           "rxMbps": 0.02, "txMbps": 0.01, "rxDeltaBytes": 150124, "txDeltaBytes": 74980 },
-  "io": [ { "dev": "sda", "readIos": 15783, "writeIos": 3699, "ioTicksMs": 91540, "readMBps": 0.0, "writeMBps": 0.01, "utilPct": 0.4, "latencyMs": 6.1 } ],
-  "psi": null, "temps": [ { "type": "acpitz", "c": 32 } ], "tempC": 32, "tempSensor": "acpitz",
-  "smart": [ { "dev": "sda", "status": "PASSED" } ], "smartAt": "2026-10-07T13:51:00.000Z",
-  "services": { "smbd": "active" },
-  "topProcs": [ { "user": "root", "pid": 990, "cpu": 0.0, "mem": 11.4, "rssKB": 98520, "etimesSec": 12880, "cmd": "/usr/sbin/sshd" } ]
-}
-```
-
-Amostras da V1 (sem `schemaVersion` e sem os campos novos) continuam válidas: o frontend trata campos ausentes.
-
-## Persistência
-
-Tudo fica no disco local. Nada é gravado no servidor. Os caminhos abaixo são os do modo clone; no modo sistema, `.env`
-e `data/` ficam nas pastas XDG (veja [Configuração](#configuração)).
-
-| Caminho | O que guarda |
-|---|---|
-| `data/history/AAAA-MM-DD.ndjson` | Amostras brutas, 1 linha por coleta, só acréscimo (fila assíncrona), 1 arquivo por dia (UTC). Retenção de 72 h; linha cortada por queda é ignorada. ~3,7 KB por coleta (~16 MB em 72 h). Em memória, só a amostra mais recente guarda `topProcs` (as antigas ficam compactas, `compactSample`); o arquivo guarda tudo e é lido em blocos de 1 MB ao reiniciar |
-| `data/rollup/AAAA-MM-DD.ndjson` | Agregados de 5 min `{ t, n, m: { métrica: [mín, máx, média] } }` por 90 dias. Quando só parte das `n` amostras tem a métrica, um 4º item diz quantas (`[mín, máx, média, c]`; média × c = soma). Fechar de novo não duplica; o boot fecha os pendentes. ~1,2 KB a cada 5 min (~29 MB em 90 dias) |
-| `data/alerts.json`, `data/annotations.json` | Alertas com ciclo de vida `new` → `ack` → `resolved` (até 500); anotações (texto, rótulo, instante) |
-| `data/outages.ndjson` | Quedas do servidor (`off`/`on`), 90 dias, separadas dos alertas (B9) |
-| `data/history.v1-migrado.json` | Backup do histórico da V1, feito pela migração (pode ser apagado) |
-| `data/sessions.json` | SHA-256 das sessões do navegador |
-| `data/atualizacao.json` | Última procura de versão nova: quando, versão achada, novidades, erro e bloqueio (ADR 0030) |
-| `data/entrar.json` | Hash do link de entrada de uso único (2 min no `./dashboard abrir`, 10 min no fim da instalação) |
-| `data/reconfigurar.json`, `data/reconfigurar.log` | Hash do código do "Reconfigurar pela tela" (5 min, sai do disco ao ser lido) e a saída da última vez, sem segredos, com o motivo se o painel novo não subiu (ADR 0034 e 0035). A tela lê só as linhas de falha (ADR 0037) |
-| `data/ssh/`, `data/dashboard.log` | `config` e `known_hosts` próprios do painel (0700); log (gira em 5 MB para `dashboard.log.1`) |
-| `data/dashboard.pid`, `data/dashboard-erros.log` | Modo segundo plano (sem systemd): PID e erros de inicialização |
-| `.runtime/node/`, `.backups/` | Node 24 baixado pelo `./dashboard`, se o do sistema faltar; cópias de `data/` feitas pelo `atualizar` (as 3 mais novas, 0700) |
-| `.atualizacao/` | `ultima.log`, `estado.json`, `trava.pid` e `pre.json` (liberação do `--pre`, ADR 0032) da atualização pelo painel, escritos pelo executor; `painel/` (`pedido.json`, `espelho.git`) é a única subpasta com escrita do serviço (ADR 0051) (0700, fora do git). Fica fora de `data/` porque a volta atrás apaga `data/` (ADR 0031). No pacote, fica na pasta de dados XDG (ADR 0048) |
-
-No navegador, o `localStorage` guarda só conveniências: o tema, a versão nova dispensada e as contagens de pastas,
-discos, SMART e serviços para o esqueleto (`dash_formato`, ADR 0033), sem nomes.
-
-Fora da pasta do projeto: a chave `~/.ssh/dashboard-<servidor>-<id>` (até a 2.1.0, `dashboard_ed25519` ou
-`dashboard_v2_ed25519`), o serviço `~/.config/systemd/user/server-dashboard.service`, o atalho
-`~/.local/share/applications/server-dashboard.desktop`, o comando `~/.local/bin/dashboard` e o autocomplete
-`~/.local/share/bash-completion/completions/dashboard` (links; respeita `BASH_COMPLETION_USER_DIR` e `XDG_DATA_HOME`)
-e, só com o sim, um bloco marcado (`# >>> server-dashboard >>>`) no arquivo de login do bash e outro no `~/.bashrc`
-(só sem o pacote `bash-completion`), com a cópia `<arquivo>.dashboard-bak`.
-
-Ao encerrar (SIGINT/SIGTERM), o painel espera gravar histórico, alertas e anotações pendentes (B11).
-
-## API
-
-Todas as rotas passam por: Host check, CSRF (com cookie `dash_csrf`), cabeçalhos de segurança, rate limit das mutações
-e error handler sem stack trace. Com `DASH_TOKEN`, `/api/*` e `/api/stream` exigem sessão ou `Bearer <token>` (menos
-`/api/session`, `/api/login` e `/api/logout`).
-
-| Rota | Método | Descrição |
-|---|---|---|
-| `/` | GET | As 8 telas (rota por hash com período: `#/rede?p=24h`) |
-| `/entrar` | GET | `?codigo=` → link de uso único do `./dashboard abrir`: cria a sessão e redireciona |
-| `/api/session` | GET | `{authRequired, authenticated, expiresAt}` (sem exigir login) |
-| `/api/login` | POST | `{token, remember?}` → cookie de sessão (30 dias; `remember: false` = só até fechar o navegador). 401 se errado; 10 tentativas/min/IP |
-| `/api/logout` | POST | Encerra a sessão deste navegador |
-| `/api/logout-all` | POST | Encerra todas as sessões (exige estar logado) |
-| `/api/status` | GET | Última amostra + meta (online, lastPollAt, nextPollAt, offlineSince) + saúde + alertas ativos |
-| `/api/history` | GET | `?limit=N&from=&to=` → amostras (reduzidas a `limit`: padrão 720, máximo 2000, com o pior caso de cada grupo; `topProcs` só na mais recente). `&formato=baldes` → `{from, to, step, buckets}` com mín/máx/média, até 90 dias |
-| `/api/config` | GET | Configuração ativa para a Ajuda: versões, alvos, modo de acesso, limiares (sem segredos) |
-| `/api/atualizacao` | GET | `{instalada, nova, novidades, exigeReconfigurar, verificadoEm, erro, modo, bloqueio, reconfiguracao}`. `reconfiguracao` é `null` ou `{em, motivos}`: o instante do `data/reconfigurar.log` e só as linhas de falha dele, até 5 (ADR 0037). `novidades` é `{secoes: [{versao, data, texto}], cortado, exigeReconfigurar}`; o `exigeReconfigurar` de fora só vale no acesso restrito; `erro` é `sem-acesso` ou `falhou`; `modo` é `systemd`, `segundo-plano` ou `null`; `bloqueio` é `sem-login`, `rodando`, `sem-git`, `arquivos-alterados` ou `outra-pasta` |
-| `/api/atualizacao/verificar` | POST | Procura versão nova agora e devolve o mesmo estado. No máximo 1 por minuto (429 acima) |
-| `/api/atualizacao/iniciar` | POST | `{versao}` igual à versão nova detectada → 202 `{alvo}`; senão, com `bloqueio` ou sem executor (testes e painel de teste), 409. Se o executor não subir, 503 (I11) |
-| `/api/atualizacao/registro` | GET | `?desde=<byte>` → `{texto, proximo, fase, alvo, de, inicio, fim, resultado, rodando}`: o pedaço novo do log, em linhas inteiras, até 64 KB. `fase`: `iniciando`, `procurando`, `trocando`, `ligando`, `voltando` ou `fim`; `resultado`: `atualizado`, `ja-na-mais-nova`, `voltou`, `falhou` ou `interrompida` |
-| `/api/reconfigurar/iniciar` | POST | Nada do pedido é lido → 202 `{codigo}`, o código do assistente, só nesta resposta (ADR 0036). Sem executor (testes e painel de teste sem `--reconfigurar`), 409. `bloqueio` no 409: `sem-login`, `rodando`, `outra-pasta` ou `sem-assinatura`. Se o executor não subir, 503, sem código no disco (I11) |
-| `/api/outages` | GET | `?days=1..90` (padrão 30) → `{days, outages, monitored, uptime}`. `monitored` são os intervalos `{from, to}` em que o painel estava medindo; `uptime` conta só esse tempo (ADR 0018) |
-| `/api/alerts` | GET | `?status=&level=&limit=` → `{active, all}` |
-| `/api/alerts/:id/ack` | POST | Reconhece o alerta |
-| `/api/alerts/:id/resolve` | POST | Resolve o alerta |
-| `/api/annotations` | GET / POST | Lista / cria anotação (`{ts, text, label}`) |
-| `/api/annotations/:id` | DELETE | Remove a anotação |
-| `/api/export` | GET | `?format=csv\|json&from=&to=` → download do relatório |
-| `/api/stream` | GET | SSE: `hello`, `sample` (`id` = instante), `alerts`, `annotations`, `status`, `atualizacao`. `Last-Event-ID` recupera até 2000 amostras |
-| `/api/poll` | POST | Coleta agora (piso de 5 s entre coletas manuais) |
-
-Durante a instalação, o assistente (`server/setup/web.js`) roda num servidor temporário, na mesma porta e com as
-mesmas proteções: `/configurar` (a página) e `/api/configurar/*` (os passos). Ele só abre com o código de uso único
-mostrado no terminal (30 min, 20 tentativas). Aberto pela tela (`--pela-tela`), ele aceita o código que o painel
-entregou ao navegador, `/api/configurar/estado` traz `pelaTela: true` e `POST /api/configurar/cancelar` devolve o
-painel.
-
-## Alertas
-
-Motor em `server/alerts/` (ADR 0006).
-
-| Condição | Chave estável | Nível | Limiar |
-|---|---|---|---|
-| Disco usado ≥ limiar | `disk:<mount>:usage` | warning | `ALERT_DISK_PCT` |
-| RAM usada ≥ limiar | `ram:usage` | warning | `ALERT_RAM_PCT` |
-| Temperatura da CPU ≥ limiar | `temp:cpu` | warning | `ALERT_TEMP_C` |
-| SMART `FAILED` (sem permissão ou sem smartctl é neutro) | `smart:<dev>` | critical | — |
-| Serviço fora de `active`/`reloading`/`activating` (sem resposta é neutro) | `service:<nome>` | critical | — |
-| Servidor inacessível depois de N falhas seguidas | `servidor-inacessivel` | critical | `ALERT_OFFLINE_AFTER` |
-
-- **Chave estável**: a condição que continua atualiza o MESMO alerta (B3).
-- **Histerese**: dispara no limiar e só limpa quando o valor cai `ALERT_HYSTERESIS` abaixo (disco e RAM em pontos de
-  %, temperatura em °C).
-- **Debounce do offline**: 1 falha isolada não alerta. A queda começa no instante da 1ª falha. Durante a queda, os
-  outros alertas ficam como estão (nada foi medido).
-- **Dado ausente** não cria nem resolve alerta.
-- **Disponibilidade** (ADR 0018): conta só o **tempo medido**, as faixas de 5 min com pelo menos 1 amostra (bruta ou
-  agregada) mais as quedas registradas (o painel estava rodando e tentando). Fórmula: 100 − fora do ar ÷ tempo medido
-  × 100. Sem tempo medido, é `null` ("sem dados"), nunca 100%. Um dia sem nenhuma coleta fica cinza em Eventos e "sem
-  dados" nos Relatórios. Os agregados guardam a cobertura em memória (`RollupStore.coverage`), lida do disco 1 vez.
-- **Saúde 0–100** (`server/alerts/health.js`): começa em 100 e perde pontos por problema, a partir dos mesmos limiares
-  dos alertas:
-  - RAM: −15 no limiar, −5 a partir de 15 pontos abaixo dele;
-  - disco: −15 no limiar, −5 a partir de 10 pontos abaixo;
-  - temperatura: −15 no limiar, −25 a partir de 10 °C acima;
-  - carga acima de 1,5 × núcleos: −10;
-  - SMART `FAILED`: −40; serviço parado: −25;
-  - offline ou sem dado: 0.
-
-Faixas: 80–100 saudável, 50–79 atenção, 0–49 crítico. A tela só mostra o que vem em `/api/status` (`health`).
-
-## Orçamento de desempenho
-
-Definido no plano da V2 e revisto só depois de medir: RAM em 16 e 19/10/2026 (#26), pico dos pedidos de 90 dias em
-26/10/2026 (#78) e página inicial de 300 para 450 KB em 30/10/2026, a pedido do mantenedor (#100).
-
-| Medida | Limite | Medido | Como se confere |
-|---|---|---|---|
-| Tempo do comando no servidor | ≤ 1,5 s | 1,26–1,31 s (servidor real, 1 núcleo) | faixa de status e `./dashboard diagnosticar` |
-| Tamanho da resposta | ≤ 16 KB | 2,9 KB (servidor real) | idem; acima de 1 MB a conexão é cortada |
-| Página inicial | ≤ 450 KB transferidos | 293 KB (com gzip) | `test/e2e/telas.test.js` |
-| RAM do Node com 72 h em memória | ≤ 95 MB | 88,5–90,4 MB (painel reiniciado com 72 h) | `npm run soak` |
-| RAM do Node no pico dos pedidos de 90 dias | ≤ 120 MB | 113–115 MB (gráfico e Relatórios, 1 h e 15 min) | `npm run soak` (fase 3) |
-| Memória depois que a janela de 72 h enche | sem crescer (≤ +4 MB) | +1,1 a +1,8 MB em 11 h a mais | `npm run soak` |
-
-O Node 24 vazio usa ~44 MB e o painel sem histórico, ~63 MB. As amostras de 72 h ocupam ~12 MB de heap. Por isso o
-painel sobe com `--max-semi-space-size=2` e `--optimize-for-size` (`server/node-flags.js`), nos 4 caminhos (serviço
-systemd, segundo plano, `npm start` e o soak): sem a primeira, a geração jovem do V8 crescia até 32 MB; a segunda faz
-o V8 coletar a geração velha mais cedo. Os pedidos de baldes de 90 dias leem 1 arquivo diário por vez, em blocos de 64
-KB, e somam só números (`RollupStore.each` + `bucketMerger`); isso tirou o pico de 165–264 MB (#78) para ~115 MB.
-Guardar as amostras em forma compacta não melhora o RSS (medido em 19/10/2026).
-
-## Solução de problemas (para quem desenvolve)
-
-Comece pelo `./dashboard diagnosticar` (o TUTORIAL cobre quem usa). Coleta lenta ou parada: `data/dashboard.log` e
-`journalctl --user -u server-dashboard`. Histórico vazio: `data/history/` e as permissões de `data/` (veio da V1?
-`npm run migrar-v1 -- --verificar`). Suíte vermelha só na sua máquina: rode num clone sem `.env` e com o Node 24. e2e
-pulado: instale o `playwright-core` (`npm ci`) e um Chromium, ou aponte um com `CHROMIUM=<caminho>`.

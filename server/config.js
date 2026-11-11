@@ -258,7 +258,7 @@ export function sshConfigFile(value, root = DATA_ROOT) {
 export const configWarnings = [];
 
 // A configuração ativa. Cada chave é uma variável do .env (nomes, padrões e faixas iguais à
-// tabela do AGENTS e ao .env.example; o docs.test.js confere os três).
+// tabela de docs/referencia/configuracao.md e ao .env.example; o docs.test.js confere os três).
 export const config = {
   SSH_HOST: sanitizeHost(env('SSH_HOST', 'seu-host')),
   SSH_CONFIG: sshConfigFile(env('SSH_CONFIG', '')),

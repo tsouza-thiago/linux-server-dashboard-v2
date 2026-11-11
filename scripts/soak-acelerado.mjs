@@ -8,9 +8,9 @@
 //          um gc) para de crescer quando a janela enche: sem vazamento.
 // Fase 2 — num processo novo, o painel reinicia com as 72 h lidas do disco e faz coletas em
 //          ritmo calmo; mede a RAM do Node (RSS) como ela fica no uso real, com as opções do
-//          Node do painel (server/node-flags.js). Orçamento (AGENTS, "Orçamento de
-//          desempenho"): até 95 MB. O Node 24 vazio já usa ~44 MB e o painel sem histórico,
-//          ~63 MB.
+//          Node do painel (server/node-flags.js). Orçamento
+//          (docs/referencia/desempenho.md): até 95 MB. O Node 24 vazio já usa ~44 MB e o
+//          painel sem histórico, ~63 MB.
 // Fase 3 — num processo novo, com agregados de 5 min até 90 dias para trás (cópias de um
 //          agregado de verdade), pede os baldes de 90 dias como as telas pedem: um gráfico
 //          (720 pontos) e os Relatórios em fuso de hora inteira (passo de 1 h) e de 45 min

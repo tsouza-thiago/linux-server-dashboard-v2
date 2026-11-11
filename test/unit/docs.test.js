@@ -15,7 +15,10 @@ import { buildScript } from '../../server/collector/builder.js';
 
 const ROOT = path.join(path.dirname(fileURLToPath(import.meta.url)), '..', '..');
 const read = (f) => fs.readFileSync(path.join(ROOT, f), 'utf8');
-const MAIN_DOCS = ['README.md', 'TUTORIAL.md', 'AGENTS.md', 'SECURITY.md'];
+// A referência sob demanda (docs/referencia/) saiu do AGENTS (#191) e segue nas mesmas conferências.
+const REF = 'docs/referencia';
+const REF_DOCS = fs.readdirSync(path.join(ROOT, REF)).filter((f) => f.endsWith('.md')).sort().map((f) => `${REF}/${f}`);
+const MAIN_DOCS = ['README.md', 'TUTORIAL.md', 'AGENTS.md', 'SECURITY.md', ...REF_DOCS];
 const ADRS = fs.readdirSync(path.join(ROOT, 'docs', 'adr')).filter((f) => f.endsWith('.md')).map((f) => `docs/adr/${f}`);
 
 function allMarkdown(dir = ROOT, out = []) {
@@ -167,11 +170,9 @@ const ENV_KEYS = [
 ].sort();
 const ALERT_FIELD = { ALERT_DISK_PCT: 'diskPct', ALERT_RAM_PCT: 'ramPct', ALERT_TEMP_C: 'tempC', ALERT_HYSTERESIS: 'hysteresis', ALERT_OFFLINE_AFTER: 'offlineAfter' };
 
-/** Linhas da tabela "Configuração" do AGENTS: { KEY: { padrao, faixa } }. */
+/** Linhas da tabela de `docs/referencia/configuracao.md`: { KEY: { padrao, faixa } }. */
 function agentsEnvTable() {
-  const md = read('AGENTS.md');
-  const start = md.indexOf('## Configuração');
-  const section = md.slice(start, md.indexOf('\n## ', start + 3));
+  const section = read(`${REF}/configuracao.md`);
   const rows = {};
   for (const line of section.split('\n')) {
     const cells = line.split('|').slice(1, -1).map((c) => c.trim());
@@ -198,9 +199,9 @@ function loadConfig(values) {
   return c;
 }
 
-test('docs: as variáveis do .env são as mesmas no código, no AGENTS e no .env.example', () => {
+test('docs: as variáveis do .env são as mesmas no código, na referência e no .env.example', () => {
   assert.ok(ENV_KEYS.length >= 18, `achei só ${ENV_KEYS.length} variáveis no config.js`);
-  assert.deepEqual(Object.keys(agentsEnvTable()).sort(), ENV_KEYS, 'tabela "Configuração" do AGENTS');
+  assert.deepEqual(Object.keys(agentsEnvTable()).sort(), ENV_KEYS, 'tabela de docs/referencia/configuracao.md');
   // Linha comentada vale (SMART_DEVS: presente e vazia desligaria o SMART de quem copiar o modelo).
   const example = [...read('.env.example').matchAll(/^(?:# )?([A-Z][A-Z_]+)=/gm)].map((m) => m[1]).sort();
   assert.deepEqual(example, ENV_KEYS, '.env.example');
@@ -213,7 +214,7 @@ test('docs: as variáveis do .env são as mesmas no código, no AGENTS e no .env
   }
 });
 
-test('docs: padrões e faixas da tabela de configuração do AGENTS são os do código', () => {
+test('docs: padrões e faixas da tabela de configuração da referência são os do código', () => {
   const rows = agentsEnvTable();
   const defaults = loadConfig({});
   for (const [key, { padrao }] of Object.entries(rows)) {
@@ -242,12 +243,12 @@ test('docs: padrões e faixas da tabela de configuração do AGENTS são os do c
 
 // ---------------------------------------------------------------- API, versões e nomes
 
-test('docs: rotas da API documentadas existem e toda rota do painel está no AGENTS', () => {
+test('docs: rotas da API documentadas existem e toda rota do painel está na referência', () => {
   const routes = (file) => [...read(file).matchAll(/app\.(get|post|delete|put)\('(\/[^']*)'/g)].map((m) => `${m[1].toUpperCase()} ${m[2]}`);
   const panel = routes('server/index.js');
   const wizard = routes('server/setup/web.js');
   const paths = new Set([...panel, ...wizard].map((r) => r.split(' ')[1]));
-  const agents = read('AGENTS.md');
+  const agents = read(`${REF}/api.md`);
   const table = new Set();
   for (const line of agents.split('\n')) {
     const cells = line.split('|').slice(1, -1).map((c) => c.trim());
@@ -255,7 +256,7 @@ test('docs: rotas da API documentadas existem e toda rota do painel está no AGE
     if (!p || !/^[A-Z/ ]+$/.test(cells[1] || '')) continue;
     for (const method of cells[1].split('/').map((m) => m.trim())) table.add(`${method} ${p}`);
   }
-  for (const r of panel) assert.ok(table.has(r), `rota ${r} fora da tabela da API do AGENTS`);
+  for (const r of panel) assert.ok(table.has(r), `rota ${r} fora da tabela de docs/referencia/api.md`);
   for (const file of MAIN_DOCS) {
     for (const [, p] of read(file).matchAll(/`((?:\/api|\/entrar|\/configurar)[^`?\s]*)/g)) {
       const ok = p.endsWith('/*') ? [...paths].some((x) => x.startsWith(p.slice(0, -1))) : paths.has(p);
@@ -305,10 +306,10 @@ test('docs: exemplos usam só IPs de documentação (RFC 5737) ou de loopback', 
   }
 });
 
-test('docs: o exemplo do comando de coleta no AGENTS é o que o builder gera', () => {
-  const md = read('AGENTS.md');
-  const start = md.indexOf('## Comando SSH de coleta');
-  assert.ok(start > 0, 'seção "Comando SSH de coleta" no AGENTS');
+test('docs: o exemplo do comando de coleta da referência é o que o builder gera', () => {
+  const md = read(`${REF}/coleta.md`);
+  const start = md.indexOf('# Comando SSH de coleta');
+  assert.ok(start >= 0, 'título "Comando SSH de coleta" em docs/referencia/coleta.md');
   const block = md.slice(start).match(/```sh\n([\s\S]*?)```/)[1];
   // Os parâmetros que o próprio texto do exemplo diz usar.
   const intro = md.slice(start, md.indexOf('```sh', start));
