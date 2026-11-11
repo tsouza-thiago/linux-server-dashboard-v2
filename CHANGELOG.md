@@ -11,6 +11,7 @@ diante: `PATCH` corrige, `MINOR` acrescenta sem quebrar e `MAJOR` quebra.
 
 ### Alterado
 - Documentação: o `AGENTS.md` ficou só com o que vale em toda sessão (regras, desenvolvimento, arquitetura e comandos). Configuração, comando de coleta, formato da amostra, persistência, API, alertas, orçamento de desempenho e solução de problemas foram para `docs/referencia/`, um arquivo por tema, sem mudança de sentido. O `AGENTS.md` ganhou a tabela "Referência sob demanda", que aponta para cada um, e caiu de 52 KB para 29 KB. O `test/unit/docs.test.js` confere os arquivos novos como conferia o `AGENTS.md` (#191).
+- Desenvolvimento: o `npm run check` confere a versão do Node antes de tudo. Com Node mais antigo que o 24, ele para com a versão encontrada e como usar o Node certo, em vez de rodar a suíte e falhar em 7 testes sem apontar a causa (#195).
 
 ## [2.6.4] — 2026-11-07
 
