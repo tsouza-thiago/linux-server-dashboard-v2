@@ -398,7 +398,7 @@ painel. `test/unit/docs.test.js` confere que cada linha aponta um teste.
 ## Verificação contínua
 
 A verificação é redundante de propósito: cada camada pega o que a outra pode deixar passar.
-Os detalhes estão no AGENTS ("Verificação em camadas") e na ADR 0014.
+Os detalhes estão em [docs/referencia/verificacao-de-seguranca.md](docs/referencia/verificacao-de-seguranca.md) e na ADR 0014.
 
 1. **`npm run check`**, antes de todo commit. Inclui os testes de `test/seguranca/`:
    regras estáticas, matriz de ataque, payloads do OWASP, OSINT e cadeia de suprimentos.
