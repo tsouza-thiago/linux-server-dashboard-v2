@@ -1,7 +1,5 @@
 # CLAUDE.md
 
-This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
-
 A referência técnica única é o AGENTS.md, importado abaixo; não duplique o conteúdo dele aqui.
 
 @AGENTS.md

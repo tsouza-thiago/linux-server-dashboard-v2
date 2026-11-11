@@ -363,7 +363,7 @@ Inclua: o passo a passo para reproduzir, o impacto estimado e a versão afetada
   SHA-256 na tag; o `voltar` vale 1 vez, até 24 h. O `.deb` é reprodutível e o `SHA256SUMS` é assinado
   no namespace `server-dashboard`: a pessoa o confere antes de instalar (README) e o CI gera o pacote 2
   vezes. O `apt purge` nunca toca nas pastas pessoais. Cada regra e cada diretiva estão no
-  [AGENTS.md](AGENTS.md#configuração) e nas ADRs [0042](docs/adr/0042-modo-sistema-deb-e-executor-em-opt.md)
+  [docs/referencia/configuracao.md](docs/referencia/configuracao.md) e nas ADRs [0042](docs/adr/0042-modo-sistema-deb-e-executor-em-opt.md)
   a [0050](docs/adr/0050-importar-desinstalar-e-purge-no-pacote.md).
 - **Verificado por:** `test/integration/atualizador.test.js`, `test/unit/unidades-systemd.test.js`
   (cada diretiva e a nota do `systemd-analyze security`), `test/unit/polkit-e-grupo.test.js` (a regra

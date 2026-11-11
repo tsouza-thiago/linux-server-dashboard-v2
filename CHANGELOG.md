@@ -9,6 +9,9 @@ diante: `PATCH` corrige, `MINOR` acrescenta sem quebrar e `MAJOR` quebra.
 
 ## [Não publicado]
 
+### Alterado
+- Documentação: o `AGENTS.md` ficou só com o que vale em toda sessão (regras, desenvolvimento, arquitetura e comandos). Configuração, comando de coleta, formato da amostra, persistência, API, alertas, orçamento de desempenho e solução de problemas foram para `docs/referencia/`, um arquivo por tema, sem mudança de sentido. O `AGENTS.md` ganhou a tabela "Referência sob demanda", que aponta para cada um, e caiu de 52 KB para 29 KB. O `test/unit/docs.test.js` confere os arquivos novos como conferia o `AGENTS.md` (#191).
+
 ## [2.6.4] — 2026-11-07
 
 A troca de tela pelo menu lateral agora se vê: a tela velha sai, a nova entra com suavidade e a entrada acontece uma vez só. Nada muda na configuração, no formato de `data/` nem no acesso ao servidor.

@@ -93,7 +93,7 @@ async function montarVitrine(dir) {
   const pico = agora - 30 * HORA;
   const queda = { de: agora - 50 * HORA, ate: agora - 50 * HORA + 18 * MIN };
   const falso = coletorFalso(saidaVitrine({ agora, pico, queda }));
-  // Sem SSH, o tempo da coleta seria 0: aqui ele fica perto do medido no servidor (AGENTS.md).
+  // Sem SSH, o tempo da coleta seria 0: aqui ele fica perto do medido no servidor (docs/referencia/desempenho.md).
   const coletar = async (t) => {
     const r = await falso(t);
     if (r.ok) r.sample.collector.durationMs = 1250 + Math.round(ruido(t / MIN, 10) * 80);

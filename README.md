@@ -180,7 +180,7 @@ de propósito. Para acesso remoto, use VPN ou túnel SSH.
 |---|---|
 | [TUTORIAL.md](TUTORIAL.md) | Quem vai instalar e usar: passo a passo, telas, glossário e problemas |
 | [SECURITY.md](SECURITY.md) | Quem quer auditar: modelo de ameaças e como reportar falhas |
-| [AGENTS.md](AGENTS.md) | Quem desenvolve: regras, configuração, coleta, API, formato dos dados |
+| [AGENTS.md](AGENTS.md) | Quem desenvolve: regras, arquitetura e comandos; configuração, coleta, API e formato dos dados em `docs/referencia/` |
 | [CHANGELOG.md](CHANGELOG.md) | Mudanças de cada versão |
 | [docs/adr/](docs/adr/README.md) | Decisões de projeto (ADRs) e análises de segurança em `docs/seguranca/` |
 
