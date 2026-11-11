@@ -142,11 +142,17 @@ async function arquivoFixado({ arquivo, url, sha256 }) {
   fs.mkdirSync(cache, { recursive: true, mode: 0o700 });
   const destino = path.join(cache, arquivo);
   const confere = (buf) => crypto.createHash('sha256').update(buf).digest('hex') === sha256;
-  if (fs.existsSync(destino) && confere(fs.readFileSync(destino))) return destino;
+  // Lê direto, sem conferir antes se existe: entre a conferência e a leitura o arquivo poderia
+  // mudar (CodeQL js/file-system-race). Faltar é só um erro de leitura.
+  try {
+    if (confere(fs.readFileSync(destino))) return destino;
+  } catch { /* sem cache: baixa */ }
   for (let tentativa = 1; tentativa <= 2; tentativa += 1) {
     try {
       const res = await fetch(url, { signal: AbortSignal.timeout(60_000) });
       const buf = Buffer.from(await res.arrayBuffer());
+      // Só grava o que bate com o SHA-256 fixo no código: o conteúdo é exatamente o arquivo
+      // esperado, venha de onde vier (análise: docs/seguranca/2026-11-11-codeql-dado-de-rede-em-arquivo.md).
       if (res.ok && confere(buf)) {
         fs.writeFileSync(destino, buf, { mode: 0o600 });
         return destino;

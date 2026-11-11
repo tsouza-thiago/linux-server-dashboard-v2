@@ -102,6 +102,14 @@ test('A03: o ZAP roda sem rede e o add-on beta é preso por SHA-256', () => {
   assert.match(beta[1], /regras: \[\d+(, \d+)+\],/);
   assert.match(src, /:\/zap\/plugin\/\$\{ZAP_BETA\.arquivo\}:ro/, 'add-on montado só leitura');
   assert.match(src, /ok: [^\n]*semBeta\.length === 0/, 'regra beta ausente reprova');
+  // Alerta 30 do CodeQL (docs/seguranca/2026-11-11-codeql-dado-de-rede-em-arquivo.md): o dado da
+  // rede só vai para o disco depois de bater com o SHA-256 fixo, e é a única escrita da função.
+  const fn = src.match(/^async function arquivoFixado\([\s\S]*?^\}$/m);
+  assert.ok(fn, 'função arquivoFixado');
+  assert.equal(fn[0].match(/fs\.writeFileSync\(/g).length, 1, 'uma escrita só');
+  assert.match(fn[0], /if \(res\.ok && confere\(buf\)\) \{\n\s+fs\.writeFileSync\(destino, buf, \{ mode: 0o600 \}\);/, 'grava só depois do hash');
+  assert.match(fn[0], /createHash\('sha256'\)\.update\(buf\)\.digest\('hex'\) === sha256/, 'hash comparado ao fixo');
+  assert.doesNotMatch(fn[0], /existsSync/, 'sem conferir antes de ler (corrida)');
 });
 
 // As imagens base do e2e de instalação também: uma tag (debian:12) pode passar a apontar para
