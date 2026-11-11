@@ -80,10 +80,36 @@ test('A08: o script de coleta é byte a byte o da v2.0.0 (o authorized_keys do s
 
 test('A03: as ferramentas de segurança rodam em imagens presas por digest sha256', () => {
   const src = ler('scripts/seguranca.mjs');
-  const imagens = [...src.matchAll(/^\s+\w+: '([^']+)',$/gm)].map((m) => m[1]).filter((i) => i.includes('/'));
+  const bloco = src.match(/^const IMG = \{\n([\s\S]*?)\n\};$/m);
+  assert.ok(bloco, 'bloco const IMG');
+  const imagens = [...bloco[1].matchAll(/^\s+\w+: '([^']+)',$/gm)].map((m) => m[1]);
   assert.ok(imagens.length >= 5, `imagens: ${imagens.length}`);
   for (const img of imagens) assert.match(img, /@sha256:[0-9a-f]{64}$/, `${img} sem digest`);
   assert.doesNotMatch(src, /:latest\b/);
+});
+
+// #202: o ZAP não baixa add-on da internet durante a varredura (`-silent`, sem `-addonupdate`).
+// O único arquivo de fora é o das regras passivas beta, com URL e SHA-256 fixos, e cada regra
+// dele precisa aparecer na saída (senão o add-on não carregou e a cobertura caiu em silêncio).
+test('A03: o ZAP roda sem rede e o add-on beta é preso por SHA-256', () => {
+  const src = ler('scripts/seguranca.mjs');
+  assert.match(src, /'-z', '-silent /, 'ZAP com -silent');
+  assert.doesNotMatch(src, /addonupdate'|'-addoninstall/, 'nenhum add-on baixado pelo ZAP');
+  const beta = src.match(/^const ZAP_BETA = \{\n([\s\S]*?)\n\};$/m);
+  assert.ok(beta, 'bloco const ZAP_BETA');
+  assert.match(beta[1], /url: 'https:\/\/github\.com\/zaproxy\/zap-extensions\/releases\/download\/[^']+',/);
+  assert.match(beta[1], /sha256: '[0-9a-f]{64}',/);
+  assert.match(beta[1], /regras: \[\d+(, \d+)+\],/);
+  assert.match(src, /:\/zap\/plugin\/\$\{ZAP_BETA\.arquivo\}:ro/, 'add-on montado só leitura');
+  assert.match(src, /ok: [^\n]*semBeta\.length === 0/, 'regra beta ausente reprova');
+  // Alerta 30 do CodeQL (docs/seguranca/2026-11-11-codeql-dado-de-rede-em-arquivo.md): o dado da
+  // rede só vai para o disco depois de bater com o SHA-256 fixo, e é a única escrita da função.
+  const fn = src.match(/^async function arquivoFixado\([\s\S]*?^\}$/m);
+  assert.ok(fn, 'função arquivoFixado');
+  assert.equal(fn[0].match(/fs\.writeFileSync\(/g).length, 1, 'uma escrita só');
+  assert.match(fn[0], /if \(res\.ok && confere\(buf\)\) \{\n\s+fs\.writeFileSync\(destino, buf, \{ mode: 0o600 \}\);/, 'grava só depois do hash');
+  assert.match(fn[0], /createHash\('sha256'\)\.update\(buf\)\.digest\('hex'\) === sha256/, 'hash comparado ao fixo');
+  assert.doesNotMatch(fn[0], /existsSync/, 'sem conferir antes de ler (corrida)');
 });
 
 // As imagens base do e2e de instalação também: uma tag (debian:12) pode passar a apontar para
