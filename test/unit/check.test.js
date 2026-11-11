@@ -7,7 +7,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { testesQueFalharam, LOG_FALHA } from '../../scripts/check.mjs';
+import { testesQueFalharam, nodeAntigo, LOG_FALHA } from '../../scripts/check.mjs';
 
 const ROOT = path.join(path.dirname(fileURLToPath(import.meta.url)), '..', '..');
 
@@ -36,6 +36,21 @@ test('check: lê o nome de cada teste que falhou na seção "failing tests"', ()
   ]);
 });
 
+test('#195: Node mais antigo que o mínimo do package.json recebe a explicação; o mínimo ou mais novo, não', () => {
+  const { engines } = JSON.parse(fs.readFileSync(path.join(ROOT, 'package.json'), 'utf8'));
+  assert.equal(engines.node, '>=24', 'mínimo do projeto (ADR 0002)');
+  assert.equal(nodeAntigo('24.0.0'), null);
+  assert.equal(nodeAntigo('26.1.0'), null);
+  assert.equal(nodeAntigo(), null, 'o Node que roda a suíte serve');
+  const erro = nodeAntigo('22.23.4');
+  assert.match(erro, /Node\.js 24 ou mais novo; este é o 22\.23\.4/);
+  assert.match(erro, /\.runtime\/node\/bin/, 'diz como usar o Node que o ./dashboard baixa');
+  // Versão ilegível não passa por boa.
+  assert.match(nodeAntigo('lixo'), /ERRO/);
+  assert.equal(nodeAntigo('30.0.0', '>=28'), null, 'segue o engines, não um número fixo');
+  assert.match(nodeAntigo('24.1.0', '>=28'), /Node\.js 28/);
+});
+
 test('check: suíte verde ou saída sem a seção não inventa falha', () => {
   assert.deepEqual(testesQueFalharam('✔ um teste (1ms)\nℹ fail 0\n'), []);
   assert.deepEqual(testesQueFalharam(''), []);
@@ -61,6 +76,8 @@ function projetoComSuiteGrande() {
     fs.writeFileSync(path.join(dir, sh), '');
   }
   // 300 KB no stdout do teste: bem mais que os 64 KiB que o pipe guarda.
+  // O check lê o Node mínimo do package.json (#195).
+  fs.copyFileSync(path.join(ROOT, 'package.json'), path.join(dir, 'package.json'));
   fs.writeFileSync(path.join(dir, 'test', 'grande.test.js'), [
     "import test from 'node:test';",
     "import assert from 'node:assert/strict';",
