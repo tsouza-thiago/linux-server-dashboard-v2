@@ -9,6 +9,10 @@ diante: `PATCH` corrige, `MINOR` acrescenta sem quebrar e `MAJOR` quebra.
 
 ## [Não publicado]
 
+## [2.6.5] — 2026-11-11
+
+Versão de manutenção para quem desenvolve o painel: o `AGENTS.md` ficou com a metade do tamanho, com a referência em `docs/referencia/`; o `npm run check` avisa quando o Node é antigo; um teste instável do histórico foi corrigido. Nada muda no painel, na configuração, no formato de `data/` nem no acesso ao servidor.
+
 ### Alterado
 - Documentação: o `AGENTS.md` ficou só com o que vale em toda sessão (regras, desenvolvimento, arquitetura e comandos). Configuração, comando de coleta, formato da amostra, persistência, API, alertas, orçamento de desempenho e solução de problemas foram para `docs/referencia/`, um arquivo por tema, sem mudança de sentido. O `AGENTS.md` ganhou a tabela "Referência sob demanda", que aponta para cada um, e caiu de 52 KB para 29 KB. O `test/unit/docs.test.js` confere os arquivos novos como conferia o `AGENTS.md` (#191).
 - Testes: o `test/unit/docs.test.js` guarda a divisão do `AGENTS.md`. A tabela "Referência sob demanda" cita todo arquivo de `docs/referencia/`, o `AGENTS.md` fica só com as seções de toda sessão e em até 32 KB, cada arquivo da referência tem título e link de volta, e o `CLAUDE.md` não repete o `AGENTS.md` (#194).
@@ -1466,7 +1470,8 @@ Documentados no plano da V2 (seção 2.2, B1–B12), entre eles: alerta SMART fa
 rede zerada com contadores grandes, alerta duplicado a cada coleta e reescrita completa do
 histórico a cada minuto.
 
-[Não publicado]: https://github.com/tsouza-thiago/linux-server-dashboard-v2/compare/v2.6.4...HEAD
+[Não publicado]: https://github.com/tsouza-thiago/linux-server-dashboard-v2/compare/v2.6.5...HEAD
+[2.6.5]: https://github.com/tsouza-thiago/linux-server-dashboard-v2/compare/v2.6.4...v2.6.5
 [2.6.4]: https://github.com/tsouza-thiago/linux-server-dashboard-v2/compare/v2.6.3...v2.6.4
 [2.6.3]: https://github.com/tsouza-thiago/linux-server-dashboard-v2/compare/v2.6.2...v2.6.3
 [2.6.2]: https://github.com/tsouza-thiago/linux-server-dashboard-v2/compare/v2.6.1...v2.6.2
