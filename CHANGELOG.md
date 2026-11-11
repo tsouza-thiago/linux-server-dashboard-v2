@@ -14,6 +14,9 @@ diante: `PATCH` corrige, `MINOR` acrescenta sem quebrar e `MAJOR` quebra.
 - Testes: o `test/unit/docs.test.js` guarda a divisão do `AGENTS.md`. A tabela "Referência sob demanda" cita todo arquivo de `docs/referencia/`, o `AGENTS.md` fica só com as seções de toda sessão e em até 32 KB, cada arquivo da referência tem título e link de volta, e o `CLAUDE.md` não repete o `AGENTS.md` (#194).
 - Desenvolvimento: o `npm run check` confere a versão do Node antes de tudo. Com Node mais antigo que o 24, ele para com a versão encontrada e como usar o Node certo, em vez de rodar a suíte e falhar em 7 testes sem apontar a causa (#195).
 
+### Corrigido
+- Testes: 2 testes do histórico gravavam e terminavam sem esperar a fila de gravação. De vez em quando, a limpeza apagava a pasta temporária com um arquivo nascendo nela e o `npm run check` falhava com `ENOTEMPTY`. Agora os 2 esperam a fila, e um teste novo acusa qualquer teste que grave no histórico sem esperar (#197).
+
 ## [2.6.4] — 2026-11-07
 
 A troca de tela pelo menu lateral agora se vê: a tela velha sai, a nova entra com suavidade e a entrada acontece uma vez só. Nada muda na configuração, no formato de `data/` nem no acesso ao servidor.
