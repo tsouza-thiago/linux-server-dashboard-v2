@@ -30,23 +30,23 @@ Leia só o arquivo que a tarefa pede. Mudou o código de um destes temas? Atuali
 | Rotas HTTP, SSE e o assistente | [docs/referencia/api.md](docs/referencia/api.md) |
 | Alertas, histerese, disponibilidade e saúde 0–100 | [docs/referencia/alertas.md](docs/referencia/alertas.md) |
 | Limites de tempo, tamanho e RAM, e como medir | [docs/referencia/desempenho.md](docs/referencia/desempenho.md) |
+| Camadas de verificação de segurança: etapas, opções e limites do `npm run seguranca` e do CI | [docs/referencia/verificacao-de-seguranca.md](docs/referencia/verificacao-de-seguranca.md) |
 | Por onde começar a investigar um problema | [docs/referencia/solucao-de-problemas.md](docs/referencia/solucao-de-problemas.md) |
 
 ## Regras (obrigatórias)
 
-- **1 único SSH por coleta**, com um comando combinado. Nada de conexões em paralelo contra o servidor.
-- **Servidor somente leitura.** Nunca compilar, instalar pacotes ou rodar scripts pesados **no servidor**. Não há
-  agente nem dependência no servidor.
-- O servidor é modesto (1 núcleo, pouca RAM) e tem discos **SMR**: evitar escrita intensa ou aleatória nele.
-- **Apenas comandos não interativos.** O painel conecta pelo alias `servidor` do `data/ssh/config`. Para inspeções à
-  mão, use o seu alias do `~/.ssh/config` (ex.: `ssh meu-servidor '<comando>'` → `usuario@192.0.2.10:22`).
+As invariantes da tabela abaixo valem sempre. Regras de conduta que a tabela não traz:
+
+- **Nunca** compilar, instalar pacotes ou rodar scripts pesados **no servidor** (1 núcleo, pouca RAM, discos SMR). Não
+  há agente nem dependência no servidor.
+- Inspeção à mão no servidor: só comandos não interativos, pelo seu alias do `~/.ssh/config` (ex.:
+  `ssh meu-servidor '<comando>'` → `usuario@192.0.2.10:22`). O painel conecta pelo alias `servidor` do
+  `data/ssh/config`.
 - **NUNCA** exibir, imprimir ou commitar o conteúdo de `.env`: ele guarda o `DASH_TOKEN` (o acesso ao painel). O
   painel não guarda senha: a coleta usa uma chave SSH. A senha do administrador serve só na instalação, fica na
   memória e é descartada.
-- **Nunca commitar `data/`.** Ela tem hostnames, IPs e telemetria da rede interna.
-- Dado dinâmico (temperatura, espaço, status) é sempre coletado ao vivo, nunca presumido. Dado ausente é `null`, nunca
-  zero inventado.
-- O painel escuta só em `127.0.0.1`.
+- `data/` nunca vai para o git nem para issue, PR ou log: ela tem hostnames, IPs e telemetria da rede interna.
+- Dado dinâmico (temperatura, espaço, status) é sempre coletado ao vivo, nunca presumido.
 
 ### Invariantes (citadas no código como I1–I11)
 
@@ -103,95 +103,55 @@ Leia só o arquivo que a tarefa pede. Mudou o código de um destes temas? Atuali
   verde.
 - **SSH isolado**: `BatchMode=yes` + `ConnectTimeout=10`. Com `SSH_CONFIG`, o painel usa só `ssh -F data/ssh/config`,
   com `known_hosts` próprio e `StrictHostKeyChecking yes` (nunca `no` nem `accept-new` depois da instalação).
-- **Acesso restrito** ([ADR 0008](docs/adr/0008-ssh-restrito.md), `SSH_ACESSO=restrito`): usuário `dashmon` sem senha.
-  A linha do `authorized_keys` é `restrict,from=,command="<coleta>"`, gerada e escapada em `server/setup/acesso.js`
-  (conferida contra o `opt_dequote` do OpenSSH). O painel envia só a palavra do modo (`basico` ou `smart`); qualquer
-  outro texto vira `basico`. Sudoers com um `smartctl -H /dev/X` por disco, nunca curinga, validado com `visudo -cf`.
-- **Vários computadores** (ADR 0020): cada instalação tem um ID (8 hex do SHA-256 da chave pública) e troca só a sua
-  linha do `authorized_keys` (`dashboard@<computador>:<id>`) e o seu sudoers
-  (`/etc/sudoers.d/dashboard-<computador>-<id>`). O nome do computador passa por `machineLabel()` (`[a-z0-9-]`, sem
-  ponto) antes de virar arquivo ou comando. O `desinstalar` tira só a parte do próprio ID; o `dashmon` sai só sem
-  nenhuma linha.
+- **Acesso restrito** ([ADR 0008](docs/adr/0008-ssh-restrito.md), `SSH_ACESSO=restrito`): usuário `dashmon` sem senha,
+  com comando forçado no `authorized_keys` e sudoers sem curinga. Fora da ADR: a linha é gerada e escapada em
+  `server/setup/acesso.js` (conferida contra o `opt_dequote` do OpenSSH), e o painel envia só a palavra do modo
+  (`basico` ou `smart`); qualquer outro texto vira `basico`.
+- **Vários computadores** ([ADR 0020](docs/adr/0020-varios-computadores-no-mesmo-servidor.md)): cada instalação tem um
+  ID e troca ou remove só a sua linha do `authorized_keys` e o seu sudoers. O nome do computador passa por
+  `machineLabel()` antes de virar arquivo ou comando.
 - **Instalação** (`server/setup/`): toda entrada é validada em `acesso.js` antes de virar arquivo ou comando. A senha
   do administrador fica só em memória (o `ssh` a recebe pelo askpass, em variável de ambiente só daquele processo; o
   `sudo -S -k`, pelo stdin), nunca vai na linha de comando e é descartada no fim do passo 5. O assistente web só abre
   com código de uso único e tem as proteções do painel.
-- **Entrada por chave** (ADR 0021): o apelido do `~/.ssh/config` é lido com `ssh -G` (não conecta) e só os valores
-  dele vão para o `runAdmin` (`server/setup/remoto.js`): `-F /dev/null`, `-i <IdentityFile>`, `IdentitiesOnly=yes`, o
-  `IdentityAgent`, `BatchMode=yes` e o `known_hosts` do painel. `ProxyJump` e `ProxyCommand` são recusados. A
-  passphrase fica no ssh-agent (o painel compara `ssh-add -L` com o `.pub`). A senha do sudo é separada da do SSH e
-  vai só pelo stdin. O preparo começa por uma conferência só de leitura do sshd (`sshd -T -C user=dashmon,…`); o
-  painel nunca altera o `sshd_config`.
-- **Comando no PATH e autocomplete** (ADRs 0028 e 0029): o link `~/.local/bin/dashboard` nunca sobrescreve outro
-  programa e só troca o de outra pasta com o sim. O arquivo de login (e o `~/.bashrc`, só sem o pacote
-  `bash-completion`) só muda com o sim (`--editar-profile` sem perguntas): cópia antes, bloco marcado e fixo, sem dado
-  da configuração. O `desinstalar` tira só o link desta pasta e só o bloco. As mensagens da CLI usam `out.cmd`
-  (`server/cli/saida.js`); as telas e os logs seguem com `./dashboard`. `scripts/completar.bash` é estático, lê o
-  `~/.ssh/config` sem rodar `ssh` e só sugere nomes `[A-Za-z0-9_.-]`, sem passar o arquivo pelo `compgen -W` (ele
-  expandiria `$(...)`). `test/unit/autocomplete.test.js` confere comandos e opções contra o código.
+- **Entrada por chave** ([ADR 0021](docs/adr/0021-instalacao-em-servidor-so-com-chave.md)): o apelido do
+  `~/.ssh/config` é lido sem conectar (`ssh -G`) e só os valores dele vão para o comando. `ProxyJump` e `ProxyCommand`
+  são recusados. A senha do sudo vai só pelo stdin. O painel nunca altera o `sshd_config`.
+- **Comando no PATH e autocomplete** (ADRs [0028](docs/adr/0028-comando-no-path-por-link-simbolico.md) e
+  [0029](docs/adr/0029-autocomplete-estatico-do-bash.md)): o link `~/.local/bin/dashboard` nunca sobrescreve outro
+  programa. O arquivo de login e o `~/.bashrc` só mudam com o sim, com cópia antes e bloco marcado. O `desinstalar`
+  tira só o link desta pasta e só o bloco. `scripts/completar.bash` é estático e nunca passa o `~/.ssh/config` pelo
+  `compgen -W`. As mensagens da CLI usam `out.cmd`.
 - **Versões assinadas** (ADR 0012): o instalador e o `./dashboard atualizar` só aceitam tags assinadas por uma chave
   de `docs/allowed_signers`, e com o nome gravado dentro da tag igual ao da ref (`verifyTag`, motivo `nome-trocado`,
 #155).
 - **Versão nova** ([ADR 0030](docs/adr/0030-atualizacao-pelo-painel.md)): o painel procura 1 vez por dia, em processo
-  à parte (`server/atualizacao/procurar.js`, `nice -n 19`, `git fetch --tags origin`, `GIT_TERMINAL_PROMPT=0`,
-  `BatchMode=yes`). É a única saída para a internet. Só vale tag assinada (`newestSignedTag`, as chaves da versão
-  instalada). As novidades vêm do CHANGELOG da tag, como texto. O `createApp` sem `procurarVersao` não sai da máquina:
-  testes nunca fazem fetch.
-- **Troca de versão pela tela** (ADRs [0031](docs/adr/0031-botao-atualizar-executor-fora-do-servico.md) e
-  [0032](docs/adr/0032-dashboard-atualizar-abre-o-painel.md), I11): `POST /api/atualizacao/iniciar` só compara a
-  versão do pedido com a detectada e dispara o comando fixo `dashboard atualizar --registro` fora do serviço
-  (`systemd-run --user` ou `spawn` com `detached`), sem shell e sem dado da tela. Exige sessão e a pasta da instalação
-  (#118). Log, estado e trava com PID ficam em `.atualizacao/`, fora de `data/`, porque a volta atrás apaga `data/`.
-  O serviço escreve só em `data/` e em `.atualizacao/painel/` (`pedido.json` e `espelho.git`, ADR 0051); o resto
-  da `.atualizacao/` é do executor. A procura de versão faz o fetch no espelho bare, nunca no `.git`, e o executor
-  nunca usa o espelho (regra estática). Sem escrita em `painel/`, a rota responde 503 com `motivo: sem-escrita`.
-  `dashboard atualizar` só abre o link de uso único com `#/visao-geral?atualizar=1`; quem troca é o clique. Sem tela,
-  sem login ou com o painel parado, segue no terminal (`--terminal` força). O `--pre` pela tela é o arquivo
-  `.atualizacao/pre.json` (30 min).
-- **Reconfigurar pela tela** (ADRs [0034](docs/adr/0034-reconfigurar-pela-tela-processo-a-parte.md) a
-  [0039](docs/adr/0039-dashboard-reconfigurar-abre-o-painel.md), F8, I11): o assistente segue em processo à parte,
-  porque recebe a senha do administrador. `dashboard reconfigurar --pela-tela` (opção interna, comando fixo) lê o hash
-  do código em `data/reconfigurar.json` (0600, 5 min, sai do disco ao ser lido) e recusa antes de parar o painel se
-  faltar código, houver atualização em andamento ou a versão não conferir. Nunca troca a versão da pasta. A cópia do
-  `.env` e do `data/ssh/` fica só na memória e nunca vai ao disco. Cancelar (`POST /api/configurar/cancelar`),
-  `SIGTERM`, 15 min parado ou falha ao subir o assistente restauram a cópia e religam o painel. O painel novo só vale
-  depois de responder em `/api/session`; senão o comando o para, restaura, religa o painel e o "iniciar com o
-  computador", e sai com código 1 (motivo em `data/reconfigurar.log`).
-- **Disparo do reconfigurar** (ADR 0036, I11): `POST /api/reconfigurar/iniciar` não lê nada do pedido, exige sessão e
-  usa o executor da troca de versão (unidade `server-dashboard-reconfigurar`). Barra antes de criar o código: sem
-  login, atualização em andamento, fora da pasta da instalação ou sem tag assinada. Depois de disparar, nada mais
-  dispara por 1 min; executor que não sobe tira o código do disco. Detalhes da espera e do motivo na tela: ADRs 0037 e
-  0038. `dashboard reconfigurar` sem opção e com o painel no ar só abre o link de uso único com
-`#/visao-geral?reconfigurar=1` (ADR 0039); nos outros casos segue pelo caminho de antes.
+  à parte. É a única saída para a internet. Só vale tag assinada, e as novidades entram como texto. O `createApp` sem
+  `procurarVersao` não sai da máquina: testes nunca fazem fetch.
+- **Troca de versão pela tela** (ADRs [0031](docs/adr/0031-botao-atualizar-executor-fora-do-servico.md),
+  [0032](docs/adr/0032-dashboard-atualizar-abre-o-painel.md) e
+  [0051](docs/adr/0051-servico-escreve-so-em-painel-e-procura-por-espelho.md), I11): a rota só compara a versão e
+  dispara um comando fixo fora do serviço, sem shell e sem dado da tela; exige sessão e a pasta da instalação. O
+  serviço escreve só em `data/` e em `.atualizacao/painel/`; o resto da `.atualizacao/` é do executor, que nunca usa o
+  espelho. `dashboard atualizar` só abre o link de uso único; quem troca é o clique.
+- **Reconfigurar pela tela** (ADRs [0034](docs/adr/0034-reconfigurar-pela-tela-processo-a-parte.md),
+  [0035](docs/adr/0035-copia-da-configuracao-fica-na-memoria.md),
+  [0036](docs/adr/0036-reconfigurar-pela-tela-disparo-pelo-painel.md) e
+  [0039](docs/adr/0039-dashboard-reconfigurar-abre-o-painel.md); espera e motivo na tela: 0037 e 0038; I11): o
+  assistente roda em processo à parte, porque recebe a senha do administrador. A rota não lê nada do pedido e exige
+  sessão. O código é de uso único e só o hash dele vai ao disco. Tudo o que pode recusar vem antes de parar o painel.
+  A cópia do `.env` e do `data/ssh/` fica só na memória. Desistir ou falhar restaura a configuração e religa o painel.
+  Nunca troca a versão da pasta.
 - **Code scanning** (CodeQL do GitHub, suíte `extended`, a cada push): todo alerta é corrigido ou descartado como
   falso positivo com a análise em `docs/seguranca/` e, se possível, um teste que falhe na forma errada. Não aplique a
   sugestão do CodeQL sem conferir o formato real (ex.: o escape do `authorized_keys` segue o `opt_dequote`, não o
   padrão genérico).
-- **Verificação em camadas** (redundante de propósito):
-  1. `test/seguranca/` roda em todo `npm run check`: regras estáticas (`invariantes-estaticas`), matriz de ataque
-     gerada das rotas reais (`superficie-ataque`), corpus OWASP (`payloads-owasp`), segredos e OSINT no que vai para o
-     repositório público (`segredos-osint`) e cadeia de suprimentos, com o hash dourado do script de coleta
-     (`cadeia-suprimentos`).
-  2. `npm run seguranca` (`scripts/seguranca.mjs`): Semgrep, Gitleaks (arquivos, sem `.runtime/`, e histórico),
-     ShellCheck, OSV-Scanner e OWASP ZAP (ataque ativo e autenticado a um painel de teste), em imagens Docker presas
-     por digest; e a mutação dos guardas (`scripts/mutacao-seguranca.mjs`): cada proteção é quebrada numa cópia e
-     algum teste precisa acusar. Achado médio ou alto só passa com análise em `docs/seguranca/excecoes.json`. Só
-     algumas etapas: `--so=semgrep,shell` ou `--pular=zap` (etapas: `semgrep`, `segredos`, `shell`, `osv`, `zap`,
-     `mutacao`; nome errado sai com erro). A mutação corre ao lado das etapas Docker, com até 4 rodadas em paralelo
-     (ADR 0040). Cada etapa e cada rodada (60 s) têm limite de tempo; a rodada presa repete 1 vez e, se prender de
-     novo, reprova com o nome da mutação e do teste (ADR 0041). `MUTACAO_PARALELO` e `MUTACAO_LIMITE_S` ajustam os 2.
-  3. CI no GitHub (ADRs 0014 e 0040, `.github/workflows/seguranca.yml`), a cada push no `main` e a cada PR:
-     `npm run check`, `npm run test:e2e` com `E2E_OBRIGATORIO=1` (sem navegador, falha em vez de pular) e
-     `npm run seguranca`, em 4 jobs ao mesmo tempo (a mutação num só dela). O job `verificacao` (o check obrigatório)
-     só passa com os 4 verdes; toda etapa tem `timeout-minutes`. O job `check` também gera o `.deb` 2 vezes e compara
-     (ADR 0049); `.github/workflows/pacote.yml` confere o `.deb` de cada Release contra o `SHA256SUMS` assinado.
-     Decisões e tempos: `docs/seguranca/2026-11-04-auditoria-ci.md`. Actions presas por SHA, permissão só de leitura,
-     sem segredos.
-  4. Ferramentas do GitHub (ADRs 0016 e 0017): Dependency Review em todo PR (reprova vulnerabilidade moderada ou pior
-     e licença incompatível), OpenSSF Scorecard (`scorecard.yml`; alertas sem correção em
-     `docs/seguranca/2026-10-19-scorecard.md`), Dependabot semanal com 14 dias de espera, secret scanning com push
-     protection. Só actions do GitHub e a `ossf/scorecard-action`, presas por SHA; PR de fora só roda o CI com
-     aprovação; o PR só entra no `main` atualizado.
+- **Verificação em camadas** (redundante de propósito,
+  [ADR 0014](docs/adr/0014-verificacao-de-seguranca-continua.md)): `test/seguranca/` em todo `npm run check`;
+  `npm run seguranca` (ferramentas externas em Docker e mutação dos guardas); os 2 no CI, a cada push no `main` e a
+  cada PR, com o check obrigatório `verificacao`; e as ferramentas do GitHub. Achado médio ou alto só passa com
+  análise em `docs/seguranca/excecoes.json`. Etapas, opções e limites:
+  [docs/referencia/verificacao-de-seguranca.md](docs/referencia/verificacao-de-seguranca.md).
 
 ## Desenvolvimento (obrigatório)
 
