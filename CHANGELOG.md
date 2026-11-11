@@ -9,6 +9,10 @@ diante: `PATCH` corrige, `MINOR` acrescenta sem quebrar e `MAJOR` quebra.
 
 ## [Não publicado]
 
+## [2.6.6] — 2026-11-11
+
+Versão de manutenção para quem desenvolve o painel: a varredura do OWASP ZAP no `npm run seguranca` não depende mais da internet, e um travamento de download deixa de derrubar a etapa. Nada muda no painel, na configuração, no formato de `data/` nem no acesso ao servidor.
+
 ### Corrigido
 - Desenvolvimento: a etapa do OWASP ZAP do `npm run seguranca` passou do limite de 300 s uma vez no CI do `main`. O ZAP baixava da internet, a cada execução, cerca de 90 MB de add-ons, fora do digest fixado da imagem, e o download da imagem contava no limite da varredura. Agora o ZAP roda sem rede (`-silent`) e só as regras passivas beta vêm de fora, de URL e SHA-256 fixos, com cada regra conferida na saída. A imagem de cada etapa é baixada antes, com limite próprio e 1 repetição. Os tetos internos do ZAP somam menos que o limite, e a saída dele, com a hora de cada fase, fica em `.seguranca/zap.log` e vai para o log do CI se a etapa falhar. O arquivo baixado só vai para o disco depois de bater com o SHA-256 (análise dos alertas 29 e 30 do CodeQL em `docs/seguranca/`) (ADR 0054, #202).
 
@@ -1473,7 +1477,8 @@ Documentados no plano da V2 (seção 2.2, B1–B12), entre eles: alerta SMART fa
 rede zerada com contadores grandes, alerta duplicado a cada coleta e reescrita completa do
 histórico a cada minuto.
 
-[Não publicado]: https://github.com/tsouza-thiago/linux-server-dashboard-v2/compare/v2.6.5...HEAD
+[Não publicado]: https://github.com/tsouza-thiago/linux-server-dashboard-v2/compare/v2.6.6...HEAD
+[2.6.6]: https://github.com/tsouza-thiago/linux-server-dashboard-v2/compare/v2.6.5...v2.6.6
 [2.6.5]: https://github.com/tsouza-thiago/linux-server-dashboard-v2/compare/v2.6.4...v2.6.5
 [2.6.4]: https://github.com/tsouza-thiago/linux-server-dashboard-v2/compare/v2.6.3...v2.6.4
 [2.6.3]: https://github.com/tsouza-thiago/linux-server-dashboard-v2/compare/v2.6.2...v2.6.3
