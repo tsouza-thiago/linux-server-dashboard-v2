@@ -1,5 +1,5 @@
 // Agregados de 5 min: só baldes completos, consulta por intervalo, 90 dias e linhas ruins.
-import { pastaTemp } from '../../test-support/limpeza.js';
+import { aoFim, pastaTemp } from '../../test-support/limpeza.js';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
@@ -94,6 +94,9 @@ test('History: reinício depois de parado fecha os baldes pendentes', async (t) 
 
 test('History.buckets: dentro da janela bruta usa amostras de 1 min e preserva o pico', (t) => {
   const h = new History({ dataDir: tmp(t), log: silent });
+  // A fila grava depois do teste: sem esperar, a limpeza apagava a pasta com um arquivo nascendo
+  // nela (ENOTEMPTY, #197). O aoFim roda antes de apagar a pasta, mesmo se uma asserção falhar.
+  aoFim(t, () => h.flush());
   for (let i = 0; i < 120; i++) h.append(sample(i, i === 61 ? 95 : 40));
   const r = h.buckets({ fromMs: BASE, toMs: Date.parse(at(119)), maxPoints: 60 });
   assert.equal(r.step, 2 * MIN);
@@ -126,6 +129,7 @@ test('History.buckets: antes da janela bruta junta agregados + bruto sem sobrepo
 
 test('History.buckets: sem dados devolve lista vazia; maxPoints é limitado', (t) => {
   const h = new History({ dataDir: tmp(t), log: silent });
+  aoFim(t, () => h.flush());
   const r = h.buckets({ fromMs: BASE, toMs: BASE + DAY_MS, maxPoints: 999999 });
   assert.deepEqual(r.buckets, []);
   assert.equal(r.step, ROLLUP_STEP_MS);
@@ -176,4 +180,19 @@ test('#78: RollupStore.each entrega os baldes do período, dia a dia, sem duplic
   r.each(BASE, BASE + DAY_MS, (b) => seen.push([b.t - BASE, b.n]));
   assert.deepEqual(seen, [[0, 1], [ROLLUP_STEP_MS, 2], [DAY_MS, 3]], 'período fechado nas pontas; 1ª linha do mesmo t');
   assert.deepEqual(r.query(0, BASE + 2 * DAY_MS).map((b) => b.n), [1, 2, 3, 4], 'query: a mesma leitura, em lista ordenada');
+});
+
+// Regressão da #197: o append só enfileira a gravação. Teste que grava e não espera a fila
+// deixa a limpeza apagar a pasta com um arquivo nascendo nela (ENOTEMPTY, de vez em quando).
+test('#197: todo teste que grava no History espera a fila antes da limpeza', () => {
+  const pasta = path.dirname(new URL(import.meta.url).pathname);
+  const semEspera = [];
+  for (const arquivo of fs.readdirSync(pasta).filter((f) => f.endsWith('.test.js'))) {
+    const fonte = fs.readFileSync(path.join(pasta, arquivo), 'utf8');
+    for (const bloco of fonte.split(/\n(?=test\()/)) {
+      if (!bloco.startsWith('test(') || !bloco.includes('new History(') || !bloco.includes('.append(')) continue;
+      if (!bloco.includes('flush()')) semEspera.push(`${arquivo}: ${bloco.slice(0, bloco.indexOf('\n'))}`);
+    }
+  }
+  assert.deepEqual(semEspera, []);
 });
