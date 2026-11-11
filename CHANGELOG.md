@@ -11,7 +11,11 @@ diante: `PATCH` corrige, `MINOR` acrescenta sem quebrar e `MAJOR` quebra.
 
 ### Alterado
 - Documentação: o `AGENTS.md` ficou só com o que vale em toda sessão (regras, desenvolvimento, arquitetura e comandos). Configuração, comando de coleta, formato da amostra, persistência, API, alertas, orçamento de desempenho e solução de problemas foram para `docs/referencia/`, um arquivo por tema, sem mudança de sentido. O `AGENTS.md` ganhou a tabela "Referência sob demanda", que aponta para cada um, e caiu de 52 KB para 29 KB. O `test/unit/docs.test.js` confere os arquivos novos como conferia o `AGENTS.md` (#191).
+- Testes: o `test/unit/docs.test.js` guarda a divisão do `AGENTS.md`. A tabela "Referência sob demanda" cita todo arquivo de `docs/referencia/`, o `AGENTS.md` fica só com as seções de toda sessão e em até 32 KB, cada arquivo da referência tem título e link de volta, e o `CLAUDE.md` não repete o `AGENTS.md` (#194).
 - Documentação: a seção "Regras" do `AGENTS.md` caiu de 15,7 KB para 11 KB, sem perder regra. Saíram os itens iniciais que repetiam a tabela de invariantes (I1 a I7); ficaram as regras de conduta que a tabela não traz. Os itens de "Regras de segurança" que resumiam uma ADR ficaram com a regra e o link da ADR; o detalhe que a ADR não cobre continua no `AGENTS.md`. O detalhe da "Verificação em camadas" foi para `docs/referencia/verificacao-de-seguranca.md`, sem mudança de sentido (#192).
+
+### Corrigido
+- Testes: 2 testes do histórico gravavam e terminavam sem esperar a fila de gravação. De vez em quando, a limpeza apagava a pasta temporária com um arquivo nascendo nela e o `npm run check` falhava com `ENOTEMPTY`. Agora os 2 esperam a fila, e um teste novo acusa qualquer teste que grave no histórico sem esperar (#197).
 
 ## [2.6.4] — 2026-11-07
 
