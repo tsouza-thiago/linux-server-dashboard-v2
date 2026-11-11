@@ -15,6 +15,21 @@ const ROOT = path.join(path.dirname(fileURLToPath(import.meta.url)), '..');
 // investigada se a saída inteira sobreviver ao terminal e ao relatório resumido.
 export const LOG_FALHA = path.join('.check', 'ultima-falha.log');
 
+/**
+ * Com Node mais antigo que o mínimo do package.json (engines), devolve a mensagem de erro;
+ * senão, null. Com o Node 22, a suíte rodava e 7 testes falhavam sem apontar a causa (#195).
+ */
+export function nodeAntigo(versao = process.versions.node, engines = JSON.parse(fs.readFileSync(path.join(ROOT, 'package.json'), 'utf8')).engines.node) {
+  const minimo = Number(String(engines).match(/\d+/)?.[0]);
+  const major = Number(String(versao).split('.')[0]);
+  if (Number.isInteger(minimo) && Number.isInteger(major) && major >= minimo) return null;
+  return [
+    `ERRO: o npm run check precisa do Node.js ${minimo} ou mais novo; este é o ${versao}.`,
+    `Instale o Node.js ${minimo}. Se o ./dashboard já baixou o dele, rode:`,
+    '  PATH="$PWD/.runtime/node/bin:$PATH" npm run check',
+  ].join('\n');
+}
+
 /** Roda um comando na raiz (sem shell) e devolve o resultado do spawnSync. */
 function run(cmd, args, opts = {}) {
   return spawnSync(cmd, args, { cwd: ROOT, encoding: 'utf8', ...opts });
@@ -123,8 +138,11 @@ const steps = [
 // chamado pela linha de comando (os testes importam testesQueFalharam sem rodar o check).
 const isCLI = process.argv[1] && fileURLToPath(import.meta.url) === path.resolve(process.argv[1]);
 if (isCLI) {
-  let failed = false;
-  for (const step of steps) {
+  // Antes de tudo: com o Node errado, nenhuma etapa diz a verdade.
+  const erroDoNode = nodeAntigo();
+  if (erroDoNode) console.error(erroDoNode);
+  let failed = Boolean(erroDoNode);
+  for (const step of failed ? [] : steps) {
     const { ok, detail } = step.fn();
     console.log(`${ok ? '✓' : '✗'} ${step.name} — ${detail}`);
     if (!ok) { failed = true; break; }
