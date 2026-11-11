@@ -80,10 +80,28 @@ test('A08: o script de coleta é byte a byte o da v2.0.0 (o authorized_keys do s
 
 test('A03: as ferramentas de segurança rodam em imagens presas por digest sha256', () => {
   const src = ler('scripts/seguranca.mjs');
-  const imagens = [...src.matchAll(/^\s+\w+: '([^']+)',$/gm)].map((m) => m[1]).filter((i) => i.includes('/'));
+  const bloco = src.match(/^const IMG = \{\n([\s\S]*?)\n\};$/m);
+  assert.ok(bloco, 'bloco const IMG');
+  const imagens = [...bloco[1].matchAll(/^\s+\w+: '([^']+)',$/gm)].map((m) => m[1]);
   assert.ok(imagens.length >= 5, `imagens: ${imagens.length}`);
   for (const img of imagens) assert.match(img, /@sha256:[0-9a-f]{64}$/, `${img} sem digest`);
   assert.doesNotMatch(src, /:latest\b/);
+});
+
+// #202: o ZAP não baixa add-on da internet durante a varredura (`-silent`, sem `-addonupdate`).
+// O único arquivo de fora é o das regras passivas beta, com URL e SHA-256 fixos, e cada regra
+// dele precisa aparecer na saída (senão o add-on não carregou e a cobertura caiu em silêncio).
+test('A03: o ZAP roda sem rede e o add-on beta é preso por SHA-256', () => {
+  const src = ler('scripts/seguranca.mjs');
+  assert.match(src, /'-z', '-silent /, 'ZAP com -silent');
+  assert.doesNotMatch(src, /addonupdate'|'-addoninstall/, 'nenhum add-on baixado pelo ZAP');
+  const beta = src.match(/^const ZAP_BETA = \{\n([\s\S]*?)\n\};$/m);
+  assert.ok(beta, 'bloco const ZAP_BETA');
+  assert.match(beta[1], /url: 'https:\/\/github\.com\/zaproxy\/zap-extensions\/releases\/download\/[^']+',/);
+  assert.match(beta[1], /sha256: '[0-9a-f]{64}',/);
+  assert.match(beta[1], /regras: \[\d+(, \d+)+\],/);
+  assert.match(src, /:\/zap\/plugin\/\$\{ZAP_BETA\.arquivo\}:ro/, 'add-on montado só leitura');
+  assert.match(src, /ok: [^\n]*semBeta\.length === 0/, 'regra beta ausente reprova');
 });
 
 // As imagens base do e2e de instalação também: uma tag (debian:12) pode passar a apontar para

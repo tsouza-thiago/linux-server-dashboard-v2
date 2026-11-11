@@ -9,6 +9,9 @@ diante: `PATCH` corrige, `MINOR` acrescenta sem quebrar e `MAJOR` quebra.
 
 ## [Não publicado]
 
+### Corrigido
+- Desenvolvimento: a etapa do OWASP ZAP do `npm run seguranca` passou do limite de 300 s uma vez no CI do `main`. O ZAP baixava da internet, a cada execução, cerca de 90 MB de add-ons, fora do digest fixado da imagem, e o download da imagem contava no limite da varredura. Agora o ZAP roda sem rede (`-silent`) e só as regras passivas beta vêm de fora, de URL e SHA-256 fixos, com cada regra conferida na saída. A imagem de cada etapa é baixada antes, com limite próprio e 1 repetição. Os tetos internos do ZAP somam menos que o limite, e a saída dele, com a hora de cada fase, fica em `.seguranca/zap.log` e vai para o log do CI se a etapa falhar (ADR 0054, #202).
+
 ## [2.6.5] — 2026-11-11
 
 Versão de manutenção para quem desenvolve o painel: o `AGENTS.md` ficou com a metade do tamanho, com a referência em `docs/referencia/`; o `npm run check` avisa quando o Node é antigo; um teste instável do histórico foi corrigido. Nada muda no painel, na configuração, no formato de `data/` nem no acesso ao servidor.

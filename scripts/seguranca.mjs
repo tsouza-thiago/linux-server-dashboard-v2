@@ -21,7 +21,8 @@
 //
 // Tempo (#128): a mutação (só CPU, sem Docker) corre ao lado das etapas Docker, que seguem
 // uma por vez. Cada etapa tem um limite próprio (`limite`, em segundos, ~4× o medido no CI):
-// a que passa dele é derrubada e reprova com o nome, em vez de prender o job até o teto.
+// a que passa dele é derrubada e reprova com o nome, em vez de prender o job até o teto. O
+// download da imagem vem antes e fica fora desse limite, com o dele (#202).
 //
 // Uso: npm run seguranca [-- --so=semgrep,zap] [-- --pular=zap]
 // Relatórios brutos: .seguranca/ (fora do git, só o dono lê).
@@ -47,6 +48,20 @@ const IMG = {
   zap: 'ghcr.io/zaproxy/zaproxy@sha256:5ccfff9a411743ab2615136a2edd7416bec9ce41572fa94e935df38c14adb2b6',
 };
 
+// Regras passivas beta do ZAP (#202). A imagem estável não as traz, e o scan empacotado as
+// baixaria a cada execução junto com ~90 MB de atualizações (`-addonupdate`), da internet e sem
+// versão fixa. O ZAP roda com `-silent` (sem rede) e só este arquivo vem de fora: URL e SHA-256
+// fixos, como as imagens. Trocar de versão é um commit consciente; a 50 exige commonlib
+// >= 1.40, e a imagem traz a 1.44.
+const ZAP_BETA = {
+  arquivo: 'pscanrulesBeta-beta-50.zap',
+  url: 'https://github.com/zaproxy/zap-extensions/releases/download/pscanrulesBeta-v50/pscanrulesBeta-beta-50.zap',
+  sha256: 'a979f7cd5d8be10e0338b417e006ec1e2f6ec79101010d570ddb5199892e921b',
+  // As 6 regras do arquivo: cada uma precisa aparecer na saída do ZAP (passou ou alertou), senão
+  // o add-on não carregou e a cobertura caiu em silêncio.
+  regras: [10026, 10049, 10063, 10099, 10110, 90004],
+};
+
 const SEMGREP_REGRAS = ['p/owasp-top-ten', 'p/nodejs', 'p/javascript', 'p/xss', 'p/command-injection', 'p/secrets'];
 
 // ---------------------------------------------------------------- utilidades
@@ -68,7 +83,7 @@ function rodar(cmd, args, opts = {}) {
  * ganha um nome próprio, para o limite parar o contêiner, e não só o cliente do Docker.
  */
 let conteineres = 0;
-function executar(cmd, args, { limiteS, env } = {}) {
+function executar(cmd, args, { limiteS, env, registro } = {}) {
   let nome = null;
   if (cmd === 'docker' && args[0] === 'run') {
     conteineres += 1;
@@ -80,8 +95,12 @@ function executar(cmd, args, { limiteS, env } = {}) {
     let stdout = '';
     let stderr = '';
     let estourou = false;
-    p.stdout.on('data', (c) => { stdout += c; });
-    p.stderr.on('data', (c) => { stderr += c; });
+    const inicio = Date.now();
+    // `registro`: cada pedaço da saída, com os segundos desde o início, para saber em que fase
+    // um comando demorado gastou o tempo (#202).
+    const anotar = (c) => { if (registro) registro.push(`[${Math.round((Date.now() - inicio) / 1000)} s] ${`${c}`.trimEnd()}`); };
+    p.stdout.on('data', (c) => { stdout += c; anotar(c); });
+    p.stderr.on('data', (c) => { stderr += c; anotar(c); });
     const teto = limiteS && setTimeout(() => {
       estourou = true;
       if (nome) spawnSync('docker', ['rm', '-f', nome], { stdio: 'ignore' });
@@ -97,6 +116,45 @@ function executar(cmd, args, { limiteS, env } = {}) {
 
 /** Resultado de uma etapa derrubada pelo limite. */
 const estourou = (limiteS) => ({ ok: false, detalhe: `passou do limite de ${limiteS} s e foi derrubada`, novos: [] });
+
+/**
+ * Baixa a imagem antes da etapa, com limite próprio e 1 repetição (#202): o download (a do ZAP
+ * tem 3,7 GB) depende da rede e não pode consumir o limite da ferramenta. Já presente, não baixa.
+ */
+async function baixarImagem(img, limiteS = 150) {
+  if (rodar('docker', ['image', 'inspect', '--format', '{{.Id}}', img]).status === 0) return { ok: true, s: 0 };
+  const inicio = Date.now();
+  let r;
+  for (let tentativa = 1; tentativa <= 2; tentativa += 1) {
+    r = await executar('docker', ['pull', '--quiet', img], { limiteS });
+    if (r.status === 0 && !r.estourou) return { ok: true, s: Math.round((Date.now() - inicio) / 1000) };
+  }
+  const motivo = r.estourou ? `passou do limite de ${limiteS} s` : (r.stderr || '').trim().split('\n').pop();
+  return { ok: false, detalhe: `download da imagem falhou 2 vezes (${motivo})` };
+}
+
+/**
+ * Arquivo de fora com SHA-256 fixo, guardado em .seguranca/cache/. Confere o hash a cada uso e
+ * baixa de novo se faltar ou não bater (limite de 60 s, 1 repetição). Devolve o caminho ou null.
+ */
+async function arquivoFixado({ arquivo, url, sha256 }) {
+  const cache = path.join(OUT, 'cache');
+  fs.mkdirSync(cache, { recursive: true, mode: 0o700 });
+  const destino = path.join(cache, arquivo);
+  const confere = (buf) => crypto.createHash('sha256').update(buf).digest('hex') === sha256;
+  if (fs.existsSync(destino) && confere(fs.readFileSync(destino))) return destino;
+  for (let tentativa = 1; tentativa <= 2; tentativa += 1) {
+    try {
+      const res = await fetch(url, { signal: AbortSignal.timeout(60_000) });
+      const buf = Buffer.from(await res.arrayBuffer());
+      if (res.ok && confere(buf)) {
+        fs.writeFileSync(destino, buf, { mode: 0o600 });
+        return destino;
+      }
+    } catch { /* rede: tenta de novo */ }
+  }
+  return null;
+}
 
 const temDocker = () => rodar('docker', ['version', '--format', '{{.Server.Version}}']).status === 0;
 
@@ -275,7 +333,13 @@ async function openapi(base) {
  * nome). Varredura passiva + ativa, com teto de tempo. Reprova risco médio ou alto novo.
  */
 async function zap({ limite }) {
+  const beta = await arquivoFixado(ZAP_BETA);
+  if (!beta) return { ok: false, detalhe: `${ZAP_BETA.arquivo}: download falhou ou o SHA-256 não confere` };
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'dash-zap-'));
+  // Cópia legível pelo usuário "zap" do contêiner (o cache é 0600), montada só leitura.
+  const betaMontado = path.join(dir, ZAP_BETA.arquivo);
+  fs.copyFileSync(beta, betaMontado);
+  fs.chmodSync(betaMontado, 0o644);
   const token = crypto.randomBytes(24).toString('hex');
   let reconfiguracoes = 0;
   const { createApp } = await import('../server/index.js');
@@ -310,22 +374,32 @@ async function zap({ limite }) {
   // scans empacotados; o `-z` quebraria o valor no espaço). O token vai pelo ambiente do
   // `docker run`, não pela linha de comando do processo.
   // Limite da etapa: se o ZAP travar, o contêiner (com nome próprio) é derrubado e a etapa
-  // reprova com o limite, em vez de o `npm run seguranca` esperar para sempre. A varredura
-  // ativa tem o próprio teto, abaixo do limite, para terminar com relatório se demorar.
+  // reprova com o limite, em vez de o `npm run seguranca` esperar para sempre. Os tetos
+  // internos somam menos que o limite (#202), para o ZAP terminar com relatório ou com erro
+  // próprio: partida e varredura passiva até 1 min cada (`-T 1`) e ativa até 2 min.
+  const registro = [];
   const r = await executar('docker', ['run', '--rm', '--network', 'host', '-v', `${wrk}:/zap/wrk:rw`,
+      '-v', `${betaMontado}:/zap/plugin/${ZAP_BETA.arquivo}:ro`,
       '-e', 'ZAP_AUTH_HEADER=Authorization', '-e', 'ZAP_AUTH_HEADER_VALUE', '-e', 'ZAP_AUTH_HEADER_SITE=127.0.0.1',
       IMG.zap, 'zap-api-scan.py', '-t', '/zap/wrk/openapi.json', '-f', 'openapi', '-J', 'zap.json',
-      // Com --network host, o ZAP escutaria em todas as interfaces e com a API sem chave (padrão
-      // dos scans empacotados): `-host 127.0.0.1` prende proxy e API no loopback durante a
-      // varredura. (A lista api.addrs fica como o scan a quer: o script fala com a API pelo
-      // nome "zap".)
-      '-z', '-host 127.0.0.1 -config ascan.maxScanDurationInMins=3'],
-  { limiteS: limite, env: { ...process.env, ZAP_AUTH_HEADER_VALUE: `Bearer ${token}` } });
+      // `-d`: cada fase com hora em .seguranca/zap.log (o token não aparece nele).
+      '-d', '-T', '1',
+      // `-silent`: sem atualizar nem instalar add-on da internet; valem os da imagem fixada e o
+      // beta acima. Com --network host, o ZAP escutaria em todas as interfaces e com a API sem
+      // chave (padrão dos scans empacotados): `-host 127.0.0.1` prende proxy e API no loopback
+      // durante a varredura. (A lista api.addrs fica como o scan a quer: o script fala com a
+      // API pelo nome "zap".)
+      '-z', '-silent -host 127.0.0.1 -config ascan.maxScanDurationInMins=2'],
+  { limiteS: limite, env: { ...process.env, ZAP_AUTH_HEADER_VALUE: `Bearer ${token}` }, registro });
+  guardar('zap.log', registro.join('\n'));
   await app.shutdown();
   await new Promise((resolve) => server.close(resolve));
+  // As últimas linhas do ZAP vão para o log, e não só para .seguranca/zap.log: no CI, o
+  // arquivo some com a máquina, e elas dizem em que fase o tempo foi gasto (#202).
+  const ultimas = () => registro.join('\n').split('\n').filter(Boolean).slice(-8).map((texto) => ({ texto }));
   if (r.estourou) {
     fs.rmSync(dir, { recursive: true, force: true });
-    return estourou(limite);
+    return { ...estourou(limite), novos: ultimas() };
   }
   let dados;
   try {
@@ -334,7 +408,7 @@ async function zap({ limite }) {
     dados = JSON.parse(bruto);
   } catch {
     fs.rmSync(dir, { recursive: true, force: true });
-    return { ok: false, detalhe: `sem relatório (saída ${r.status}): ${r.stderr.trim().split('\n').pop() || '?'}` };
+    return { ok: false, detalhe: `sem relatório (saída ${r.status})`, novos: ultimas() };
   }
   fs.rmSync(dir, { recursive: true, force: true });
   const alertas = (dados.site || []).flatMap((s) => s.alerts || []);
@@ -346,12 +420,14 @@ async function zap({ limite }) {
   const baixos = alertas.filter((a) => Number(a.riskcode) < 2).map((a) => `${a.pluginid} ${a.alert}`);
   guardar('zap-codigos.json', JSON.stringify(codigos));
   const total = Object.values(codigos).reduce((a, b) => a + b, 0);
+  const saida = registro.join('\n');
+  const semBeta = ZAP_BETA.regras.filter((id) => !saida.includes(`[${id}]`));
   const ok2xx = Object.entries(codigos).filter(([c]) => c.startsWith('2')).reduce((a, [, n]) => a + n, 0);
   // O ZAP precisa ter chegado ao executor falso do Reconfigurar pelo menos 1 vez: senão a rota
   // que para o painel ficou só nos bloqueios (409) e o ataque a ela foi raso.
   return {
-    ok: novos.length === 0 && ok2xx > 0 && reconfiguracoes > 0,
-    detalhe: `${novos.length} médios/altos novos · ${aceitos} analisados · ${baixos.length} baixos/informativos · ${total} pedidos (${ok2xx} com 2xx) · ${reconfiguracoes} disparo(s) do Reconfigurar falso`,
+    ok: novos.length === 0 && ok2xx > 0 && reconfiguracoes > 0 && semBeta.length === 0,
+    detalhe: `${semBeta.length ? `regras beta sem rodar: ${semBeta.join(', ')} · ` : ''}${novos.length} médios/altos novos · ${aceitos} analisados · ${baixos.length} baixos/informativos · ${total} pedidos (${ok2xx} com 2xx) · ${reconfiguracoes} disparo(s) do Reconfigurar falso`,
     novos,
   };
 }
@@ -375,7 +451,9 @@ async function mutacao({ limite }) {
 
 // `limite`: segundos até a etapa ser derrubada. Medido no CI em 04/11/2026 (run #229): Semgrep
 // 20 s, Gitleaks 5 s, ShellCheck 1 s, OSV 7 s, ZAP 56 s e mutação 137 s (antes do paralelo).
-// O Semgrep e o OSV baixam regras e a base de vulnerabilidades a cada vez: folga maior.
+// O Semgrep e o OSV baixam regras e a base de vulnerabilidades a cada vez: folga maior. Desde
+// a #202, o tempo do ZAP não conta o download da imagem nem o dos add-ons (24 s na máquina do
+// mantenedor, contra 37 s antes).
 const ETAPAS = [
   { nome: 'semgrep', titulo: 'análise estática OWASP (Semgrep)', docker: true, limite: 180, fn: semgrep },
   { nome: 'segredos', titulo: 'segredos no código e no histórico (Gitleaks)', docker: true, limite: 120, fn: segredos },
@@ -404,10 +482,18 @@ async function main() {
       console.log(`${noCI ? '✗' : '▲'} ${etapa.titulo} — sem Docker${noCI ? ' (obrigatório no CI)' : ': pulada'}`);
       return;
     }
+    // A imagem vem antes, fora do limite da etapa (#202); o tempo dela aparece à parte.
+    const imagem = etapa.docker ? await baixarImagem(IMG[etapa.nome]) : { ok: true, s: 0 };
+    if (!imagem.ok) {
+      resultados.set(etapa.nome, { ok: false });
+      console.log(`✗ ${etapa.titulo} — ${imagem.detalhe}`);
+      return;
+    }
     const inicio = Date.now();
     const { ok, detalhe, novos = [] } = await etapa.fn({ limite: etapa.limite });
     resultados.set(etapa.nome, { ok });
-    console.log(`${ok ? '✓' : '✗'} ${etapa.titulo} — ${detalhe} (${Math.round((Date.now() - inicio) / 1000)} s)`);
+    const download = imagem.s ? `; download da imagem: ${imagem.s} s` : '';
+    console.log(`${ok ? '✓' : '✗'} ${etapa.titulo} — ${detalhe} (${Math.round((Date.now() - inicio) / 1000)} s${download})`);
     for (const a of novos.slice(0, 20)) console.log(`    · ${resumo(a)}`);
   };
   // 2 filas ao mesmo tempo: as etapas Docker, uma por vez (disputam o mesmo daemon e a rede),
