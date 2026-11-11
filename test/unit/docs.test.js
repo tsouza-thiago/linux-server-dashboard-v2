@@ -417,3 +417,58 @@ test('github: formulários de issue, template de PR e CODEOWNERS seguem a ADR 00
   assert.match(read('.github/CODEOWNERS'), /^\* @tsouza-thiago$/m);
   assert.match(read('SECURITY.md'), /security\/advisories\/new/, 'SECURITY aponta o reporte privado');
 });
+
+// ---------------------------------------------------------------- AGENTS enxuto e referência sob demanda (#191, #194)
+
+// O CLAUDE.md importa o AGENTS.md inteiro em toda sessão de agente. Estes testes impedem que a
+// referência de consulta volte para ele ou que um arquivo dela fique fora do índice.
+const SECOES_DO_AGENTS = ['Referência sob demanda', 'Regras (obrigatórias)', 'Desenvolvimento (obrigatório)', 'Arquitetura', 'Comandos'];
+const TEMAS_DA_REFERENCIA = ['alertas', 'amostra', 'api', 'coleta', 'configuracao', 'desempenho', 'persistencia', 'solucao-de-problemas'];
+const AGENTS_MAX_KB = 32;
+
+/** Títulos de nível 2 (`## `) fora dos blocos de código. */
+const secoes = (md) => [...prose(md).matchAll(/^## (.+)$/gm)].map((m) => m[1].trim());
+
+test('docs: a tabela "Referência sob demanda" do AGENTS cita todo arquivo de docs/referencia, e só eles', () => {
+  const md = read('AGENTS.md');
+  const inicio = md.indexOf('## Referência sob demanda');
+  assert.ok(inicio > 0, 'seção "Referência sob demanda" no AGENTS');
+  const secao = md.slice(inicio, md.indexOf('\n## ', inicio + 3));
+  // Só as linhas da tabela: o texto e o link de cada uma apontam para o mesmo arquivo.
+  const citados = [];
+  for (const linha of secao.split('\n').filter((l) => l.startsWith('|'))) {
+    const m = linha.match(/\[([^\]]+)\]\(([^)]+)\)/);
+    if (!m) continue;
+    assert.equal(m[1], m[2], `texto e destino do link diferem: ${linha}`);
+    citados.push(m[2]);
+  }
+  assert.deepEqual([...citados].sort(), REF_DOCS, 'a tabela e a pasta docs/referencia/ têm os mesmos arquivos');
+  assert.equal(new Set(citados).size, citados.length, 'arquivo repetido na tabela');
+});
+
+test('docs: o AGENTS fica só com as seções de toda sessão e cabe no orçamento de tamanho', () => {
+  const md = read('AGENTS.md');
+  assert.deepEqual(secoes(md), SECOES_DO_AGENTS, 'seção de consulta vai para docs/referencia/, não para o AGENTS');
+  const kb = Buffer.byteLength(md) / 1024;
+  assert.ok(kb <= AGENTS_MAX_KB, `AGENTS.md com ${kb.toFixed(1)} KB (limite: ${AGENTS_MAX_KB} KB); mova o detalhe para docs/referencia/ ou para uma ADR`);
+});
+
+test('docs: cada arquivo de docs/referencia tem um título, conteúdo e o link de volta para o AGENTS', () => {
+  for (const tema of TEMAS_DA_REFERENCIA) assert.ok(REF_DOCS.includes(`${REF}/${tema}.md`), `falta ${REF}/${tema}.md`);
+  for (const file of REF_DOCS) {
+    const md = read(file);
+    assert.match(md, /^# \S/, `${file}: começa pelo título`);
+    assert.equal([...prose(md).matchAll(/^# /gm)].length, 1, `${file}: 1 título de nível 1`);
+    assert.ok(md.includes('](../../AGENTS.md)'), `${file}: link de volta para o AGENTS`);
+    assert.ok(Buffer.byteLength(md) > 400, `${file}: sem conteúdo`);
+    assert.match(file, /^docs\/referencia\/[a-z0-9-]+\.md$/, `${file}: nome em minúsculas, sem acento`);
+  }
+});
+
+test('docs: o CLAUDE.md importa o AGENTS e não repete o conteúdo dele', () => {
+  const md = read('CLAUDE.md');
+  assert.match(md, /^@AGENTS\.md$/m, 'linha de importação');
+  assert.doesNotMatch(md, /This file provides guidance/, 'sem o cabeçalho em inglês');
+  for (const s of secoes(read('AGENTS.md'))) assert.ok(!secoes(md).includes(s), `CLAUDE.md repete a seção "${s}"`);
+  assert.ok(Buffer.byteLength(md) <= 4096, 'CLAUDE.md só com os complementos (até 4 KB)');
+});
